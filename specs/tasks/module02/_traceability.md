@@ -18,7 +18,7 @@ This matrix ensures every requirement, component, and behavior from the Module 0
 | EmotionalState | UTL emotional state enum | TASK-M02-019 | `crates/context-graph-core/src/pulse.rs` | ☐ |
 | SuggestedAction | Cognitive pulse action enum | TASK-M02-020 | `crates/context-graph-core/src/pulse.rs` | ☐ |
 | StorageError | Storage operation error types | TASK-M02-025 | `crates/context-graph-storage/src/lib.rs` | ☐ |
-| TransitionTrigger | Johari transition trigger types | TASK-M02-012 | `crates/context-graph-core/src/johari.rs` | ☐ |
+| TransitionTrigger | Johari transition trigger types | TASK-M02-012 | `crates/context-graph-core/src/types/johari.rs` | ☐ |
 
 ### Core Structs
 
@@ -29,7 +29,7 @@ This matrix ensures every requirement, component, and behavior from the Module 0
 | NeurotransmitterWeights | Marblestone NT weight struct | TASK-M02-008 | `crates/context-graph-core/src/marblestone.rs` | ✅ |
 | GraphEdge | Graph edge with 13 Marblestone fields (replaces 7-field legacy struct) | TASK-M02-010 | `crates/context-graph-core/src/types/graph_edge.rs` | ✅ |
 | CognitivePulse | System cognitive state struct | TASK-M02-021 | `crates/context-graph-core/src/pulse.rs` | ☐ |
-| JohariTransition | Quadrant transition record | TASK-M02-012 | `crates/context-graph-core/src/johari.rs` | ☐ |
+| JohariTransition | Quadrant transition record | TASK-M02-012 | `crates/context-graph-core/src/types/johari.rs` | ☐ |
 
 ### Methods / Business Logic
 
@@ -52,11 +52,15 @@ This matrix ensures every requirement, component, and behavior from the Module 0
 | MemoryNode::validate() | Validate node constraints | TASK-M02-006 | ✅ |
 | NeurotransmitterWeights::for_domain() | Get domain-specific NT weights | TASK-M02-008 | ✅ |
 | NeurotransmitterWeights::compute_effective_weight() | Calculate effective weight | TASK-M02-008 | ✅ |
-| GraphEdge::new() | Create new graph edge | TASK-M02-011 | ☐ |
-| GraphEdge::get_modulated_weight() | Get NT-modulated weight | TASK-M02-011 | ☐ |
-| GraphEdge::apply_steering_reward() | Apply steering reward | TASK-M02-011 | ☐ |
-| GraphEdge::record_traversal() | Record edge traversal | TASK-M02-011 | ☐ |
-| GraphEdge::is_reliable_shortcut() | Check if reliable amortized shortcut | TASK-M02-011 | ☐ |
+| GraphEdge::new() | Create new graph edge | TASK-M02-011 | ✅ |
+| GraphEdge::with_weight() | Create edge with explicit weight | TASK-M02-011 | ✅ |
+| GraphEdge::get_modulated_weight() | Get NT-modulated weight | TASK-M02-011 | ✅ |
+| GraphEdge::apply_steering_reward() | Apply steering reward | TASK-M02-011 | ✅ |
+| GraphEdge::decay_steering() | Decay steering reward | TASK-M02-011 | ✅ |
+| GraphEdge::record_traversal() | Record edge traversal | TASK-M02-011 | ✅ |
+| GraphEdge::is_reliable_shortcut() | Check if reliable amortized shortcut | TASK-M02-011 | ✅ |
+| GraphEdge::mark_as_shortcut() | Mark edge as amortized shortcut | TASK-M02-011 | ✅ |
+| GraphEdge::age_seconds() | Get edge age in seconds | TASK-M02-011 | ✅ |
 | JohariQuadrant::valid_transitions() | Get valid transitions from quadrant | TASK-M02-012 | ☐ |
 | CognitivePulse::new() | Create new cognitive pulse | TASK-M02-022 | ☐ |
 | CognitivePulse::compute_suggested_action() | Compute suggested action | TASK-M02-022 | ☐ |
@@ -132,7 +136,7 @@ This matrix ensures every requirement, component, and behavior from the Module 0
 | Content size limit | ≤1MB | TASK-M02-006 | ☐ |
 | Embedding normalization | Must be normalized | TASK-M02-006 | ☐ |
 | NT weights range | [0.0, 1.0] each | TASK-M02-008 | ✅ |
-| Steering reward range | [-1.0, 1.0] | TASK-M02-011 | ☐ |
+| Steering reward range | [-1.0, 1.0] | TASK-M02-011 | ✅ |
 | Pulse metrics range | [0.0, 1.0] | TASK-M02-022 | ☐ |
 
 ### Marblestone Integration
@@ -143,7 +147,7 @@ This matrix ensures every requirement, component, and behavior from the Module 0
 | Excitatory/Inhibitory/Modulatory | Three-weight NT system | TASK-M02-008 | ✅ |
 | Amortized shortcuts | Learned shortcut edges | TASK-M02-010, TASK-M02-011 | ✅ (struct) |
 | Steering reward | [-1,1] reward signal | TASK-M02-010, TASK-M02-011 | ✅ (struct) |
-| Modulated weight calculation | NT-adjusted edge weights | TASK-M02-011 | ☐ |
+| Modulated weight calculation | NT-adjusted edge weights | TASK-M02-011 | ✅ |
 | Domain enum | Code/Legal/Medical/Creative/Research/General | TASK-M02-007 | ✅ |
 
 ### Error States
@@ -173,7 +177,7 @@ This matrix ensures every requirement, component, and behavior from the Module 0
 | ValidationError unit tests | Error display and context | TASK-M02-004 | ✅ |
 | MemoryNode unit tests | All struct methods | TASK-M02-006 | ✅ |
 | NeurotransmitterWeights unit tests | Domain profiles and calculations | TASK-M02-008 | ✅ |
-| GraphEdge unit tests | Edge operations and Marblestone | TASK-M02-011 | ☐ |
+| GraphEdge unit tests | Edge operations and Marblestone | TASK-M02-011 | ✅ |
 | Johari transition tests | Valid transition logic | TASK-M02-012 | ☐ |
 | Serialization tests | Round-trip serialization | TASK-M02-014 | ☐ |
 | Column family tests | CF creation and options | TASK-M02-015 | ☐ |

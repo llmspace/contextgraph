@@ -7,7 +7,7 @@
 - **Foundation:** 12 tasks
 - **Logic:** 6 tasks
 - **Surface:** 10 tasks
-- **Current Progress:** 10/28 (36%) - Tasks 001-010 VERIFIED
+- **Current Progress:** 11/28 (39%) - Tasks 001-011 VERIFIED
 - **Version:** 1.0.0
 - **Created:** 2025-12-31
 - **Dependencies:** module-01-ghost-system
@@ -109,8 +109,8 @@ graph TD
 | 8 | TASK-M02-008 | Define NeurotransmitterWeights Struct | foundation | 007 | 2.0 | ✅ Complete |
 | 9 | TASK-M02-009 | Define EdgeType Enum (Marblestone) + Migrate from graph_edge.rs | foundation | — | 1.5 | ✅ Complete |
 | 10 | TASK-M02-010 | Define GraphEdge Struct (13-field Marblestone) | foundation | 007, 008, 009 | 2.0 | ✅ Complete |
-| 11 | TASK-M02-011 | Implement GraphEdge Methods | foundation | 010 | 2.5 | ⏳ Ready (v2.0 Audited) |
-| 12 | TASK-M02-012 | Implement Johari Transition Logic | foundation | 001 | 2.0 | ⛔ Blocked |
+| 11 | TASK-M02-011 | Implement GraphEdge Methods | foundation | 010 | 2.5 | ✅ Complete |
+| 12 | TASK-M02-012 | Implement Johari Transition Logic | foundation | 001 | 2.0 | ⏳ Ready |
 | 13 | TASK-M02-013 | Create Storage Crate Structure | logic | 006 | 1.5 | ⏳ Ready |
 | 14 | TASK-M02-014 | Implement Bincode Serialization | logic | 013 | 2.5 | ⛔ Blocked |
 | 15 | TASK-M02-015 | Define Column Family Descriptors | logic | 013 | 3.0 | ⛔ Blocked |
@@ -149,8 +149,8 @@ graph TD
 | TASK-M02-008 | 2025-12-31 | 2025-12-31 | 2025-12-31 | Sherlock-Holmes verified: 66/66 marblestone tests pass (29 Domain + 37 NT), 0 clippy warnings |
 | TASK-M02-009 | 2025-12-31 | 2025-12-31 | 2025-12-31 | Sherlock-Holmes verified: 31 EdgeType tests pass, 330 total tests, 0 clippy warnings |
 | TASK-M02-010 | 2025-12-31 | 2025-12-31 | 2025-12-31 | Sherlock-Holmes verified: 32 graph_edge tests pass, 0 clippy warnings, 13 fields confirmed |
-| TASK-M02-011 | — | — | — | Depends on 010 |
-| TASK-M02-012 | — | — | — | Depends on 001 |
+| TASK-M02-011 | 2025-12-31 | 2025-12-31 | 2025-12-31 | Sherlock-Holmes verified: 78/78 graph_edge tests pass, 0 clippy warnings, 9 methods + Default impl |
+| TASK-M02-012 | — | — | — | READY - 001 COMPLETE |
 | TASK-M02-013 | — | — | — | Depends on 006 |
 | TASK-M02-014 | — | — | — | Depends on 013 |
 | TASK-M02-015 | — | — | — | Depends on 013 |
