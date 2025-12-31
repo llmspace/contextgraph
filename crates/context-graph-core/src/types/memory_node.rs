@@ -86,61 +86,87 @@ pub enum ValidationError {
     },
 }
 
-/// Memory node representing a stored memory unit.
+/// A memory node representing a single knowledge unit in the Context Graph.
 ///
-/// Each node contains content, its embedding vector, importance scores,
-/// and metadata for graph operations.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// # Performance Characteristics
+/// - Average serialized size: ~6.5KB (with embedding)
+/// - Insert latency target: <1ms
+/// - Retrieval latency target: <500us
+///
+/// # PRD Section 4.1 KnowledgeNode Mapping
+/// - `id`: UUID v4 unique identifier
+/// - `content`: str[<=65536] - actual stored knowledge (max 1MB enforced)
+/// - `embedding`: Vec1536 - dense vector representation
+/// - `quadrant`: Johari Window classification
+/// - `importance`: f32[0,1] - relevance score
+/// - `emotional_valence`: f32[-1,1] - emotional charge
+/// - `created_at`: Creation timestamp
+/// - `accessed_at`: Last access timestamp
+/// - `access_count`: Number of accesses
+/// - `metadata`: Rich metadata container
+///
+/// # Constitution Compliance
+/// - AP-009: All f32 fields must be validated (no NaN/Infinity)
+/// - SEC-06: Soft delete via metadata.deleted flag
+/// - Naming: snake_case fields per constitution.yaml
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MemoryNode {
-    /// Unique identifier
+    /// Unique identifier for this node (UUID v4).
     pub id: NodeId,
 
-    /// Raw content stored in this node
+    /// The content/knowledge stored in this node (max 1MB).
     pub content: String,
 
-    /// Embedding vector (1536D)
+    /// Dense embedding vector (1536 dimensions by default).
     pub embedding: EmbeddingVector,
 
-    /// Semantic importance score [0.0, 1.0]
+    /// Johari Window quadrant classification.
+    pub quadrant: JohariQuadrant,
+
+    /// Importance/relevance score [0.0, 1.0].
     pub importance: f32,
 
-    /// Access count for decay calculations
-    pub access_count: u64,
+    /// Emotional valence [-1.0, 1.0].
+    /// Negative = negative emotion, Positive = positive emotion.
+    pub emotional_valence: f32,
 
-    /// Last access timestamp
-    pub last_accessed: DateTime<Utc>,
-
-    /// Creation timestamp
+    /// Timestamp when this node was created.
     pub created_at: DateTime<Utc>,
 
-    /// Soft deletion marker
-    pub deleted: bool,
+    /// Timestamp when this node was last accessed.
+    pub accessed_at: DateTime<Utc>,
 
-    /// Johari quadrant classification
-    pub johari_quadrant: JohariQuadrant,
+    /// Number of times this node has been accessed.
+    pub access_count: u64,
 
-    /// Source modality
-    pub modality: Modality,
-
-    /// Additional metadata
+    /// Rich metadata container.
     pub metadata: NodeMetadata,
 }
 
 impl MemoryNode {
     /// Create a new memory node with the given content and embedding.
+    ///
+    /// # Arguments
+    /// * `content` - The content/knowledge to store
+    /// * `embedding` - The embedding vector (should be 1536 dimensions)
+    ///
+    /// # Default Values
+    /// - `importance`: 0.5
+    /// - `emotional_valence`: 0.0 (neutral)
+    /// - `quadrant`: JohariQuadrant::Open
+    /// - `access_count`: 0
     pub fn new(content: String, embedding: EmbeddingVector) -> Self {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
             content,
             embedding,
+            quadrant: JohariQuadrant::default(),
             importance: 0.5,
-            access_count: 0,
-            last_accessed: now,
+            emotional_valence: 0.0,
             created_at: now,
-            deleted: false,
-            johari_quadrant: JohariQuadrant::default(),
-            modality: Modality::default(),
+            accessed_at: now,
+            access_count: 0,
             metadata: NodeMetadata::default(),
         }
     }
@@ -148,7 +174,7 @@ impl MemoryNode {
     /// Mark this node as accessed, updating access count and timestamp.
     pub fn mark_accessed(&mut self) {
         self.access_count += 1;
-        self.last_accessed = Utc::now();
+        self.accessed_at = Utc::now();
     }
 }
 
@@ -371,20 +397,20 @@ mod tests {
         assert_eq!(node.embedding.len(), 1536);
         assert_eq!(node.importance, 0.5);
         assert_eq!(node.access_count, 0);
-        assert!(!node.deleted);
+        assert!(!node.metadata.deleted);
     }
 
     #[test]
     fn test_mark_accessed() {
         let embedding = vec![0.1; 1536];
         let mut node = MemoryNode::new("test".to_string(), embedding);
-        let initial_accessed = node.last_accessed;
+        let initial_accessed = node.accessed_at;
 
         std::thread::sleep(std::time::Duration::from_millis(10));
         node.mark_accessed();
 
         assert_eq!(node.access_count, 1);
-        assert!(node.last_accessed > initial_accessed);
+        assert!(node.accessed_at > initial_accessed);
     }
 
     // =========================================================================
@@ -499,7 +525,7 @@ mod tests {
         let embedding = vec![0.1; 10];
         let node = MemoryNode::new("Timestamp test".to_string(), embedding);
         let original_created_at = node.created_at;
-        let original_last_accessed = node.last_accessed;
+        let original_accessed_at = node.accessed_at;
 
         // Round-trip through JSON
         let json_str = serde_json::to_string(&node).unwrap();
@@ -510,8 +536,8 @@ mod tests {
             "created_at must be preserved"
         );
         assert_eq!(
-            restored.last_accessed, original_last_accessed,
-            "last_accessed must be preserved"
+            restored.accessed_at, original_accessed_at,
+            "accessed_at must be preserved"
         );
     }
 
@@ -1016,9 +1042,15 @@ newlines, plus unicode: 日本語 🎉 émojis"#;
         };
         let msg = error.to_string();
 
-        assert!(msg.contains("expected 1536"), "Should show expected dimension");
+        assert!(
+            msg.contains("expected 1536"),
+            "Should show expected dimension"
+        );
         assert!(msg.contains("got 768"), "Should show actual dimension");
-        assert!(msg.contains("Invalid embedding dimension"), "Should have correct prefix");
+        assert!(
+            msg.contains("Invalid embedding dimension"),
+            "Should have correct prefix"
+        );
     }
 
     #[test]
@@ -1051,25 +1083,28 @@ newlines, plus unicode: 日本語 🎉 émojis"#;
 
     #[test]
     fn test_validation_error_embedding_not_normalized() {
-        let error = ValidationError::EmbeddingNotNormalized {
-            magnitude: 0.85,
-        };
+        let error = ValidationError::EmbeddingNotNormalized { magnitude: 0.85 };
         let msg = error.to_string();
 
-        assert!(msg.contains("0.850000"), "Should show magnitude with precision");
-        assert!(msg.contains("not normalized"), "Should indicate normalization issue");
+        assert!(
+            msg.contains("0.850000"),
+            "Should show magnitude with precision"
+        );
+        assert!(
+            msg.contains("not normalized"),
+            "Should indicate normalization issue"
+        );
         assert!(msg.contains("expected ~1.0"), "Should show expected value");
     }
 
     #[test]
     fn test_validation_error_implements_std_error() {
         // Verify thiserror properly implements std::error::Error
-        let error: Box<dyn std::error::Error> = Box::new(
-            ValidationError::InvalidEmbeddingDimension {
+        let error: Box<dyn std::error::Error> =
+            Box::new(ValidationError::InvalidEmbeddingDimension {
                 expected: 1536,
                 actual: 0,
-            }
-        );
+            });
 
         // std::error::Error requires Display, which we get from thiserror
         let _ = error.to_string();
@@ -1090,9 +1125,18 @@ newlines, plus unicode: 日本語 🎉 émojis"#;
 
     #[test]
     fn test_validation_error_partial_eq() {
-        let a = ValidationError::ContentTooLarge { size: 100, max_size: 50 };
-        let b = ValidationError::ContentTooLarge { size: 100, max_size: 50 };
-        let c = ValidationError::ContentTooLarge { size: 101, max_size: 50 };
+        let a = ValidationError::ContentTooLarge {
+            size: 100,
+            max_size: 50,
+        };
+        let b = ValidationError::ContentTooLarge {
+            size: 100,
+            max_size: 50,
+        };
+        let c = ValidationError::ContentTooLarge {
+            size: 101,
+            max_size: 50,
+        };
 
         assert_eq!(a, b, "Same values should be equal");
         assert_ne!(a, c, "Different values should not be equal");
@@ -1106,7 +1150,10 @@ newlines, plus unicode: 日本語 🎉 émojis"#;
         };
         let debug_str = format!("{:?}", error);
 
-        assert!(debug_str.contains("InvalidEmbeddingDimension"), "Debug should show variant");
+        assert!(
+            debug_str.contains("InvalidEmbeddingDimension"),
+            "Debug should show variant"
+        );
         assert!(debug_str.contains("1536"), "Debug should show expected");
         assert!(debug_str.contains("512"), "Debug should show actual");
     }
@@ -1123,7 +1170,10 @@ newlines, plus unicode: 日本語 🎉 émojis"#;
         let msg = error.to_string();
 
         assert!(msg.contains("-1.5"), "Should handle negative values");
-        assert!(msg.contains("[-1, 1]"), "Should show negative range correctly");
+        assert!(
+            msg.contains("[-1, 1]"),
+            "Should show negative range correctly"
+        );
     }
 
     #[test]
@@ -1134,5 +1184,127 @@ newlines, plus unicode: 日本語 🎉 émojis"#;
 
         assert!(too_small.to_string().contains("0.000000"));
         assert!(too_large.to_string().contains("100.000000"));
+    }
+
+    // =========================================================================
+    // TASK-M02-005: MemoryNode Struct Tests
+    // =========================================================================
+
+    #[test]
+    fn test_default_embedding_dim_constant() {
+        assert_eq!(DEFAULT_EMBEDDING_DIM, 1536);
+    }
+
+    #[test]
+    fn test_max_content_size_constant() {
+        assert_eq!(MAX_CONTENT_SIZE, 1_048_576);
+        assert_eq!(MAX_CONTENT_SIZE, 1024 * 1024); // 1MB
+    }
+
+    #[test]
+    fn test_memory_node_has_all_required_fields() {
+        let embedding = vec![0.1; DEFAULT_EMBEDDING_DIM];
+        let node = MemoryNode::new("test".to_string(), embedding);
+
+        // Verify all 10 fields exist and are accessible
+        let _id: NodeId = node.id;
+        let _content: &String = &node.content;
+        let _embedding: &EmbeddingVector = &node.embedding;
+        let _quadrant: JohariQuadrant = node.quadrant;
+        let _importance: f32 = node.importance;
+        let _valence: f32 = node.emotional_valence;
+        let _created: DateTime<Utc> = node.created_at;
+        let _accessed: DateTime<Utc> = node.accessed_at;
+        let _count: u64 = node.access_count;
+        let _meta: &NodeMetadata = &node.metadata;
+    }
+
+    #[test]
+    fn test_memory_node_new_defaults() {
+        let embedding = vec![0.0; 1536];
+        let node = MemoryNode::new("content".to_string(), embedding);
+
+        assert_eq!(node.content, "content");
+        assert_eq!(node.embedding.len(), 1536);
+        assert_eq!(node.quadrant, JohariQuadrant::Open);
+        assert_eq!(node.importance, 0.5);
+        assert_eq!(node.emotional_valence, 0.0);
+        assert_eq!(node.access_count, 0);
+        assert!(!node.metadata.deleted);
+    }
+
+    #[test]
+    fn test_memory_node_emotional_valence_range() {
+        let embedding = vec![0.0; 10];
+        let mut node = MemoryNode::new("test".to_string(), embedding);
+
+        node.emotional_valence = -1.0;
+        assert_eq!(node.emotional_valence, -1.0);
+
+        node.emotional_valence = 0.0;
+        assert_eq!(node.emotional_valence, 0.0);
+
+        node.emotional_valence = 1.0;
+        assert_eq!(node.emotional_valence, 1.0);
+    }
+
+    #[test]
+    fn test_memory_node_serde_with_emotional_valence() {
+        let embedding = vec![0.5; 100];
+        let mut node = MemoryNode::new("serde test".to_string(), embedding);
+        node.emotional_valence = -0.75;
+        node.importance = 0.9;
+
+        let json = serde_json::to_string(&node).expect("serialize");
+        let restored: MemoryNode = serde_json::from_str(&json).expect("deserialize");
+
+        assert_eq!(restored.emotional_valence, -0.75);
+        assert_eq!(restored.importance, 0.9);
+        assert_eq!(restored.content, "serde test");
+    }
+
+    #[test]
+    fn test_memory_node_mark_accessed_updates_timestamp() {
+        let embedding = vec![0.1; 10];
+        let mut node = MemoryNode::new("test".to_string(), embedding);
+        let initial = node.accessed_at;
+
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        node.mark_accessed();
+
+        assert_eq!(node.access_count, 1);
+        assert!(node.accessed_at > initial);
+    }
+
+    #[test]
+    fn test_memory_node_deleted_via_metadata() {
+        let embedding = vec![0.1; 10];
+        let mut node = MemoryNode::new("test".to_string(), embedding);
+
+        assert!(!node.metadata.deleted);
+        node.metadata.mark_deleted();
+        assert!(node.metadata.deleted);
+    }
+
+    #[test]
+    fn test_memory_node_quadrant_field() {
+        let embedding = vec![0.1; 10];
+        let node = MemoryNode::new("test".to_string(), embedding);
+        assert_eq!(node.quadrant, JohariQuadrant::Open);
+    }
+
+    #[test]
+    fn test_memory_node_accessed_at_field() {
+        let embedding = vec![0.1; 10];
+        let node = MemoryNode::new("test".to_string(), embedding);
+        let _timestamp: DateTime<Utc> = node.accessed_at;
+    }
+
+    #[test]
+    fn test_memory_node_modality_via_metadata() {
+        let embedding = vec![0.1; 10];
+        let mut node = MemoryNode::new("test".to_string(), embedding);
+        node.metadata.modality = Modality::Code;
+        assert_eq!(node.metadata.modality, Modality::Code);
     }
 }

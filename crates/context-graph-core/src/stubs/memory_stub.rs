@@ -67,16 +67,16 @@ impl MemoryStore for InMemoryStore {
             .values()
             .filter(|n| {
                 // Apply filters
-                if !options.include_deleted && n.deleted {
+                if !options.include_deleted && n.metadata.deleted {
                     return false;
                 }
                 if let Some(ref quadrant) = options.johari_filter {
-                    if &n.johari_quadrant != quadrant {
+                    if &n.quadrant != quadrant {
                         return false;
                     }
                 }
                 if let Some(ref modality) = options.modality_filter {
-                    if &n.modality != modality {
+                    if &n.metadata.modality != modality {
                         return false;
                     }
                 }
@@ -112,7 +112,7 @@ impl MemoryStore for InMemoryStore {
         let nodes = self.nodes.read().await;
         let mut results: Vec<(MemoryNode, f32)> = nodes
             .values()
-            .filter(|n| !n.deleted || options.include_deleted)
+            .filter(|n| !n.metadata.deleted || options.include_deleted)
             .take(options.top_k)
             .map(|n| (n.clone(), 0.5)) // Mock similarity
             .collect();
@@ -124,7 +124,7 @@ impl MemoryStore for InMemoryStore {
         let mut nodes = self.nodes.write().await;
         if soft {
             if let Some(node) = nodes.get_mut(&id) {
-                node.deleted = true;
+                node.metadata.deleted = true;
                 return Ok(true);
             }
         } else if nodes.remove(&id).is_some() {
@@ -146,12 +146,12 @@ impl MemoryStore for InMemoryStore {
 
     async fn count(&self) -> CoreResult<usize> {
         let nodes = self.nodes.read().await;
-        Ok(nodes.values().filter(|n| !n.deleted).count())
+        Ok(nodes.values().filter(|n| !n.metadata.deleted).count())
     }
 
     async fn compact(&self) -> CoreResult<()> {
         let mut nodes = self.nodes.write().await;
-        nodes.retain(|_, n| !n.deleted);
+        nodes.retain(|_, n| !n.metadata.deleted);
         Ok(())
     }
 }
@@ -197,7 +197,7 @@ mod tests {
         // Node still exists but is marked deleted
         let retrieved = store.retrieve(id).await.unwrap();
         assert!(retrieved.is_some());
-        assert!(retrieved.unwrap().deleted);
+        assert!(retrieved.unwrap().metadata.deleted);
     }
 
     #[tokio::test]
@@ -329,7 +329,7 @@ mod tests {
         let mut node = MemoryNode::new("Metadata integrity test".to_string(), embedding);
         node.importance = 0.95;
         node.access_count = 42;
-        node.deleted = false;
+        node.metadata.deleted = false;
         node.metadata.source = Some("test-source".to_string());
         node.metadata.language = Some("en".to_string());
         node.metadata.tags = vec!["tag1".to_string(), "tag2".to_string()];
@@ -339,7 +339,7 @@ mod tests {
 
         let id = node.id;
         let original_created_at = node.created_at;
-        let original_last_accessed = node.last_accessed;
+        let original_accessed_at = node.accessed_at;
 
         store.store(node).await.unwrap();
         let retrieved = store.retrieve(id).await.unwrap().expect("Node must exist");
@@ -347,14 +347,14 @@ mod tests {
         // Verify all fields
         assert_eq!(retrieved.importance, 0.95, "Importance must match");
         assert_eq!(retrieved.access_count, 42, "Access count must match");
-        assert_eq!(retrieved.deleted, false, "Deleted flag must match");
+        assert!(!retrieved.metadata.deleted, "Deleted flag must match");
         assert_eq!(
             retrieved.created_at, original_created_at,
             "Created timestamp must match"
         );
         assert_eq!(
-            retrieved.last_accessed, original_last_accessed,
-            "Last accessed must match"
+            retrieved.accessed_at, original_accessed_at,
+            "Accessed at must match"
         );
 
         // Verify metadata

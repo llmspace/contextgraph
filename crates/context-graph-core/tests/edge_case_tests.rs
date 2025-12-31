@@ -371,7 +371,7 @@ async fn edge_case_soft_vs_hard_delete() {
     let retrieved1 = store.retrieve(id1).await.unwrap();
     println!("  - Node 1 still retrievable: {}", retrieved1.is_some());
     if let Some(n) = retrieved1 {
-        println!("  - Node 1 deleted flag: {}", n.deleted);
+        println!("  - Node 1 deleted flag: {}", n.metadata.deleted);
     }
 
     // Hard delete node2
