@@ -59,7 +59,7 @@ mod tests_node_lifecycle;
 pub use config::{RocksDbConfig, DEFAULT_CACHE_SIZE, DEFAULT_MAX_OPEN_FILES};
 
 // Re-export error types
-pub use error::StorageError;
+pub use error::{StorageError, StorageResult};
 
 // Re-export main struct
 pub use core::RocksDbMemex;

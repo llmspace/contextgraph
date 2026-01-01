@@ -4,7 +4,8 @@
 //! Designed for fail-fast debugging with descriptive error messages.
 
 use crate::serialization::SerializationError;
-use context_graph_core::types::ValidationError;
+use context_graph_core::marblestone::EdgeType;
+use context_graph_core::types::{NodeId, ValidationError};
 use thiserror::Error;
 
 /// Storage operation errors.
@@ -92,6 +93,63 @@ impl From<ValidationError> for StorageError {
         StorageError::ValidationFailed(e.to_string())
     }
 }
+
+impl StorageError {
+    /// Create NotFound error for a missing MemoryNode.
+    ///
+    /// # Arguments
+    /// * `id` - The NodeId (UUID) that was not found
+    ///
+    /// # Example
+    /// ```ignore
+    /// let error = StorageError::not_found_node(node_id);
+    /// ```
+    pub fn not_found_node(id: NodeId) -> Self {
+        StorageError::NotFound { id: id.to_string() }
+    }
+
+    /// Create NotFound error for a missing GraphEdge.
+    ///
+    /// Formats the edge identifier as "source->target:EdgeType" for clarity.
+    ///
+    /// # Arguments
+    /// * `source` - The source node ID
+    /// * `target` - The target node ID
+    /// * `edge_type` - The type of edge
+    ///
+    /// # Example
+    /// ```ignore
+    /// let error = StorageError::not_found_edge(source_id, target_id, EdgeType::Semantic);
+    /// ```
+    pub fn not_found_edge(source: NodeId, target: NodeId, edge_type: EdgeType) -> Self {
+        StorageError::NotFound {
+            id: format!("{}->{}:{:?}", source, target, edge_type),
+        }
+    }
+
+    /// Create NotFound error for a missing Embedding.
+    ///
+    /// Prefixes with "embedding:" to distinguish from node lookups.
+    ///
+    /// # Arguments
+    /// * `id` - The NodeId (UUID) whose embedding was not found
+    ///
+    /// # Example
+    /// ```ignore
+    /// let error = StorageError::not_found_embedding(node_id);
+    /// ```
+    pub fn not_found_embedding(id: NodeId) -> Self {
+        StorageError::NotFound {
+            id: format!("embedding:{}", id),
+        }
+    }
+}
+
+/// Convenient Result type for storage operations.
+///
+/// All storage operations should return `StorageResult<T>` instead of
+/// the more verbose `Result<T, StorageError>`.
+pub type StorageResult<T> = Result<T, StorageError>;
 
 #[cfg(test)]
 mod tests {
@@ -183,5 +241,115 @@ mod tests {
         };
         let storage_error: StorageError = val_error.into();
         assert!(matches!(storage_error, StorageError::ValidationFailed(_)));
+    }
+
+    // ========== TASK-M02-025: New Variant Tests ==========
+
+    #[test]
+    fn test_error_index_corrupted() {
+        let error = StorageError::IndexCorrupted {
+            index_name: "johari_open".to_string(),
+            details: "UUID parse failed".to_string(),
+        };
+        let msg = error.to_string();
+        assert!(msg.contains("johari_open"));
+        assert!(msg.contains("UUID parse failed"));
+        assert!(msg.contains("Index corruption"));
+    }
+
+    #[test]
+    fn test_error_internal() {
+        let error = StorageError::Internal("unexpected state".to_string());
+        let msg = error.to_string();
+        assert!(msg.contains("Internal storage error"));
+        assert!(msg.contains("unexpected state"));
+    }
+
+    // ========== TASK-M02-025: Convenience Constructor Tests ==========
+
+    #[test]
+    fn test_not_found_node() {
+        let id = uuid::Uuid::new_v4();
+        let error = StorageError::not_found_node(id);
+        let msg = error.to_string();
+        assert!(msg.contains(&id.to_string()));
+        assert!(msg.contains("Node not found"));
+    }
+
+    #[test]
+    fn test_not_found_edge() {
+        let source = uuid::Uuid::new_v4();
+        let target = uuid::Uuid::new_v4();
+        let error = StorageError::not_found_edge(source, target, EdgeType::Semantic);
+        let msg = error.to_string();
+        // Check that source and target UUIDs are in the message
+        assert!(msg.contains(&source.to_string()[..8]));
+        assert!(msg.contains(&target.to_string()[..8]));
+        assert!(msg.contains("Semantic"));
+    }
+
+    #[test]
+    fn test_not_found_embedding() {
+        let id = uuid::Uuid::new_v4();
+        let error = StorageError::not_found_embedding(id);
+        let msg = error.to_string();
+        assert!(msg.contains("embedding:"));
+        assert!(msg.contains(&id.to_string()));
+    }
+
+    // ========== TASK-M02-025: StorageResult Type Alias Test ==========
+
+    #[test]
+    fn test_storage_result_type_alias() {
+        fn returns_ok_result() -> StorageResult<String> {
+            Ok("test".to_string())
+        }
+
+        fn returns_err_result() -> StorageResult<String> {
+            Err(StorageError::Internal("test error".to_string()))
+        }
+
+        assert!(returns_ok_result().is_ok());
+        assert!(returns_err_result().is_err());
+    }
+
+    // ========== TASK-M02-025: Edge Case Tests ==========
+
+    #[test]
+    fn edge_case_index_corrupted_empty_details() {
+        println!("=== EDGE CASE 1: Empty details string ===");
+        let error = StorageError::IndexCorrupted {
+            index_name: "".to_string(),
+            details: "".to_string(),
+        };
+        println!("BEFORE: Creating error with empty strings");
+        let msg = error.to_string();
+        println!("AFTER: message = '{}'", msg);
+        assert!(msg.contains("Index corruption"));
+        println!("RESULT: PASS - Handles empty strings");
+    }
+
+    #[test]
+    fn edge_case_unicode_in_internal_error() {
+        println!("=== EDGE CASE 2: Unicode in Internal error ===");
+        let error = StorageError::Internal("错误: 日本語 🔥".to_string());
+        println!("BEFORE: Creating error with unicode");
+        let msg = error.to_string();
+        println!("AFTER: message = '{}'", msg);
+        assert!(msg.contains("错误"));
+        assert!(msg.contains("🔥"));
+        println!("RESULT: PASS - Unicode preserved");
+    }
+
+    #[test]
+    fn edge_case_nil_uuid_in_not_found() {
+        println!("=== EDGE CASE 3: Nil UUID in not_found_node ===");
+        let nil = uuid::Uuid::nil();
+        println!("BEFORE: Creating not_found_node with nil UUID");
+        let error = StorageError::not_found_node(nil);
+        let msg = error.to_string();
+        println!("AFTER: error = '{}'", msg);
+        assert!(msg.contains("00000000-0000-0000-0000-000000000000"));
+        println!("RESULT: PASS - Nil UUID formatted correctly");
     }
 }

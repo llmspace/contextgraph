@@ -17,7 +17,7 @@ This matrix ensures every requirement, component, and behavior from the Module 0
 | EdgeType | Graph edge relationship types (4 variants per constitution.yaml, migrated from graph_edge.rs) | TASK-M02-009 | `crates/context-graph-core/src/marblestone.rs` | ✅ |
 | EmotionalState | UTL emotional state enum | TASK-M02-019 | `crates/context-graph-core/src/types/utl.rs` | ✅ |
 | SuggestedAction | Cognitive pulse action enum | TASK-M02-020 | `crates/context-graph-core/src/types/pulse.rs` | ✅ |
-| StorageError | Storage operation error types | TASK-M02-025 | `crates/context-graph-storage/src/lib.rs` | ☐ |
+| StorageError | Storage operation error types | TASK-M02-025 | `crates/context-graph-storage/src/rocksdb_backend/error.rs` | ✅ |
 | TransitionTrigger | Johari transition trigger types | TASK-M02-012 | `crates/context-graph-core/src/types/johari.rs` | ✅ |
 
 ### Core Structs
@@ -162,14 +162,15 @@ This matrix ensures every requirement, component, and behavior from the Module 0
 | OutOfBounds | Importance/valence outside valid range | TASK-M02-004 | ✅ |
 | ContentTooLarge | Content exceeds 1MB limit | TASK-M02-004 | ✅ |
 | EmbeddingNotNormalized | Embedding vector not normalized | TASK-M02-004 | ✅ |
-| OpenFailed | Database open failure | TASK-M02-025 | ☐ |
-| ColumnFamilyNotFound | Missing column family | TASK-M02-025 | ☐ |
-| SerializationFailed | Serialization error | TASK-M02-025 | ☐ |
-| DeserializationFailed | Deserialization error | TASK-M02-025 | ☐ |
-| NotFound | Entity not found | TASK-M02-025 | ☐ |
-| WriteFailed | Write operation failure | TASK-M02-025 | ☐ |
-| ReadFailed | Read operation failure | TASK-M02-025 | ☐ |
-| IndexCorrupted | Index corruption detected | TASK-M02-025 | ☐ |
+| OpenFailed | Database open failure | TASK-M02-025 | ✅ |
+| ColumnFamilyNotFound | Missing column family | TASK-M02-025 | ✅ |
+| SerializationFailed | Serialization error | TASK-M02-025 | ✅ |
+| DeserializationFailed | Deserialization error | TASK-M02-025 | ✅ |
+| NotFound | Entity not found | TASK-M02-025 | ✅ |
+| WriteFailed | Write operation failure | TASK-M02-025 | ✅ |
+| ReadFailed | Read operation failure | TASK-M02-025 | ✅ |
+| IndexCorrupted | Index corruption detected | TASK-M02-025 | ✅ |
+| Internal | Generic internal error | TASK-M02-025 | ✅ |
 
 ### Test Coverage
 

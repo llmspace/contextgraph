@@ -27,9 +27,10 @@ pub use column_families::{
     nodes_options, system_options,
 };
 
-// Re-export RocksDB backend types (TASK-M02-016)
+// Re-export RocksDB backend types (TASK-M02-016, TASK-M02-025)
 pub use rocksdb_backend::{
-    RocksDbConfig, RocksDbMemex, StorageError, DEFAULT_CACHE_SIZE, DEFAULT_MAX_OPEN_FILES,
+    RocksDbConfig, RocksDbMemex, StorageError, StorageResult, DEFAULT_CACHE_SIZE,
+    DEFAULT_MAX_OPEN_FILES,
 };
 
 // Re-export core types for storage consumers
