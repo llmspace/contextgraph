@@ -27,10 +27,15 @@ def consolidate_files():
         "M03-L13.md", "M03-L14.md", "M03-L15.md", "M03-L16.md",
         "M03-L17.md", "M03-L18.md", "M03-L19.md", "M03-L20.md",
         "M03-L21.md", "M03-L22.md", "M03-L23.md", "M03-L24.md",
+        "M03-L25.md", "M03-L26.md", "M03-L27.md", "M03-L28.md",
+        "M03-L29.md", "M03-L30.md", "M03-L31.md", "M03-L32.md",
+        "M03-L33.md",
         # Surface layer
         "M03-S01.md", "M03-S02.md", "M03-S03.md", "M03-S04.md",
         "M03-S05.md", "M03-S06.md", "M03-S07.md", "M03-S08.md",
         "M03-S09.md", "M03-S10.md", "M03-S11.md", "M03-S12.md",
+        "M03-S13.md", "M03-S14.md", "M03-S15.md", "M03-S16.md",
+        "M03-S17.md", "M03-S18.md", "M03-S19.md",
     ]
 
     output_path = script_dir / "module03_consolidated_tasks.txt"

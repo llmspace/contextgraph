@@ -4,13 +4,21 @@
 metadata:
   module_id: M03
   module_name: 12-Model Embedding Pipeline
-  version: 2.0.0
-  total_tasks: 52
+  version: 2.4.0
+  total_tasks: 68
   foundation_tasks: 16
-  logic_tasks: 24
-  surface_tasks: 12
+  logic_tasks: 33
+  surface_tasks: 19
   generated: 2026-01-01
+  updated: 2026-01-01
   approach: inside-out-bottom-up
+  changelog:
+    - "v2.4.0: Added M03-L32 (HDC Vector Persistence), M03-L33 (SPLADE Projection)"
+    - "v2.4.0: Added M03-S18 (Tracing & Instrumentation), M03-S19 (Alignment Verification)"
+    - "v2.3.0: Added M03-S17 (Fail-Safe Async Orchestrator), M03-L29 (Tokenizer Cache)"
+    - "v2.3.0: Added M03-L30 (Grouped GEMM for MoE), M03-L31 (FuseMoE Weight Registry)"
+    - "v2.2.0: Added M03-L28 (Blackwell Quantization), M03-S15 (GDS), M03-S16 (Warm-up)"
+    - "v2.2.0: Updated M03-F05 with aux_data for ColBERT token storage"
 ```
 
 ---
@@ -20,8 +28,8 @@ metadata:
 | Layer | Task Range | Count | Focus |
 |-------|------------|-------|-------|
 | Foundation | M03-F01 → M03-F16 | 16 | Types, traits, configuration |
-| Logic | M03-L01 → M03-L24 | 24 | Models, batch, cache, fusion |
-| Surface | M03-S01 → M03-S12 | 12 | Pipeline, CUDA, tests |
+| Logic | M03-L01 → M03-L33 | 33 | Models, batch, cache, fusion, security, neuromod, quantization, tokenization, GEMM, persistence |
+| Surface | M03-S01 → M03-S19 | 19 | Pipeline, CUDA, GDS, warm-up, async orchestration, tracing, alignment, artifacts, tests |
 
 ---
 
@@ -87,27 +95,43 @@ Execute tasks in this order to satisfy all dependencies:
 | 38 | M03-L22 | FuseMoE Router | M03-L20, M03-L21 | 4 |
 | 39 | M03-L23 | FuseMoE Main Module | M03-L22, M03-F05 | 4 |
 | 40 | M03-L24 | CAME-AB Bridge (Optional) | M03-L23 | 3 |
+| 41 | M03-L25 | PII Scrubber Implementation | M03-F06, M03-F08 | 4 |
+| 42 | M03-L26 | Neuromodulation Integration | M03-F14, M03-L20, M03-L23 | 5 |
+| 43 | M03-L27 | EmbeddingPriors/Context Priming | M03-F01, M03-F14, M03-L20, M03-L23 | 4 |
+| 44 | M03-L28 | Blackwell Quantization Kernels (FP8/FP4) | M03-L23, M03-S04 | 5 |
+| 45 | M03-L29 | Shared Tokenizer Cache (TokenizationManager) | M03-F06, M03-F01, M03-L01 | 3 |
+| 46 | M03-L30 | Grouped GEMM for MoE Expert Execution | M03-L21, M03-L22, M03-S04 | 5 |
+| 47 | M03-L31 | FuseMoE Weight Registry and Initialization | M03-L23, M03-L21, M03-S13 | 4 |
+| 48 | M03-L32 | HDC Base-Vector Persistence | M03-L11, M03-F01, M03-S13 | 3 |
+| 49 | M03-L33 | Sparse Projection Matrix Management (SPLADE) | M03-L08, M03-L31, M03-S13 | 3 |
 
-**Phase 3 Subtotal: 40.5 hours**
+**Phase 3 Subtotal: 76.5 hours**
 
 ### Phase 4: Surface Layer (Week 4)
 
 | Order | Task ID | Title | Dependencies | Est. Hours |
 |-------|---------|-------|--------------|------------|
-| 41 | M03-S08 | Configuration File Loading | M03-F11 | 2 |
-| 42 | M03-S04 | CUDA Device Trait | M03-F16 | 3 |
-| 43 | M03-S05 | GPU Memory Pool | M03-S04 | 3 |
-| 44 | M03-S06 | CUDA Kernel Stubs | M03-S04 | 2 |
-| 45 | M03-S01 | EmbeddingPipeline Core | M03-L01, M03-L17, M03-L19, M03-L23 | 5 |
-| 46 | M03-S02 | PipelineMetrics/HealthStatus | M03-S01 | 1.5 |
-| 47 | M03-S03 | EmbeddingProvider Bridge | M03-S01 | 2 |
-| 48 | M03-S07 | HotSwap Model Loading | M03-L01 | 3 |
-| 49 | M03-S09 | Unit Tests Suite | M03-F01→M03-F16 | 4 |
-| 50 | M03-S10 | Integration Tests | M03-S01, M03-S03 | 6 |
-| 51 | M03-S11 | Benchmarks | M03-S01 | 4 |
-| 52 | M03-S12 | Documentation/Examples | M03-S01 | 3 |
+| 50 | M03-S08 | Configuration File Loading | M03-F11 | 2 |
+| 51 | M03-S04 | CUDA Device Trait | M03-F16 | 3 |
+| 52 | M03-S05 | GPU Memory Pool | M03-S04 | 3 |
+| 53 | M03-S15 | GPU Direct Storage (GDS) Integration | M03-S04, M03-S05 | 6 |
+| 54 | M03-S06 | CUDA Kernel Stubs | M03-S04 | 2 |
+| 55 | M03-S13 | Model Artifact Manager | M03-F01, M03-F11, M03-F12, M03-L01 | 5 |
+| 56 | M03-S14 | Green Context SM Partitioning | M03-S04, M03-S05 | 6 |
+| 57 | M03-S01 | EmbeddingPipeline Core | M03-L01, M03-L17, M03-L19, M03-L23, M03-L25, M03-S13, M03-S15, M03-L29 | 5 |
+| 58 | M03-S17 | Fail-Safe Async Orchestrator | M03-S01, M03-L17, M03-L23 | 4 |
+| 59 | M03-S18 | Tracing & Async Instrumentation | M03-S01, M03-S17, M03-L17 | 4 |
+| 60 | M03-S16 | Pipeline Warm-up & JIT Trigger | M03-S01, M03-S05, M03-L23 | 3 |
+| 61 | M03-S02 | PipelineMetrics/HealthStatus | M03-S01 | 1.5 |
+| 62 | M03-S03 | EmbeddingProvider Bridge | M03-S01, M03-S17 | 2 |
+| 63 | M03-S07 | HotSwap Model Loading | M03-L01 | 3 |
+| 64 | M03-S09 | Unit Tests Suite | M03-F01→M03-F16 | 4 |
+| 65 | M03-S10 | Integration Tests | M03-S01, M03-S03, M03-S16, M03-S17 | 6 |
+| 66 | M03-S19 | Semantic Alignment Verification | M03-S01, M03-L23, M03-S10 | 4 |
+| 67 | M03-S11 | Benchmarks | M03-S01, M03-S16, M03-S17, M03-S18 | 4 |
+| 68 | M03-S12 | Documentation/Examples | M03-S01 | 3 |
 
-**Phase 4 Subtotal: 38.5 hours**
+**Phase 4 Subtotal: 70.5 hours**
 
 ---
 
@@ -162,6 +186,12 @@ graph TB
         L22[M03-L22: Router]
         L23[M03-L23: FuseMoE]
         L24[M03-L24: CAME-AB]
+        L28[M03-L28: Blackwell Quant]
+        L29[M03-L29: Tokenizer Cache]
+        L30[M03-L30: Grouped GEMM]
+        L31[M03-L31: Weight Registry]
+        L32[M03-L32: HDC Persistence]
+        L33[M03-L33: SPLADE Projection]
     end
 
     subgraph Surface["Surface Layer (Week 4)"]
@@ -177,6 +207,11 @@ graph TB
         S10[M03-S10: Integration Tests]
         S11[M03-S11: Benchmarks]
         S12[M03-S12: Documentation]
+        S15[M03-S15: GPU Direct Storage]
+        S16[M03-S16: Pipeline Warm-up]
+        S17[M03-S17: Async Orchestrator]
+        S18[M03-S18: Tracing]
+        S19[M03-S19: Alignment Verification]
     end
 
     %% Foundation dependencies
@@ -241,23 +276,64 @@ graph TB
     L22 --> L23
     F05 --> L23
     L23 --> L24
+    L23 --> L28
+    S04 --> L28
+
+    %% New task dependencies (v2.3.0)
+    F06 --> L29
+    F01 --> L29
+    L01 --> L29
+    L21 --> L30
+    L22 --> L30
+    S04 --> L30
+    L23 --> L31
+    L21 --> L31
+    S13 --> L31
+    L11 --> L32
+    F01 --> L32
+    S13 --> L32
+    L08 --> L33
+    L31 --> L33
+    S13 --> L33
 
     %% Surface dependencies
     F11 --> S08
     F16 --> S04
     S04 --> S05
     S04 --> S06
+    S05 --> S15
+    S04 --> S15
     L01 --> S01
     L17 --> S01
     L19 --> S01
     L23 --> S01
+    S15 --> S01
+    L29 --> S01
+    S01 --> S17
+    L17 --> S17
+    L23 --> S17
+    S01 --> S16
+    S05 --> S16
+    L23 --> S16
     S01 --> S02
     S01 --> S03
+    S17 --> S03
     L01 --> S07
     S01 --> S09
     S01 --> S10
     S03 --> S10
+    S16 --> S10
+    S17 --> S10
+    S10 --> S19
+    S01 --> S19
+    L23 --> S19
+    S01 --> S18
+    S17 --> S18
+    L17 --> S18
     S01 --> S11
+    S16 --> S11
+    S17 --> S11
+    S18 --> S11
     S01 --> S12
 ```
 
@@ -326,6 +402,17 @@ M03-F01 (ModelId) ────────────────────�
 | **Cache Ready** | M03-L19 | Pipeline |
 | **Fusion Ready** | M03-L23 | Pipeline |
 | **Pipeline Operational** | M03-S01 | Integration tests |
+| **GDS Ready** | M03-S15 | High-speed model loading |
+| **Warm-up Complete** | M03-S16 | First request latency |
+| **Quantization Ready** | M03-L28 | FP8/FP4 inference |
+| **Tokenization Ready** | M03-L29 | Shared tokenizer efficiency |
+| **Grouped GEMM Ready** | M03-L30 | MoE 4x speedup |
+| **Weights Loaded** | M03-L31 | FuseMoE initialization |
+| **Orchestration Ready** | M03-S17 | Fail-safe async collection |
+| **HDC Stable** | M03-L32 | Long-term embedding stability |
+| **SPLADE Stable** | M03-L33 | Projection matrix persistence |
+| **Tracing Ready** | M03-S18 | P95 latency debugging |
+| **Alignment Verified** | M03-S19 | Unified space coherence |
 | **Provider Compatible** | M03-S03 | Module 4 |
 | **All Tests Pass** | M03-S09, M03-S10 | Release |
 | **Performance Met** | M03-S11 benchmarks | Release |
@@ -361,7 +448,7 @@ M03-F01 (ModelId) ────────────────────�
 | M03-F15 | `M03-F15.md` | CacheConfig and GpuConfig |
 | M03-F16 | `M03-F16.md` | Module Structure/Exports |
 
-### Logic Layer (24 files)
+### Logic Layer (31 files)
 | Task ID | File | Title |
 |---------|------|-------|
 | M03-L01 | `M03-L01.md` | ModelRegistry Core |
@@ -388,8 +475,17 @@ M03-F01 (ModelId) ────────────────────�
 | M03-L22 | `M03-L22.md` | FuseMoE Router |
 | M03-L23 | `M03-L23.md` | FuseMoE Main Module |
 | M03-L24 | `M03-L24.md` | CAME-AB Bridge Layer |
+| M03-L25 | `M03-L25.md` | PII Scrubber Implementation |
+| M03-L26 | `M03-L26.md` | Neuromodulation Integration |
+| M03-L27 | `M03-L27.md` | EmbeddingPriors/Context Priming |
+| M03-L28 | `M03-L28.md` | Blackwell Quantization Kernels (FP8/FP4) |
+| M03-L29 | `M03-L29.md` | Shared Tokenizer Cache (TokenizationManager) |
+| M03-L30 | `M03-L30.md` | Grouped GEMM for MoE Expert Execution |
+| M03-L31 | `M03-L31.md` | FuseMoE Weight Registry and Initialization |
+| M03-L32 | `M03-L32.md` | HDC Base-Vector Persistence |
+| M03-L33 | `M03-L33.md` | Sparse Projection Matrix Management (SPLADE) |
 
-### Surface Layer (12 files)
+### Surface Layer (19 files)
 | Task ID | File | Title |
 |---------|------|-------|
 | M03-S01 | `M03-S01.md` | EmbeddingPipeline Core |
@@ -404,6 +500,13 @@ M03-F01 (ModelId) ────────────────────�
 | M03-S10 | `M03-S10.md` | Integration Tests |
 | M03-S11 | `M03-S11.md` | Benchmarks |
 | M03-S12 | `M03-S12.md` | Documentation/Examples |
+| M03-S13 | `M03-S13.md` | Model Artifact Manager |
+| M03-S14 | `M03-S14.md` | Green Context SM Partitioning |
+| M03-S15 | `M03-S15.md` | GPU Direct Storage (GDS) Integration |
+| M03-S16 | `M03-S16.md` | Pipeline Warm-up & JIT Trigger |
+| M03-S17 | `M03-S17.md` | Fail-Safe Async Orchestrator (FusionInputAssembler) |
+| M03-S18 | `M03-S18.md` | Tracing & Async Instrumentation |
+| M03-S19 | `M03-S19.md` | Semantic Alignment Verification |
 
 ---
 
@@ -443,6 +546,90 @@ M03-F01 (ModelId) ────────────────────�
 
 ---
 
+---
+
+## New Tasks Summary (v2.4.0)
+
+### M03-L32: HDC Base-Vector Persistence
+- **Purpose**: Serialize and reload HDC base/position vectors for long-term embedding stability
+- **Dependencies**: M03-L11 (HDC Model), M03-F01 (ModelId), M03-S13 (ArtifactManager)
+- **Effort**: 3 hours
+- **Key Feature**: Checksum verification, deterministic serialization, cross-restart stability
+
+### M03-L33: Sparse Projection Matrix Management (SPLADE)
+- **Purpose**: Persist random/learned projection matrix for SPLADE 30k→1536D projection
+- **Dependencies**: M03-L08 (SPLADE), M03-L31 (WeightRegistry), M03-S13 (ArtifactManager)
+- **Effort**: 3 hours
+- **Key Feature**: Johnson-Lindenstrauss determinism, WeightRegistry integration
+
+### M03-S18: Tracing & Async Instrumentation
+- **Purpose**: Hierarchical spans for debugging parallel model execution bottlenecks
+- **Dependencies**: M03-S01 (Pipeline), M03-S17 (Orchestrator), M03-L17 (BatchProcessor)
+- **Effort**: 4 hours
+- **Key Feature**: tokio-console, OpenTelemetry export, per-model timing visibility
+
+### M03-S19: Semantic Alignment Verification
+- **Purpose**: Integration tests ensuring FuseMoE produces coherent unified latent space
+- **Dependencies**: M03-S01 (Pipeline), M03-L23 (FuseMoE), M03-S10 (Integration Tests)
+- **Effort**: 4 hours
+- **Key Feature**: Text↔Code equivalence tests, 90% pass rate threshold, similarity assertions
+
+---
+
+## Previous Tasks Summary (v2.3.0)
+
+### M03-S17: Fail-Safe Async Orchestrator (FusionInputAssembler)
+- **Purpose**: Handle partial results when models timeout or crash during parallel execution
+- **Dependencies**: M03-S01 (Pipeline), M03-L17 (BatchProcessor), M03-L23 (FuseMoE)
+- **Effort**: 4 hours
+- **Key Feature**: 150ms hard timeout with tokio::JoinSet, graceful degradation
+
+### M03-L29: Shared Tokenizer Cache (TokenizationManager)
+- **Purpose**: Eliminate redundant tokenization across models sharing tokenizer families
+- **Dependencies**: M03-F06 (ModelInput), M03-F01 (ModelId), M03-L01 (ModelRegistry)
+- **Effort**: 3 hours
+- **Key Feature**: 12 models → 5-6 unique tokenizations, <100μs cache hits
+
+### M03-L30: Grouped GEMM for MoE Expert Execution
+- **Purpose**: 4x speedup for MoE via cuBLAS/CUTLASS grouped GEMM (Blackwell optimized)
+- **Dependencies**: M03-L21 (Expert Networks), M03-L22 (Router), M03-S04 (CUDA Device)
+- **Effort**: 5 hours
+- **Key Feature**: Single kernel launch for all active experts vs sequential
+
+### M03-L31: FuseMoE Weight Registry and Initialization
+- **Purpose**: Manage FuseMoE weights with checkpoint loading and deterministic initialization
+- **Dependencies**: M03-L23 (FuseMoE), M03-L21 (Expert Networks), M03-S13 (Artifact Manager)
+- **Effort**: 4 hours
+- **Key Feature**: Golden checkpoint, Kaiming/Xavier init, hot-swap, version tracking
+
+---
+
+## Previous Tasks Summary (v2.2.0)
+
+### M03-L28: Blackwell-Specific Quantization Kernels (FP8/FP4)
+- **Purpose**: Implement FP8/FP4 quantization for maximum throughput on RTX 5090
+- **Dependencies**: M03-L23 (FuseMoE), M03-S04 (CUDA Device)
+- **Effort**: 5 hours
+- **Key Feature**: Block-scaling logic for E4M3/E5M2/NVFP4 formats
+
+### M03-S15: GPU Direct Storage (GDS) Integration
+- **Purpose**: High-bandwidth NVMe→GPU DMA bypass for model loading
+- **Dependencies**: M03-S04 (CUDA Device), M03-S05 (GPU Memory Pool)
+- **Effort**: 6 hours
+- **Key Feature**: 25+ GB/s model loading vs ~6 GB/s via CPU
+
+### M03-S16: Pipeline Warm-up & JIT Trigger
+- **Purpose**: Prime GPU and CUDA kernels during initialization
+- **Dependencies**: M03-S01 (Pipeline), M03-S05 (Memory Pool), M03-L23 (FuseMoE)
+- **Effort**: 3 hours
+- **Key Feature**: Ensures <200ms P95 latency from first interaction
+
+### M03-F05 Update: ColBERT Token Storage
+- **Purpose**: Add `aux_data` field for per-token embeddings (Late-Interaction)
+- **Key Feature**: `AuxiliaryEmbeddingData` struct for Module 4 graph storage
+
+---
+
 *Index Generated: 2026-01-01*
 *Module: 03 - 12-Model Embedding Pipeline*
-*Version: 2.0.0*
+*Version: 2.4.0*
