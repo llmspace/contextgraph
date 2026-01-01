@@ -1,80 +1,3 @@
-# Task Specification: M03-F03
-
-```xml
-<task_spec id="M03-F03" version="2.0">
-<metadata>
-  <title>Define ModelEmbedding Struct for Single Model Output</title>
-  <status>complete</status>
-  <layer>foundation</layer>
-  <sequence>3</sequence>
-  <implements>constitution.yaml: embeddings.output_format</implements>
-  <depends_on>M03-F01, M03-F02</depends_on>
-  <estimated_hours>2.0</estimated_hours>
-  <last_updated>2026-01-01</last_updated>
-</metadata>
-```
-
-## Context
-
-Implement `ModelEmbedding` struct representing the output from a single embedding model in the 12-model pipeline. This struct captures the embedding vector along with metadata about which model produced it, timing information for performance monitoring, and whether the vector has been projected to the standard dimension.
-
-### Codebase State (Source of Truth)
-
-**Completed Dependencies:**
-- **M03-F01** (Complete): `ModelId` enum at `crates/context-graph-embeddings/src/types/model_id.rs`
-  - 12 variants: `Semantic`, `TemporalRecent`, `TemporalPeriodic`, `TemporalPositional`, `Causal`, `Sparse`, `Code`, `Graph`, `Hdc`, `Multimodal`, `Entity`, `LateInteraction`
-  - Methods: `dimension()`, `projected_dimension()`, `is_custom()`, `model_repo()`
-  - 21 tests passing
-
-- **M03-F02** (Complete): Dimension constants at `crates/context-graph-embeddings/src/types/dimensions.rs`
-  - `TOTAL_CONCATENATED = 8320` (sum of all 12 model dimensions)
-  - `FUSED_OUTPUT = 1536` (final output dimension)
-  - `MODEL_COUNT = 12`
-  - Individual model dimensions: `SEMANTIC=1024`, `TEMPORAL_*=512`, `CAUSAL=768`, etc.
-  - 15 tests passing
-
-**Existing Error Types** at `crates/context-graph-embeddings/src/error.rs`:
-```rust
-#[derive(Debug, Error)]
-pub enum EmbeddingError {
-    #[error("Failed to load embedding model: {0}")]
-    ModelLoadError(String),
-    #[error("Failed to generate embedding: {0}")]
-    GenerationError(String),
-    #[error("Invalid input: {0}")]
-    InvalidInput(String),
-    #[error("Dimension mismatch: expected {expected}, got {actual}")]
-    DimensionMismatch { expected: usize, actual: usize },
-    #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
-}
-
-pub type EmbeddingResult<T> = Result<T, EmbeddingError>;
-```
-
-**Current Module Structure** at `crates/context-graph-embeddings/src/types/mod.rs`:
-```rust
-//! Core types for the 12-model embedding pipeline.
-mod embedding;
-mod model_id;
-pub mod dimensions;
-
-pub use embedding::ModelEmbedding;
-pub use model_id::ModelId;
-pub use model_id::TokenizerFamily;
-```
-
-### Hardware Target (RTX 5090)
-- VRAM: 32GB GDDR7
-- CUDA: 13.1
-- Compute Capability: 12.0
-- Memory Bandwidth: 1792 GB/s
-
-## Definition of Done
-
-### Required Struct and Implementation
-
-```rust
 //! Single model embedding output with validation and normalization.
 //!
 //! This module provides the `ModelEmbedding` struct which represents
@@ -198,7 +121,7 @@ impl ModelEmbedding {
         // Rule 1: Vector must not be empty
         if self.vector.is_empty() {
             return Err(EmbeddingError::InvalidInput(
-                "Embedding vector is empty".to_string()
+                "Embedding vector is empty".to_string(),
             ));
         }
 
@@ -219,14 +142,16 @@ impl ModelEmbedding {
         // Rule 3 & 4: Check for NaN and Inf values (fail fast)
         for (idx, &val) in self.vector.iter().enumerate() {
             if val.is_nan() {
-                return Err(EmbeddingError::InvalidInput(
-                    format!("NaN value found at index {}", idx)
-                ));
+                return Err(EmbeddingError::InvalidInput(format!(
+                    "NaN value found at index {}",
+                    idx
+                )));
             }
             if val.is_infinite() {
-                return Err(EmbeddingError::InvalidInput(
-                    format!("Infinite value found at index {}", idx)
-                ));
+                return Err(EmbeddingError::InvalidInput(format!(
+                    "Infinite value found at index {}",
+                    idx
+                )));
             }
         }
 
@@ -247,9 +172,7 @@ impl ModelEmbedding {
             return 0.0;
         }
 
-        let sum_squares: f32 = self.vector.iter()
-            .map(|x| x * x)
-            .sum();
+        let sum_squares: f32 = self.vector.iter().map(|x| x * x).sum();
 
         sum_squares.sqrt()
     }
@@ -324,14 +247,16 @@ impl ModelEmbedding {
 
             for (idx, &val) in weights.iter().enumerate() {
                 if val.is_nan() {
-                    return Err(EmbeddingError::InvalidInput(
-                        format!("NaN in attention weights at index {}", idx)
-                    ));
+                    return Err(EmbeddingError::InvalidInput(format!(
+                        "NaN in attention weights at index {}",
+                        idx
+                    )));
                 }
                 if val.is_infinite() {
-                    return Err(EmbeddingError::InvalidInput(
-                        format!("Infinite value in attention weights at index {}", idx)
-                    ));
+                    return Err(EmbeddingError::InvalidInput(format!(
+                        "Infinite value in attention weights at index {}",
+                        idx
+                    )));
                 }
             }
         }
@@ -352,7 +277,7 @@ impl ModelEmbedding {
     pub fn cosine_similarity(&self, other: &Self) -> EmbeddingResult<f32> {
         if self.vector.is_empty() || other.vector.is_empty() {
             return Err(EmbeddingError::InvalidInput(
-                "Cannot compute similarity with empty vector".to_string()
+                "Cannot compute similarity with empty vector".to_string(),
             ));
         }
 
@@ -363,7 +288,9 @@ impl ModelEmbedding {
             });
         }
 
-        let dot_product: f32 = self.vector.iter()
+        let dot_product: f32 = self
+            .vector
+            .iter()
             .zip(other.vector.iter())
             .map(|(a, b)| a * b)
             .sum();
@@ -390,11 +317,7 @@ impl Default for ModelEmbedding {
         }
     }
 }
-```
 
-### Required Unit Tests
-
-```rust
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -441,11 +364,7 @@ mod tests {
 
     #[test]
     fn test_dimension_returns_vector_length() {
-        let embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![1.0; 1024],
-            100,
-        );
+        let embedding = ModelEmbedding::new(ModelId::Semantic, vec![1.0; 1024], 100);
         assert_eq!(embedding.dimension(), 1024);
     }
 
@@ -457,11 +376,7 @@ mod tests {
 
     #[test]
     fn test_is_empty_for_non_empty_vector() {
-        let embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![1.0],
-            100,
-        );
+        let embedding = ModelEmbedding::new(ModelId::Semantic, vec![1.0], 100);
         assert!(!embedding.is_empty());
     }
 
@@ -470,11 +385,7 @@ mod tests {
     #[test]
     fn test_validate_correct_dimension_succeeds() {
         // Semantic has dimension 1024
-        let embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![0.1; 1024],
-            100,
-        );
+        let embedding = ModelEmbedding::new(ModelId::Semantic, vec![0.1; 1024], 100);
         assert!(embedding.validate().is_ok());
     }
 
@@ -482,7 +393,7 @@ mod tests {
     fn test_validate_wrong_dimension_fails() {
         let embedding = ModelEmbedding::new(
             ModelId::Semantic,
-            vec![0.1; 512],  // Wrong: should be 1024
+            vec![0.1; 512], // Wrong: should be 1024
             100,
         );
 
@@ -563,7 +474,7 @@ mod tests {
         // Sparse has dimension() = 30522 but projected_dimension() = 1536
         let mut embedding = ModelEmbedding::new(
             ModelId::Sparse,
-            vec![0.1; 1536],  // projected_dimension() = 1536
+            vec![0.1; 1536], // projected_dimension() = 1536
             100,
         );
         embedding.set_projected(true);
@@ -575,32 +486,20 @@ mod tests {
 
     #[test]
     fn test_l2_norm_unit_vector() {
-        let embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![1.0, 0.0, 0.0],
-            100,
-        );
+        let embedding = ModelEmbedding::new(ModelId::Semantic, vec![1.0, 0.0, 0.0], 100);
         assert!((embedding.l2_norm() - 1.0).abs() < 1e-6);
     }
 
     #[test]
     fn test_l2_norm_known_value() {
         // sqrt(3^2 + 4^2) = sqrt(9 + 16) = sqrt(25) = 5
-        let embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![3.0, 4.0],
-            100,
-        );
+        let embedding = ModelEmbedding::new(ModelId::Semantic, vec![3.0, 4.0], 100);
         assert!((embedding.l2_norm() - 5.0).abs() < 1e-6);
     }
 
     #[test]
     fn test_l2_norm_zero_vector() {
-        let embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![0.0, 0.0, 0.0],
-            100,
-        );
+        let embedding = ModelEmbedding::new(ModelId::Semantic, vec![0.0, 0.0, 0.0], 100);
         assert_eq!(embedding.l2_norm(), 0.0);
     }
 
@@ -612,21 +511,13 @@ mod tests {
 
     #[test]
     fn test_l2_norm_single_element() {
-        let embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![5.0],
-            100,
-        );
+        let embedding = ModelEmbedding::new(ModelId::Semantic, vec![5.0], 100);
         assert!((embedding.l2_norm() - 5.0).abs() < 1e-6);
     }
 
     #[test]
     fn test_l2_norm_negative_values() {
-        let embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![-3.0, -4.0],
-            100,
-        );
+        let embedding = ModelEmbedding::new(ModelId::Semantic, vec![-3.0, -4.0], 100);
         assert!((embedding.l2_norm() - 5.0).abs() < 1e-6);
     }
 
@@ -634,25 +525,21 @@ mod tests {
 
     #[test]
     fn test_normalize_produces_unit_vector() {
-        let mut embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![3.0, 4.0, 0.0],
-            100,
-        );
+        let mut embedding = ModelEmbedding::new(ModelId::Semantic, vec![3.0, 4.0, 0.0], 100);
         embedding.normalize();
 
         let norm = embedding.l2_norm();
-        assert!((norm - 1.0).abs() < 1e-6, "L2 norm should be 1.0, got {}", norm);
+        assert!(
+            (norm - 1.0).abs() < 1e-6,
+            "L2 norm should be 1.0, got {}",
+            norm
+        );
     }
 
     #[test]
     fn test_normalize_preserves_direction() {
         let original = vec![3.0, 4.0];
-        let mut embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            original.clone(),
-            100,
-        );
+        let mut embedding = ModelEmbedding::new(ModelId::Semantic, original.clone(), 100);
         embedding.normalize();
 
         // Check ratio is preserved
@@ -663,11 +550,7 @@ mod tests {
 
     #[test]
     fn test_normalize_zero_vector_unchanged() {
-        let mut embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![0.0, 0.0, 0.0],
-            100,
-        );
+        let mut embedding = ModelEmbedding::new(ModelId::Semantic, vec![0.0, 0.0, 0.0], 100);
         embedding.normalize();
 
         assert_eq!(embedding.vector, vec![0.0, 0.0, 0.0]);
@@ -683,11 +566,7 @@ mod tests {
 
     #[test]
     fn test_normalized_returns_new_embedding() {
-        let embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![3.0, 4.0],
-            100,
-        );
+        let embedding = ModelEmbedding::new(ModelId::Semantic, vec![3.0, 4.0], 100);
         let normalized = embedding.normalized();
 
         // Original unchanged
@@ -698,11 +577,7 @@ mod tests {
 
     #[test]
     fn test_is_normalized_true_for_unit_vector() {
-        let mut embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![1.0, 2.0, 3.0],
-            100,
-        );
+        let mut embedding = ModelEmbedding::new(ModelId::Semantic, vec![1.0, 2.0, 3.0], 100);
         embedding.normalize();
 
         assert!(embedding.is_normalized(1e-6));
@@ -710,11 +585,7 @@ mod tests {
 
     #[test]
     fn test_is_normalized_false_for_non_unit_vector() {
-        let embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![1.0, 2.0, 3.0],
-            100,
-        );
+        let embedding = ModelEmbedding::new(ModelId::Semantic, vec![1.0, 2.0, 3.0], 100);
 
         assert!(!embedding.is_normalized(1e-6));
     }
@@ -772,11 +643,7 @@ mod tests {
 
     #[test]
     fn test_validate_attention_none_succeeds() {
-        let embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![0.1; 1024],
-            100,
-        );
+        let embedding = ModelEmbedding::new(ModelId::Semantic, vec![0.1; 1024], 100);
 
         // Should succeed when no attention weights present
         assert!(embedding.validate_attention(10).is_ok());
@@ -786,11 +653,7 @@ mod tests {
 
     #[test]
     fn test_cosine_similarity_identical_vectors() {
-        let embedding1 = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![1.0, 2.0, 3.0],
-            100,
-        );
+        let embedding1 = ModelEmbedding::new(ModelId::Semantic, vec![1.0, 2.0, 3.0], 100);
         let embedding2 = embedding1.clone();
 
         let sim = embedding1.cosine_similarity(&embedding2).unwrap();
@@ -799,16 +662,8 @@ mod tests {
 
     #[test]
     fn test_cosine_similarity_opposite_vectors() {
-        let embedding1 = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![1.0, 0.0, 0.0],
-            100,
-        );
-        let embedding2 = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![-1.0, 0.0, 0.0],
-            100,
-        );
+        let embedding1 = ModelEmbedding::new(ModelId::Semantic, vec![1.0, 0.0, 0.0], 100);
+        let embedding2 = ModelEmbedding::new(ModelId::Semantic, vec![-1.0, 0.0, 0.0], 100);
 
         let sim = embedding1.cosine_similarity(&embedding2).unwrap();
         assert!((sim - (-1.0)).abs() < 1e-6);
@@ -816,16 +671,8 @@ mod tests {
 
     #[test]
     fn test_cosine_similarity_orthogonal_vectors() {
-        let embedding1 = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![1.0, 0.0],
-            100,
-        );
-        let embedding2 = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![0.0, 1.0],
-            100,
-        );
+        let embedding1 = ModelEmbedding::new(ModelId::Semantic, vec![1.0, 0.0], 100);
+        let embedding2 = ModelEmbedding::new(ModelId::Semantic, vec![0.0, 1.0], 100);
 
         let sim = embedding1.cosine_similarity(&embedding2).unwrap();
         assert!(sim.abs() < 1e-6);
@@ -833,16 +680,8 @@ mod tests {
 
     #[test]
     fn test_cosine_similarity_dimension_mismatch_fails() {
-        let embedding1 = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![1.0, 2.0, 3.0],
-            100,
-        );
-        let embedding2 = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![1.0, 2.0],
-            100,
-        );
+        let embedding1 = ModelEmbedding::new(ModelId::Semantic, vec![1.0, 2.0, 3.0], 100);
+        let embedding2 = ModelEmbedding::new(ModelId::Semantic, vec![1.0, 2.0], 100);
 
         let err = embedding1.cosine_similarity(&embedding2).unwrap_err();
         match err {
@@ -854,11 +693,7 @@ mod tests {
     #[test]
     fn test_cosine_similarity_empty_vector_fails() {
         let embedding1 = ModelEmbedding::default();
-        let embedding2 = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![1.0, 2.0],
-            100,
-        );
+        let embedding2 = ModelEmbedding::new(ModelId::Semantic, vec![1.0, 2.0], 100);
 
         let err = embedding1.cosine_similarity(&embedding2).unwrap_err();
         match err {
@@ -875,26 +710,22 @@ mod tests {
     fn test_validate_all_model_dimensions() {
         // All 12 models with their native dimensions from ModelId::dimension()
         let models_and_dims = [
-            (ModelId::Semantic, 1024),           // E1: e5-large-v2
-            (ModelId::TemporalRecent, 512),      // E2: Custom exponential decay
-            (ModelId::TemporalPeriodic, 512),    // E3: Custom Fourier basis
-            (ModelId::TemporalPositional, 512),  // E4: Custom sinusoidal PE
-            (ModelId::Causal, 768),              // E5: Longformer
-            (ModelId::Sparse, 30522),            // E6: SPLADE (sparse vocab)
-            (ModelId::Code, 256),                // E7: CodeT5p embed_dim
-            (ModelId::Graph, 384),               // E8: paraphrase-MiniLM
-            (ModelId::Hdc, 10000),               // E9: Hyperdimensional (10K-bit)
-            (ModelId::Multimodal, 768),          // E10: CLIP
-            (ModelId::Entity, 384),              // E11: all-MiniLM
-            (ModelId::LateInteraction, 128),     // E12: ColBERT per-token
+            (ModelId::Semantic, 1024),          // E1: e5-large-v2
+            (ModelId::TemporalRecent, 512),     // E2: Custom exponential decay
+            (ModelId::TemporalPeriodic, 512),   // E3: Custom Fourier basis
+            (ModelId::TemporalPositional, 512), // E4: Custom sinusoidal PE
+            (ModelId::Causal, 768),             // E5: Longformer
+            (ModelId::Sparse, 30522),           // E6: SPLADE (sparse vocab)
+            (ModelId::Code, 256),               // E7: CodeT5p embed_dim
+            (ModelId::Graph, 384),              // E8: paraphrase-MiniLM
+            (ModelId::Hdc, 10000),              // E9: Hyperdimensional (10K-bit)
+            (ModelId::Multimodal, 768),         // E10: CLIP
+            (ModelId::Entity, 384),             // E11: all-MiniLM
+            (ModelId::LateInteraction, 128),    // E12: ColBERT per-token
         ];
 
         for (model_id, expected_dim) in models_and_dims {
-            let embedding = ModelEmbedding::new(
-                model_id,
-                vec![0.1; expected_dim],
-                100,
-            );
+            let embedding = ModelEmbedding::new(model_id, vec![0.1; expected_dim], 100);
 
             assert!(
                 embedding.validate().is_ok(),
@@ -910,11 +741,7 @@ mod tests {
     #[test]
     fn test_large_vector_normalization() {
         let large_vec: Vec<f32> = (0..10000).map(|i| i as f32).collect();
-        let mut embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            large_vec,
-            100,
-        );
+        let mut embedding = ModelEmbedding::new(ModelId::Semantic, large_vec, 100);
         embedding.normalize();
 
         assert!((embedding.l2_norm() - 1.0).abs() < 1e-5);
@@ -922,16 +749,19 @@ mod tests {
 
     #[test]
     fn test_very_small_values_normalize() {
-        let mut embedding = ModelEmbedding::new(
-            ModelId::Semantic,
-            vec![1e-20, 1e-20, 1e-20],
-            100,
-        );
+        // Values with norm < f32::EPSILON should remain unchanged
+        let original = vec![1e-20, 1e-20, 1e-20];
+        let mut embedding = ModelEmbedding::new(ModelId::Semantic, original.clone(), 100);
+
+        // Verify norm is below EPSILON threshold
+        let norm_before = embedding.l2_norm();
+        assert!(norm_before < f32::EPSILON, "Test assumes norm < EPSILON");
+
         embedding.normalize();
 
-        // Very small values (1e-20) have norm below f32::EPSILON threshold,
-        // so normalize() leaves them unchanged to avoid numerical instability
-        assert_eq!(embedding.vector, vec![1e-20, 1e-20, 1e-20]);
+        // Vector should remain unchanged (avoid division by near-zero)
+        assert_eq!(embedding.vector, original);
+        assert_eq!(embedding.l2_norm(), norm_before);
     }
 
     #[test]
@@ -948,136 +778,3 @@ mod tests {
         assert_eq!(embedding, cloned);
     }
 }
-```
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| `crates/context-graph-embeddings/src/types/embedding.rs` | ModelEmbedding struct implementation |
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `crates/context-graph-embeddings/src/types/mod.rs` | Add `mod embedding;` and `pub use embedding::ModelEmbedding;` |
-
-## Validation Criteria
-
-### Build Verification
-```bash
-# All must pass
-cargo check -p context-graph-embeddings
-cargo build -p context-graph-embeddings
-cargo test -p context-graph-embeddings
-cargo clippy -p context-graph-embeddings -- -D warnings
-cargo doc -p context-graph-embeddings --no-deps
-```
-
-### Test Coverage Requirements
-- All 39 unit tests must pass (embedding.rs contains exactly 39 tests)
-- Coverage for all public methods
-- Edge cases: empty vector, zero vector, single element, large vector
-- All 12 model dimension validations tested
-
-## Full State Verification Protocol
-
-### 1. Source of Truth Identification
-- **ModelId enum**: `crates/context-graph-embeddings/src/types/model_id.rs`
-- **Dimension constants**: `crates/context-graph-embeddings/src/types/dimensions.rs`
-- **Error types**: `crates/context-graph-embeddings/src/error.rs`
-- **Module exports**: `crates/context-graph-embeddings/src/types/mod.rs`
-
-### 2. Execute & Inspect
-```bash
-# Run tests with output
-cargo test -p context-graph-embeddings -- --nocapture
-
-# Verify specific ModelEmbedding tests
-cargo test -p context-graph-embeddings embedding -- --nocapture
-```
-
-### 3. Boundary & Edge Case Audit
-- [ ] Empty vector handling (validate returns error, normalize no-op)
-- [ ] Zero vector handling (normalize avoids division by zero)
-- [ ] Single element vector
-- [ ] Very large vectors (10,000+ elements)
-- [ ] Very small values (1e-20)
-- [ ] NaN at various positions (first, middle, last)
-- [ ] Inf at various positions
-- [ ] All 12 model dimensions tested
-
-### 4. Evidence of Success
-```bash
-# Required output pattern for embedding.rs:
-# running 39 tests
-# test tests::test_new_creates_valid_embedding ... ok
-# test tests::test_validate_correct_dimension_succeeds ... ok
-# ... (all tests)
-# test result: ok. 39 passed; 0 failed; 0 ignored
-
-# Total package tests (M03-F01 + F02 + F03):
-# test result: ok. 83 passed; 0 failed; 0 ignored
-```
-
-## Manual Verification Requirements
-
-After implementation, verify:
-
-1. **Code Review Checklist**:
-   - [ ] No `unwrap()` on user input paths
-   - [ ] All errors use `EmbeddingError` variants
-   - [ ] No panics in production code paths
-   - [ ] Inline hints on hot paths (`#[inline]`)
-   - [ ] Documentation on all public items
-
-2. **Integration Check**:
-   - [ ] `ModelEmbedding` exported from `crate::types`
-   - [ ] Can be used with `ModelId::Semantic` through `ModelId::LateInteraction`
-   - [ ] Latency tracking works correctly
-
-3. **Cargo Commands**:
-   ```bash
-   cargo check -p context-graph-embeddings  # Must pass
-   cargo test -p context-graph-embeddings   # Must pass (83 tests after M03-F01, F02, F03)
-   cargo clippy -p context-graph-embeddings -- -D warnings  # Must pass
-   ```
-
-## Sherlock-Holmes Verification
-
-**After implementation, run sherlock-holmes subagent with:**
-
-```
-Verify M03-F03 ModelEmbedding implementation:
-1. Confirm embedding.rs exists at correct path
-2. Confirm struct has all 5 fields: model_id, vector, latency_us, attention_weights, is_projected
-3. Confirm all methods exist: new, with_attention, dimension, is_empty, validate, l2_norm, normalize, normalized, is_normalized, set_projected, validate_attention, cosine_similarity
-4. Confirm all 39 tests in embedding.rs pass
-5. Confirm no mock data in tests - all use real model dimensions
-6. Confirm error handling uses EmbeddingError variants
-7. Confirm mod.rs exports ModelEmbedding
-```
-
-## Downstream Impact
-
-This task enables:
-- **M03-F04**: `CombinedEmbedding` struct (depends on `ModelEmbedding`)
-- **M03-C01**: Pipeline configuration (uses embedding types)
-- **M03-I01**: Batch processing (processes `ModelEmbedding` instances)
-
-## Implementation Notes
-
-### Fail Fast Policy
-- All validation errors return immediately on first failure
-- No partial validation or error accumulation
-- Clear error messages with indices where applicable
-
-### No Mock Data
-- All tests use actual model dimensions from `ModelId::dimension()`
-- Tests verify against all 12 model types
-- Edge cases use realistic value ranges
-
-### Performance Considerations
-- `#[inline]` on frequently-called methods
-- SIMD-friendly loop patterns for GPU compatibility
-- No allocations in hot paths where possible

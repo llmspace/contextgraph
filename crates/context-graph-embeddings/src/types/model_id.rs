@@ -257,13 +257,13 @@ impl ModelId {
     }
 
     /// Returns only pretrained models (require weight loading).
-    #[must_use]
+    #[must_use = "this returns an iterator that must be consumed"]
     pub fn pretrained() -> impl Iterator<Item = ModelId> {
         Self::all().iter().copied().filter(|m| m.is_pretrained())
     }
 
     /// Returns only custom models (require implementation, no weights).
-    #[must_use]
+    #[must_use = "this returns an iterator that must be consumed"]
     pub fn custom() -> impl Iterator<Item = ModelId> {
         Self::all().iter().copied().filter(|m| m.is_custom())
     }
