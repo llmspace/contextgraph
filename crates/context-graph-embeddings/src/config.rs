@@ -1115,6 +1115,7 @@ impl EmbeddingConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
@@ -1490,9 +1491,11 @@ enabled = false
 
     // =========================================================================
     // ENVIRONMENT OVERRIDE TESTS (6 tests)
+    // These tests must run serially to avoid env var pollution
     // =========================================================================
 
     #[test]
+    #[serial]
     fn test_env_override_models_dir() {
         env::set_var("EMBEDDING_MODELS_DIR", "/custom/models");
         let config = EmbeddingConfig::default().with_env_overrides();
@@ -1502,6 +1505,7 @@ enabled = false
     }
 
     #[test]
+    #[serial]
     fn test_env_override_gpu_enabled() {
         env::set_var("EMBEDDING_GPU_ENABLED", "false");
         let config = EmbeddingConfig::default().with_env_overrides();
@@ -1511,6 +1515,7 @@ enabled = false
     }
 
     #[test]
+    #[serial]
     fn test_env_override_cache_max_entries() {
         env::set_var("EMBEDDING_CACHE_MAX_ENTRIES", "50000");
         let config = EmbeddingConfig::default().with_env_overrides();
@@ -1520,6 +1525,7 @@ enabled = false
     }
 
     #[test]
+    #[serial]
     fn test_env_override_batch_max_size() {
         env::set_var("EMBEDDING_BATCH_MAX_SIZE", "64");
         let config = EmbeddingConfig::default().with_env_overrides();
@@ -1529,6 +1535,7 @@ enabled = false
     }
 
     #[test]
+    #[serial]
     fn test_env_override_invalid_value_ignored() {
         env::set_var("EMBEDDING_GPU_ENABLED", "not_a_bool");
         let config = EmbeddingConfig::default().with_env_overrides();
@@ -1539,6 +1546,7 @@ enabled = false
     }
 
     #[test]
+    #[serial]
     fn test_env_override_lazy_loading() {
         env::set_var("EMBEDDING_LAZY_LOADING", "false");
         let config = EmbeddingConfig::default().with_env_overrides();
