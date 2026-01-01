@@ -7,7 +7,8 @@ mod error_codes;
 mod initialize;
 mod memory;
 mod meta_cognitive;
-mod tools;
+mod tools_list;
+mod tools_call;
 mod utl;
 
 use std::sync::Arc;

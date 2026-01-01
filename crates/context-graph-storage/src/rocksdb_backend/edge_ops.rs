@@ -6,7 +6,7 @@
 use rocksdb::IteratorMode;
 
 use crate::column_families::cf_names;
-use crate::serialization::{deserialize_edge, serialize_edge, serialize_uuid};
+use crate::serialization::{deserialize_edge, serialize_edge};
 use context_graph_core::marblestone::EdgeType;
 use context_graph_core::types::{GraphEdge, NodeId};
 
@@ -168,7 +168,3 @@ impl RocksDbMemex {
         Ok(edges)
     }
 }
-
-// Re-export for use in tests
-pub(crate) use super::helpers::format_edge_key;
-pub(crate) use crate::serialization::serialize_uuid;

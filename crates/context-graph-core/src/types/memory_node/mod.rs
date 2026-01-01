@@ -23,7 +23,6 @@ mod metadata;
 mod node;
 mod validation;
 
-// Comprehensive test modules
 #[cfg(test)]
 mod tests_serialization;
 #[cfg(test)]

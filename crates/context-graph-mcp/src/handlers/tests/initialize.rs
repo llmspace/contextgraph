@@ -1,7 +1,5 @@
 //! Initialize Handshake Tests (MCP 2024-11-05 compliance)
 
-use serde_json::json;
-
 use crate::protocol::JsonRpcId;
 
 use super::{create_test_handlers, make_request};
