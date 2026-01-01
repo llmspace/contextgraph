@@ -106,7 +106,7 @@ impl FusedEmbedding {
     ) -> EmbeddingResult<Self> {
         // Validate dimension
         if vector.len() != FUSED_OUTPUT {
-            return Err(EmbeddingError::DimensionMismatch {
+            return Err(EmbeddingError::InvalidDimension {
                 expected: FUSED_OUTPUT,
                 actual: vector.len(),
             });
@@ -115,18 +115,16 @@ impl FusedEmbedding {
         // Validate expert indices
         for (i, &idx) in selected_experts.iter().enumerate() {
             if idx as usize >= NUM_EXPERTS {
-                return Err(EmbeddingError::InvalidExpertIndex {
-                    index: idx,
-                    max: NUM_EXPERTS,
+                return Err(EmbeddingError::FusionError {
+                    message: format!("Invalid expert index {}, max is {}", idx, NUM_EXPERTS),
                 });
             }
             // Check for duplicate expert selection
-            for j in (i + 1)..selected_experts.len() {
-                if selected_experts[j] == idx {
-                    return Err(EmbeddingError::InvalidInput(format!(
-                        "Duplicate expert index: {}",
-                        idx
-                    )));
+            for &other_idx in selected_experts.iter().skip(i + 1) {
+                if other_idx == idx {
+                    return Err(EmbeddingError::FusionError {
+                        message: format!("Duplicate expert index: {}", idx),
+                    });
                 }
             }
         }
@@ -162,41 +160,32 @@ impl FusedEmbedding {
     /// - selected_experts contain invalid indices (>=8)
     ///
     /// # Errors
-    /// - `EmbeddingError::InvalidVector` if NaN or Inf values found
-    /// - `EmbeddingError::ExpertWeightsInvalid` if weights don't sum to ~1.0
-    /// - `EmbeddingError::InvalidExpertIndex` if expert indices >= 8
+    /// - `EmbeddingError::InvalidValue` if NaN or Inf values found
+    /// - `EmbeddingError::FusionError` if weights don't sum to ~1.0 or invalid expert indices
     pub fn validate(&self) -> EmbeddingResult<()> {
         // Check for NaN/Inf in vector
         for (idx, &val) in self.vector.iter().enumerate() {
-            if val.is_nan() {
-                return Err(EmbeddingError::InvalidVector(format!(
-                    "NaN value at index {}",
-                    idx
-                )));
-            }
-            if val.is_infinite() {
-                return Err(EmbeddingError::InvalidVector(format!(
-                    "Infinite value at index {}",
-                    idx
-                )));
+            if val.is_nan() || val.is_infinite() {
+                return Err(EmbeddingError::InvalidValue { index: idx, value: val });
             }
         }
 
         // Check expert weights sum to 1.0 ± tolerance
         let weight_sum: f32 = self.expert_weights.iter().sum();
         if (weight_sum - 1.0).abs() > WEIGHT_SUM_TOLERANCE {
-            return Err(EmbeddingError::ExpertWeightsInvalid(format!(
-                "Weights sum to {:.6}, expected 1.0 ± {}",
-                weight_sum, WEIGHT_SUM_TOLERANCE
-            )));
+            return Err(EmbeddingError::FusionError {
+                message: format!(
+                    "Weights sum to {:.6}, expected 1.0 ± {}",
+                    weight_sum, WEIGHT_SUM_TOLERANCE
+                ),
+            });
         }
 
         // Check expert indices
         for &idx in &self.selected_experts {
             if idx as usize >= NUM_EXPERTS {
-                return Err(EmbeddingError::InvalidExpertIndex {
-                    index: idx,
-                    max: NUM_EXPERTS,
+                return Err(EmbeddingError::FusionError {
+                    message: format!("Invalid expert index {}, max is {}", idx, NUM_EXPERTS),
                 });
             }
         }
@@ -296,11 +285,13 @@ impl FusedEmbedding {
     /// - `EmbeddingError::SerializationError` if data is truncated or corrupted
     pub fn from_bytes(bytes: &[u8]) -> EmbeddingResult<Self> {
         if bytes.len() < CORE_BINARY_SIZE {
-            return Err(EmbeddingError::SerializationError(format!(
-                "Data too short: expected at least {} bytes, got {}",
-                CORE_BINARY_SIZE,
-                bytes.len()
-            )));
+            return Err(EmbeddingError::SerializationError {
+                message: format!(
+                    "Data too short: expected at least {} bytes, got {}",
+                    CORE_BINARY_SIZE,
+                    bytes.len()
+                ),
+            });
         }
 
         let mut offset = 0;
@@ -372,12 +363,14 @@ impl FusedEmbedding {
         // Aux data blob (if present)
         let aux_data = if aux_len > 0 {
             if bytes.len() < offset + aux_len {
-                return Err(EmbeddingError::SerializationError(format!(
-                    "Aux data truncated: expected {} bytes at offset {}, got {} total",
-                    aux_len,
-                    offset,
-                    bytes.len()
-                )));
+                return Err(EmbeddingError::SerializationError {
+                    message: format!(
+                        "Aux data truncated: expected {} bytes at offset {}, got {} total",
+                        aux_len,
+                        offset,
+                        bytes.len()
+                    ),
+                });
             }
             let blob = &bytes[offset..offset + aux_len];
             Some(AuxiliaryEmbeddingData::from_blob(blob)?)
@@ -410,23 +403,23 @@ impl FusedEmbedding {
     /// Compress aux_data token_vectors into blob.
     ///
     /// # Errors
-    /// - `EmbeddingError::InvalidAuxData` if no aux_data present
+    /// - `EmbeddingError::FusionError` if no aux_data present
     pub fn compress_aux_data(&mut self) -> EmbeddingResult<()> {
         if let Some(ref mut aux) = self.aux_data {
             let blob = aux.to_blob();
             aux.blob = Some(blob);
             Ok(())
         } else {
-            Err(EmbeddingError::InvalidAuxData(
-                "No auxiliary data to compress".to_string(),
-            ))
+            Err(EmbeddingError::FusionError {
+                message: "No auxiliary data to compress".to_string(),
+            })
         }
     }
 
     /// Decompress aux_data blob into token_vectors.
     ///
     /// # Errors
-    /// - `EmbeddingError::InvalidAuxData` if no aux_data or no blob present
+    /// - `EmbeddingError::FusionError` if no aux_data or no blob present
     pub fn decompress_aux_data(&mut self) -> EmbeddingResult<()> {
         if let Some(ref mut aux) = self.aux_data {
             if let Some(ref blob) = aux.blob {
@@ -435,14 +428,14 @@ impl FusedEmbedding {
                 aux.num_tokens = decompressed.num_tokens;
                 Ok(())
             } else {
-                Err(EmbeddingError::InvalidAuxData(
-                    "No blob to decompress".to_string(),
-                ))
+                Err(EmbeddingError::FusionError {
+                    message: "No blob to decompress".to_string(),
+                })
             }
         } else {
-            Err(EmbeddingError::InvalidAuxData(
-                "No auxiliary data present".to_string(),
-            ))
+            Err(EmbeddingError::FusionError {
+                message: "No auxiliary data present".to_string(),
+            })
         }
     }
 
@@ -498,14 +491,14 @@ impl AuxiliaryEmbeddingData {
     /// Try to create new AuxiliaryEmbeddingData without panicking.
     ///
     /// # Errors
-    /// - `EmbeddingError::DimensionMismatch` if any token vector is not 128D
+    /// - `EmbeddingError::InvalidDimension` if any token vector is not 128D
     pub fn try_new(
         source_model: ModelId,
         token_vectors: Vec<Vec<f32>>,
     ) -> EmbeddingResult<Self> {
         for vec in token_vectors.iter() {
             if vec.len() != COLBERT_V3_DIM {
-                return Err(EmbeddingError::DimensionMismatch {
+                return Err(EmbeddingError::InvalidDimension {
                     expected: COLBERT_V3_DIM,
                     actual: vec.len(),
                 });
@@ -553,14 +546,16 @@ impl AuxiliaryEmbeddingData {
     /// - `EmbeddingError::SerializationError` if blob is corrupted or truncated
     pub fn from_blob(blob: &[u8]) -> EmbeddingResult<Self> {
         if blob.len() < 5 {
-            return Err(EmbeddingError::SerializationError(
-                "Blob too short for header".to_string(),
-            ));
+            return Err(EmbeddingError::SerializationError {
+                message: "Blob too short for header".to_string(),
+            });
         }
 
         // Source model: 1 byte
         let source_model = ModelId::try_from(blob[0]).map_err(|e| {
-            EmbeddingError::SerializationError(format!("Invalid source model: {}", e))
+            EmbeddingError::SerializationError {
+                message: format!("Invalid source model: {}", e),
+            }
         })?;
 
         // Num tokens: 4 bytes
@@ -569,10 +564,12 @@ impl AuxiliaryEmbeddingData {
 
         let expected_len = 5 + num_tokens * COLBERT_V3_DIM * 4;
         if blob.len() < expected_len {
-            return Err(EmbeddingError::SerializationError(format!(
-                "Blob too short: expected {} bytes for {} tokens, got {}",
-                expected_len, num_tokens, blob.len()
-            )));
+            return Err(EmbeddingError::SerializationError {
+                message: format!(
+                    "Blob too short: expected {} bytes for {} tokens, got {}",
+                    expected_len, num_tokens, blob.len()
+                ),
+            });
         }
 
         // Token vectors
@@ -612,28 +609,25 @@ impl AuxiliaryEmbeddingData {
     /// Validate token vector dimensions.
     ///
     /// # Errors
-    /// - `EmbeddingError::DimensionMismatch` if any token vector is not 128D
+    /// - `EmbeddingError::InvalidDimension` if any token vector is not 128D
+    /// - `EmbeddingError::FusionError` if NaN or Inf values found
     pub fn validate(&self) -> EmbeddingResult<()> {
         for (i, vec) in self.token_vectors.iter().enumerate() {
             if vec.len() != COLBERT_V3_DIM {
-                return Err(EmbeddingError::DimensionMismatch {
+                return Err(EmbeddingError::InvalidDimension {
                     expected: COLBERT_V3_DIM,
                     actual: vec.len(),
                 });
             }
             // Check for NaN/Inf
             for (j, &val) in vec.iter().enumerate() {
-                if val.is_nan() {
-                    return Err(EmbeddingError::InvalidVector(format!(
-                        "NaN in token {} at position {}",
-                        i, j
-                    )));
-                }
-                if val.is_infinite() {
-                    return Err(EmbeddingError::InvalidVector(format!(
-                        "Infinite in token {} at position {}",
-                        i, j
-                    )));
+                if val.is_nan() || val.is_infinite() {
+                    return Err(EmbeddingError::FusionError {
+                        message: format!(
+                            "Invalid value {} in token {} at position {}",
+                            val, i, j
+                        ),
+                    });
                 }
             }
         }
@@ -700,11 +694,11 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            EmbeddingError::DimensionMismatch { expected, actual } => {
+            EmbeddingError::InvalidDimension { expected, actual } => {
                 assert_eq!(expected, FUSED_OUTPUT);
                 assert_eq!(actual, 512);
             }
-            e => panic!("Expected DimensionMismatch, got {:?}", e),
+            e => panic!("Expected InvalidDimension, got {:?}", e),
         }
         println!("PASSED: new() with wrong dimension fails correctly");
     }
@@ -719,11 +713,11 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            EmbeddingError::InvalidExpertIndex { index, max } => {
-                assert_eq!(index, 8);
-                assert_eq!(max, NUM_EXPERTS);
+            EmbeddingError::FusionError { message } => {
+                assert!(message.contains("8"));
+                assert!(message.contains("Invalid expert index"));
             }
-            e => panic!("Expected InvalidExpertIndex, got {:?}", e),
+            e => panic!("Expected FusionError, got {:?}", e),
         }
         println!("PASSED: new() with invalid expert indices fails correctly");
     }
@@ -793,11 +787,11 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            EmbeddingError::InvalidVector(msg) => {
-                assert!(msg.contains("NaN"));
-                assert!(msg.contains("100"));
+            EmbeddingError::InvalidValue { index, value } => {
+                assert_eq!(index, 100);
+                assert!(value.is_nan());
             }
-            e => panic!("Expected InvalidVector, got {:?}", e),
+            e => panic!("Expected InvalidValue, got {:?}", e),
         }
         println!("PASSED: validate() rejects NaN in vector");
     }
@@ -811,10 +805,11 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            EmbeddingError::InvalidVector(msg) => {
-                assert!(msg.contains("Infinite"));
+            EmbeddingError::InvalidValue { index, value } => {
+                assert_eq!(index, 500);
+                assert!(value.is_infinite() && value.is_sign_positive());
             }
-            e => panic!("Expected InvalidVector, got {:?}", e),
+            e => panic!("Expected InvalidValue, got {:?}", e),
         }
         println!("PASSED: validate() rejects Inf in vector");
     }
@@ -828,10 +823,11 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            EmbeddingError::InvalidVector(msg) => {
-                assert!(msg.contains("Infinite"));
+            EmbeddingError::InvalidValue { index, value } => {
+                assert_eq!(index, 200);
+                assert!(value.is_infinite() && value.is_sign_negative());
             }
-            e => panic!("Expected InvalidVector, got {:?}", e),
+            e => panic!("Expected InvalidValue, got {:?}", e),
         }
         println!("PASSED: validate() rejects -Inf in vector");
     }
@@ -845,10 +841,10 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            EmbeddingError::ExpertWeightsInvalid(msg) => {
-                assert!(msg.contains("0.8"));
+            EmbeddingError::FusionError { message } => {
+                assert!(message.contains("0.8"));
             }
-            e => panic!("Expected ExpertWeightsInvalid, got {:?}", e),
+            e => panic!("Expected FusionError, got {:?}", e),
         }
         println!("PASSED: validate() rejects expert_weights sum != 1.0");
     }
@@ -1156,8 +1152,8 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            EmbeddingError::SerializationError(msg) => {
-                assert!(msg.contains("too short"));
+            EmbeddingError::SerializationError { message } => {
+                assert!(message.contains("too short"));
             }
             e => panic!("Expected SerializationError, got {:?}", e),
         }
@@ -1396,10 +1392,10 @@ mod tests {
         println!("Duplicate expert selection result: {:?}", result);
         assert!(result.is_err());
         match result.unwrap_err() {
-            EmbeddingError::InvalidInput(msg) => {
-                assert!(msg.contains("Duplicate"));
+            EmbeddingError::FusionError { message } => {
+                assert!(message.contains("Duplicate"));
             }
-            e => panic!("Expected InvalidInput for duplicate, got {:?}", e),
+            e => panic!("Expected FusionError for duplicate, got {:?}", e),
         }
         println!("Edge Case PASSED: Duplicate expert indices rejected");
     }

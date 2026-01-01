@@ -568,8 +568,11 @@ mod tests {
         let result = ce.validate();
         assert!(result.is_err());
         match result.unwrap_err() {
-            EmbeddingError::InvalidInput(msg) => assert!(msg.contains("NaN")),
-            _ => panic!("Expected InvalidInput error"),
+            EmbeddingError::InvalidValue { index, value } => {
+                assert_eq!(index, 500);
+                assert!(value.is_nan());
+            }
+            _ => panic!("Expected InvalidValue error"),
         }
     }
 

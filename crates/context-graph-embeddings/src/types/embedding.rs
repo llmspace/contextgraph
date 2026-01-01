@@ -111,18 +111,16 @@ impl ModelEmbedding {
     /// 4. Vector must not be empty
     ///
     /// # Errors
-    /// - `EmbeddingError::InvalidInput` if vector is empty
-    /// - `EmbeddingError::DimensionMismatch` if dimension doesn't match model
-    /// - `EmbeddingError::InvalidInput` if NaN or Inf values found
+    /// - `EmbeddingError::EmptyInput` if vector is empty
+    /// - `EmbeddingError::InvalidDimension` if dimension doesn't match model
+    /// - `EmbeddingError::EmptyInput` if NaN or Inf values found
     ///
     /// # Fail Fast
     /// This method fails immediately on first error - no partial validation.
     pub fn validate(&self) -> EmbeddingResult<()> {
         // Rule 1: Vector must not be empty
         if self.vector.is_empty() {
-            return Err(EmbeddingError::InvalidInput(
-                "Embedding vector is empty".to_string(),
-            ));
+            return Err(EmbeddingError::EmptyInput);
         }
 
         // Rule 2: Check dimension matches expected
@@ -133,7 +131,7 @@ impl ModelEmbedding {
         };
 
         if self.vector.len() != expected_dim {
-            return Err(EmbeddingError::DimensionMismatch {
+            return Err(EmbeddingError::InvalidDimension {
                 expected: expected_dim,
                 actual: self.vector.len(),
             });
@@ -141,17 +139,8 @@ impl ModelEmbedding {
 
         // Rule 3 & 4: Check for NaN and Inf values (fail fast)
         for (idx, &val) in self.vector.iter().enumerate() {
-            if val.is_nan() {
-                return Err(EmbeddingError::InvalidInput(format!(
-                    "NaN value found at index {}",
-                    idx
-                )));
-            }
-            if val.is_infinite() {
-                return Err(EmbeddingError::InvalidInput(format!(
-                    "Infinite value found at index {}",
-                    idx
-                )));
+            if val.is_nan() || val.is_infinite() {
+                return Err(EmbeddingError::InvalidValue { index: idx, value: val });
             }
         }
 
@@ -234,29 +223,20 @@ impl ModelEmbedding {
     /// * `expected_token_count` - The number of input tokens
     ///
     /// # Errors
-    /// - `EmbeddingError::DimensionMismatch` if attention weights length != token count
-    /// - `EmbeddingError::InvalidInput` if NaN/Inf in attention weights
+    /// - `EmbeddingError::InvalidDimension` if attention weights length != token count
+    /// - `EmbeddingError::InvalidValue` if NaN/Inf in attention weights
     pub fn validate_attention(&self, expected_token_count: usize) -> EmbeddingResult<()> {
         if let Some(ref weights) = self.attention_weights {
             if weights.len() != expected_token_count {
-                return Err(EmbeddingError::DimensionMismatch {
+                return Err(EmbeddingError::InvalidDimension {
                     expected: expected_token_count,
                     actual: weights.len(),
                 });
             }
 
             for (idx, &val) in weights.iter().enumerate() {
-                if val.is_nan() {
-                    return Err(EmbeddingError::InvalidInput(format!(
-                        "NaN in attention weights at index {}",
-                        idx
-                    )));
-                }
-                if val.is_infinite() {
-                    return Err(EmbeddingError::InvalidInput(format!(
-                        "Infinite value in attention weights at index {}",
-                        idx
-                    )));
+                if val.is_nan() || val.is_infinite() {
+                    return Err(EmbeddingError::InvalidValue { index: idx, value: val });
                 }
             }
         }
@@ -272,17 +252,15 @@ impl ModelEmbedding {
     /// Cosine similarity in range [-1.0, 1.0]
     ///
     /// # Errors
-    /// - `EmbeddingError::DimensionMismatch` if dimensions don't match
-    /// - `EmbeddingError::InvalidInput` if either vector is empty
+    /// - `EmbeddingError::InvalidDimension` if dimensions don't match
+    /// - `EmbeddingError::EmptyInput` if either vector is empty
     pub fn cosine_similarity(&self, other: &Self) -> EmbeddingResult<f32> {
         if self.vector.is_empty() || other.vector.is_empty() {
-            return Err(EmbeddingError::InvalidInput(
-                "Cannot compute similarity with empty vector".to_string(),
-            ));
+            return Err(EmbeddingError::EmptyInput);
         }
 
         if self.vector.len() != other.vector.len() {
-            return Err(EmbeddingError::DimensionMismatch {
+            return Err(EmbeddingError::InvalidDimension {
                 expected: self.vector.len(),
                 actual: other.vector.len(),
             });
@@ -399,11 +377,11 @@ mod tests {
 
         let err = embedding.validate().unwrap_err();
         match err {
-            EmbeddingError::DimensionMismatch { expected, actual } => {
+            EmbeddingError::InvalidDimension { expected, actual } => {
                 assert_eq!(expected, 1024);
                 assert_eq!(actual, 512);
             }
-            _ => panic!("Expected DimensionMismatch error"),
+            _ => panic!("Expected InvalidDimension error"),
         }
     }
 
@@ -412,12 +390,10 @@ mod tests {
         let embedding = ModelEmbedding::default();
 
         let err = embedding.validate().unwrap_err();
-        match err {
-            EmbeddingError::InvalidInput(msg) => {
-                assert!(msg.contains("empty"));
-            }
-            _ => panic!("Expected InvalidInput error for empty vector"),
-        }
+        assert!(
+            matches!(err, EmbeddingError::EmptyInput),
+            "Expected EmptyInput error for empty vector"
+        );
     }
 
     #[test]
@@ -429,11 +405,11 @@ mod tests {
 
         let err = embedding.validate().unwrap_err();
         match err {
-            EmbeddingError::InvalidInput(msg) => {
-                assert!(msg.contains("NaN"));
-                assert!(msg.contains("500"));
+            EmbeddingError::InvalidValue { index, value } => {
+                assert_eq!(index, 500);
+                assert!(value.is_nan());
             }
-            _ => panic!("Expected InvalidInput error for NaN"),
+            _ => panic!("Expected InvalidValue error for NaN"),
         }
     }
 
@@ -446,10 +422,11 @@ mod tests {
 
         let err = embedding.validate().unwrap_err();
         match err {
-            EmbeddingError::InvalidInput(msg) => {
-                assert!(msg.contains("Infinite"));
+            EmbeddingError::InvalidValue { index, value } => {
+                assert_eq!(index, 100);
+                assert!(value.is_infinite() && value.is_sign_positive());
             }
-            _ => panic!("Expected InvalidInput error for Inf"),
+            _ => panic!("Expected InvalidValue error for Inf"),
         }
     }
 
@@ -462,10 +439,11 @@ mod tests {
 
         let err = embedding.validate().unwrap_err();
         match err {
-            EmbeddingError::InvalidInput(msg) => {
-                assert!(msg.contains("Infinite"));
+            EmbeddingError::InvalidValue { index, value } => {
+                assert_eq!(index, 200);
+                assert!(value.is_infinite() && value.is_sign_negative());
             }
-            _ => panic!("Expected InvalidInput error for -Inf"),
+            _ => panic!("Expected InvalidValue error for -Inf"),
         }
     }
 
@@ -615,11 +593,11 @@ mod tests {
 
         let err = embedding.validate_attention(5).unwrap_err();
         match err {
-            EmbeddingError::DimensionMismatch { expected, actual } => {
+            EmbeddingError::InvalidDimension { expected, actual } => {
                 assert_eq!(expected, 5);
                 assert_eq!(actual, 3);
             }
-            _ => panic!("Expected DimensionMismatch error"),
+            _ => panic!("Expected InvalidDimension error"),
         }
     }
 
@@ -634,10 +612,11 @@ mod tests {
 
         let err = embedding.validate_attention(3).unwrap_err();
         match err {
-            EmbeddingError::InvalidInput(msg) => {
-                assert!(msg.contains("NaN"));
+            EmbeddingError::InvalidValue { index, value } => {
+                assert_eq!(index, 1);
+                assert!(value.is_nan());
             }
-            _ => panic!("Expected InvalidInput error"),
+            _ => panic!("Expected InvalidValue error"),
         }
     }
 
@@ -685,8 +664,8 @@ mod tests {
 
         let err = embedding1.cosine_similarity(&embedding2).unwrap_err();
         match err {
-            EmbeddingError::DimensionMismatch { .. } => {}
-            _ => panic!("Expected DimensionMismatch error"),
+            EmbeddingError::InvalidDimension { .. } => {}
+            _ => panic!("Expected InvalidDimension error"),
         }
     }
 
@@ -696,12 +675,10 @@ mod tests {
         let embedding2 = ModelEmbedding::new(ModelId::Semantic, vec![1.0, 2.0], 100);
 
         let err = embedding1.cosine_similarity(&embedding2).unwrap_err();
-        match err {
-            EmbeddingError::InvalidInput(msg) => {
-                assert!(msg.contains("empty"));
-            }
-            _ => panic!("Expected InvalidInput error"),
-        }
+        assert!(
+            matches!(err, EmbeddingError::EmptyInput),
+            "Expected EmptyInput error"
+        );
     }
 
     // ========== All Model Dimension Tests ==========

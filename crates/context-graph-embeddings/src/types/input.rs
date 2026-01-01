@@ -5,7 +5,7 @@
 //!
 //! # Design Principles
 //!
-//! - **NO FALLBACKS**: Empty content returns `EmbeddingError::InvalidInput` immediately
+//! - **NO FALLBACKS**: Empty content returns `EmbeddingError::EmptyInput` immediately
 //! - **NO MOCK DATA**: All validation is real, no stubs
 //! - **DETERMINISTIC HASHING**: `content_hash()` uses xxhash64 for cache keying
 //!
@@ -150,7 +150,7 @@ impl std::fmt::Display for ImageFormat {
 ///
 /// # Validation
 ///
-/// All constructors validate inputs and return `EmbeddingError::InvalidInput` for:
+/// All constructors validate inputs and return `EmbeddingError::EmptyInput` for:
 /// - Empty content/bytes
 /// - Invalid parameters (e.g., sample_rate=0, channels not 1 or 2)
 ///
@@ -215,7 +215,7 @@ impl ModelInput {
     /// * `content` - Text content to embed (must not be empty)
     ///
     /// # Errors
-    /// Returns `EmbeddingError::InvalidInput` if content is empty.
+    /// Returns `EmbeddingError::EmptyInput` if content is empty.
     ///
     /// # Example
     ///
@@ -228,9 +228,7 @@ impl ModelInput {
     pub fn text(content: impl Into<String>) -> EmbeddingResult<Self> {
         let content = content.into();
         if content.is_empty() {
-            return Err(EmbeddingError::InvalidInput(
-                "Text content cannot be empty".to_string(),
-            ));
+            return Err(EmbeddingError::EmptyInput);
         }
         Ok(Self::Text {
             content,
@@ -248,7 +246,7 @@ impl ModelInput {
     /// * `instruction` - Instruction prefix (e.g., "query:", "passage:", "document:")
     ///
     /// # Errors
-    /// Returns `EmbeddingError::InvalidInput` if content is empty.
+    /// Returns `EmbeddingError::EmptyInput` if content is empty.
     /// Note: Empty instruction is allowed (will be stored as Some("")).
     ///
     /// # Example
@@ -267,9 +265,7 @@ impl ModelInput {
     ) -> EmbeddingResult<Self> {
         let content = content.into();
         if content.is_empty() {
-            return Err(EmbeddingError::InvalidInput(
-                "Text content cannot be empty".to_string(),
-            ));
+            return Err(EmbeddingError::EmptyInput);
         }
         Ok(Self::Text {
             content,
@@ -284,7 +280,7 @@ impl ModelInput {
     /// * `language` - Programming language identifier (must not be empty)
     ///
     /// # Errors
-    /// Returns `EmbeddingError::InvalidInput` if content or language is empty.
+    /// Returns `EmbeddingError::EmptyInput` if content or language is empty.
     ///
     /// # Supported Languages
     ///
@@ -309,14 +305,12 @@ impl ModelInput {
         let language = language.into();
 
         if content.is_empty() {
-            return Err(EmbeddingError::InvalidInput(
-                "Code content cannot be empty".to_string(),
-            ));
+            return Err(EmbeddingError::EmptyInput);
         }
         if language.is_empty() {
-            return Err(EmbeddingError::InvalidInput(
-                "Code language cannot be empty".to_string(),
-            ));
+            return Err(EmbeddingError::ConfigError {
+                message: "Code language cannot be empty".to_string(),
+            });
         }
 
         Ok(Self::Code { content, language })
@@ -329,7 +323,7 @@ impl ModelInput {
     /// * `format` - Image format (PNG, JPEG, WebP, or GIF)
     ///
     /// # Errors
-    /// Returns `EmbeddingError::InvalidInput` if bytes is empty.
+    /// Returns `EmbeddingError::EmptyInput` if bytes is empty.
     ///
     /// # Example
     ///
@@ -341,9 +335,7 @@ impl ModelInput {
     /// ```
     pub fn image(bytes: Vec<u8>, format: ImageFormat) -> EmbeddingResult<Self> {
         if bytes.is_empty() {
-            return Err(EmbeddingError::InvalidInput(
-                "Image bytes cannot be empty".to_string(),
-            ));
+            return Err(EmbeddingError::EmptyInput);
         }
         Ok(Self::Image { bytes, format })
     }
@@ -356,7 +348,7 @@ impl ModelInput {
     /// * `channels` - Number of channels (must be 1 for mono or 2 for stereo)
     ///
     /// # Errors
-    /// Returns `EmbeddingError::InvalidInput` if:
+    /// Returns `EmbeddingError::EmptyInput` if:
     /// - bytes is empty
     /// - sample_rate is 0
     /// - channels is not 1 or 2
@@ -371,20 +363,20 @@ impl ModelInput {
     /// ```
     pub fn audio(bytes: Vec<u8>, sample_rate: u32, channels: u8) -> EmbeddingResult<Self> {
         if bytes.is_empty() {
-            return Err(EmbeddingError::InvalidInput(
-                "Audio bytes cannot be empty".to_string(),
-            ));
+            return Err(EmbeddingError::EmptyInput);
         }
         if sample_rate == 0 {
-            return Err(EmbeddingError::InvalidInput(
-                "Audio sample_rate cannot be 0".to_string(),
-            ));
+            return Err(EmbeddingError::ConfigError {
+                message: "Audio sample_rate cannot be 0".to_string(),
+            });
         }
         if channels != 1 && channels != 2 {
-            return Err(EmbeddingError::InvalidInput(format!(
-                "Audio channels must be 1 (mono) or 2 (stereo), got {}",
-                channels
-            )));
+            return Err(EmbeddingError::ConfigError {
+                message: format!(
+                    "Audio channels must be 1 (mono) or 2 (stereo), got {}",
+                    channels
+                ),
+            });
         }
         Ok(Self::Audio {
             bytes,
@@ -783,12 +775,10 @@ mod tests {
         println!("AFTER: Result = {:?}", result);
 
         assert!(result.is_err());
-        match result {
-            Err(EmbeddingError::InvalidInput(msg)) => {
-                assert!(msg.contains("empty"), "Error message should mention 'empty'");
-            }
-            _ => panic!("Expected InvalidInput error"),
-        }
+        assert!(
+            matches!(result, Err(EmbeddingError::EmptyInput)),
+            "Expected EmptyInput error"
+        );
     }
 
     #[test]
@@ -817,12 +807,10 @@ mod tests {
     fn test_text_with_instruction_empty_content_returns_invalid_input() {
         let result = ModelInput::text_with_instruction("", "query:");
         assert!(result.is_err());
-        match result {
-            Err(EmbeddingError::InvalidInput(msg)) => {
-                assert!(msg.contains("empty"));
-            }
-            _ => panic!("Expected InvalidInput error"),
-        }
+        assert!(
+            matches!(result, Err(EmbeddingError::EmptyInput)),
+            "Expected EmptyInput error"
+        );
     }
 
     // ============================================================
@@ -841,26 +829,24 @@ mod tests {
     }
 
     #[test]
-    fn test_code_with_empty_content_returns_invalid_input() {
+    fn test_code_with_empty_content_returns_empty_input() {
         let result = ModelInput::code("", "rust");
         assert!(result.is_err());
-        match result {
-            Err(EmbeddingError::InvalidInput(msg)) => {
-                assert!(msg.contains("content") && msg.contains("empty"));
-            }
-            _ => panic!("Expected InvalidInput error for empty content"),
-        }
+        assert!(
+            matches!(result, Err(EmbeddingError::EmptyInput)),
+            "Expected EmptyInput error for empty content"
+        );
     }
 
     #[test]
-    fn test_code_with_empty_language_returns_invalid_input() {
+    fn test_code_with_empty_language_returns_config_error() {
         let result = ModelInput::code("fn main() {}", "");
         assert!(result.is_err());
         match result {
-            Err(EmbeddingError::InvalidInput(msg)) => {
-                assert!(msg.contains("language") && msg.contains("empty"));
+            Err(EmbeddingError::ConfigError { message }) => {
+                assert!(message.contains("language") && message.contains("empty"));
             }
-            _ => panic!("Expected InvalidInput error for empty language"),
+            _ => panic!("Expected ConfigError for empty language"),
         }
     }
 
@@ -893,15 +879,13 @@ mod tests {
     }
 
     #[test]
-    fn test_image_with_empty_bytes_returns_invalid_input() {
+    fn test_image_with_empty_bytes_returns_empty_input() {
         let result = ModelInput::image(vec![], ImageFormat::Png);
         assert!(result.is_err());
-        match result {
-            Err(EmbeddingError::InvalidInput(msg)) => {
-                assert!(msg.contains("empty"));
-            }
-            _ => panic!("Expected InvalidInput error"),
-        }
+        assert!(
+            matches!(result, Err(EmbeddingError::EmptyInput)),
+            "Expected EmptyInput error"
+        );
     }
 
     #[test]
@@ -933,59 +917,57 @@ mod tests {
     }
 
     #[test]
-    fn test_audio_with_empty_bytes_returns_invalid_input() {
+    fn test_audio_with_empty_bytes_returns_empty_input() {
         let result = ModelInput::audio(vec![], 16000, 1);
         assert!(result.is_err());
-        match result {
-            Err(EmbeddingError::InvalidInput(msg)) => {
-                assert!(msg.contains("empty"));
-            }
-            _ => panic!("Expected InvalidInput error"),
-        }
+        assert!(
+            matches!(result, Err(EmbeddingError::EmptyInput)),
+            "Expected EmptyInput error"
+        );
     }
 
     #[test]
-    fn test_audio_with_sample_rate_zero_returns_invalid_input() {
+    fn test_audio_with_sample_rate_zero_returns_config_error() {
         println!("BEFORE: audio bytes=[1,2,3], sample_rate=0, channels=1");
         let result = ModelInput::audio(vec![1, 2, 3], 0, 1);
         println!("AFTER: sample_rate=0 result = {:?}", result);
 
         assert!(result.is_err());
         match result {
-            Err(EmbeddingError::InvalidInput(msg)) => {
-                assert!(msg.contains("sample_rate"));
+            Err(EmbeddingError::ConfigError { message }) => {
+                assert!(message.contains("sample_rate"));
             }
-            _ => panic!("Expected InvalidInput error"),
+            _ => panic!("Expected ConfigError"),
         }
     }
 
     #[test]
-    fn test_audio_with_channels_zero_returns_invalid_input() {
+    fn test_audio_with_channels_zero_returns_config_error() {
         println!("BEFORE: audio bytes=[1,2,3], sample_rate=16000, channels=0");
         let result = ModelInput::audio(vec![1, 2, 3], 16000, 0);
         println!("AFTER: channels=0 result = {:?}", result);
 
         assert!(result.is_err());
         match result {
-            Err(EmbeddingError::InvalidInput(msg)) => {
-                assert!(msg.contains("channels") && msg.contains("1") && msg.contains("2"));
+            Err(EmbeddingError::ConfigError { message }) => {
+                assert!(message.contains("channels") && message.contains("1") && message.contains("2"));
             }
-            _ => panic!("Expected InvalidInput error"),
+            _ => panic!("Expected ConfigError"),
         }
     }
 
     #[test]
-    fn test_audio_with_channels_three_returns_invalid_input() {
+    fn test_audio_with_channels_three_returns_config_error() {
         println!("BEFORE: audio bytes=[1,2,3], sample_rate=16000, channels=3");
         let result = ModelInput::audio(vec![1, 2, 3], 16000, 3);
         println!("AFTER: channels=3 result = {:?}", result);
 
         assert!(result.is_err());
         match result {
-            Err(EmbeddingError::InvalidInput(msg)) => {
-                assert!(msg.contains("3"));
+            Err(EmbeddingError::ConfigError { message }) => {
+                assert!(message.contains("3"));
             }
-            _ => panic!("Expected InvalidInput error"),
+            _ => panic!("Expected ConfigError"),
         }
     }
 
