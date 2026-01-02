@@ -22,14 +22,13 @@ mod model_loader;
 mod ops;
 mod tensor;
 
-pub use device::{init_gpu, device, default_dtype, is_gpu_available, get_gpu_info, require_gpu};
-pub use memory::{GpuMemoryPool, MemoryStats, VramTracker};
+pub use device::{default_dtype, device, get_gpu_info, init_gpu, is_gpu_available, require_gpu};
+pub use memory::{GpuMemoryPool, MemoryBudget, MemoryError, MemoryStats, VramTracker};
 pub use model_loader::{
-    GpuModelLoader, BertConfig, BertWeights, EmbeddingWeights,
-    AttentionWeights, FfnWeights, EncoderLayerWeights, PoolerWeights,
-    ModelLoadError,
+    AttentionWeights, BertConfig, BertWeights, EmbeddingWeights, EncoderLayerWeights, FfnWeights,
+    GpuModelLoader, ModelLoadError, PoolerWeights,
 };
-pub use ops::{l2_norm_gpu, normalize_gpu, cosine_similarity_gpu, matmul_gpu, softmax_gpu};
+pub use ops::{cosine_similarity_gpu, l2_norm_gpu, matmul_gpu, normalize_gpu, softmax_gpu};
 pub use tensor::GpuTensor;
 
 /// GPU device information for runtime queries.

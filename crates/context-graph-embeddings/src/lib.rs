@@ -61,39 +61,20 @@ pub mod traits;
 pub mod types;
 
 pub use config::{
-    BatchConfig,
-    CacheConfig,
-    EmbeddingConfig,
-    EvictionPolicy,
-    FusionConfig,
-    GpuConfig,
-    ModelPathConfig,
-    PaddingStrategy,
+    BatchConfig, CacheConfig, EmbeddingConfig, EvictionPolicy, FusionConfig, GpuConfig,
+    ModelPathConfig, PaddingStrategy,
 };
 pub use error::{EmbeddingError, EmbeddingResult};
 pub use provider::EmbeddingProvider;
 pub use traits::{
-    DevicePlacement,
-    EmbeddingModel,
-    ModelFactory,
-    QuantizationMode,
-    SingleModelConfig,
-    MEMORY_ESTIMATES,
-    TOTAL_MEMORY_ESTIMATE,
-    get_memory_estimate,
+    get_memory_estimate, DevicePlacement, EmbeddingModel, ModelFactory, QuantizationMode,
+    SingleModelConfig, MEMORY_ESTIMATES, TOTAL_MEMORY_ESTIMATE,
 };
 
 // Type re-exports for public API
 pub use types::{
-    AuxiliaryEmbeddingData,
-    ConcatenatedEmbedding,
-    FusedEmbedding,
-    ImageFormat,
-    InputType,
-    ModelEmbedding,
-    ModelId,
-    ModelInput,
-    TokenizerFamily,
+    AuxiliaryEmbeddingData, ConcatenatedEmbedding, FusedEmbedding, ImageFormat, InputType,
+    ModelEmbedding, ModelId, ModelInput, TokenizerFamily,
 };
 
 // Re-export dimensions module for constant access

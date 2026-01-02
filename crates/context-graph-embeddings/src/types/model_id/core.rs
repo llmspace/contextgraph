@@ -1,0 +1,233 @@
+//! Core ModelId enum definition and primary methods.
+
+use serde::{Deserialize, Serialize};
+
+use super::tokenizer::TokenizerFamily;
+
+/// Identifies one of the 12 embedding models in the fusion pipeline.
+///
+/// # Variants
+///
+/// | Variant | Model | Dimension | Type |
+/// |---------|-------|-----------|------|
+/// | Semantic | e5-large-v2 | 1024 | Pretrained |
+/// | TemporalRecent | Exponential decay | 512 | Custom |
+/// | TemporalPeriodic | Fourier basis | 512 | Custom |
+/// | TemporalPositional | Sinusoidal PE | 512 | Custom |
+/// | Causal | Longformer | 768 | Pretrained |
+/// | Sparse | SPLADE | ~30K sparse | Pretrained |
+/// | Code | CodeT5p | 256 embed | Pretrained |
+/// | Graph | paraphrase-MiniLM | 384 | Pretrained |
+/// | Hdc | Hyperdimensional | 10K-bit | Custom |
+/// | Multimodal | CLIP | 768 | Pretrained |
+/// | Entity | all-MiniLM | 384 | Pretrained |
+/// | LateInteraction | ColBERT | 128/token | Pretrained |
+///
+/// # Example
+///
+/// ```rust
+/// use context_graph_embeddings::types::ModelId;
+///
+/// let model = ModelId::Semantic;
+/// assert_eq!(model.dimension(), 1024);
+/// assert!(model.is_pretrained());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum ModelId {
+    /// E1: Semantic embedding using intfloat/e5-large-v2 (1024D)
+    Semantic = 0,
+    /// E2: Temporal recency using exponential decay (512D, custom)
+    TemporalRecent = 1,
+    /// E3: Temporal periodicity using Fourier basis (512D, custom)
+    TemporalPeriodic = 2,
+    /// E4: Temporal position using sinusoidal encoding (512D, custom)
+    TemporalPositional = 3,
+    /// E5: Causal embedding using allenai/longformer-base-4096 (768D)
+    Causal = 4,
+    /// E6: Sparse lexical using naver/splade-cocondenser (~30K sparse -> 1536D projected)
+    Sparse = 5,
+    /// E7: Code embedding using Salesforce/codet5p-110m-embedding (256D embed, 768D internal)
+    /// Note: PRD says 1536D - that's the projected dimension after learned projection layer
+    Code = 6,
+    /// E8: Graph/sentence using sentence-transformers/paraphrase-MiniLM-L6-v2 (384D)
+    Graph = 7,
+    /// E9: Hyperdimensional computing (10K-bit -> 1024D projected, custom)
+    Hdc = 8,
+    /// E10: Multimodal using openai/clip-vit-large-patch14 (768D)
+    Multimodal = 9,
+    /// E11: Entity using sentence-transformers/all-MiniLM-L6-v2 (384D)
+    Entity = 10,
+    /// E12: Late interaction using colbert-ir/colbertv2.0 (128D per token)
+    LateInteraction = 11,
+}
+
+impl ModelId {
+    /// Returns the native output dimension of this model BEFORE any projection.
+    ///
+    /// Note: Sparse (30K), Hdc (10K-bit), and Code (256) are projected to larger dimensions
+    /// in downstream processing. This returns the raw model output size.
+    #[must_use]
+    pub const fn dimension(&self) -> usize {
+        match self {
+            Self::Semantic => 1024,
+            Self::TemporalRecent => 512,
+            Self::TemporalPeriodic => 512,
+            Self::TemporalPositional => 512,
+            Self::Causal => 768,
+            Self::Sparse => 30522, // SPLADE vocab size
+            Self::Code => 256,     // CodeT5p embed_dim (internal d_model=768)
+            Self::Graph => 384,
+            Self::Hdc => 10000, // 10K-bit vector
+            Self::Multimodal => 768,
+            Self::Entity => 384,
+            Self::LateInteraction => 128, // Per-token dimension
+        }
+    }
+
+    /// Returns the projected dimension used after normalization (for FuseMoE input).
+    ///
+    /// All models are normalized to these dimensions before concatenation:
+    /// - Most models: native dimension (no projection needed)
+    /// - Sparse: 1536 (projected from 30K sparse)
+    /// - Code: 768 (projected from 256 embed_dim)
+    /// - Hdc: 1024 (projected from 10K-bit)
+    /// - LateInteraction: pooled to single 128D vector
+    #[must_use]
+    pub const fn projected_dimension(&self) -> usize {
+        match self {
+            Self::Sparse => 1536,  // 30K -> 1536 via learned projection
+            Self::Code => 768,     // 256 embed -> 768 via projection (CodeT5p internal dim)
+            Self::Hdc => 1024,     // 10K-bit -> 1024 via projection
+            _ => self.dimension(), // No projection needed
+        }
+    }
+
+    /// Returns true if this model requires custom implementation (no pretrained weights).
+    #[must_use]
+    pub const fn is_custom(&self) -> bool {
+        matches!(
+            self,
+            Self::TemporalRecent | Self::TemporalPeriodic | Self::TemporalPositional | Self::Hdc
+        )
+    }
+
+    /// Returns true if this model uses pretrained weights from HuggingFace.
+    #[must_use]
+    pub const fn is_pretrained(&self) -> bool {
+        !self.is_custom()
+    }
+
+    /// Returns the maximum input token count for this model.
+    ///
+    /// # Returns
+    /// - Causal (Longformer): 4096 tokens
+    /// - CLIP (Multimodal): 77 tokens
+    /// - Most others: 512 tokens
+    /// - Custom models: effectively unlimited (no tokenization)
+    #[must_use]
+    pub const fn max_tokens(&self) -> usize {
+        match self {
+            Self::Causal => 4096,   // Longformer's extended context
+            Self::Multimodal => 77, // CLIP text encoder limit
+            Self::TemporalRecent
+            | Self::TemporalPeriodic
+            | Self::TemporalPositional
+            | Self::Hdc => usize::MAX, // Custom models: no token limit
+            _ => 512,               // Standard BERT-family limit
+        }
+    }
+
+    /// Returns the tokenizer family for shared tokenizer caching.
+    ///
+    /// Models using the same tokenizer family can share tokenization results.
+    /// See M03-L29 (TokenizationManager) for usage.
+    #[must_use]
+    pub const fn tokenizer_family(&self) -> TokenizerFamily {
+        match self {
+            Self::Semantic => TokenizerFamily::BertWordpiece, // e5 uses BERT tokenizer
+            Self::Causal => TokenizerFamily::RobertaBpe,      // Longformer uses RoBERTa
+            Self::Sparse => TokenizerFamily::BertWordpiece,   // SPLADE uses BERT
+            Self::Code => TokenizerFamily::SentencePieceBpe,  // CodeT5p uses SentencePiece
+            Self::Graph => TokenizerFamily::BertWordpiece,    // MiniLM uses BERT
+            Self::Multimodal => TokenizerFamily::ClipBpe,     // CLIP has its own BPE
+            Self::Entity => TokenizerFamily::BertWordpiece,   // all-MiniLM uses BERT
+            Self::LateInteraction => TokenizerFamily::BertWordpiece, // ColBERT uses BERT
+            Self::TemporalRecent
+            | Self::TemporalPeriodic
+            | Self::TemporalPositional
+            | Self::Hdc => TokenizerFamily::None, // Custom: no tokenizer
+        }
+    }
+
+    /// Returns all 12 model variants in pipeline order.
+    ///
+    /// Order matches the E1-E12 specification in constitution.yaml.
+    #[must_use]
+    pub const fn all() -> &'static [ModelId] {
+        &[
+            Self::Semantic,           // E1
+            Self::TemporalRecent,     // E2
+            Self::TemporalPeriodic,   // E3
+            Self::TemporalPositional, // E4
+            Self::Causal,             // E5
+            Self::Sparse,             // E6
+            Self::Code,               // E7
+            Self::Graph,              // E8
+            Self::Hdc,                // E9
+            Self::Multimodal,         // E10
+            Self::Entity,             // E11
+            Self::LateInteraction,    // E12
+        ]
+    }
+
+    /// Returns only pretrained models (require weight loading).
+    #[must_use = "this returns an iterator that must be consumed"]
+    pub fn pretrained() -> impl Iterator<Item = ModelId> {
+        Self::all().iter().copied().filter(|m| m.is_pretrained())
+    }
+
+    /// Returns only custom models (require implementation, no weights).
+    #[must_use = "this returns an iterator that must be consumed"]
+    pub fn custom() -> impl Iterator<Item = ModelId> {
+        Self::all().iter().copied().filter(|m| m.is_custom())
+    }
+
+    /// Latency budget in milliseconds from constitution.yaml.
+    #[must_use]
+    pub const fn latency_budget_ms(&self) -> u32 {
+        match self {
+            Self::Semantic => 5,
+            Self::TemporalRecent | Self::TemporalPeriodic | Self::TemporalPositional => 2,
+            Self::Causal => 8,
+            Self::Sparse => 3,
+            Self::Code => 10,
+            Self::Graph => 5,
+            Self::Hdc => 1,
+            Self::Multimodal => 15,
+            Self::Entity => 2,
+            Self::LateInteraction => 8,
+        }
+    }
+
+    /// Returns the string representation of the model ID for configuration.
+    ///
+    /// These names are used in config files (e.g., `preload_models = ["semantic", "code"]`).
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Semantic => "semantic",
+            Self::TemporalRecent => "temporal_recent",
+            Self::TemporalPeriodic => "temporal_periodic",
+            Self::TemporalPositional => "temporal_positional",
+            Self::Causal => "causal",
+            Self::Sparse => "sparse",
+            Self::Code => "code",
+            Self::Graph => "graph",
+            Self::Hdc => "hdc",
+            Self::Multimodal => "multimodal",
+            Self::Entity => "entity",
+            Self::LateInteraction => "late_interaction",
+        }
+    }
+}

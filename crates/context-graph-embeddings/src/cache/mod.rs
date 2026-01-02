@@ -33,7 +33,7 @@
 //! ```
 
 pub mod manager;
-pub mod types;
+mod types;
 
 pub use manager::{CacheManager, CacheMetrics};
 pub use types::{CacheEntry, CacheKey};

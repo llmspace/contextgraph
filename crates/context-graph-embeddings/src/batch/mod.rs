@@ -59,10 +59,4 @@ mod processor;
 mod types;
 
 pub use processor::{BatchProcessor, BatchProcessorConfig, BatchProcessorStats};
-pub use types::{
-    Batch,
-    BatchQueue,
-    BatchQueueStats,
-    BatchQueueSummary,
-    BatchRequest,
-};
+pub use types::{Batch, BatchQueue, BatchQueueStats, BatchQueueSummary, BatchRequest};

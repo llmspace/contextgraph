@@ -203,7 +203,10 @@ pub fn softmax_gpu(tensor: &Tensor) -> candle_core::Result<Tensor> {
 /// let sharp = softmax_with_temperature_gpu(&logits, 0.5)?;  // More peaked
 /// let flat = softmax_with_temperature_gpu(&logits, 2.0)?;   // More uniform
 /// ```
-pub fn softmax_with_temperature_gpu(tensor: &Tensor, temperature: f32) -> candle_core::Result<Tensor> {
+pub fn softmax_with_temperature_gpu(
+    tensor: &Tensor,
+    temperature: f32,
+) -> candle_core::Result<Tensor> {
     let scaled = (tensor / temperature as f64)?;
     candle_nn::ops::softmax(&scaled, D::Minus1)
 }
@@ -244,7 +247,7 @@ pub fn apply_laplace_smoothing_gpu(
 /// Tuple of (values, indices) tensors.
 pub fn topk_gpu(tensor: &Tensor, k: usize) -> candle_core::Result<(Tensor, Tensor)> {
     // Candle doesn't have native topk, so we implement it
-    let (sorted, indices) = tensor.sort_last_dim(false)?;  // descending
+    let (sorted, indices) = tensor.sort_last_dim(false)?; // descending
 
     let values = sorted.narrow(D::Minus1, 0, k)?;
     let top_indices = indices.narrow(D::Minus1, 0, k)?;

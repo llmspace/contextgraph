@@ -1,11 +1,11 @@
 //! Core types for the 12-model embedding pipeline.
 
 mod concatenated;
+pub mod dimensions;
 mod embedding;
 mod fused;
 mod input;
 mod model_id;
-pub mod dimensions;
 
 pub use concatenated::ConcatenatedEmbedding;
 pub use embedding::ModelEmbedding;

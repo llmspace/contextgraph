@@ -16,16 +16,11 @@
 //! - **ASYNC FIRST**: All operations are async for non-blocking I/O
 //! - **CONSERVATIVE ESTIMATES**: Memory estimates are overestimates, never underestimates
 
-mod embedding_model;
+mod embedding_model; // Directory-based module with submodules
 mod model_factory;
 
 pub use embedding_model::EmbeddingModel;
 pub use model_factory::{
-    DevicePlacement,
-    ModelFactory,
-    QuantizationMode,
-    SingleModelConfig,
-    MEMORY_ESTIMATES,
-    TOTAL_MEMORY_ESTIMATE,
-    get_memory_estimate,
+    get_memory_estimate, DevicePlacement, ModelFactory, QuantizationMode, SingleModelConfig,
+    MEMORY_ESTIMATES, TOTAL_MEMORY_ESTIMATE,
 };
