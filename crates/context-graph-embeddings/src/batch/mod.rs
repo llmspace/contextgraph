@@ -55,8 +55,10 @@
 //! - **ASYNC NATIVE**: Uses tokio oneshot channels for response delivery
 //! - **THREAD SAFE**: Statistics use atomics for concurrent access
 
+mod processor;
 mod types;
 
+pub use processor::{BatchProcessor, BatchProcessorConfig, BatchProcessorStats};
 pub use types::{
     Batch,
     BatchQueue,
