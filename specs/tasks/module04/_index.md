@@ -27,7 +27,7 @@ metadata:
 - **Foundation:** 12 tasks (M04-T00 to M04-T08a) - Sequences 1-12
 - **Logic:** 13 tasks (M04-T09 to M04-T17a, M04-T26) - Sequences 13-25
 - **Surface:** 11 tasks (M04-T18 to M04-T25, M04-T27 to M04-T29) - Sequences 26-36
-- **Current Progress:** 6/36 (16.7%) - M04-T00, M04-T01, M04-T01a, M04-T02, M04-T02a, M04-T03 Complete
+- **Current Progress:** 7/36 (19.4%) - M04-T00, M04-T01, M04-T01a, M04-T02, M04-T02a, M04-T03, M04-T04 Complete
 
 ### Atomic Task Files Created
 
@@ -181,9 +181,9 @@ graph TD
 | 3 | M04-T01a | **Re-export Vector1536 from Core** | foundation | T01 | :white_check_mark: Complete | 1 |
 | 4 | M04-T02 | Define HyperbolicConfig for Poincare Ball | foundation | T00 | :white_check_mark: Verified | 1 |
 | 5 | M04-T02a | **Implement Curvature Validation** | foundation | T02 | :white_check_mark: Verified | 0.5 |
-| 6 | M04-T03 | Define ConeConfig for Entailment Cones | foundation | T00 | :hourglass: Ready | 1.5 |
-| 7 | M04-T04 | Define PoincarePoint for 64D Hyperbolic Space | foundation | T02 | :no_entry: Blocked | 2 |
-| 8 | M04-T05 | Implement PoincareBall Mobius Operations | foundation | T04 | :no_entry: Blocked | 4 |
+| 6 | M04-T03 | Define ConeConfig for Entailment Cones | foundation | T00 | :white_check_mark: Complete | 1.5 |
+| 7 | M04-T04 | Define PoincarePoint for 64D Hyperbolic Space | foundation | T02 | :white_check_mark: Complete | 2 |
+| 8 | M04-T05 | Implement PoincareBall Mobius Operations | foundation | T04 | :hourglass: Ready | 4 |
 | 9 | M04-T06 | Define EntailmentCone Struct | foundation | T03, T05 | :no_entry: Blocked | 3 |
 | 10 | M04-T07 | Implement EntailmentCone Containment Logic | foundation | T06 | :no_entry: Blocked | 3 |
 | 11 | M04-T08 | Define GraphError Enum | foundation | T00 | :hourglass: Ready | 1.5 |
@@ -238,8 +238,8 @@ graph TD
 | M04-T01a | 2026-01-03 | 2026-01-03 | Yes | COMPLETE: EmbeddingVector re-export |
 | M04-T02 | 2026-01-03 | 2026-01-03 | Yes | VERIFIED: HyperbolicConfig 4 fields (sherlock-holmes) |
 | M04-T02a | 2026-01-03 | 2026-01-03 | Yes | VERIFIED: validate() with NaN checks (sherlock-holmes) |
-| M04-T03 | - | - | - | |
-| M04-T04 | - | - | - | |
+| M04-T03 | 2026-01-03 | 2026-01-03 | Yes | COMPLETE: ConeConfig with 3 fields + validate() |
+| M04-T04 | 2026-01-03 | 2026-01-03 | Yes | COMPLETE: PoincarePoint 64D, 30 tests pass |
 | M04-T05 | - | - | - | |
 | M04-T06 | - | - | - | |
 | M04-T07 | - | - | - | |
