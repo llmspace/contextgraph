@@ -27,7 +27,7 @@ metadata:
 - **Foundation:** 12 tasks (M04-T00 to M04-T08a) - Sequences 1-12
 - **Logic:** 13 tasks (M04-T09 to M04-T17a, M04-T26) - Sequences 13-25
 - **Surface:** 11 tasks (M04-T18 to M04-T25, M04-T27 to M04-T29) - Sequences 26-36
-- **Current Progress:** 7/36 (19.4%) - M04-T00, M04-T01, M04-T01a, M04-T02, M04-T02a, M04-T03, M04-T04 Complete
+- **Current Progress:** 8/36 (22.2%) - M04-T00, M04-T01, M04-T01a, M04-T02, M04-T02a, M04-T03, M04-T04, M04-T05 Complete
 
 ### Atomic Task Files Created
 
@@ -183,8 +183,8 @@ graph TD
 | 5 | M04-T02a | **Implement Curvature Validation** | foundation | T02 | :white_check_mark: Verified | 0.5 |
 | 6 | M04-T03 | Define ConeConfig for Entailment Cones | foundation | T00 | :white_check_mark: Complete | 1.5 |
 | 7 | M04-T04 | Define PoincarePoint for 64D Hyperbolic Space | foundation | T02 | :white_check_mark: Complete | 2 |
-| 8 | M04-T05 | Implement PoincareBall Mobius Operations | foundation | T04 | :hourglass: Ready | 4 |
-| 9 | M04-T06 | Define EntailmentCone Struct | foundation | T03, T05 | :no_entry: Blocked | 3 |
+| 8 | M04-T05 | Implement PoincareBall Mobius Operations | foundation | T04 | :white_check_mark: Complete | 4 |
+| 9 | M04-T06 | Define EntailmentCone Struct | foundation | T03, T05 | :hourglass: Ready | 3 |
 | 10 | M04-T07 | Implement EntailmentCone Containment Logic | foundation | T06 | :no_entry: Blocked | 3 |
 | 11 | M04-T08 | Define GraphError Enum | foundation | T00 | :hourglass: Ready | 1.5 |
 | 12 | M04-T08a | **Implement Error Conversions (From traits)** | foundation | T08 | :no_entry: Blocked | 1 |
@@ -205,7 +205,7 @@ graph TD
 | 27 | M04-T20 | Implement Entailment Query Operation | surface | T07, T13 | :no_entry: Blocked | 4 |
 | 28 | M04-T21 | Implement Contradiction Detection | surface | T18, T16 | :no_entry: Blocked | 3 |
 | 29 | M04-T22 | Implement get_modulated_weight Function | surface | T15 | :no_entry: Blocked | 1 |
-| 30 | M04-T23 | Implement Poincare Distance CUDA Kernel | surface | T05 | :no_entry: Blocked | 4 |
+| 30 | M04-T23 | Implement Poincare Distance CUDA Kernel | surface | T05 | :hourglass: Ready | 4 |
 | 31 | M04-T24 | Implement Cone Membership CUDA Kernel | surface | T07 | :no_entry: Blocked | 4 |
 | 32 | M04-T26 | **Add EdgeType::CONTRADICTS Variant** | surface | T15 | :no_entry: Blocked | 1 |
 | 33 | M04-T27 | **Fix Containment Formula Conflicts** | surface | T07 | :no_entry: Blocked | 2 |
@@ -240,7 +240,7 @@ graph TD
 | M04-T02a | 2026-01-03 | 2026-01-03 | Yes | VERIFIED: validate() with NaN checks (sherlock-holmes) |
 | M04-T03 | 2026-01-03 | 2026-01-03 | Yes | COMPLETE: ConeConfig with 3 fields + validate() |
 | M04-T04 | 2026-01-03 | 2026-01-03 | Yes | COMPLETE: PoincarePoint 64D, 30 tests pass |
-| M04-T05 | - | - | - | |
+| M04-T05 | 2026-01-03 | 2026-01-03 | Yes | COMPLETE: PoincareBall with mobius_add, distance, exp_map, log_map |
 | M04-T06 | - | - | - | |
 | M04-T07 | - | - | - | |
 | M04-T08 | - | - | - | |

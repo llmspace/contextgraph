@@ -1,110 +1,3 @@
----
-id: "M04-T05"
-title: "Implement PoincareBall Mobius Operations"
-description: |
-  Implement PoincareBall struct with Mobius algebra operations for hyperbolic geometry.
-  Methods: mobius_add(x, y), distance(x, y), exp_map(x, v), log_map(x, y).
-  Performance target: <10us per distance computation.
-layer: "foundation"
-status: "complete"
-priority: "critical"
-estimated_hours: 4
-sequence: 8
-verified_date: "2026-01-03"
-verified_by: "sherlock-holmes"
-depends_on:
-  - "M04-T04"  # PoincarePoint - VERIFIED COMPLETE
-spec_refs:
-  - "TECH-GRAPH-004 Section 5.2"
-  - "REQ-KG-051"
-files_to_create:
-  - path: "crates/context-graph-graph/src/hyperbolic/mobius.rs"
-    description: "PoincareBall struct and Mobius operations"
-files_to_modify:
-  - path: "crates/context-graph-graph/src/hyperbolic/mod.rs"
-    description: "Add mobius module and re-export PoincareBall"
-  - path: "crates/context-graph-graph/src/lib.rs"
-    description: "Re-export PoincareBall at crate root"
-test_file: "crates/context-graph-graph/src/hyperbolic/mobius.rs"
-  # Tests are co-located in #[cfg(test)] per constitution
----
-
-## CRITICAL CODEBASE STATE (Verified 2026-01-03)
-
-### Dependency Status: ALL SATISFIED
-
-| Dependency | Status | Location |
-|------------|--------|----------|
-| M04-T00 (Crate) | COMPLETE | `crates/context-graph-graph/` exists |
-| M04-T02 (HyperbolicConfig) | COMPLETE | `src/config.rs:137-330` |
-| M04-T04 (PoincarePoint) | COMPLETE | `src/hyperbolic/poincare.rs:52-340` |
-| GraphError | COMPLETE | `src/error.rs:24-160` |
-
-### Current File Structure (ACTUAL)
-
-```
-crates/context-graph-graph/
-├── Cargo.toml
-└── src/
-    ├── lib.rs                    # Crate root, re-exports
-    ├── config.rs                 # IndexConfig, HyperbolicConfig, ConeConfig
-    ├── error.rs                  # GraphError enum
-    └── hyperbolic/
-        ├── mod.rs                # Module declaration (needs mobius added)
-        └── poincare.rs           # PoincarePoint (64D, 256 bytes, 64-byte aligned)
-```
-
-### Verified Types Available
-
-```rust
-// From crates/context-graph-graph/src/config.rs:137-168
-pub struct HyperbolicConfig {
-    pub dim: usize,           // Default: 64
-    pub curvature: f32,       // Default: -1.0 (MUST be negative)
-    pub eps: f32,             // Default: 1e-7
-    pub max_norm: f32,        // Default: 0.99999 (1.0 - 1e-5)
-}
-impl HyperbolicConfig {
-    pub fn abs_curvature(&self) -> f32;  // Returns |curvature|
-    pub fn scale(&self) -> f32;           // Returns sqrt(|curvature|)
-    pub fn validate(&self) -> Result<(), GraphError>;
-}
-
-// From crates/context-graph-graph/src/hyperbolic/poincare.rs:52-58
-#[repr(C, align(64))]
-#[derive(Clone, Debug)]
-pub struct PoincarePoint {
-    pub coords: [f32; 64],    // 64D coordinates
-}
-impl PoincarePoint {
-    pub fn origin() -> Self;
-    pub fn from_coords(coords: [f32; 64]) -> Self;
-    pub fn from_coords_projected(coords: [f32; 64], config: &HyperbolicConfig) -> Self;
-    pub fn norm_squared(&self) -> f32;
-    pub fn norm(&self) -> f32;
-    pub fn project(&mut self, config: &HyperbolicConfig);
-    pub fn projected(&self, config: &HyperbolicConfig) -> Self;
-    pub fn is_valid(&self) -> bool;          // norm_squared < 1.0
-    pub fn is_valid_for_config(&self, config: &HyperbolicConfig) -> bool;
-}
-
-// From crates/context-graph-graph/src/error.rs
-pub enum GraphError {
-    InvalidHyperbolicPoint { norm: f32 },
-    MobiusOperationFailed(String),
-    InvalidConfig(String),
-    // ... other variants
-}
-pub type GraphResult<T> = Result<T, GraphError>;
-```
-
-## Implementation Requirements
-
-### File: `crates/context-graph-graph/src/hyperbolic/mobius.rs`
-
-Create this file with the following exact implementation:
-
-```rust
 //! PoincareBall implementation with Mobius algebra operations.
 //!
 //! # Poincare Ball Model
@@ -191,6 +84,18 @@ impl PoincareBall {
         &self.config
     }
 
+    /// Compute the conformal factor λ_x = 2 / (1 - c||x||²).
+    ///
+    /// The conformal factor scales tangent vectors between Euclidean
+    /// and hyperbolic metrics at point x.
+    #[inline]
+    fn conformal_factor(&self, x: &PoincarePoint) -> f32 {
+        let c = self.config.abs_curvature();
+        let x_norm_sq = x.norm_squared();
+        let denom = (1.0 - c * x_norm_sq).max(self.config.eps);
+        2.0 / denom
+    }
+
     /// Mobius addition in Poincare ball.
     ///
     /// Formula: x ⊕ y = ((1 + 2c<x,y> + c||y||²)x + (1 - c||x||²)y) /
@@ -261,7 +166,9 @@ impl PoincareBall {
 
     /// Compute Poincare ball distance between two points.
     ///
-    /// Formula: d(x,y) = (2/√c) * arctanh(√(c * ||x-y||² / ((1 - c||x||²)(1 - c||y||²))))
+    /// Formula: d(x,y) = (2/√c) * arctanh(√c * ||(-x) ⊕ y||)
+    ///
+    /// Uses Mobius subtraction for accurate hyperbolic distance.
     ///
     /// # Arguments
     ///
@@ -270,11 +177,11 @@ impl PoincareBall {
     ///
     /// # Returns
     ///
-    /// Hyperbolic distance (always >= 0).
+    /// Hyperbolic distance (always >= 0), or NaN if input contains NaN.
     ///
     /// # Performance
     ///
-    /// Target: <10μs. O(64) with one sqrt and one atanh.
+    /// Target: <10μs. O(64) with Mobius add and one atanh.
     ///
     /// # Example
     ///
@@ -298,33 +205,29 @@ impl PoincareBall {
     /// assert!((d1 - d2).abs() < 1e-6);
     /// ```
     pub fn distance(&self, x: &PoincarePoint, y: &PoincarePoint) -> f32 {
+        // Propagate NaN inputs
+        if x.coords.iter().any(|c| c.is_nan()) || y.coords.iter().any(|c| c.is_nan()) {
+            return f32::NAN;
+        }
+
         let c = self.config.abs_curvature();
         let sqrt_c = c.sqrt();
 
-        // ||x - y||²
-        let diff_norm_sq: f32 = x.coords.iter()
-            .zip(y.coords.iter())
-            .map(|(a, b)| (a - b).powi(2))
-            .sum();
+        // Compute (-x) ⊕ y using Mobius subtraction
+        let mut neg_x = x.clone();
+        for coord in &mut neg_x.coords {
+            *coord = -*coord;
+        }
+        let diff = self.mobius_add(&neg_x, y);
+        let diff_norm = diff.norm();
 
-        // Early exit for identical points
-        if diff_norm_sq < self.config.eps * self.config.eps {
+        // Handle identical points
+        if diff_norm < self.config.eps {
             return 0.0;
         }
 
-        let x_norm_sq = x.norm_squared();
-        let y_norm_sq = y.norm_squared();
-
-        // Conformal factors: λ_x = 1 - c||x||², λ_y = 1 - c||y||²
-        let lambda_x = 1.0 - c * x_norm_sq;
-        let lambda_y = 1.0 - c * y_norm_sq;
-
-        // Avoid division by zero near boundary
-        let denom = (lambda_x * lambda_y).max(self.config.eps);
-
-        // arctanh argument, clamped to avoid NaN
-        let arg = (c * diff_norm_sq / denom).sqrt().min(1.0 - self.config.eps);
-
+        // d(x,y) = (2/√c) * arctanh(√c * ||(-x) ⊕ y||)
+        let arg = (sqrt_c * diff_norm).min(1.0 - self.config.eps);
         (2.0 / sqrt_c) * arg.atanh()
     }
 
@@ -344,9 +247,9 @@ impl PoincareBall {
     ///
     /// # Mathematical Formula
     ///
-    /// exp_x(v) = x ⊕ (tanh(√c ||v|| / λ_x) * v / (√c ||v||))
+    /// exp_x(v) = x ⊕ (tanh(√c * λ_x * ||v|| / 2) * v / (√c * ||v||))
     ///
-    /// where λ_x = 1 - c||x||² is the conformal factor.
+    /// where λ_x = 2 / (1 - c||x||²) is the conformal factor.
     ///
     /// # Example
     ///
@@ -374,14 +277,13 @@ impl PoincareBall {
             return x.clone();
         }
 
-        // Conformal factor at x
-        let x_norm_sq = x.norm_squared();
-        let lambda_x = (1.0 - c * x_norm_sq).max(self.config.eps);
+        // Conformal factor at x: λ_x = 2 / (1 - c||x||²)
+        let lambda_x = self.conformal_factor(x);
 
-        // Scaled tangent norm
-        let scaled_norm = sqrt_c * v_norm / lambda_x;
-
-        let tanh_factor = scaled_norm.tanh();
+        // tanh(√c * λ_x * ||v|| / 2)
+        // Clamp tanh_factor to stay strictly inside ball (tanh saturates to 1.0 in f32)
+        let tanh_arg = sqrt_c * lambda_x * v_norm / 2.0;
+        let tanh_factor = tanh_arg.tanh().min(self.config.max_norm);
 
         // Create direction point: (tanh_factor / (sqrt_c * v_norm)) * v
         let mut direction = PoincarePoint::origin();
@@ -390,8 +292,31 @@ impl PoincareBall {
             direction.coords[i] = scale * v[i];
         }
 
+        // Ensure direction is strictly inside the ball before Mobius add
+        let dir_norm = direction.norm();
+        if dir_norm >= self.config.max_norm {
+            // Scale to be strictly inside: max_norm - eps
+            let target_norm = self.config.max_norm - self.config.eps;
+            let scale_factor = target_norm / dir_norm;
+            for i in 0..64 {
+                direction.coords[i] *= scale_factor;
+            }
+        }
+
         // Mobius add with x
-        self.mobius_add(x, &direction)
+        let mut result = self.mobius_add(x, &direction);
+
+        // Final check: ensure result is strictly inside ball
+        let result_norm = result.norm();
+        if result_norm >= self.config.max_norm {
+            let target_norm = self.config.max_norm - self.config.eps;
+            let scale_factor = target_norm / result_norm;
+            for i in 0..64 {
+                result.coords[i] *= scale_factor;
+            }
+        }
+
+        result
     }
 
     /// Logarithmic map: point on manifold -> tangent vector at x.
@@ -410,7 +335,9 @@ impl PoincareBall {
     ///
     /// # Mathematical Formula
     ///
-    /// log_x(y) = (2 λ_x / √c) * arctanh(√c ||(-x) ⊕ y||) * ((-x) ⊕ y) / ||(-x) ⊕ y||
+    /// log_x(y) = (2 / (λ_x * √c)) * arctanh(√c * ||(-x) ⊕ y||) * ((-x) ⊕ y) / ||(-x) ⊕ y||
+    ///
+    /// where λ_x = 2 / (1 - c||x||²) is the conformal factor.
     ///
     /// # Example
     ///
@@ -443,13 +370,15 @@ impl PoincareBall {
             return [0.0; 64];
         }
 
-        // Conformal factor at x
-        let x_norm_sq = x.norm_squared();
-        let lambda_x = (1.0 - c * x_norm_sq).max(self.config.eps);
+        // Conformal factor at x: λ_x = 2 / (1 - c||x||²)
+        let lambda_x = self.conformal_factor(x);
 
         // arctanh(√c * ||(-x) ⊕ y||), clamped to avoid NaN
         let arg = (sqrt_c * diff_norm).min(1.0 - self.config.eps);
-        let scale = (2.0 * lambda_x / sqrt_c) * arg.atanh() / diff_norm;
+        let arctanh_val = arg.atanh();
+
+        // Scale: (2 / (λ_x * √c)) * arctanh(...) / ||diff||
+        let scale = (2.0 / (lambda_x * sqrt_c)) * arctanh_val / diff_norm;
 
         let mut result = [0.0; 64];
         for i in 0..64 {
@@ -811,260 +740,57 @@ mod tests {
             assert!((d - first_distance).abs() < 1e-10, "Distance should be deterministic");
         }
     }
+
+    // ========== 2D POINT TESTS ==========
+
+    #[test]
+    fn test_mobius_add_2d_points() {
+        let ball = default_ball();
+        let p1 = make_point_2d(0.2, 0.1);
+        let p2 = make_point_2d(0.1, 0.2);
+
+        let result = ball.mobius_add(&p1, &p2);
+        assert!(result.is_valid());
+        // Both coordinates should be non-zero
+        assert!(result.coords[0].abs() > 0.01);
+        assert!(result.coords[1].abs() > 0.01);
+    }
+
+    #[test]
+    fn test_distance_2d_points() {
+        let ball = default_ball();
+        let p1 = make_point_2d(0.3, 0.4);
+        let p2 = make_point_2d(-0.3, 0.4);
+
+        let d = ball.distance(&p1, &p2);
+        assert!(d > 0.0);
+        assert!(!d.is_nan());
+    }
+
+    // ========== ADDITIONAL EDGE CASE TESTS ==========
+
+    #[test]
+    fn test_exp_map_large_tangent_vector() {
+        let ball = default_ball();
+        let base = PoincarePoint::origin();
+        let mut v = [0.0f32; 64];
+        v[0] = 100.0; // Very large
+
+        let result = ball.exp_map(&base, &v);
+        assert!(result.is_valid_for_config(ball.config()));
+        // Should approach boundary but stay inside
+        assert!(result.norm() > 0.9);
+    }
+
+    #[test]
+    fn test_log_map_points_near_boundary() {
+        let ball = default_ball();
+        let p1 = make_point(0.1);
+        let p2 = make_point(0.95);
+
+        let v = ball.log_map(&p1, &p2);
+        let v_norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!(v_norm > 0.0, "Log map should produce non-zero vector");
+        assert!(!v_norm.is_nan());
+    }
 }
-```
-
-### File: `crates/context-graph-graph/src/hyperbolic/mod.rs`
-
-Update to add mobius module:
-
-```rust
-//! Hyperbolic geometry module using Poincare ball model.
-//!
-//! This module implements hyperbolic geometry operations for representing
-//! hierarchical relationships in the knowledge graph. Points closer to the
-//! boundary represent more specific concepts; points near origin are general.
-//!
-//! # Mathematics
-//!
-//! The Poincare ball model uses the unit ball B^n = {x in R^n : ||x|| < 1}
-//! with the metric:
-//!
-//! ```text
-//! d(x,y) = arcosh(1 + 2||x-y||² / ((1-||x||²)(1-||y||²)))
-//! ```
-//!
-//! # Components
-//!
-//! - [`PoincarePoint`]: 64D point in hyperbolic space
-//! - [`PoincareBall`]: Mobius operations (add, distance, exp/log maps)
-//!
-//! # Constitution Reference
-//!
-//! - perf.latency.entailment_check: <1ms
-//! - hyperbolic.curvature: -1.0 (default)
-//!
-//! # GPU Acceleration
-//!
-//! CUDA kernels for batch operations: TODO: M04-T23
-
-pub mod poincare;
-pub mod mobius;
-
-pub use poincare::PoincarePoint;
-pub use mobius::PoincareBall;
-```
-
-### File: `crates/context-graph-graph/src/lib.rs`
-
-Update the re-exports to include PoincareBall:
-
-Find this line:
-```rust
-pub use hyperbolic::PoincarePoint;
-```
-
-Replace with:
-```rust
-pub use hyperbolic::{PoincareBall, PoincarePoint};
-```
-
-## Acceptance Criteria
-
-### Signatures (MUST MATCH EXACTLY)
-
-- [ ] `PoincareBall::new(config: HyperbolicConfig) -> Self`
-- [ ] `PoincareBall::config(&self) -> &HyperbolicConfig`
-- [ ] `PoincareBall::mobius_add(&self, x: &PoincarePoint, y: &PoincarePoint) -> PoincarePoint`
-- [ ] `PoincareBall::distance(&self, x: &PoincarePoint, y: &PoincarePoint) -> f32`
-- [ ] `PoincareBall::exp_map(&self, x: &PoincarePoint, v: &[f32; 64]) -> PoincarePoint`
-- [ ] `PoincareBall::log_map(&self, x: &PoincarePoint, y: &PoincarePoint) -> [f32; 64]`
-
-### Mathematical Constraints (MUST HOLD)
-
-- [ ] `mobius_add(x, origin) == x` (identity)
-- [ ] `mobius_add(origin, y) == y` (identity)
-- [ ] `distance(x, x) == 0` (reflexivity)
-- [ ] `distance(x, y) == distance(y, x)` (symmetry)
-- [ ] `distance(x, z) <= distance(x, y) + distance(y, z)` (triangle inequality)
-- [ ] `exp_map(x, log_map(x, y)) ≈ y` (roundtrip)
-- [ ] `log_map(x, exp_map(x, v)) ≈ v` (roundtrip)
-- [ ] All results stay inside Poincare ball (norm < max_norm)
-
-### Performance (VERIFY WITH TIMING)
-
-- [ ] `distance()` completes in <10μs per call
-- [ ] `mobius_add()` completes in <5μs per call
-
-## Verification Commands
-
-```bash
-# 1. Build the crate
-cargo build -p context-graph-graph
-
-# 2. Run all tests (must pass 100%)
-cargo test -p context-graph-graph mobius -- --nocapture
-
-# 3. Run specific tests
-cargo test -p context-graph-graph test_distance_is_symmetric
-cargo test -p context-graph-graph test_exp_log_roundtrip
-
-# 4. Run clippy (must have 0 warnings)
-cargo clippy -p context-graph-graph -- -D warnings
-
-# 5. Run doc tests
-cargo test -p context-graph-graph --doc
-
-# 6. Check documentation
-cargo doc -p context-graph-graph --open
-```
-
-## Full State Verification Protocol
-
-After completing implementation, you MUST verify the entire state:
-
-### 1. Source of Truth Identification
-
-The source of truth for M04-T05 is:
-- **File existence**: `crates/context-graph-graph/src/hyperbolic/mobius.rs`
-- **Module registration**: `pub mod mobius;` in `hyperbolic/mod.rs`
-- **Re-export**: `pub use hyperbolic::PoincareBall;` in `lib.rs`
-- **Test results**: `cargo test -p context-graph-graph mobius`
-
-### 2. Execute & Inspect Protocol
-
-After writing code, run these commands and capture output:
-
-```bash
-# Verify file exists
-ls -la crates/context-graph-graph/src/hyperbolic/mobius.rs
-
-# Verify module is registered
-grep "pub mod mobius" crates/context-graph-graph/src/hyperbolic/mod.rs
-
-# Verify re-export
-grep "PoincareBall" crates/context-graph-graph/src/lib.rs
-
-# Build and capture output
-cargo build -p context-graph-graph 2>&1
-
-# Run tests and capture output
-cargo test -p context-graph-graph mobius 2>&1
-
-# Run clippy
-cargo clippy -p context-graph-graph -- -D warnings 2>&1
-```
-
-### 3. Boundary & Edge Case Audit
-
-Manually test these 3 edge cases by adding temporary test output:
-
-**Edge Case 1: Points at boundary (norm ≈ 0.99)**
-```rust
-#[test]
-fn edge_case_boundary() {
-    let ball = default_ball();
-    let p1 = make_point(0.999);
-    let p2 = make_point(0.998);
-    println!("BEFORE: p1.norm={}, p2.norm={}", p1.norm(), p2.norm());
-    let result = ball.mobius_add(&p1, &p2);
-    println!("AFTER: result.norm={}, is_valid={}", result.norm(), result.is_valid());
-    assert!(result.is_valid_for_config(ball.config()));
-}
-```
-
-**Edge Case 2: Origin operations**
-```rust
-#[test]
-fn edge_case_origin() {
-    let ball = default_ball();
-    let origin = PoincarePoint::origin();
-    let p = make_point(0.5);
-    println!("BEFORE: origin.norm={}, p.norm={}", origin.norm(), p.norm());
-    let d = ball.distance(&origin, &p);
-    let expected = 2.0 * 0.5_f32.atanh();
-    println!("AFTER: distance={}, expected={}", d, expected);
-    assert!((d - expected).abs() < 1e-5);
-}
-```
-
-**Edge Case 3: Roundtrip precision**
-```rust
-#[test]
-fn edge_case_roundtrip() {
-    let ball = default_ball();
-    let base = make_point(0.3);
-    let target = make_point(0.7);
-    println!("BEFORE: base={:?}, target.coords[0]={}", base.coords[0], target.coords[0]);
-    let v = ball.log_map(&base, &target);
-    let recovered = ball.exp_map(&base, &v);
-    println!("AFTER: recovered.coords[0]={}, diff={}", recovered.coords[0], (target.coords[0] - recovered.coords[0]).abs());
-    assert!((target.coords[0] - recovered.coords[0]).abs() < 1e-4);
-}
-```
-
-### 4. Evidence of Success
-
-Your final verification should produce a log showing:
-
-```
-=== M04-T05 VERIFICATION LOG ===
-
-File exists: crates/context-graph-graph/src/hyperbolic/mobius.rs ✓
-Module registered: pub mod mobius; ✓
-Re-export found: pub use hyperbolic::PoincareBall; ✓
-
-Build result: SUCCESS (0 errors, 0 warnings)
-Test result: XX passed; 0 failed
-Clippy result: 0 warnings
-
-Edge Case 1 (boundary): PASS - result.norm=0.9999, is_valid=true
-Edge Case 2 (origin): PASS - distance=1.0986, expected=1.0986
-Edge Case 3 (roundtrip): PASS - diff=0.00001
-
-=== TASK COMPLETE ===
-```
-
-## FINAL VERIFICATION: Sherlock-Holmes Agent
-
-After completing ALL above steps, you MUST spawn the `sherlock-holmes` subagent to perform forensic verification:
-
-```
-Task("Verify M04-T05 complete",
-     "Investigate M04-T05 PoincareBall Mobius implementation completion.
-      Verify:
-      1. File mobius.rs exists at crates/context-graph-graph/src/hyperbolic/mobius.rs
-      2. All 6 methods implemented: new, config, mobius_add, distance, exp_map, log_map
-      3. All tests pass: cargo test -p context-graph-graph mobius
-      4. No clippy warnings
-      5. Doc tests pass
-      6. Mathematical properties verified (identity, symmetry, triangle inequality, roundtrip)
-      Report any issues found.",
-     "sherlock-holmes")
-```
-
-Fix ANY issues identified by sherlock-holmes before marking task complete.
-
-## Anti-Patterns to AVOID
-
-Per constitution.yaml:
-- **AP-001**: Never use `unwrap()` - use proper error handling
-- **AP-003**: No magic numbers - use `self.config.eps`, `self.config.max_norm`
-- **AP-009**: Clamp values to avoid NaN/Infinity in distance calculation
-- **NO MOCKS**: Tests must use real HyperbolicConfig, real PoincarePoint
-- **NO BACKWARDS COMPATIBILITY**: If something breaks, error immediately with clear message
-
-## Notes for Implementer
-
-1. The `HyperbolicConfig.eps` is available at `self.config.eps` (default 1e-7)
-2. The `HyperbolicConfig.max_norm` is available at `self.config.max_norm` (default 0.99999)
-3. The `HyperbolicConfig.abs_curvature()` method returns `|curvature|`
-4. The `PoincarePoint.project()` method ensures points stay inside ball
-5. All tests MUST be in `#[cfg(test)]` module inside mobius.rs (co-located per constitution)
-6. Dimension is always 64 (hardcoded in PoincarePoint, matches HyperbolicConfig.dim)
-
----
-
-*Task Version: 2.0.0*
-*Last Updated: 2026-01-03*
-*Dependencies Verified: M04-T00, M04-T02, M04-T02a, M04-T04 all COMPLETE*

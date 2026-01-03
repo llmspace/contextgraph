@@ -16,7 +16,7 @@
 //! # Components
 //!
 //! - [`PoincarePoint`]: 64D point in hyperbolic space
-//! - `PoincareBall`: Mobius operations (TODO: M04-T05)
+//! - [`PoincareBall`]: Mobius operations (add, distance, exp/log maps)
 //!
 //! # Constitution Reference
 //!
@@ -28,9 +28,7 @@
 //! CUDA kernels for batch operations: TODO: M04-T23
 
 pub mod poincare;
+pub mod mobius;
 
 pub use poincare::PoincarePoint;
-
-// TODO: M04-T05 - Implement PoincareBall Mobius operations
-// pub mod mobius;
-// pub use mobius::PoincareBall;
+pub use mobius::PoincareBall;
