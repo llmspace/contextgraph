@@ -9,6 +9,7 @@ members = [
     "crates/context-graph-cuda",
     "crates/context-graph-embeddings",
     "crates/context-graph-storage",
+    "crates/context-graph-graph",
 ]
 
 [workspace.package]
