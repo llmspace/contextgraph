@@ -9,7 +9,7 @@ metadata:
   total_tasks: 36
   approach: "inside-out-bottom-up"
   created: "2025-12-31"
-  updated: "2026-01-03"
+  updated: "2026-01-04"
   dependencies:
     - module-02-core-infrastructure
     - module-03-embedding-pipeline
@@ -27,7 +27,7 @@ metadata:
 - **Foundation:** 12 tasks (M04-T00 to M04-T08a) - Sequences 1-12
 - **Logic:** 13 tasks (M04-T09 to M04-T17a, M04-T26) - Sequences 13-25
 - **Surface:** 11 tasks (M04-T18 to M04-T25, M04-T27 to M04-T29) - Sequences 26-36
-- **Current Progress:** 20/36 (56%) - M04-T00 through M04-T14a Complete (Foundation: 12/12, Logic: 8/13 complete)
+- **Current Progress:** 21/36 (58%) - Foundation: 12/12, Logic: 8/13, Surface: 1/11 complete
 
 ### Atomic Task Files Created
 
@@ -45,7 +45,7 @@ All 36 atomic task files are located in `/home/cabdru/contextgraph/specs/tasks/m
 |-------|----------|-----------------|
 | `context-graph-graph` crate DOES NOT EXIST | CRITICAL | M04-T00 |
 | No FAISS FFI implementation exists | CRITICAL | M04-T09 |
-| No CUDA kernels exist | HIGH | M04-T23, M04-T24 |
+| ~~No CUDA kernels exist~~ RESOLVED | ~~HIGH~~ | M04-T23 COMPLETE, M04-T24 |
 | Vector1536 type not re-exported | HIGH | M04-T01a |
 | EdgeType::CONTRADICTS missing | HIGH | M04-T26 |
 | Formula conflicts in containment | MEDIUM | M04-T27 |

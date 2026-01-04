@@ -28,6 +28,10 @@ pub enum CudaError {
     /// Feature not implemented.
     #[error("Feature not implemented: {0}")]
     NotImplemented(String),
+
+    /// Invalid configuration parameter.
+    #[error("Invalid configuration: {0}")]
+    InvalidConfig(String),
 }
 
 /// Result type for CUDA operations.

@@ -8,8 +8,9 @@ description: |
   Use shared memory for query caching.
   Performance: <1ms for 1K x 1K distance matrix.
 layer: "surface"
-status: "pending"
+status: "complete"
 priority: "high"
+completed_date: "2026-01-04"
 estimated_hours: 4
 sequence: 32
 depends_on:
@@ -53,32 +54,34 @@ integration_test: "crates/context-graph-graph/tests/cuda_poincare_test.rs"
 - repr(C): FFI-compatible for CUDA kernels (explicitly noted in comments)
 - 30 passing tests
 
-**CUDA Crate Current State:**
+**CUDA Crate State (IMPLEMENTED):**
 - Location: `crates/context-graph-cuda/`
-- Cargo.toml: Has `stub` and placeholder `cuda` features
-- src/lib.rs: Exports `StubVectorOps`, `VectorOps`, `CudaError`, `CudaResult`
+- Cargo.toml: Has `stub` and `cuda` features
+- src/lib.rs: Exports `StubVectorOps`, `VectorOps`, `CudaError`, `CudaResult`, `poincare` module
 - src/stub.rs: CPU fallback implementations
-- src/error.rs: Basic error types (6 variants)
-- **NO build.rs exists** - must be created
-- **NO kernels/ directory exists** - must be created
-- **NO .cu files exist** - this is the first CUDA kernel
+- src/error.rs: 7 error variants (added InvalidConfig)
+- src/poincare.rs: ✅ 915 lines, CPU + GPU FFI
+- build.rs: ✅ nvcc compilation for sm_120
+- kernels/poincare_distance.cu: ✅ 261 lines, RTX 5090 optimized
+- tests/cuda_poincare_test.rs: ✅ 421 lines, 18 integration tests
 
 **HyperbolicConfig:**
 - Location: `crates/context-graph-graph/src/config.rs`
 - Fields: dim=64, curvature=-1.0, max_norm=0.99999, eps=1e-7
 - Method: `abs_curvature()` returns |curvature|
 
-### File Paths Verified (EXACT paths)
+### File Paths Verified (EXACT paths) - IMPLEMENTED
 
-| File | Exists | Action |
-|------|--------|--------|
-| `crates/context-graph-cuda/Cargo.toml` | YES | MODIFY |
-| `crates/context-graph-cuda/src/lib.rs` | YES | MODIFY |
-| `crates/context-graph-cuda/src/error.rs` | YES | MODIFY |
-| `crates/context-graph-cuda/build.rs` | NO | CREATE |
-| `crates/context-graph-cuda/kernels/` | NO | CREATE DIR |
-| `crates/context-graph-cuda/kernels/poincare_distance.cu` | NO | CREATE |
-| `crates/context-graph-cuda/src/poincare.rs` | NO | CREATE |
+| File | Status | Evidence |
+|------|--------|----------|
+| `crates/context-graph-cuda/Cargo.toml` | ✅ MODIFIED | Added cuda feature |
+| `crates/context-graph-cuda/src/lib.rs` | ✅ MODIFIED | Exports poincare module |
+| `crates/context-graph-cuda/src/error.rs` | ✅ MODIFIED | Added InvalidConfig |
+| `crates/context-graph-cuda/build.rs` | ✅ CREATED | nvcc compilation, sm_120 |
+| `crates/context-graph-cuda/kernels/` | ✅ CREATED | Directory exists |
+| `crates/context-graph-cuda/kernels/poincare_distance.cu` | ✅ CREATED | 261 lines, full kernel |
+| `crates/context-graph-cuda/src/poincare.rs` | ✅ CREATED | 915 lines, FFI + CPU |
+| `crates/context-graph-cuda/tests/cuda_poincare_test.rs` | ✅ CREATED | 421 lines, 18 tests |
 
 ---
 
@@ -987,3 +990,39 @@ At task completion, the sherlock-holmes agent MUST verify:
 5. **The CUDA crate has NO existing kernels** - you are creating the entire infrastructure (build.rs, kernels/, etc.)
 
 6. **Fallback strategy**: When `cuda` feature is disabled, `is_poincare_gpu_available()` returns false. Users should use CPU PoincareBall::distance() instead.
+
+---
+
+## COMPLETION EVIDENCE (2026-01-04)
+
+### Forensic Verification (Sherlock-Holmes Agent)
+
+**ALL REQUIREMENTS VERIFIED - IMPLEMENTATION CORRECT**
+
+| Requirement | Status | Evidence |
+|-------------|--------|----------|
+| Mathematics | ✅ PASS | poincare_distance.cu:75-147 uses `c=|curvature|`, correct formula |
+| RTX 5090 | ✅ PASS | build.rs:51 targets sm_120, kernel uses 32x8 blocks |
+| CPU Fallback | ✅ PASS | poincare.rs:541-617 provides poincare_distance_cpu/batch_cpu |
+| Config Validation | ✅ PASS | poincare.rs:136-165 validates c<0, dim=64 |
+| Tests (No Mocks) | ✅ PASS | cuda_poincare_test.rs uses deterministic LCG |
+| Error Handling | ✅ PASS | Fail-fast validation in both Rust and CUDA |
+| Feature Gating | ✅ PASS | #[cfg(feature = "cuda")] gates GPU code |
+
+### Test Results
+
+```
+running 31 tests (unit) ... ok
+running 18 tests (integration) ... ok
+running 5 tests (doc) ... ok
+test result: ok. 54 passed; 0 failed
+```
+
+### Files Created
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| build.rs | 204 | nvcc compilation (sm_120) |
+| kernels/poincare_distance.cu | 261 | CUDA kernel (32x8 blocks) |
+| src/poincare.rs | 915 | Rust FFI + CPU fallback |
+| tests/cuda_poincare_test.rs | 421 | Integration tests (18 tests)
