@@ -61,7 +61,10 @@ pub use entailment::{
 };
 pub use error::{GraphError, GraphResult};
 pub use hyperbolic::{PoincareBall, PoincarePoint};
-pub use index::{FaissGpuIndex, GpuResources, MetricType, SearchResult, SearchResultItem};
+pub use index::{
+    AllocationHandle, FaissGpuIndex, GpuMemoryConfig, GpuMemoryManager, GpuResources,
+    MemoryCategory, MemoryStats, MetricType, SearchResult, SearchResultItem,
+};
 pub use search::{
     semantic_search, semantic_search_batch, semantic_search_batch_simple, semantic_search_simple,
     BatchSemanticSearchResult, NodeMetadataProvider, NoMetadataProvider, SearchFilters,

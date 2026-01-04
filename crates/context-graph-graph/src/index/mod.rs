@@ -9,6 +9,7 @@
 //! faiss_ffi.rs     - Low-level C FFI bindings (M04-T09)
 //! gpu_index.rs     - High-level FaissGpuIndex wrapper (M04-T10)
 //! search_result.rs - Search result types (M04-T11)
+//! gpu_memory.rs    - GPU memory manager for VRAM budget tracking (M04-T28)
 //! ```
 //!
 //! # Index Type
@@ -38,9 +39,11 @@
 
 pub mod faiss_ffi;
 pub mod gpu_index;
+pub mod gpu_memory;
 pub mod search_result;
 
 // Re-exports for convenience
 pub use faiss_ffi::{check_faiss_result, MetricType};
 pub use gpu_index::{FaissGpuIndex, GpuResources};
+pub use gpu_memory::{AllocationHandle, GpuMemoryConfig, GpuMemoryManager, MemoryCategory, MemoryStats};
 pub use search_result::{SearchResult, SearchResultItem};
