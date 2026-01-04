@@ -97,6 +97,15 @@ pub const CF_NODES: &str = "nodes";
 /// Optimized for: small dataset, infrequent access
 pub const CF_METADATA: &str = "metadata";
 
+/// Column family for full GraphEdge storage (M04-T15).
+/// Key: edge_id (8 bytes i64)
+/// Value: GraphEdge (bincode serialized, all 13 Marblestone fields)
+/// Optimized for: point lookups by edge ID
+///
+/// This CF stores full edges with NT weights, domain, steering_reward, etc.
+/// Used by BFS traversal to get modulated weights.
+pub const CF_EDGES: &str = "edges";
+
 /// All column family names in order.
 /// Order matters for RocksDB - must match descriptor generation order.
 pub const ALL_COLUMN_FAMILIES: &[&str] = &[
@@ -106,6 +115,7 @@ pub const ALL_COLUMN_FAMILIES: &[&str] = &[
     CF_FAISS_IDS,
     CF_NODES,
     CF_METADATA,
+    CF_EDGES,
 ];
 
 // ========== Storage Configuration ==========
@@ -293,6 +303,7 @@ pub fn get_column_family_descriptors(
         faiss_ids_cf_descriptor(config, &cache),
         nodes_cf_descriptor(config, &cache),
         metadata_cf_descriptor(&cache),
+        edges_cf_descriptor(config, &cache),
     ])
 }
 
@@ -451,6 +462,34 @@ fn metadata_cf_descriptor(cache: &Cache) -> ColumnFamilyDescriptor {
     ColumnFamilyDescriptor::new(CF_METADATA, opts)
 }
 
+/// Get CF descriptor for full GraphEdge storage (M04-T15).
+/// Optimized for point lookups by edge ID.
+/// Values are bincode-serialized GraphEdge (~200-300 bytes).
+fn edges_cf_descriptor(config: &StorageConfig, cache: &Cache) -> ColumnFamilyDescriptor {
+    let mut opts = Options::default();
+
+    opts.set_write_buffer_size(config.write_buffer_size);
+    opts.set_max_write_buffer_number(config.max_write_buffers);
+    opts.set_target_file_size_base(config.target_file_size_base);
+
+    // LZ4 compression for good compression ratio on serialized edges
+    if config.enable_compression {
+        opts.set_compression_type(DBCompressionType::Lz4);
+    }
+
+    // Block-based table optimized for point lookups
+    let mut block_opts = BlockBasedOptions::default();
+    block_opts.set_block_cache(cache);
+    block_opts.set_block_size(8 * 1024); // 8KB blocks
+
+    // Bloom filter for fast negative lookups
+    block_opts.set_bloom_filter(config.bloom_filter_bits as f64, false);
+
+    opts.set_block_based_table_factory(&block_opts);
+
+    ColumnFamilyDescriptor::new(CF_EDGES, opts)
+}
+
 /// Get default DB options for opening the database.
 ///
 /// Configures parallelism based on CPU count and sets reasonable defaults
@@ -503,7 +542,7 @@ mod tests {
 
     #[test]
     fn test_all_column_families_count() {
-        assert_eq!(ALL_COLUMN_FAMILIES.len(), 6);
+        assert_eq!(ALL_COLUMN_FAMILIES.len(), 7); // M04-T15: added CF_EDGES
     }
 
     #[test]
@@ -514,6 +553,7 @@ mod tests {
         assert!(ALL_COLUMN_FAMILIES.contains(&CF_FAISS_IDS));
         assert!(ALL_COLUMN_FAMILIES.contains(&CF_NODES));
         assert!(ALL_COLUMN_FAMILIES.contains(&CF_METADATA));
+        assert!(ALL_COLUMN_FAMILIES.contains(&CF_EDGES)); // M04-T15
     }
 
     #[test]
@@ -525,6 +565,7 @@ mod tests {
         assert_eq!(ALL_COLUMN_FAMILIES[3], CF_FAISS_IDS);
         assert_eq!(ALL_COLUMN_FAMILIES[4], CF_NODES);
         assert_eq!(ALL_COLUMN_FAMILIES[5], CF_METADATA);
+        assert_eq!(ALL_COLUMN_FAMILIES[6], CF_EDGES); // M04-T15
     }
 
     // ========== StorageConfig Tests ==========
@@ -662,7 +703,7 @@ mod tests {
     fn test_get_column_family_descriptors_count() {
         let config = StorageConfig::default();
         let descriptors = get_column_family_descriptors(&config).unwrap();
-        assert_eq!(descriptors.len(), 6);
+        assert_eq!(descriptors.len(), 7); // M04-T15: added CF_EDGES
     }
 
     #[test]

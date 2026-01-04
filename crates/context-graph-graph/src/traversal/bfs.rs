@@ -1,101 +1,3 @@
----
-id: "M04-T16"
-title: "Implement BFS Graph Traversal with Marblestone Domain Modulation"
-description: |
-  COMPLETE: bfs_traverse(storage, start, params) implemented using get_outgoing_edges().
-  Uses VecDeque for O(1) frontier, HashSet for O(1) visited lookup.
-  BfsParams: 7 fields (max_depth, max_nodes, edge_types, domain_filter, min_weight, include_edges, record_traversal).
-  BfsResult: 6 fields (nodes, edges, depth_counts, start_node, max_depth_reached, truncated).
-  Domain modulation via get_modulated_weight(domain). All edge cases tested.
-layer: "logic"
-status: "complete"
-priority: "high"
-estimated_hours: 3
-actual_hours: 3
-sequence: 22
-depends_on:
-  - "M04-T13"
-  - "M04-T15"
-spec_refs:
-  - "TECH-GRAPH-004 Section 7.1"
-  - "REQ-KG-061"
-files_created:
-  - path: "crates/context-graph-graph/src/traversal/bfs.rs"
-    description: "BFS traversal implementation (656 lines)"
-files_modified:
-  - path: "crates/context-graph-graph/src/traversal/mod.rs"
-    description: "Added bfs module and re-exports"
-test_file: "crates/context-graph-graph/tests/storage_tests.rs"
-verified_by: "sherlock-holmes"
-verified_date: "2025-01-04"
----
-
-## VERIFICATION: COMPLETE (2025-01-04)
-
-### Implementation Summary
-
-**File: `crates/context-graph-graph/src/traversal/bfs.rs` (656 lines)**
-
-**Functions implemented:**
-- `bfs_traverse(storage, start, params)` - Main BFS traversal (line 214)
-- `bfs_shortest_path(storage, start, target, max_depth)` - Find shortest path (line 327)
-- `bfs_neighborhood(storage, start, max_distance)` - Get nodes within distance (line 378)
-- `bfs_domain_neighborhood(storage, start, max_distance, domain, min_weight)` - Domain-filtered neighborhood (line 390)
-
-**BfsParams (7 fields):**
-- max_depth (default: 6)
-- max_nodes (default: 10000)
-- edge_types (Option<Vec<EdgeType>>)
-- domain_filter (Option<Domain>)
-- min_weight (f32)
-- include_edges (bool)
-- record_traversal (bool)
-
-**BfsResult (6 fields):**
-- nodes: Vec<NodeId>
-- edges: Vec<GraphEdge>
-- depth_counts: HashMap<usize, usize>
-- start_node: NodeId
-- max_depth_reached: usize
-- truncated: bool
-
-**Data Structures:**
-- VecDeque for O(1) frontier operations (line 241)
-- HashSet for O(1) visited lookup (line 240)
-- Domain modulation via `get_modulated_weight(domain)` (line 291)
-
-**Dependency:**
-- Uses `get_outgoing_edges(source_node: i64)` from M04-T15 (line 279)
-
-### Sherlock-Holmes Verification Results
-
-```
-MISSION: M04-T16 BFS Traversal Implementation
-DATE: 2025-01-04
-STATUS: COMPLETE ✓
-
-EVIDENCE:
-1. bfs.rs exists: 656 lines
-2. Uses get_outgoing_edges() NOT get_adjacency() ✓
-3. BfsParams has 7 fields ✓
-4. BfsResult has 6 fields ✓
-5. VecDeque for frontier ✓
-6. HashSet for visited ✓
-7. get_modulated_weight() called with domain_filter ✓
-8. Cycle prevention via visited set ✓
-9. 11 BFS tests passing ✓
-10. Edge cases tested: empty graph, cycles, max limits ✓
-```
-
----
-
-## ARCHIVED: Original Requirements
-
-## IMPLEMENTATION
-
-### File: `crates/context-graph-graph/src/traversal/bfs.rs`
-
-```rust
 //! BFS (Breadth-First Search) graph traversal with Marblestone domain modulation.
 //!
 //! Explores the graph level by level, applying edge type filtering and
@@ -114,11 +16,16 @@ EVIDENCE:
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::error::{GraphError, GraphResult};
-use crate::storage::{GraphEdge, GraphStorage, NodeId};  // NodeId = i64 here
+use uuid::Uuid;
+
+use crate::error::GraphResult;
+use crate::storage::{GraphEdge, GraphStorage};
 
 // Re-export edge types for convenience
 pub use crate::storage::edges::{Domain, EdgeType};
+
+/// Node ID type for BFS (i64 for storage compatibility).
+pub type NodeId = i64;
 
 /// Parameters for BFS traversal.
 ///
@@ -276,6 +183,20 @@ impl BfsResult {
     }
 }
 
+/// Convert UUID to i64 for storage key operations.
+///
+/// This reverses `Uuid::from_u64_pair(id as u64, 0)` used in storage.
+/// from_u64_pair stores values in big-endian order in the UUID bytes.
+#[inline]
+fn uuid_to_i64(uuid: &Uuid) -> i64 {
+    let bytes = uuid.as_bytes();
+    // from_u64_pair uses big-endian byte order
+    i64::from_be_bytes([
+        bytes[0], bytes[1], bytes[2], bytes[3],
+        bytes[4], bytes[5], bytes[6], bytes[7],
+    ])
+}
+
 /// Perform BFS traversal from a starting node.
 ///
 /// # Arguments
@@ -354,9 +275,8 @@ pub fn bfs_traverse(
             continue;
         }
 
-        // Get full edges (NOT adjacency!) with Marblestone fields
-        // CRITICAL: This requires M04-T15 to be complete
-        let edges = storage.get_edges(current_node)?;
+        // Get full edges with Marblestone fields using get_outgoing_edges
+        let edges = storage.get_outgoing_edges(current_node)?;
 
         for edge in edges {
             // Filter by edge type if specified
@@ -379,7 +299,6 @@ pub fn bfs_traverse(
             }
 
             // Convert UUID target to i64 for visited tracking
-            // CRITICAL: GraphEdge.target is UUID, but our visited set uses i64
             let target_i64 = uuid_to_i64(&edge.target);
 
             // Skip if already visited
@@ -448,7 +367,7 @@ pub fn bfs_shortest_path(
             continue;
         }
 
-        let edges = storage.get_edges(current_node)?;
+        let edges = storage.get_outgoing_edges(current_node)?;
 
         for edge in edges {
             let target_i64 = uuid_to_i64(&edge.target);
@@ -513,25 +432,10 @@ pub fn bfs_domain_neighborhood(
     Ok(result.nodes)
 }
 
-// ========== Helper Functions ==========
-
-/// Convert UUID to i64 for storage key operations.
-/// Uses first 8 bytes of UUID as little-endian i64.
-#[inline]
-fn uuid_to_i64(uuid: &uuid::Uuid) -> i64 {
-    let bytes = uuid.as_bytes();
-    i64::from_le_bytes([
-        bytes[0], bytes[1], bytes[2], bytes[3],
-        bytes[4], bytes[5], bytes[6], bytes[7],
-    ])
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::tempdir;
-    use uuid::Uuid;
-    use crate::storage::edges::GraphEdge;
 
     /// Create test graph and return (storage, start_node_id, tempdir).
     /// TempDir must be kept alive for the duration of the test.
@@ -547,29 +451,22 @@ mod tests {
         //  /|   |\
         // 4 5   6 7
 
-        let edges_from_1 = vec![
-            GraphEdge::new(1, Uuid::from_u64_pair(1, 0), Uuid::from_u64_pair(2, 0),
-                EdgeType::Semantic, 0.8, Domain::General),
-            GraphEdge::new(2, Uuid::from_u64_pair(1, 0), Uuid::from_u64_pair(3, 0),
-                EdgeType::Semantic, 0.8, Domain::General),
-        ];
-        storage.put_edges(1, &edges_from_1).expect("put_edges failed");
+        // Use Uuid::from_u64_pair to create consistent UUIDs from i64 node IDs
+        let uuid = |id: i64| Uuid::from_u64_pair(id as u64, 0);
 
-        let edges_from_2 = vec![
-            GraphEdge::new(3, Uuid::from_u64_pair(2, 0), Uuid::from_u64_pair(4, 0),
-                EdgeType::Semantic, 0.7, Domain::General),
-            GraphEdge::new(4, Uuid::from_u64_pair(2, 0), Uuid::from_u64_pair(5, 0),
-                EdgeType::Semantic, 0.7, Domain::General),
+        let edges = vec![
+            // From node 1
+            GraphEdge::new(1, uuid(1), uuid(2), EdgeType::Semantic, 0.8, Domain::General),
+            GraphEdge::new(2, uuid(1), uuid(3), EdgeType::Semantic, 0.8, Domain::General),
+            // From node 2
+            GraphEdge::new(3, uuid(2), uuid(4), EdgeType::Semantic, 0.7, Domain::General),
+            GraphEdge::new(4, uuid(2), uuid(5), EdgeType::Semantic, 0.7, Domain::General),
+            // From node 3
+            GraphEdge::new(5, uuid(3), uuid(6), EdgeType::Hierarchical, 0.7, Domain::Code),
+            GraphEdge::new(6, uuid(3), uuid(7), EdgeType::Hierarchical, 0.7, Domain::Code),
         ];
-        storage.put_edges(2, &edges_from_2).expect("put_edges failed");
 
-        let edges_from_3 = vec![
-            GraphEdge::new(5, Uuid::from_u64_pair(3, 0), Uuid::from_u64_pair(6, 0),
-                EdgeType::Hierarchical, 0.7, Domain::Code),
-            GraphEdge::new(6, Uuid::from_u64_pair(3, 0), Uuid::from_u64_pair(7, 0),
-                EdgeType::Hierarchical, 0.7, Domain::Code),
-        ];
-        storage.put_edges(3, &edges_from_3).expect("put_edges failed");
+        storage.put_edges(&edges).expect("put_edges failed");
 
         (storage, 1, dir)
     }
@@ -582,7 +479,7 @@ mod tests {
             .expect("BFS failed");
 
         // Should find all 7 nodes
-        assert_eq!(result.node_count(), 7, "Expected 7 nodes");
+        assert_eq!(result.node_count(), 7, "Expected 7 nodes, got {}", result.node_count());
         assert_eq!(result.nodes[0], 1, "Start node should be first");
 
         // Verify depth counts
@@ -730,258 +627,29 @@ mod tests {
         // Only start node should be returned
         assert!(result.node_count() < 7);
     }
+
+    #[test]
+    fn test_bfs_cyclic_graph() {
+        let dir = tempdir().expect("Failed to create temp dir");
+        let storage = GraphStorage::open_default(dir.path())
+            .expect("Failed to open storage");
+
+        // Create cycle: 1 -> 2 -> 3 -> 1
+        let uuid = |id: i64| Uuid::from_u64_pair(id as u64, 0);
+        let edges = vec![
+            GraphEdge::new(1, uuid(1), uuid(2), EdgeType::Semantic, 0.8, Domain::General),
+            GraphEdge::new(2, uuid(2), uuid(3), EdgeType::Semantic, 0.8, Domain::General),
+            GraphEdge::new(3, uuid(3), uuid(1), EdgeType::Semantic, 0.8, Domain::General),
+        ];
+        storage.put_edges(&edges).expect("put_edges failed");
+
+        let result = bfs_traverse(&storage, 1, BfsParams::default())
+            .expect("BFS failed");
+
+        // Should visit each node exactly once, no infinite loop
+        assert_eq!(result.node_count(), 3);
+        assert!(result.nodes.contains(&1));
+        assert!(result.nodes.contains(&2));
+        assert!(result.nodes.contains(&3));
+    }
 }
-```
-
-### File: `crates/context-graph-graph/src/traversal/mod.rs`
-
-**Replace entire contents with:**
-
-```rust
-//! Graph traversal algorithms.
-//!
-//! This module provides graph traversal algorithms for navigating the
-//! knowledge graph with edge type filtering and NT weight modulation.
-//!
-//! # Algorithms
-//!
-//! - **BFS**: Breadth-first search for shortest paths and level-order exploration (M04-T16)
-//! - **DFS**: Depth-first search (TODO: M04-T17)
-//! - **A***: A* search with hyperbolic heuristic (TODO: M04-T17a)
-//!
-//! # Edge Filtering
-//!
-//! All traversals support filtering by:
-//! - Edge types (Semantic, Temporal, Causal, Hierarchical)
-//! - Minimum weight threshold
-//! - Domain-specific modulation via NT weights
-//!
-//! # Constitution Reference
-//!
-//! - edge_model.nt_weights.formula: Canonical modulation formula
-//! - perf.latency: <100ms for depth=6 traversal
-
-pub mod bfs;
-
-pub use bfs::{
-    bfs_domain_neighborhood, bfs_neighborhood, bfs_shortest_path, bfs_traverse,
-    BfsParams, BfsResult, Domain, EdgeType,
-};
-
-// TODO: M04-T17 - Implement DFS traversal
-// pub mod dfs;
-// pub use dfs::{dfs_traverse, DfsParams, DfsResult};
-
-// TODO: M04-T17a - Implement A* traversal
-// pub mod astar;
-// pub use astar::astar_search;
-```
-
----
-
-## Verification
-
-### Test Commands
-
-```bash
-# Build
-cargo build -p context-graph-graph 2>&1 | head -50
-
-# Run BFS tests specifically
-cargo test -p context-graph-graph bfs -- --nocapture
-
-# Run all traversal tests
-cargo test -p context-graph-graph traversal -- --nocapture
-
-# Clippy
-cargo clippy -p context-graph-graph -- -D warnings
-```
-
-### Verify Dependency (M04-T15)
-
-```bash
-# MUST return results - if empty, M04-T15 is incomplete
-grep -n "fn get_edges" crates/context-graph-graph/src/storage/storage_impl.rs
-```
-
----
-
-## FULL STATE VERIFICATION PROTOCOL
-
-### Source of Truth
-
-After BFS implementation, verify by checking:
-
-1. **Database**: Create test graph, run BFS, verify nodes in RocksDB
-2. **BfsResult**: Check nodes array contains expected IDs in BFS order
-3. **Depth counts**: Verify depth_counts HashMap matches expected distribution
-
-### Execute & Inspect
-
-```bash
-# 1. Verify bfs.rs exists
-ls -la crates/context-graph-graph/src/traversal/bfs.rs
-
-# 2. Verify mod.rs exports
-grep "pub use bfs" crates/context-graph-graph/src/traversal/mod.rs
-
-# 3. Run tests with output
-cargo test -p context-graph-graph bfs -- --nocapture 2>&1 | tee /tmp/bfs_test.log
-
-# 4. Verify test passed
-grep -E "test result|PASSED|FAILED" /tmp/bfs_test.log
-```
-
-### Boundary & Edge Case Audit
-
-Execute these 3 edge cases and print state before/after:
-
-**Edge Case 1: Empty graph (node with no edges)**
-```rust
-let dir = tempdir()?;
-let storage = GraphStorage::open_default(dir.path())?;
-
-println!("BEFORE: Graph is empty, querying node 1");
-let result = bfs_traverse(&storage, 1, BfsParams::default())?;
-
-println!("AFTER: result.nodes = {:?}", result.nodes);
-println!("EXPECTED: [1] (just start node)");
-assert_eq!(result.nodes, vec![1]);
-println!("PASS: Empty graph handled correctly");
-```
-
-**Edge Case 2: max_nodes = 0 (should return empty or error?)**
-```rust
-let (storage, start, _dir) = setup_test_graph();
-
-println!("BEFORE: max_nodes = 0");
-let result = bfs_traverse(&storage, start, BfsParams::default().max_nodes(0))?;
-
-println!("AFTER: result.nodes.len() = {}", result.nodes.len());
-println!("EXPECTED: 0 (or 1 if we include start before checking)");
-// Decide: Should 0 mean "no limit" or "no nodes"?
-// Current impl: 0 means immediate truncation
-assert!(result.truncated || result.nodes.is_empty());
-```
-
-**Edge Case 3: Cyclic graph (A -> B -> C -> A)**
-```rust
-let dir = tempdir()?;
-let storage = GraphStorage::open_default(dir.path())?;
-
-// Create cycle: 1 -> 2 -> 3 -> 1
-let edges_1 = vec![GraphEdge::new(1, uuid(1), uuid(2), EdgeType::Semantic, 0.8, Domain::General)];
-let edges_2 = vec![GraphEdge::new(2, uuid(2), uuid(3), EdgeType::Semantic, 0.8, Domain::General)];
-let edges_3 = vec![GraphEdge::new(3, uuid(3), uuid(1), EdgeType::Semantic, 0.8, Domain::General)];
-
-storage.put_edges(1, &edges_1)?;
-storage.put_edges(2, &edges_2)?;
-storage.put_edges(3, &edges_3)?;
-
-println!("BEFORE: Cyclic graph 1->2->3->1, starting from 1");
-let result = bfs_traverse(&storage, 1, BfsParams::default())?;
-
-println!("AFTER: result.nodes = {:?}", result.nodes);
-println!("EXPECTED: [1, 2, 3] (each visited once, no infinite loop)");
-assert_eq!(result.nodes.len(), 3);
-assert!(result.nodes.contains(&1));
-assert!(result.nodes.contains(&2));
-assert!(result.nodes.contains(&3));
-println!("PASS: Cycle handled correctly by visited set");
-```
-
-### Evidence of Success
-
-After completion, produce this log:
-
-```
-========================================
-BFS IMPLEMENTATION VERIFICATION LOG
-========================================
-Timestamp: [ISO timestamp]
-Task: M04-T16 BFS Traversal Implementation
-
-SOURCE OF TRUTH:
-- File: crates/context-graph-graph/src/traversal/bfs.rs
-- Test file: crates/context-graph-graph/tests/bfs_traversal_tests.rs
-
-VERIFICATION STEPS:
-1. File exists: [ls -la output]
-2. Compilation: cargo build output [PASS/FAIL]
-3. Tests passed: cargo test bfs output [PASS/FAIL with count]
-4. Clippy clean: cargo clippy output [PASS/FAIL]
-
-EDGE CASE RESULTS:
-1. Empty graph: [PASS/FAIL]
-2. max_nodes=0: [PASS/FAIL]
-3. Cyclic graph: [PASS/FAIL]
-
-MODULATION VERIFICATION:
-- Created edge with Domain::Code, weight=0.8
-- Called get_modulated_weight(Domain::Code)
-- Expected: > 0.8 (domain bonus applies)
-- Actual: [value]
-- Result: [PASS/FAIL]
-
-PHYSICAL PROOF:
-- RocksDB written to: [temp dir path]
-- Nodes stored: [count]
-- Edges stored: [count]
-- BFS visited: [node count]
-
-Verified By: sherlock-holmes subagent
-========================================
-```
-
----
-
-## SHERLOCK-HOLMES FINAL VERIFICATION
-
-After implementation, spawn sherlock-holmes agent with:
-
-```
-MISSION: Verify M04-T16 BFS implementation is complete and correct
-
-CRITICAL CHECKS:
-1. File crates/context-graph-graph/src/traversal/bfs.rs exists
-2. File uses storage.get_edges() NOT storage.get_adjacency()
-3. BfsParams struct has all fields: max_depth, max_nodes, edge_types, domain_filter, min_weight, include_edges, record_traversal
-4. BfsResult struct has: nodes, edges, depth_counts, start_node, max_depth_reached, truncated
-5. bfs_traverse() uses VecDeque for frontier
-6. bfs_traverse() uses HashSet for visited
-7. get_modulated_weight(domain) is called when domain_filter is Some
-8. Visited set prevents cycles
-9. cargo build -p context-graph-graph succeeds
-10. cargo test -p context-graph-graph bfs passes all tests
-11. No clippy warnings
-12. Edge case tests pass (empty graph, cycles, max limits)
-
-DEPENDENCY CHECK:
-- grep "fn get_edges" storage_impl.rs returns a match (M04-T15 complete)
-
-PHYSICAL VERIFICATION:
-- Run tests and verify RocksDB contains expected data
-- Verify BFS order is level-by-level (not DFS order)
-- Verify domain modulation affects traversal (edges filtered by weight)
-
-REPORT: Fix any issues before marking complete
-```
-
----
-
-## Acceptance Criteria
-
-- [ ] `bfs.rs` created with bfs_traverse(), bfs_shortest_path(), bfs_neighborhood()
-- [ ] Uses `storage.get_edges()` (NOT `get_adjacency()`)
-- [ ] BfsParams with all 7 fields
-- [ ] BfsResult with all 6 fields
-- [ ] VecDeque for O(1) frontier operations
-- [ ] HashSet for O(1) visited lookup
-- [ ] Domain modulation via `get_modulated_weight()`
-- [ ] Edge type filtering works
-- [ ] Cycle prevention via visited set
-- [ ] Compiles with `cargo build -p context-graph-graph`
-- [ ] All tests pass with `cargo test -p context-graph-graph bfs`
-- [ ] No clippy warnings
-- [ ] All 3 edge cases verified with before/after logging
-- [ ] sherlock-holmes verification passes

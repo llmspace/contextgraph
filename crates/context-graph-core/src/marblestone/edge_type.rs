@@ -136,6 +136,53 @@ impl EdgeType {
             Self::Hierarchical => 0.9,
         }
     }
+
+    /// Converts this edge type to its u8 representation for storage.
+    ///
+    /// # M04-T15: Edge Storage Integration
+    ///
+    /// Used for compact storage in RocksDB CF_EDGES column family.
+    ///
+    /// # Returns
+    ///
+    /// - Semantic: 0
+    /// - Temporal: 1
+    /// - Causal: 2
+    /// - Hierarchical: 3
+    #[inline]
+    pub fn as_u8(&self) -> u8 {
+        match self {
+            Self::Semantic => 0,
+            Self::Temporal => 1,
+            Self::Causal => 2,
+            Self::Hierarchical => 3,
+        }
+    }
+
+    /// Converts a u8 value to an EdgeType.
+    ///
+    /// # M04-T15: Edge Storage Integration
+    ///
+    /// Used for deserializing from RocksDB CF_EDGES column family.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The u8 representation (0-3)
+    ///
+    /// # Returns
+    ///
+    /// - `Some(EdgeType)` if value is 0-3
+    /// - `None` if value is out of range
+    #[inline]
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(Self::Semantic),
+            1 => Some(Self::Temporal),
+            2 => Some(Self::Causal),
+            3 => Some(Self::Hierarchical),
+            _ => None,
+        }
+    }
 }
 
 impl Default for EdgeType {
@@ -156,5 +203,76 @@ impl fmt::Display for EdgeType {
             Self::Hierarchical => "hierarchical",
         };
         write!(f, "{}", s)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========== as_u8 / from_u8 Tests (M04-T15) ==========
+
+    #[test]
+    fn test_edge_type_as_u8() {
+        assert_eq!(EdgeType::Semantic.as_u8(), 0);
+        assert_eq!(EdgeType::Temporal.as_u8(), 1);
+        assert_eq!(EdgeType::Causal.as_u8(), 2);
+        assert_eq!(EdgeType::Hierarchical.as_u8(), 3);
+    }
+
+    #[test]
+    fn test_edge_type_from_u8_valid() {
+        assert_eq!(EdgeType::from_u8(0), Some(EdgeType::Semantic));
+        assert_eq!(EdgeType::from_u8(1), Some(EdgeType::Temporal));
+        assert_eq!(EdgeType::from_u8(2), Some(EdgeType::Causal));
+        assert_eq!(EdgeType::from_u8(3), Some(EdgeType::Hierarchical));
+    }
+
+    #[test]
+    fn test_edge_type_from_u8_invalid() {
+        assert_eq!(EdgeType::from_u8(4), None);
+        assert_eq!(EdgeType::from_u8(255), None);
+    }
+
+    #[test]
+    fn test_edge_type_roundtrip() {
+        for edge_type in EdgeType::all() {
+            let u8_val = edge_type.as_u8();
+            let recovered = EdgeType::from_u8(u8_val).expect("valid u8 should convert");
+            assert_eq!(recovered, edge_type);
+        }
+    }
+
+    // ========== Existing Tests ==========
+
+    #[test]
+    fn test_default_weight() {
+        assert_eq!(EdgeType::Semantic.default_weight(), 0.5);
+        assert_eq!(EdgeType::Temporal.default_weight(), 0.7);
+        assert_eq!(EdgeType::Causal.default_weight(), 0.8);
+        assert_eq!(EdgeType::Hierarchical.default_weight(), 0.9);
+    }
+
+    #[test]
+    fn test_display() {
+        assert_eq!(EdgeType::Semantic.to_string(), "semantic");
+        assert_eq!(EdgeType::Temporal.to_string(), "temporal");
+        assert_eq!(EdgeType::Causal.to_string(), "causal");
+        assert_eq!(EdgeType::Hierarchical.to_string(), "hierarchical");
+    }
+
+    #[test]
+    fn test_default() {
+        assert_eq!(EdgeType::default(), EdgeType::Semantic);
+    }
+
+    #[test]
+    fn test_all() {
+        let all = EdgeType::all();
+        assert_eq!(all.len(), 4);
+        assert!(all.contains(&EdgeType::Semantic));
+        assert!(all.contains(&EdgeType::Temporal));
+        assert!(all.contains(&EdgeType::Causal));
+        assert!(all.contains(&EdgeType::Hierarchical));
     }
 }

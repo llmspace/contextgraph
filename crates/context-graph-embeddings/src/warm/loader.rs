@@ -387,7 +387,7 @@ impl WarmLoader {
                 MINIMUM_VRAM_BYTES,
                 "Simulated".to_string(),
             ));
-            return Ok(());
+            Ok(())
         }
 
         #[cfg(feature = "cuda")]
@@ -441,7 +441,7 @@ impl WarmLoader {
         {
             // In stub mode, we don't have a real allocator
             tracing::warn!("CUDA feature not enabled, skipping allocator initialization");
-            return Ok(());
+            Ok(())
         }
 
         #[cfg(feature = "cuda")]

@@ -19,11 +19,13 @@ use std::path::Path;
 use std::sync::Arc;
 
 use rocksdb::{ColumnFamily, IteratorMode, WriteBatch, DB};
+use uuid::Uuid;
 
 use super::{
     get_column_family_descriptors, get_db_options, StorageConfig, CF_ADJACENCY, CF_CONES,
-    CF_HYPERBOLIC, CF_METADATA,
+    CF_EDGES, CF_HYPERBOLIC, CF_METADATA,
 };
+use super::edges::GraphEdge;
 use crate::error::{GraphError, GraphResult};
 
 // ========== Type Aliases ==========
@@ -612,6 +614,234 @@ impl GraphStorage {
             .ok_or_else(|| GraphError::ColumnFamilyNotFound(CF_METADATA.to_string()))
     }
 
+    /// Get column family handle for edges (M04-T15).
+    fn cf_edges(&self) -> GraphResult<&ColumnFamily> {
+        self.db
+            .cf_handle(CF_EDGES)
+            .ok_or_else(|| GraphError::ColumnFamilyNotFound(CF_EDGES.to_string()))
+    }
+
+    // ========== GraphEdge Operations (M04-T15) ==========
+
+    /// Compute edge key from edge ID.
+    ///
+    /// Key format: 8 bytes (i64 little-endian)
+    #[inline]
+    fn compute_edge_key(edge_id: i64) -> [u8; 8] {
+        edge_id.to_le_bytes()
+    }
+
+    /// Get a single GraphEdge by ID.
+    ///
+    /// # Arguments
+    /// * `edge_id` - The edge's unique identifier (i64)
+    ///
+    /// # Returns
+    /// * `Ok(Some(edge))` - Edge found
+    /// * `Ok(None)` - Edge not found
+    /// * `Err(GraphError::CorruptedData)` - Invalid data in storage
+    pub fn get_edge(&self, edge_id: i64) -> GraphResult<Option<GraphEdge>> {
+        let cf = self.cf_edges()?;
+        let key = Self::compute_edge_key(edge_id);
+
+        match self.db.get_cf(cf, key)? {
+            Some(bytes) => {
+                let edge: GraphEdge = bincode::deserialize(&bytes).map_err(|e| {
+                    log::error!("CORRUPTED: edge edge_id={}: {}", edge_id, e);
+                    GraphError::CorruptedData {
+                        location: format!("edge edge_id={}", edge_id),
+                        details: e.to_string(),
+                    }
+                })?;
+                Ok(Some(edge))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Store a single GraphEdge.
+    ///
+    /// Overwrites existing edge if present.
+    ///
+    /// # Arguments
+    /// * `edge` - The edge to store (id field used as key)
+    pub fn put_edge(&self, edge: &GraphEdge) -> GraphResult<()> {
+        let cf = self.cf_edges()?;
+        let key = Self::compute_edge_key(edge.id);
+        let value = bincode::serialize(edge)?;
+
+        self.db.put_cf(cf, key, value)?;
+        log::trace!("PUT edge edge_id={}", edge.id);
+        Ok(())
+    }
+
+    /// Delete a GraphEdge by ID.
+    pub fn delete_edge(&self, edge_id: i64) -> GraphResult<()> {
+        let cf = self.cf_edges()?;
+        let key = Self::compute_edge_key(edge_id);
+
+        self.db.delete_cf(cf, key)?;
+        log::trace!("DELETE edge edge_id={}", edge_id);
+        Ok(())
+    }
+
+    /// Get multiple GraphEdges by their IDs.
+    ///
+    /// Returns edges in the same order as input IDs.
+    /// Missing edges are skipped (not included in result).
+    ///
+    /// # Arguments
+    /// * `edge_ids` - Slice of edge IDs to retrieve
+    ///
+    /// # Returns
+    /// Vector of (edge_id, GraphEdge) pairs for found edges.
+    pub fn get_edges(&self, edge_ids: &[i64]) -> GraphResult<Vec<(i64, GraphEdge)>> {
+        let cf = self.cf_edges()?;
+        let mut results = Vec::with_capacity(edge_ids.len());
+
+        for &edge_id in edge_ids {
+            let key = Self::compute_edge_key(edge_id);
+            if let Some(bytes) = self.db.get_cf(cf, key)? {
+                let edge: GraphEdge = bincode::deserialize(&bytes).map_err(|e| {
+                    log::error!("CORRUPTED: edge edge_id={}: {}", edge_id, e);
+                    GraphError::CorruptedData {
+                        location: format!("edge edge_id={}", edge_id),
+                        details: e.to_string(),
+                    }
+                })?;
+                results.push((edge_id, edge));
+            }
+        }
+
+        Ok(results)
+    }
+
+    /// Store multiple GraphEdges atomically.
+    ///
+    /// Uses WriteBatch for atomic commit of all edges.
+    ///
+    /// # Arguments
+    /// * `edges` - Slice of edges to store
+    pub fn put_edges(&self, edges: &[GraphEdge]) -> GraphResult<()> {
+        if edges.is_empty() {
+            return Ok(());
+        }
+
+        let cf = self.cf_edges()?;
+        let mut batch = WriteBatch::default();
+
+        for edge in edges {
+            let key = Self::compute_edge_key(edge.id);
+            let value = bincode::serialize(edge)?;
+            batch.put_cf(cf, key, value);
+        }
+
+        self.db.write(batch)?;
+        log::trace!("PUT {} edges", edges.len());
+        Ok(())
+    }
+
+    /// Delete multiple GraphEdges atomically.
+    ///
+    /// # Arguments
+    /// * `edge_ids` - Slice of edge IDs to delete
+    pub fn delete_edges(&self, edge_ids: &[i64]) -> GraphResult<()> {
+        if edge_ids.is_empty() {
+            return Ok(());
+        }
+
+        let cf = self.cf_edges()?;
+        let mut batch = WriteBatch::default();
+
+        for &edge_id in edge_ids {
+            let key = Self::compute_edge_key(edge_id);
+            batch.delete_cf(cf, key);
+        }
+
+        self.db.write(batch)?;
+        log::trace!("DELETE {} edges", edge_ids.len());
+        Ok(())
+    }
+
+    /// Iterate over all GraphEdges.
+    pub fn iter_edges(
+        &self,
+    ) -> GraphResult<impl Iterator<Item = GraphResult<GraphEdge>> + '_> {
+        let cf = self.cf_edges()?;
+        let iter = self.db.iterator_cf(cf, IteratorMode::Start);
+
+        Ok(iter.map(|result| {
+            let (key, value) = result.map_err(GraphError::from)?;
+            let edge_id = i64::from_le_bytes(
+                key[..8]
+                    .try_into()
+                    .expect("Edge key must be 8 bytes - storage corrupted"),
+            );
+            let edge: GraphEdge =
+                bincode::deserialize(&value).map_err(|e| GraphError::CorruptedData {
+                    location: format!("edge edge_id={}", edge_id),
+                    details: e.to_string(),
+                })?;
+            Ok(edge)
+        }))
+    }
+
+    /// Get count of GraphEdges stored.
+    pub fn edge_count(&self) -> GraphResult<usize> {
+        let cf = self.cf_edges()?;
+        Ok(self.db.iterator_cf(cf, IteratorMode::Start).count())
+    }
+
+    /// Get all outgoing edges from a source node (M04-T16 BFS support).
+    ///
+    /// This method iterates CF_EDGES to find edges where `edge.source`
+    /// matches the given source node ID (converted from i64 to UUID).
+    ///
+    /// # Arguments
+    /// * `source_node` - Source node ID (i64 storage format)
+    ///
+    /// # Returns
+    /// Vector of full GraphEdges originating from the source node.
+    ///
+    /// # Note
+    /// This performs a full scan of CF_EDGES. For production use with
+    /// large graphs, consider adding a secondary index by source node.
+    pub fn get_outgoing_edges(&self, source_node: i64) -> GraphResult<Vec<GraphEdge>> {
+        let source_uuid = self.i64_to_uuid(source_node);
+        let mut result = Vec::new();
+
+        for edge_result in self.iter_edges()? {
+            let edge = edge_result?;
+            if edge.source == source_uuid {
+                result.push(edge);
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Add edge to batch (M04-T15).
+    pub fn batch_put_edge(
+        &self,
+        batch: &mut WriteBatch,
+        edge: &GraphEdge,
+    ) -> GraphResult<()> {
+        let cf = self.cf_edges()?;
+        let key = Self::compute_edge_key(edge.id);
+        let value = bincode::serialize(edge)?;
+        batch.put_cf(cf, key, value);
+        Ok(())
+    }
+
+    // ========== UUID Conversion Helpers ==========
+
+    /// Convert i64 node ID to UUID for comparison with GraphEdge.source/target.
+    #[inline]
+    fn i64_to_uuid(&self, id: i64) -> Uuid {
+        // Use from_u64_pair with the i64 in the first position, 0 in second
+        Uuid::from_u64_pair(id as u64, 0)
+    }
+
     // ========== Serialization ==========
 
     /// Serialize PoincarePoint to exactly 256 bytes.
@@ -708,6 +938,7 @@ impl std::fmt::Debug for GraphStorage {
             .field("hyperbolic_count", &self.hyperbolic_count().unwrap_or(0))
             .field("cone_count", &self.cone_count().unwrap_or(0))
             .field("adjacency_count", &self.adjacency_count().unwrap_or(0))
+            .field("edge_count", &self.edge_count().unwrap_or(0))
             .finish()
     }
 }
@@ -843,5 +1074,217 @@ mod tests {
             }
             _ => panic!("Expected CorruptedData error"),
         }
+    }
+
+    // ========== GraphEdge Storage Tests (M04-T15) ==========
+
+    #[test]
+    fn test_graph_edge_roundtrip() {
+        use crate::storage::edges::{Domain, EdgeType};
+        use uuid::Uuid;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("test_edge_roundtrip.db");
+        let storage = GraphStorage::open_default(&db_path).unwrap();
+
+        let source = Uuid::new_v4();
+        let target = Uuid::new_v4();
+        let edge = GraphEdge::new(42, source, target, EdgeType::Semantic, 0.75, Domain::Code);
+
+        // Put edge
+        storage.put_edge(&edge).unwrap();
+
+        // Get edge back
+        let retrieved = storage.get_edge(42).unwrap().expect("edge should exist");
+
+        assert_eq!(retrieved.id, 42);
+        assert_eq!(retrieved.source, source);
+        assert_eq!(retrieved.target, target);
+        assert_eq!(retrieved.edge_type, EdgeType::Semantic);
+        assert!((retrieved.weight - 0.75).abs() < 0.0001);
+        assert_eq!(retrieved.domain, Domain::Code);
+    }
+
+    #[test]
+    fn test_graph_edge_not_found() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("test_edge_not_found.db");
+        let storage = GraphStorage::open_default(&db_path).unwrap();
+
+        let result = storage.get_edge(999).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_graph_edge_delete() {
+        use crate::storage::edges::{Domain, EdgeType};
+        use uuid::Uuid;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("test_edge_delete.db");
+        let storage = GraphStorage::open_default(&db_path).unwrap();
+
+        let edge = GraphEdge::new(100, Uuid::new_v4(), Uuid::new_v4(), EdgeType::Causal, 0.8, Domain::General);
+
+        storage.put_edge(&edge).unwrap();
+        assert!(storage.get_edge(100).unwrap().is_some());
+
+        storage.delete_edge(100).unwrap();
+        assert!(storage.get_edge(100).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_graph_edges_bulk_operations() {
+        use crate::storage::edges::{Domain, EdgeType};
+        use uuid::Uuid;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("test_edges_bulk.db");
+        let storage = GraphStorage::open_default(&db_path).unwrap();
+
+        let edges: Vec<GraphEdge> = (0..10)
+            .map(|i| {
+                GraphEdge::new(
+                    i,
+                    Uuid::new_v4(),
+                    Uuid::new_v4(),
+                    EdgeType::Semantic,
+                    0.5 + (i as f32 * 0.05),
+                    Domain::General,
+                )
+            })
+            .collect();
+
+        // Put all edges
+        storage.put_edges(&edges).unwrap();
+
+        // Get subset of edges
+        let edge_ids: Vec<i64> = vec![0, 3, 5, 9];
+        let retrieved = storage.get_edges(&edge_ids).unwrap();
+
+        assert_eq!(retrieved.len(), 4);
+        assert_eq!(retrieved[0].0, 0);
+        assert_eq!(retrieved[1].0, 3);
+        assert_eq!(retrieved[2].0, 5);
+        assert_eq!(retrieved[3].0, 9);
+
+        // Verify edge count
+        assert_eq!(storage.edge_count().unwrap(), 10);
+    }
+
+    #[test]
+    fn test_graph_edges_bulk_delete() {
+        use crate::storage::edges::{Domain, EdgeType};
+        use uuid::Uuid;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("test_edges_bulk_delete.db");
+        let storage = GraphStorage::open_default(&db_path).unwrap();
+
+        let edges: Vec<GraphEdge> = (0..5)
+            .map(|i| {
+                GraphEdge::new(i, Uuid::new_v4(), Uuid::new_v4(), EdgeType::Temporal, 0.6, Domain::Research)
+            })
+            .collect();
+
+        storage.put_edges(&edges).unwrap();
+        assert_eq!(storage.edge_count().unwrap(), 5);
+
+        // Delete some edges
+        storage.delete_edges(&[1, 3]).unwrap();
+        assert_eq!(storage.edge_count().unwrap(), 3);
+
+        // Verify specific edges are gone
+        assert!(storage.get_edge(1).unwrap().is_none());
+        assert!(storage.get_edge(3).unwrap().is_none());
+
+        // Verify others remain
+        assert!(storage.get_edge(0).unwrap().is_some());
+        assert!(storage.get_edge(2).unwrap().is_some());
+        assert!(storage.get_edge(4).unwrap().is_some());
+    }
+
+    #[test]
+    fn test_graph_edge_iteration() {
+        use crate::storage::edges::{Domain, EdgeType};
+        use uuid::Uuid;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("test_edge_iter.db");
+        let storage = GraphStorage::open_default(&db_path).unwrap();
+
+        let edges: Vec<GraphEdge> = (100..103)
+            .map(|i| {
+                GraphEdge::new(i, Uuid::new_v4(), Uuid::new_v4(), EdgeType::Hierarchical, 0.9, Domain::Code)
+            })
+            .collect();
+
+        storage.put_edges(&edges).unwrap();
+
+        // Iterate and collect
+        let mut collected: Vec<GraphEdge> = storage
+            .iter_edges()
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+
+        collected.sort_by_key(|e| e.id);
+        assert_eq!(collected.len(), 3);
+        assert_eq!(collected[0].id, 100);
+        assert_eq!(collected[1].id, 101);
+        assert_eq!(collected[2].id, 102);
+    }
+
+    #[test]
+    fn test_graph_edge_batch_put() {
+        use crate::storage::edges::{Domain, EdgeType};
+        use uuid::Uuid;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("test_edge_batch.db");
+        let storage = GraphStorage::open_default(&db_path).unwrap();
+
+        let edge1 = GraphEdge::new(1, Uuid::new_v4(), Uuid::new_v4(), EdgeType::Semantic, 0.5, Domain::General);
+        let edge2 = GraphEdge::new(2, Uuid::new_v4(), Uuid::new_v4(), EdgeType::Causal, 0.7, Domain::General);
+
+        let mut batch = storage.new_batch();
+        storage.batch_put_edge(&mut batch, &edge1).unwrap();
+        storage.batch_put_edge(&mut batch, &edge2).unwrap();
+        storage.write_batch(batch).unwrap();
+
+        assert_eq!(storage.edge_count().unwrap(), 2);
+        assert!(storage.get_edge(1).unwrap().is_some());
+        assert!(storage.get_edge(2).unwrap().is_some());
+    }
+
+    #[test]
+    fn test_graph_edge_modulated_weight() {
+        use crate::storage::edges::{Domain, EdgeType};
+        use uuid::Uuid;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("test_edge_modulation.db");
+        let storage = GraphStorage::open_default(&db_path).unwrap();
+
+        let edge = GraphEdge::new(
+            42,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            EdgeType::Semantic,
+            0.5,
+            Domain::Code,
+        );
+
+        storage.put_edge(&edge).unwrap();
+        let retrieved = storage.get_edge(42).unwrap().unwrap();
+
+        // Verify modulated weight works after roundtrip
+        // Same domain gives bonus
+        let code_weight = retrieved.get_modulated_weight(Domain::Code);
+        // Different domain no bonus
+        let general_weight = retrieved.get_modulated_weight(Domain::General);
+
+        // Code domain should have higher modulated weight due to domain bonus
+        assert!(code_weight > general_weight, "Same domain should boost weight");
     }
 }

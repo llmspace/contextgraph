@@ -5,7 +5,7 @@
 //!
 //! # Algorithms
 //!
-//! - **BFS**: Breadth-first search for shortest paths and level-order exploration
+//! - **BFS**: Breadth-first search for shortest paths and level-order exploration (M04-T16 ✓)
 //! - **DFS**: Depth-first search (iterative, NOT recursive) for deep exploration
 //! - **A***: A* search with hyperbolic distance heuristic for optimal pathfinding
 //!
@@ -18,7 +18,7 @@
 //!
 //! # Components
 //!
-//! - BFS traversal (TODO: M04-T16)
+//! - BFS traversal (M04-T16 ✓)
 //! - DFS traversal (TODO: M04-T17)
 //! - A* traversal with hyperbolic heuristic (TODO: M04-T17a)
 //! - Traversal utilities (TODO: M04-T22)
@@ -26,15 +26,41 @@
 //! # Constitution Reference
 //!
 //! - edge_model.nt_weights.formula: w_eff = base * (1 + excitatory - inhibitory + 0.5*modulatory)
+//!
+//! # Examples
+//!
+//! ## Basic BFS Traversal
+//!
+//! ```rust,ignore
+//! use context_graph_graph::traversal::{bfs_traverse, BfsParams, Domain};
+//!
+//! let params = BfsParams::default()
+//!     .max_depth(3)
+//!     .domain(Domain::Code)
+//!     .min_weight(0.3);
+//!
+//! let result = bfs_traverse(&storage, start_node, params)?;
+//! println!("Found {} nodes", result.node_count());
+//! ```
+//!
+//! ## Shortest Path
+//!
+//! ```rust,ignore
+//! use context_graph_graph::traversal::bfs_shortest_path;
+//!
+//! if let Some(path) = bfs_shortest_path(&storage, start, target, 10)? {
+//!     println!("Path: {:?}", path);
+//! }
+//! ```
 
-// TODO: M04-T16 - Implement BFS traversal
-// pub struct BfsIterator<'a> { ... }
-// impl<'a> BfsIterator<'a> {
-//     pub fn new(storage: &'a GraphStorage, start: NodeId, filter: EdgeFilter) -> Self
-// }
-// impl<'a> Iterator for BfsIterator<'a> {
-//     type Item = (NodeId, usize); // (node, depth)
-// }
+// M04-T16: BFS traversal with domain modulation
+pub mod bfs;
+
+// Re-export BFS public API
+pub use bfs::{
+    bfs_domain_neighborhood, bfs_neighborhood, bfs_shortest_path, bfs_traverse, BfsParams,
+    BfsResult, Domain, EdgeType, NodeId,
+};
 
 // TODO: M04-T17 - Implement DFS traversal
 // pub struct DfsIterator<'a> { ... }

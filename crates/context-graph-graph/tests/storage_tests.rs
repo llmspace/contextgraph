@@ -17,7 +17,7 @@
 use context_graph_graph::error::GraphError;
 use context_graph_graph::storage::{
     get_column_family_descriptors, get_db_options, StorageConfig, ALL_COLUMN_FAMILIES,
-    CF_ADJACENCY, CF_CONES, CF_FAISS_IDS, CF_HYPERBOLIC, CF_METADATA, CF_NODES,
+    CF_ADJACENCY, CF_CONES, CF_EDGES, CF_FAISS_IDS, CF_HYPERBOLIC, CF_METADATA, CF_NODES,
     // M04-T13 types
     EntailmentCone, GraphStorage, LegacyGraphEdge, NodeId, PoincarePoint,
     // M04-T13a types
@@ -38,7 +38,8 @@ fn test_cf_names() {
 
 #[test]
 fn test_all_column_families_count() {
-    assert_eq!(ALL_COLUMN_FAMILIES.len(), 6);
+    // M04-T15: Added CF_EDGES column family
+    assert_eq!(ALL_COLUMN_FAMILIES.len(), 7);
 }
 
 #[test]
@@ -49,6 +50,8 @@ fn test_all_column_families_contains_all() {
     assert!(ALL_COLUMN_FAMILIES.contains(&CF_FAISS_IDS));
     assert!(ALL_COLUMN_FAMILIES.contains(&CF_NODES));
     assert!(ALL_COLUMN_FAMILIES.contains(&CF_METADATA));
+    // M04-T15: Added CF_EDGES column family
+    assert!(ALL_COLUMN_FAMILIES.contains(&CF_EDGES));
 }
 
 // ========== StorageConfig Tests ==========
@@ -123,7 +126,8 @@ fn test_storage_config_validate_write_buffer_too_small() {
 fn test_get_column_family_descriptors_count() {
     let config = StorageConfig::default();
     let descriptors = get_column_family_descriptors(&config).unwrap();
-    assert_eq!(descriptors.len(), 6);
+    // M04-T15: Added CF_EDGES column family
+    assert_eq!(descriptors.len(), 7);
 }
 
 #[test]
