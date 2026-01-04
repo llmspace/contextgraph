@@ -25,6 +25,7 @@ use std::sync::Arc;
 
 use crate::config::IndexConfig;
 use crate::error::{GraphError, GraphResult};
+#[allow(unused_imports)]
 use super::faiss_ffi::{
     FaissIndex, GpuResources as FfiGpuResources, MetricType,
     faiss_index_factory, faiss_index_cpu_to_gpu, faiss_Index_train,

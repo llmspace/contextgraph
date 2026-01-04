@@ -119,16 +119,20 @@ impl EntailmentCone {
     }
 }
 
-/// Graph edge (placeholder until M04-T15).
+/// Legacy graph edge (placeholder before M04-T15).
 ///
-/// Represents a directed edge in the knowledge graph.
+/// This is the minimal edge representation used in storage_impl.
+/// For the full Marblestone-aware GraphEdge with NT weights, use
+/// `crate::storage::edges::GraphEdge` instead.
+///
+/// NOTE: This type is kept for backwards compatibility with existing
+/// storage operations until they are migrated to use the full GraphEdge.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct GraphEdge {
+pub struct LegacyGraphEdge {
     /// Target node ID.
     pub target: NodeId,
     /// Edge type identifier.
     pub edge_type: u8,
-    // NT weights to be added in M04-T15
 }
 
 // ========== GraphStorage ==========
@@ -292,13 +296,13 @@ impl GraphStorage {
     /// Get edges for a node.
     ///
     /// Returns empty Vec if node has no edges.
-    pub fn get_adjacency(&self, node_id: NodeId) -> GraphResult<Vec<GraphEdge>> {
+    pub fn get_adjacency(&self, node_id: NodeId) -> GraphResult<Vec<LegacyGraphEdge>> {
         let cf = self.cf_adjacency()?;
         let key = node_id.to_le_bytes();
 
         match self.db.get_cf(cf, key)? {
             Some(bytes) => {
-                let edges: Vec<GraphEdge> =
+                let edges: Vec<LegacyGraphEdge> =
                     bincode::deserialize(&bytes).map_err(|e| GraphError::CorruptedData {
                         location: format!("adjacency node_id={}", node_id),
                         details: e.to_string(),
@@ -310,7 +314,7 @@ impl GraphStorage {
     }
 
     /// Store edges for a node.
-    pub fn put_adjacency(&self, node_id: NodeId, edges: &[GraphEdge]) -> GraphResult<()> {
+    pub fn put_adjacency(&self, node_id: NodeId, edges: &[LegacyGraphEdge]) -> GraphResult<()> {
         let cf = self.cf_adjacency()?;
         let key = node_id.to_le_bytes();
         let value = bincode::serialize(edges)?;
@@ -321,7 +325,7 @@ impl GraphStorage {
     }
 
     /// Add a single edge (reads existing, appends, writes back).
-    pub fn add_edge(&self, source: NodeId, edge: GraphEdge) -> GraphResult<()> {
+    pub fn add_edge(&self, source: NodeId, edge: LegacyGraphEdge) -> GraphResult<()> {
         let mut edges = self.get_adjacency(source)?;
         edges.push(edge);
         self.put_adjacency(source, &edges)
@@ -400,7 +404,7 @@ impl GraphStorage {
         &self,
         batch: &mut WriteBatch,
         node_id: NodeId,
-        edges: &[GraphEdge],
+        edges: &[LegacyGraphEdge],
     ) -> GraphResult<()> {
         let cf = self.cf_adjacency()?;
         let key = node_id.to_le_bytes();
@@ -452,7 +456,7 @@ impl GraphStorage {
     /// Iterate over all adjacency lists.
     pub fn iter_adjacency(
         &self,
-    ) -> GraphResult<impl Iterator<Item = GraphResult<(NodeId, Vec<GraphEdge>)>> + '_> {
+    ) -> GraphResult<impl Iterator<Item = GraphResult<(NodeId, Vec<LegacyGraphEdge>)>> + '_> {
         let cf = self.cf_adjacency()?;
         let iter = self.db.iterator_cf(cf, IteratorMode::Start);
 
@@ -463,7 +467,7 @@ impl GraphStorage {
                     .try_into()
                     .expect("NodeId key must be 8 bytes - storage corrupted"),
             );
-            let edges: Vec<GraphEdge> =
+            let edges: Vec<LegacyGraphEdge> =
                 bincode::deserialize(&value).map_err(|e| GraphError::CorruptedData {
                     location: format!("adjacency node_id={}", node_id),
                     details: e.to_string(),
@@ -760,13 +764,13 @@ mod tests {
     }
 
     #[test]
-    fn test_graph_edge_serialization() {
-        let edge = GraphEdge {
+    fn test_legacy_graph_edge_serialization() {
+        let edge = LegacyGraphEdge {
             target: 42,
             edge_type: 1,
         };
         let bytes = bincode::serialize(&edge).expect("serialize");
-        let deserialized: GraphEdge = bincode::deserialize(&bytes).expect("deserialize");
+        let deserialized: LegacyGraphEdge = bincode::deserialize(&bytes).expect("deserialize");
         assert_eq!(deserialized.target, 42);
         assert_eq!(deserialized.edge_type, 1);
     }

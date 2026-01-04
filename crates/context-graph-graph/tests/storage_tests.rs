@@ -19,7 +19,7 @@ use context_graph_graph::storage::{
     get_column_family_descriptors, get_db_options, StorageConfig, ALL_COLUMN_FAMILIES,
     CF_ADJACENCY, CF_CONES, CF_FAISS_IDS, CF_HYPERBOLIC, CF_METADATA, CF_NODES,
     // M04-T13 types
-    EntailmentCone, GraphEdge, GraphStorage, NodeId, PoincarePoint,
+    EntailmentCone, GraphStorage, LegacyGraphEdge, NodeId, PoincarePoint,
     // M04-T13a types
     Migrations, SCHEMA_VERSION,
 };
@@ -726,9 +726,9 @@ fn test_graph_storage_adjacency_operations() {
     println!("INITIAL: No edges for node_id={}", source);
 
     // Add edges
-    storage.add_edge(source, GraphEdge { target: 10, edge_type: 1 }).expect("Add edge 1 failed");
-    storage.add_edge(source, GraphEdge { target: 20, edge_type: 2 }).expect("Add edge 2 failed");
-    storage.add_edge(source, GraphEdge { target: 30, edge_type: 1 }).expect("Add edge 3 failed");
+    storage.add_edge(source, LegacyGraphEdge { target: 10, edge_type: 1 }).expect("Add edge 1 failed");
+    storage.add_edge(source, LegacyGraphEdge { target: 20, edge_type: 2 }).expect("Add edge 2 failed");
+    storage.add_edge(source, LegacyGraphEdge { target: 30, edge_type: 1 }).expect("Add edge 3 failed");
 
     let edges = storage.get_adjacency(source).expect("GET failed");
     assert_eq!(edges.len(), 3);
@@ -784,8 +784,8 @@ fn test_graph_storage_batch_operations() {
 
     // Add edges
     let edges = vec![
-        GraphEdge { target: 1, edge_type: 0 },
-        GraphEdge { target: 2, edge_type: 1 },
+        LegacyGraphEdge { target: 1, edge_type: 0 },
+        LegacyGraphEdge { target: 2, edge_type: 1 },
     ];
     storage.batch_put_adjacency(&mut batch, 100, &edges).expect("Batch put failed");
 
@@ -883,7 +883,7 @@ fn test_graph_storage_reopen_preserves_data() {
         let cone = EntailmentCone::default_at_origin();
         storage.put_cone(2, &cone).expect("PUT failed");
 
-        storage.put_adjacency(3, &[GraphEdge { target: 4, edge_type: 5 }]).expect("PUT failed");
+        storage.put_adjacency(3, &[LegacyGraphEdge { target: 4, edge_type: 5 }]).expect("PUT failed");
 
         println!("FIRST OPEN: Wrote point, cone, edges");
     }
@@ -1116,7 +1116,7 @@ fn test_migration_preserves_existing_data() {
         let cone = EntailmentCone::default_at_origin();
         storage.put_cone(2, &cone).expect("PUT failed");
 
-        storage.put_adjacency(3, &[GraphEdge { target: 4, edge_type: 1 }]).expect("PUT failed");
+        storage.put_adjacency(3, &[LegacyGraphEdge { target: 4, edge_type: 1 }]).expect("PUT failed");
 
         // Version should still be 0
         let version = storage.get_schema_version().expect("Get version failed");
@@ -1221,12 +1221,12 @@ fn test_entailment_cone_default() {
 }
 
 #[test]
-fn test_graph_edge_serialization() {
-    let edge = GraphEdge { target: 42, edge_type: 7 };
+fn test_legacy_graph_edge_serialization() {
+    let edge = LegacyGraphEdge { target: 42, edge_type: 7 };
 
     // Serialize and deserialize with bincode
     let bytes = bincode::serialize(&edge).expect("Serialize failed");
-    let deserialized: GraphEdge = bincode::deserialize(&bytes).expect("Deserialize failed");
+    let deserialized: LegacyGraphEdge = bincode::deserialize(&bytes).expect("Deserialize failed");
 
     assert_eq!(deserialized.target, 42);
     assert_eq!(deserialized.edge_type, 7);

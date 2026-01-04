@@ -13,7 +13,6 @@ use tokio::time::interval;
 
 use crate::error::EmbeddingResult;
 use crate::models::ModelRegistry;
-use crate::traits::EmbeddingModel as _;
 use crate::types::{ModelEmbedding, ModelId};
 
 use crate::batch::{Batch, BatchQueue, BatchRequest};

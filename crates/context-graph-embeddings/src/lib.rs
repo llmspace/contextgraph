@@ -62,6 +62,7 @@ pub mod provider;
 pub mod storage;
 pub mod traits;
 pub mod types;
+pub mod warm;
 
 pub use config::{
     BatchConfig, CacheConfig, EmbeddingConfig, EvictionPolicy, FusionConfig, GpuConfig,

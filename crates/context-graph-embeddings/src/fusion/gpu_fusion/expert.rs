@@ -10,6 +10,35 @@ use crate::error::EmbeddingResult;
 use super::activation::GpuActivation;
 use super::linear::GpuLinear;
 
+/// CPU weights for a single expert layer.
+#[cfg(feature = "candle")]
+pub struct ExpertLayerWeights<'a> {
+    /// Weight matrix for this layer.
+    pub weights: &'a [f32],
+    /// Bias vector for this layer.
+    pub bias: &'a [f32],
+}
+
+/// CPU weights for a complete expert network.
+#[cfg(feature = "candle")]
+pub struct ExpertCpuWeights<'a> {
+    /// Input to hidden layer weights.
+    pub input_to_hidden: ExpertLayerWeights<'a>,
+    /// Hidden to output layer weights.
+    pub hidden_to_output: ExpertLayerWeights<'a>,
+}
+
+/// Expert dimensions for construction.
+#[cfg(feature = "candle")]
+pub struct ExpertDims {
+    /// Input dimension (8320).
+    pub input_dim: usize,
+    /// Hidden layer dimension (4096).
+    pub hidden_dim: usize,
+    /// Output dimension (1536).
+    pub output_dim: usize,
+}
+
 /// GPU-accelerated Expert Network.
 ///
 /// Single expert FFN: input_dim -> hidden_dim -> GELU -> output_dim
@@ -75,30 +104,31 @@ impl GpuExpert {
     }
 
     /// Create GpuExpert from CPU weights.
+    ///
+    /// # Arguments
+    /// * `expert_id` - Unique identifier (0..NUM_EXPERTS)
+    /// * `dims` - Expert layer dimensions
+    /// * `weights` - CPU weight data for both layers
+    /// * `device` - CUDA device
     pub fn from_cpu(
         expert_id: usize,
-        input_dim: usize,
-        hidden_dim: usize,
-        output_dim: usize,
-        input_to_hidden_weights: &[f32],
-        input_to_hidden_bias: &[f32],
-        hidden_to_output_weights: &[f32],
-        hidden_to_output_bias: &[f32],
+        dims: ExpertDims,
+        weights: ExpertCpuWeights<'_>,
         device: &Device,
     ) -> EmbeddingResult<Self> {
         let input_to_hidden = GpuLinear::from_cpu(
-            input_dim,
-            hidden_dim,
-            input_to_hidden_weights,
-            input_to_hidden_bias,
+            dims.input_dim,
+            dims.hidden_dim,
+            weights.input_to_hidden.weights,
+            weights.input_to_hidden.bias,
             device,
         )?;
 
         let hidden_to_output = GpuLinear::from_cpu(
-            hidden_dim,
-            output_dim,
-            hidden_to_output_weights,
-            hidden_to_output_bias,
+            dims.hidden_dim,
+            dims.output_dim,
+            weights.hidden_to_output.weights,
+            weights.hidden_to_output.bias,
             device,
         )?;
 

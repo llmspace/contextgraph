@@ -39,5 +39,3 @@ pub use queue::BatchQueue;
 pub use request::BatchRequest;
 pub use stats::{BatchQueueStats, BatchQueueSummary};
 
-// Re-export Uuid for external use
-pub use uuid::Uuid;

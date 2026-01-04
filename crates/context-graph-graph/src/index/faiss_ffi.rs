@@ -122,30 +122,24 @@ fn check_cuda_works() -> bool {
     // This tests that FAISS can actually call CUDA functions without crashing
     let faiss_test = "/tmp/test_faiss_gpu_check";
     if Path::new(faiss_test).exists() {
-        match Command::new(faiss_test).output() {
-            Ok(output) => {
-                if output.status.success() {
-                    return true;
-                }
-                // FAISS GPU test crashed - GPU not usable
-                return false;
+        if let Ok(output) = Command::new(faiss_test).output() {
+            if output.status.success() {
+                return true;
             }
-            Err(_) => {}
+            // FAISS GPU test crashed - GPU not usable
+            return false;
         }
     }
 
     // Fallback: Check for CUDA test binary
     let cuda_test = "/tmp/test_cuda3";
     if Path::new(cuda_test).exists() {
-        match Command::new(cuda_test).output() {
-            Ok(output) => {
-                if !output.status.success() {
-                    return false;
-                }
-                // CUDA works, but we still need to be careful about FAISS
-                // On WSL2 with driver issues, CUDA may work but FAISS crashes
+        if let Ok(output) = Command::new(cuda_test).output() {
+            if !output.status.success() {
+                return false;
             }
-            Err(_) => {}
+            // CUDA works, but we still need to be careful about FAISS
+            // On WSL2 with driver issues, CUDA may work but FAISS crashes
         }
     }
 

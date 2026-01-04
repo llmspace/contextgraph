@@ -40,7 +40,7 @@ use std::cmp::Ordering;
 /// - Some IVF cells have fewer than nprobe neighbors
 ///
 /// All `query_results*` methods automatically filter out `-1` sentinels.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct SearchResult {
     /// Vector IDs for all queries (flattened, k per query)
     /// -1 indicates no match found for that position
@@ -275,16 +275,6 @@ impl SearchResult {
     }
 }
 
-impl Default for SearchResult {
-    fn default() -> Self {
-        Self {
-            ids: Vec::new(),
-            distances: Vec::new(),
-            k: 0,
-            num_queries: 0,
-        }
-    }
-}
 
 /// Single search result item with additional metadata.
 ///

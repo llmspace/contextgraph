@@ -53,19 +53,6 @@ pub fn l2_norm_gpu(tensor: &Tensor) -> candle_core::Result<f32> {
     tensor.sqr()?.sum_all()?.sqrt()?.to_vec0()
 }
 
-/// Compute L2 norm per row for batch tensors.
-///
-/// # Arguments
-///
-/// * `tensor` - 2D tensor of shape [batch_size, dim]
-///
-/// # Returns
-///
-/// 1D tensor of shape [batch_size] containing L2 norms.
-pub fn l2_norm_batch_gpu(tensor: &Tensor) -> candle_core::Result<Tensor> {
-    tensor.sqr()?.sum_keepdim(D::Minus1)?.sqrt()
-}
-
 /// Normalize a tensor to unit length (L2 normalization).
 ///
 /// # Formula
@@ -126,24 +113,6 @@ pub fn cosine_similarity_gpu(a: &Tensor, b: &Tensor) -> candle_core::Result<f32>
     dot.broadcast_div(&denom)?.to_vec0()
 }
 
-/// Compute cosine similarity for batch of vector pairs.
-///
-/// # Arguments
-///
-/// * `a` - Tensor of shape [batch_size, dim]
-/// * `b` - Tensor of shape [batch_size, dim]
-///
-/// # Returns
-///
-/// 1D tensor of shape [batch_size] containing similarities.
-pub fn cosine_similarity_batch_gpu(a: &Tensor, b: &Tensor) -> candle_core::Result<Tensor> {
-    let dot = (a * b)?.sum_keepdim(D::Minus1)?;
-    let norm_a = a.sqr()?.sum_keepdim(D::Minus1)?.sqrt()?;
-    let norm_b = b.sqr()?.sum_keepdim(D::Minus1)?.sqrt()?;
-    let denom = ((norm_a * norm_b)? + 1e-12)?;
-    dot.broadcast_div(&denom)?.squeeze(D::Minus1)
-}
-
 /// Matrix multiplication with automatic shape handling.
 ///
 /// # Shapes
@@ -172,20 +141,6 @@ pub fn cosine_similarity_batch_gpu(a: &Tensor, b: &Tensor) -> candle_core::Resul
 /// # }
 /// ```
 pub fn matmul_gpu(a: &Tensor, b: &Tensor) -> candle_core::Result<Tensor> {
-    a.matmul(b)
-}
-
-/// Batched matrix multiplication.
-///
-/// # Arguments
-///
-/// * `a` - Tensor of shape [batch, M, K]
-/// * `b` - Tensor of shape [batch, K, N]
-///
-/// # Returns
-///
-/// Tensor of shape [batch, M, N].
-pub fn batched_matmul_gpu(a: &Tensor, b: &Tensor) -> candle_core::Result<Tensor> {
     a.matmul(b)
 }
 
@@ -249,67 +204,6 @@ pub fn softmax_with_temperature_gpu(
 ) -> candle_core::Result<Tensor> {
     let scaled = (tensor / temperature as f64)?;
     candle_nn::ops::softmax(&scaled, D::Minus1)
-}
-
-/// Apply Laplace smoothing to probability distribution.
-///
-/// # Formula
-///
-/// `smoothed_i = (p_i + alpha) / (1 + alpha * n)`
-///
-/// Prevents zero probabilities for unseen classes.
-///
-/// # Arguments
-///
-/// * `probs` - Probability tensor (must sum to 1)
-/// * `alpha` - Smoothing parameter (typically 0.01 to 0.1)
-/// * `num_classes` - Number of classes
-pub fn apply_laplace_smoothing_gpu(
-    probs: &Tensor,
-    alpha: f32,
-    num_classes: usize,
-) -> candle_core::Result<Tensor> {
-    let alpha_tensor = Tensor::full(alpha, probs.shape(), probs.device())?;
-    let smoothed = (probs + alpha_tensor)?;
-    let normalizer = 1.0 + alpha * num_classes as f32;
-    smoothed / normalizer as f64
-}
-
-/// Select top-k values and their indices.
-///
-/// # Arguments
-///
-/// * `tensor` - 1D or 2D tensor
-/// * `k` - Number of top values to select
-///
-/// # Returns
-///
-/// Tuple of (values, indices) tensors.
-pub fn topk_gpu(tensor: &Tensor, k: usize) -> candle_core::Result<(Tensor, Tensor)> {
-    // Candle doesn't have native topk, so we implement it
-    let (sorted, indices) = tensor.sort_last_dim(false)?; // descending
-
-    let values = sorted.narrow(D::Minus1, 0, k)?;
-    let top_indices = indices.narrow(D::Minus1, 0, k)?;
-
-    Ok((values, top_indices))
-}
-
-/// Compute dot product between two vectors.
-pub fn dot_product_gpu(a: &Tensor, b: &Tensor) -> candle_core::Result<f32> {
-    a.mul(b)?.sum_all()?.to_vec0()
-}
-
-/// Check for NaN or Inf values in tensor.
-///
-/// # Returns
-///
-/// Tuple of (has_nan, has_inf) booleans.
-pub fn check_valid_values(tensor: &Tensor) -> candle_core::Result<(bool, bool)> {
-    let values: Vec<f32> = tensor.flatten_all()?.to_vec1()?;
-    let has_nan = values.iter().any(|v| v.is_nan());
-    let has_inf = values.iter().any(|v| v.is_infinite());
-    Ok((has_nan, has_inf))
 }
 
 #[cfg(test)]

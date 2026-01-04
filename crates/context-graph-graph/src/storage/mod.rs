@@ -35,13 +35,20 @@
 
 // ========== Submodules ==========
 
+pub mod edges;
 pub mod migrations;
 pub mod storage_impl;  // renamed to avoid conflict with rocksdb crate
 
 // ========== Re-exports ==========
 
 // GraphStorage and types (M04-T13)
-pub use storage_impl::{EntailmentCone, GraphEdge, GraphStorage, NodeId, PoincarePoint};
+pub use storage_impl::{EntailmentCone, GraphStorage, LegacyGraphEdge, NodeId, PoincarePoint};
+
+// GraphEdge with Marblestone NT modulation (M04-T15)
+// Note: This is the full implementation, not the placeholder in storage_impl
+pub use edges::{EdgeId, GraphEdge};
+// Re-export core types from edges module for convenience
+pub use edges::{Domain, EdgeType, NeurotransmitterWeights};
 
 // Migrations (M04-T13a)
 pub use migrations::{MigrationInfo, Migrations, SCHEMA_VERSION};
