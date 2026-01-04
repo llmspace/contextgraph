@@ -423,6 +423,11 @@ pub unsafe fn poincare_distance_batch_gpu(
     Ok(())
 }
 
+/// Stub implementation when CUDA feature is disabled.
+///
+/// # Safety
+///
+/// This stub always returns an error and does not use the pointers.
 #[cfg(not(feature = "cuda"))]
 pub unsafe fn poincare_distance_batch_gpu(
     _d_queries: *const f32,
@@ -484,6 +489,11 @@ pub unsafe fn poincare_distance_single_gpu(
     Ok(())
 }
 
+/// Stub implementation when CUDA feature is disabled.
+///
+/// # Safety
+///
+/// This stub always returns an error and does not use the pointers.
 #[cfg(not(feature = "cuda"))]
 pub unsafe fn poincare_distance_single_gpu(
     _d_point_a: *const f32,

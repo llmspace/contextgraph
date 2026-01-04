@@ -26,6 +26,7 @@
 //! assert_eq!(ops.device_name(), "CPU (Stub)");
 //! ```
 
+pub mod cone;
 pub mod error;
 pub mod ops;
 pub mod poincare;
@@ -36,4 +37,12 @@ pub use ops::VectorOps;
 pub use poincare::{PoincareCudaConfig, poincare_distance_cpu, poincare_distance_batch_cpu};
 #[cfg(feature = "cuda")]
 pub use poincare::{poincare_distance_batch_gpu, poincare_distance_single_gpu};
+pub use cone::{
+    ConeCudaConfig, ConeData, ConeKernelInfo,
+    cone_check_batch_cpu, cone_membership_score_cpu,
+    is_cone_gpu_available, get_cone_kernel_info,
+    CONE_DATA_DIM, POINT_DIM,
+};
+#[cfg(feature = "cuda")]
+pub use cone::{cone_check_batch_gpu, cone_check_single_gpu};
 pub use stub::StubVectorOps;

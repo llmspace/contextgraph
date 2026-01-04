@@ -19,8 +19,11 @@
 //! - `CUDA_ARCH`: Target architecture (default: sm_120 for RTX 5090)
 //! - `NVCC_FLAGS`: Additional nvcc flags
 
+#[cfg(feature = "cuda")]
 use std::env;
+#[cfg(feature = "cuda")]
 use std::path::PathBuf;
+#[cfg(feature = "cuda")]
 use std::process::Command;
 
 fn main() {
@@ -55,6 +58,9 @@ fn compile_cuda_kernels() {
 
     // Compile poincare_distance.cu
     compile_kernel(&nvcc, "kernels/poincare_distance.cu", "poincare_distance", &cuda_arch, &out_dir);
+
+    // Compile cone_check.cu
+    compile_kernel(&nvcc, "kernels/cone_check.cu", "cone_check", &cuda_arch, &out_dir);
 }
 
 #[cfg(feature = "cuda")]
