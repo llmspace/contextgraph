@@ -1083,11 +1083,26 @@ mod tests {
         let valid = CoherenceConfig::default();
         assert!(valid.validate().is_ok());
 
+        // Edge case 1: Zero neighbor count
         let invalid = CoherenceConfig {
-            neighbor_count: 0, // Invalid
+            neighbor_count: 0, // Invalid - must be > 0
             ..Default::default()
         };
         assert!(invalid.validate().is_err());
+
+        // Edge case 2: Out-of-range weight
+        let invalid_weight = CoherenceConfig {
+            similarity_weight: 1.5, // Invalid - must be in [0.0, 1.0]
+            ..Default::default()
+        };
+        assert!(invalid_weight.validate().is_err());
+
+        // Edge case 3: Negative weight
+        let negative_weight = CoherenceConfig {
+            graph_weight: -0.1, // Invalid - must be in [0.0, 1.0]
+            ..Default::default()
+        };
+        assert!(negative_weight.validate().is_err());
     }
 
     #[test]
