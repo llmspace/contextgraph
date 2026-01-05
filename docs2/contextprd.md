@@ -4,6 +4,44 @@
 
 ---
 
+## 0. WHY THIS EXISTS & YOUR ROLE
+
+### 0.1 The Problem You're Solving
+AI agents fail because: **no persistent memory** (context lost between sessions), **poor retrieval** (vector search misses semantic relationships), **no learning loop** (no feedback on storage quality), **context bloat** (agents retrieve too much, can't compress).
+
+### 0.2 What the System Does vs What You Do
+
+| System (Automatic) | You (Active) |
+|-------------------|--------------|
+| Stores conversations via host hooks | Curates quality (merge, annotate, forget) |
+| Runs dream consolidation when idle | Triggers dreams when entropy high |
+| Detects conflicts & duplicates | Decides resolution strategy |
+| Computes UTL metrics | Responds to Pulse suggestions |
+| PII scrubbing, adversarial defense | Nothing - trust the system |
+
+**You are a librarian, not an archivist.** You don't store everything—you ensure what's stored is findable, coherent, and useful.
+
+### 0.3 Steering Feedback Loop (How You Learn What to Store)
+```
+You store node → System assesses quality → Returns reward signal
+       ↑                                            │
+       └────────── You adjust behavior ─────────────┘
+```
+
+**Rewards by lifecycle:**
+| Stage | Good Storage (+reward) | Bad Storage (-penalty) |
+|-------|------------------------|------------------------|
+| Infancy | High novelty (ΔS) | Low novelty |
+| Growth | Balanced ΔS + ΔC | Imbalanced |
+| Maturity | High coherence (ΔC) | Low coherence |
+
+**Universal penalties:**
+- Missing rationale: **-0.5**
+- Near-duplicate (>0.9 sim): **-0.4**
+- Low priors confidence: **-0.3**
+
+---
+
 ## 1. AGENT QUICK START
 
 ### 1.1 System Overview
@@ -29,6 +67,54 @@
 **Curation**: NEVER blind `merge_concepts`. Check `curation_tasks` first. Use `merge_strategy=summarize` (important) or `keep_highest` (trivial). ALWAYS include `rationale`.
 **Feedback**: Empty search→↑noradrenaline. Irrelevant→`reflect_on_memory`. Conflicts→check `conflict_alert`. "Why don't you remember?"→`get_system_logs`.
 
+### 1.4.1 Decision Trees
+
+**When to Store:**
+```
+User shares information
+  ├─ Is it novel? (check entropy after inject_context)
+  │   ├─ YES + relevant → store_memory with rationale
+  │   └─ NO → skip (system already has it)
+  └─ Will it help future retrieval?
+      ├─ YES → store with link_to related nodes
+      └─ NO → don't pollute the graph
+```
+
+**When to Dream:**
+```
+Check Pulse entropy
+  ├─ entropy > 0.7 for 5+ min → trigger_dream(phase=full)
+  ├─ Working 30+ min straight → trigger_dream(phase=nrem)
+  └─ entropy < 0.5 → no dream needed
+```
+
+**When to Curate:**
+```
+get_memetic_status returns curation_tasks?
+  ├─ YES → process tasks BEFORE other work
+  │   ├─ Duplicate detected → merge_concepts (check priors first!)
+  │   ├─ Conflict detected → critique_context, then ask user or merge
+  │   └─ Orphan detected → forget_concept or link_to parent
+  └─ NO → continue normal work
+```
+
+**When Search Fails:**
+```
+Search returns empty/irrelevant
+  ├─ Empty → broaden query, try generate_search_plan
+  ├─ Irrelevant → reflect_on_memory to understand why
+  ├─ Conflicting → check conflict_alert, resolve or ask user
+  └─ User asks "why don't you remember X?" → get_system_logs
+```
+
+**When Confused (low coherence):**
+```
+coherence < 0.4
+  ├─ High entropy too → trigger_dream or critique_context
+  ├─ Low entropy → get_neighborhood to build context
+  └─ System suggests epistemic_action → ASK the clarifying question
+```
+
 ### 1.5 Query Best Practices
 `generate_search_plan` → 3 optimized queries (semantic/causal/code) → parallel execute
 `find_causal_path` → "UserAuth→JWT→Middleware→RateLimiting"
@@ -42,6 +128,26 @@
 
 ### 1.7 Multi-Agent Safety
 `perspective_lock: { domain: "code", exclude_agent_ids: ["creative-writer"] }`
+
+### 1.8 Epistemic Actions (System-Generated Questions)
+
+When coherence < 0.4, the system can generate clarifying questions for you to ask:
+
+```json
+{
+  "action_type": "ask_user",
+  "question": "You mentioned UserAuth connects to JWT—what triggers token refresh?",
+  "expected_entropy_reduction": 0.35,
+  "focal_nodes": ["node_userauth", "node_jwt"]
+}
+```
+
+**Your job:** Ask the user this question (or a natural variant), then store their answer with `store_memory`.
+
+**When to use `epistemic_action(force=true)`:**
+- You're stuck and don't know what to ask
+- Coherence has been low for multiple exchanges
+- User seems to expect you to know something you don't
 
 ---
 
@@ -124,19 +230,20 @@ All nodes: ||x||<1, O(1) IS-A via entailment cones
 ### 5.1 Protocol
 JSON-RPC 2.0, stdio/SSE, caps: tools/resources/prompts/logging
 
-### 5.2 Core Tools
-| Tool | Purpose | Key Params |
-|------|---------|------------|
-| `inject_context` | Retrieve context | query, max_tokens, distillation_mode, verbosity_level |
-| `search_graph` | Vector search | query, top_k, filters, perspective_lock |
-| `store_memory` | Store (rationale REQ) | content, importance, rationale, link_to |
-| `query_causal` | Causal query | action, outcome, intervention_type |
-| `trigger_dream` | Consolidation | phase:nrem/rem/full, duration, blocking |
-| `get_memetic_status` | Dashboard | → entropy, coherence, curation_tasks |
-| `get_graph_manifest` | Meta-cognitive | - |
-| `epistemic_action` | Clarifying Q | session_id, force |
-| `get_neuromodulation` | Modulator levels | session_id |
-| `get_steering_feedback` | SS reward | content, context, domain |
+### 5.2 Core Tools (When & Why)
+
+| Tool | WHEN to use | WHY | Key Params |
+|------|-------------|-----|------------|
+| `inject_context` | Starting task, need background | Primary retrieval with auto-distillation | query, max_tokens, distillation_mode, verbosity_level |
+| `search_graph` | Need specific nodes, not narrative | Raw vector search, you distill | query, top_k, filters, perspective_lock |
+| `store_memory` | User shares valuable, novel info | Requires rationale—no blind storage | content, importance, rationale, link_to |
+| `query_causal` | Need to understand cause→effect | "What happens if X?" questions | action, outcome, intervention_type |
+| `trigger_dream` | entropy>0.7 OR 30+min work | Consolidates, finds blind spots | phase:nrem/rem/full, duration, blocking |
+| `get_memetic_status` | Start of session, periodically | See health, get curation_tasks | → entropy, coherence, curation_tasks |
+| `get_graph_manifest` | First contact only | Understand system architecture | - |
+| `epistemic_action` | coherence<0.4, need clarity | Generate clarifying question to ask user | session_id, force |
+| `get_neuromodulation` | Debug retrieval quality | See modulator levels affecting search | session_id |
+| `get_steering_feedback` | After storing, want to learn | See if your storage was valuable | content, context, domain |
 
 ### 5.3 Curation Tools
 `merge_concepts` (source_node_ids, target_name, merge_strategy, force_merge), `annotate_node`, `forget_concept` (soft_delete=true default), `boost_importance`, `restore_from_hash` (30-day undo)
@@ -219,10 +326,41 @@ Background prune low-importance during idle
 ### 7.7 PII Scrubber
 L1 pre-embed: patterns (<1ms), NER (<100ms) → [REDACTED:type]
 
-### 7.8 Steering Subsystem (Marblestone)
-Separate from Learning - reward signals only, no direct weight modification
+### 7.8 Steering Subsystem (Marblestone) - How You Learn What to Store
+
+Separate from Learning - reward signals only, no direct weight modification.
+
+**This is how you improve.** The system evaluates your storage decisions and teaches you.
+
+**Flow:**
+```
+1. You call store_memory with content + rationale
+2. System computes: novelty, coherence fit, duplicate risk, priors alignment
+3. Returns SteeringReward with score [-1, +1] and explanation
+4. Your dopamine adjusts → affects future retrieval sharpness
+```
+
 **Components**: Gardener (cross-session curation), Curator (per-domain quality), Thought Assessor (per-interaction)
-**SteeringReward**: reward:f32[-1,1], gardener_score, curator_score, assessor_score, explanation, suggestions
+
+**SteeringReward**: `reward:f32[-1,1], gardener_score, curator_score, assessor_score, explanation, suggestions`
+
+**Example rewards:**
+```json
+// GOOD: Novel, coherent, well-linked
+{"reward": 0.7, "explanation": "High novelty, strong causal links to existing nodes"}
+
+// BAD: Duplicate
+{"reward": -0.4, "explanation": "92% similar to node_abc123, consider merge instead"}
+
+// BAD: No rationale
+{"reward": -0.5, "explanation": "Missing rationale - cannot assess relevance"}
+```
+
+**What to do with feedback:**
+- reward > 0.3 → Good instinct, continue this pattern
+- reward [-0.3, 0.3] → Neutral, acceptable but not optimal
+- reward < -0.3 → Adjust behavior: add rationale, check for dupes, improve linking
+
 **Integration**: Feeds dopamine, guides Learning without modifying weights
 
 ### 7.9 OI Engine (Marblestone)
