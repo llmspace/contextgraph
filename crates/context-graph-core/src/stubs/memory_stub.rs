@@ -172,9 +172,11 @@ impl MemoryStore for InMemoryStore {
         let data = serde_json::to_vec(&*nodes)
             .map_err(|e| CoreError::StorageError(format!("Failed to serialize checkpoint: {}", e)))?;
 
+        // Use UUID to ensure uniqueness across parallel test executions
         let path = std::env::temp_dir().join(format!(
-            "inmemory_checkpoint_{}.json",
-            chrono::Utc::now().timestamp_millis()
+            "inmemory_checkpoint_{}_{}.json",
+            chrono::Utc::now().timestamp_millis(),
+            uuid::Uuid::new_v4()
         ));
 
         std::fs::File::create(&path)
