@@ -24,9 +24,9 @@ This matrix ensures every stub, fake implementation, and silent fallback identif
 
 | Item | Location | Line(s) | Task ID | Verified |
 |------|----------|---------|---------|----------|
-| Fake embedding `vec![0.1; 1536]` | `handlers/tools.rs` | 230 | M06-T04, M06-T10 | [ ] |
-| Fake embedding `vec![0.1; 1536]` | `handlers/tools.rs` | 273 | M06-T04, M06-T10 | [ ] |
-| Fake embedding `vec![0.1; 1536]` | `handlers/memory.rs` | 42 | M06-T04, M06-T10 | [ ] |
+| ~~Fake embedding `vec![0.1; 1536]`~~ | ~~`handlers/tools.rs`~~ | ~~230~~ | M06-T02 | [x] **REMOVED** |
+| ~~Fake embedding `vec![0.1; 1536]`~~ | ~~`handlers/tools.rs`~~ | ~~273~~ | M06-T02 | [x] **REMOVED** |
+| ~~Fake embedding `vec![0.1; 1536]`~~ | ~~`handlers/memory.rs`~~ | ~~42~~ | M06-T02 | [x] **REMOVED** |
 | Hash-based UTL metrics | `stubs/utl_stub.rs` | 50-80 | M06-T01 | [x] |
 | Hardcoded `get_status()` zeros | `stubs/utl_stub.rs` | 104-122 | M06-T01 | [x] |
 
@@ -35,10 +35,11 @@ This matrix ensures every stub, fake implementation, and silent fallback identif
 | Trait | Real Implementation | Gap | Task ID | Verified |
 |-------|---------------------|-----|---------|----------|
 | `core::traits::UtlProcessor` | `utl::processor::UtlProcessor` | **BRIDGED** via `UtlProcessorAdapter` | M06-T01 | [x] |
-| `core::traits::MemoryStore` | N/A (only InMemoryStore stub) | No real implementation | M06-T05 | [ ] |
+| `core::traits::MemoryStore` | `InMemoryStore` (stub) | **TRAIT EXTENDED** (M06-T03): Added persistence methods. Real RocksDB impl pending | M06-T05 | [ ] |
 | `core::traits::GraphIndex` | `cuda::FaissGpuIndex` | Not connected via trait | M06-T06 | [ ] |
 | `core::traits::NervousLayer` | N/A (5 stubs only) | No real implementations | M06-T07, M06-T08 | [ ] |
-| `embeddings::EmbeddingModel` | `embeddings::candle_models::*` | **TRAIT COMPLETE** (M06-T02), factory wiring pending (M06-T04) | M06-T02, M06-T04 | [x] (T02 only) |
+| `core::traits::EmbeddingProvider` | `mcp::adapters::EmbeddingProviderAdapter` | **COMPLETE** - Trait+Adapter+Handler wiring done | M06-T02 | [x] |
+| `core::providers::CandleEmbeddingProvider` | N/A | Lightweight 384D provider in core pending | M06-T04 | [ ] |
 
 ### Silent Fallbacks (Sample - 100+ identified)
 
@@ -53,9 +54,9 @@ This matrix ensures every stub, fake implementation, and silent fallback identif
 
 | Issue | Location | Task ID | Verified |
 |-------|----------|---------|----------|
-| `Arc::new(StubUtlProcessor::new())` | `server.rs:34` | M06-T10 | [ ] |
+| ~~`Arc::new(StubUtlProcessor::new())`~~ | ~~`server.rs:34`~~ | M06-T01 | [x] **Uses UtlProcessorAdapter now** |
 | `Arc::new(InMemoryStore::new())` | `server.rs:33` | M06-T10 | [ ] |
-| No EmbeddingProvider injected | `handlers/tools.rs` | M06-T10 | [ ] |
+| ~~No EmbeddingProvider injected~~ | ~~`handlers/tools.rs`~~ | M06-T02 | [x] **Uses EmbeddingProviderAdapter now** |
 | No GraphIndex injected | `handlers/tools.rs` | M06-T10 | [ ] |
 
 ## Uncovered Items
@@ -79,14 +80,15 @@ This matrix ensures every stub, fake implementation, and silent fallback identif
 
 ## Validation Checklist
 
-- [ ] All stub implementations have replacement tasks
-- [ ] All fake embeddings have removal tasks
-- [ ] All trait gaps have bridging tasks
+- [x] All stub implementations have replacement tasks
+- [x] All fake embeddings have removal tasks (M06-T02 complete)
+- [x] All trait gaps have bridging tasks
 - [ ] Silent fallbacks systematically addressed
 - [ ] Production wiring issues covered
-- [ ] Task dependencies form valid DAG (no cycles)
-- [ ] Layer ordering correct (foundation -> logic -> surface)
-- [ ] No item appears without a task assignment
+- [x] Task dependencies form valid DAG (no cycles)
+- [x] Layer ordering correct (foundation -> logic -> surface)
+- [x] No item appears without a task assignment
+- [x] Foundation layer complete (M06-T01, M06-T02, M06-T03)
 
 ## Verification Commands
 

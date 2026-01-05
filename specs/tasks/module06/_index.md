@@ -18,7 +18,7 @@ Investigation by 5 subagents revealed the system is running entirely on stub imp
 | Issue | Severity | Location |
 |-------|----------|----------|
 | ~~Real UtlProcessor doesn't implement core trait~~ | ~~CRITICAL~~ | ~~`context-graph-utl` vs `context-graph-core`~~ **RESOLVED: M06-T01** |
-| Fake embeddings `vec![0.1; 1536]` in production | CRITICAL | `handlers/tools.rs:230,273`, `handlers/memory.rs:42` |
+| ~~Fake embeddings `vec![0.1; 1536]` in production~~ | ~~CRITICAL~~ | ~~`handlers/tools.rs`, `handlers/memory.rs`~~ **RESOLVED: M06-T02** |
 | InMemoryStore returns 0.5 similarity for ALL | CRITICAL | `stubs/memory_store_stub.rs` |
 | StubUtlProcessor uses hash-based fake metrics | CRITICAL | `stubs/utl_stub.rs` |
 | 5 NervousLayer implementations are all stubs | HIGH | `stubs/layers_stub.rs` |
@@ -71,9 +71,9 @@ graph TD
 |---|---------|-------|-------|------------|--------|----------|
 | 1 | [M06-T01](M06-T01.md) | Bridge UtlProcessor Trait to Real Implementation | foundation | - | Complete | critical |
 | 2 | [M06-T02](M06-T02.md) | Define EmbeddingProvider Trait & Factory | foundation | - | Complete | critical |
-| 3 | [M06-T03](M06-T03.md) | Define PersistentMemoryStore Interface | foundation | - | Ready | critical |
-| 4 | [M06-T04](M06-T04.md) | Implement Candle EmbeddingProvider | logic | T02 | Ready | critical |
-| 5 | [M06-T05](M06-T05.md) | Implement RocksDB MemoryStore | logic | T03 | Blocked | high |
+| 3 | [M06-T03](M06-T03.md) | Define PersistentMemoryStore Interface | foundation | - | Complete | critical |
+| 4 | [M06-T04](M06-T04.md) | Implement CandleEmbeddingProvider (384D MiniLM in core) | logic | T02 | Ready | critical |
+| 5 | [M06-T05](M06-T05.md) | Implement RocksDB MemoryStore | logic | T03 | Ready | high |
 | 6 | [M06-T06](M06-T06.md) | Implement FAISS GraphIndex | logic | - | Ready | high |
 | 7 | [M06-T07](M06-T07.md) | Implement Real SensingLayer (L1) | logic | T04 | Blocked | high |
 | 8 | [M06-T08](M06-T08.md) | Implement Real L2-L5 NervousLayers | logic | T07 | Blocked | medium |
@@ -102,7 +102,7 @@ M06-T02 → M06-T04 → M06-T07 → M06-T08 → M06-T10 → M06-T11 → M06-T12
 
 Tasks that can execute simultaneously:
 
-- **Batch 1 (Foundation)**: M06-T01, M06-T02, M06-T03 (no dependencies)
+- **Batch 1 (Foundation)**: M06-T01, M06-T02, M06-T03 (COMPLETE)
 - **Batch 2 (Early Logic)**: M06-T06, M06-T09 (independent of each other)
 - **Batch 3 (Logic)**: M06-T04, M06-T05 (both depend only on foundation)
 
@@ -129,7 +129,7 @@ Tasks that can execute simultaneously:
 
 | Gate | Criteria | Status |
 |------|----------|--------|
-| Foundation Complete | T01-T03 complete, traits compile | PENDING |
+| Foundation Complete | T01-T03 complete, traits compile | COMPLETE |
 | Embeddings Real | No `vec![0.1; 1536]` in handlers/ | PENDING |
 | Storage Real | InMemoryStore replaced with RocksDB | PENDING |
 | UTL Real | StubUtlProcessor removed from server.rs | PENDING |
