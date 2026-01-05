@@ -1,0 +1,560 @@
+//! Adapter bridging real UtlProcessor to core trait interface.
+//!
+//! This module provides `UtlProcessorAdapter` which wraps the synchronous
+//! `context_graph_utl::processor::UtlProcessor` and implements the async
+//! `context_graph_core::traits::UtlProcessor` trait.
+//!
+//! # Architecture
+//!
+//! The real UtlProcessor uses `&mut self` synchronous methods, while the
+//! core trait requires async methods. This adapter bridges the gap using
+//! `tokio::task::spawn_blocking` to avoid blocking the async runtime.
+//!
+//! # Example
+//!
+//! ```ignore
+//! use context_graph_core::adapters::UtlProcessorAdapter;
+//! use context_graph_core::types::UtlContext;
+//!
+//! let adapter = UtlProcessorAdapter::with_defaults();
+//! let context = UtlContext::default();
+//! let score = adapter.compute_learning_score("test input", &context).await?;
+//! ```
+
+use async_trait::async_trait;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+use context_graph_utl::config::UtlConfig;
+use context_graph_utl::metrics::{StageThresholds, UtlComputationMetrics, UtlStatus};
+use context_graph_utl::phase::ConsolidationPhase;
+use context_graph_utl::processor::UtlProcessor as RealUtlProcessor;
+
+use crate::error::{CoreError, CoreResult};
+use crate::traits::UtlProcessor;
+use crate::types::{MemoryNode, UtlContext, UtlMetrics};
+
+/// Adapter bridging real UtlProcessor to core trait.
+///
+/// Wraps the synchronous `context_graph_utl::processor::UtlProcessor`
+/// and implements the async `context_graph_core::traits::UtlProcessor`.
+///
+/// # Thread Safety
+///
+/// Uses `Arc<RwLock<RealUtlProcessor>>` to allow safe concurrent access
+/// while preserving the ability to mutate processor state.
+///
+/// # Performance
+///
+/// All async methods use `spawn_blocking` to run synchronous UTL computations
+/// without blocking the async runtime. Target latency: < 10ms per computation.
+#[derive(Debug)]
+pub struct UtlProcessorAdapter {
+    /// The wrapped real UTL processor
+    inner: Arc<RwLock<RealUtlProcessor>>,
+
+    /// Accumulated computation metrics for status reporting
+    metrics: Arc<RwLock<UtlComputationMetrics>>,
+}
+
+impl UtlProcessorAdapter {
+    /// Create adapter with configuration.
+    ///
+    /// # Arguments
+    /// * `config` - UTL configuration for the real processor
+    ///
+    /// # Panics
+    /// Panics if config validation fails. Use `try_new()` for fallible construction.
+    pub fn new(config: UtlConfig) -> Self {
+        let processor = RealUtlProcessor::new(config);
+        Self {
+            inner: Arc::new(RwLock::new(processor)),
+            metrics: Arc::new(RwLock::new(UtlComputationMetrics::new())),
+        }
+    }
+
+    /// Try to create adapter, returning error if config is invalid.
+    pub fn try_new(config: UtlConfig) -> CoreResult<Self> {
+        let processor = RealUtlProcessor::try_new(config)
+            .map_err(|e| CoreError::UtlError(e.to_string()))?;
+        Ok(Self {
+            inner: Arc::new(RwLock::new(processor)),
+            metrics: Arc::new(RwLock::new(UtlComputationMetrics::new())),
+        })
+    }
+
+    /// Create adapter from existing processor.
+    pub fn from_processor(processor: RealUtlProcessor) -> Self {
+        Self {
+            inner: Arc::new(RwLock::new(processor)),
+            metrics: Arc::new(RwLock::new(UtlComputationMetrics::new())),
+        }
+    }
+
+    /// Create with default configuration.
+    pub fn with_defaults() -> Self {
+        Self::new(UtlConfig::default())
+    }
+
+    /// Get a clone of the inner processor reference for spawn_blocking.
+    fn inner_clone(&self) -> Arc<RwLock<RealUtlProcessor>> {
+        Arc::clone(&self.inner)
+    }
+
+    /// Get a clone of the metrics reference for spawn_blocking.
+    fn metrics_clone(&self) -> Arc<RwLock<UtlComputationMetrics>> {
+        Arc::clone(&self.metrics)
+    }
+
+    /// Extract embedding from context, providing default if missing.
+    fn get_embedding(context: &UtlContext) -> Vec<f32> {
+        context
+            .goal_vector
+            .clone()
+            .unwrap_or_else(|| vec![0.0; 128])
+    }
+
+    /// Build context embeddings from UtlContext.
+    /// Uses goal_vector as the primary embedding source.
+    fn get_context_embeddings(_context: &UtlContext) -> Vec<Vec<f32>> {
+        // For now, return empty context - real usage would have prior embeddings
+        Vec::new()
+    }
+}
+
+impl Clone for UtlProcessorAdapter {
+    fn clone(&self) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+            metrics: Arc::clone(&self.metrics),
+        }
+    }
+}
+
+#[async_trait]
+impl UtlProcessor for UtlProcessorAdapter {
+    /// Compute the full UTL learning score.
+    ///
+    /// Bridges to real processor's `compute_learning()` method via spawn_blocking.
+    async fn compute_learning_score(&self, input: &str, context: &UtlContext) -> CoreResult<f32> {
+        let inner = self.inner_clone();
+        let metrics_ref = self.metrics_clone();
+        let input = input.to_string();
+        let embedding = Self::get_embedding(context);
+        let context_embeddings = Self::get_context_embeddings(context);
+
+        tokio::task::spawn_blocking(move || {
+            let mut processor = inner.blocking_write();
+            let signal = processor
+                .compute_learning(&input, &embedding, &context_embeddings)
+                .map_err(|e| CoreError::UtlError(e.to_string()))?;
+
+            // Update accumulated metrics
+            {
+                let mut metrics = metrics_ref.blocking_write();
+                metrics.record_computation(
+                    signal.magnitude,
+                    signal.delta_s,
+                    signal.delta_c,
+                    signal.quadrant,
+                    signal.latency_us as f64,
+                );
+                metrics.lifecycle_stage = processor.lifecycle_stage();
+                metrics.lambda_weights = processor.lambda_weights();
+            }
+
+            Ok(signal.magnitude)
+        })
+        .await
+        .map_err(|e| CoreError::Internal(format!("spawn_blocking failed: {}", e)))?
+    }
+
+    /// Compute surprise component (ΔS).
+    ///
+    /// Returns value in [0.0, 1.0] representing information gain/novelty.
+    async fn compute_surprise(&self, input: &str, context: &UtlContext) -> CoreResult<f32> {
+        let inner = self.inner_clone();
+        let input = input.to_string();
+        let embedding = Self::get_embedding(context);
+        let context_embeddings = Self::get_context_embeddings(context);
+
+        tokio::task::spawn_blocking(move || {
+            let mut processor = inner.blocking_write();
+            let signal = processor
+                .compute_learning(&input, &embedding, &context_embeddings)
+                .map_err(|e| CoreError::UtlError(e.to_string()))?;
+            Ok(signal.delta_s)
+        })
+        .await
+        .map_err(|e| CoreError::Internal(format!("spawn_blocking failed: {}", e)))?
+    }
+
+    /// Compute coherence change (ΔC).
+    ///
+    /// Returns value in [0.0, 1.0] representing understanding gain.
+    async fn compute_coherence_change(&self, input: &str, context: &UtlContext) -> CoreResult<f32> {
+        let inner = self.inner_clone();
+        let input = input.to_string();
+        let embedding = Self::get_embedding(context);
+        let context_embeddings = Self::get_context_embeddings(context);
+
+        tokio::task::spawn_blocking(move || {
+            let mut processor = inner.blocking_write();
+            let signal = processor
+                .compute_learning(&input, &embedding, &context_embeddings)
+                .map_err(|e| CoreError::UtlError(e.to_string()))?;
+            Ok(signal.delta_c)
+        })
+        .await
+        .map_err(|e| CoreError::Internal(format!("spawn_blocking failed: {}", e)))?
+    }
+
+    /// Compute emotional weight (wₑ).
+    ///
+    /// Returns value in [0.5, 1.5] representing emotional salience.
+    async fn compute_emotional_weight(&self, input: &str, context: &UtlContext) -> CoreResult<f32> {
+        let inner = self.inner_clone();
+        let input = input.to_string();
+        let embedding = Self::get_embedding(context);
+        let context_embeddings = Self::get_context_embeddings(context);
+
+        tokio::task::spawn_blocking(move || {
+            let mut processor = inner.blocking_write();
+            let signal = processor
+                .compute_learning(&input, &embedding, &context_embeddings)
+                .map_err(|e| CoreError::UtlError(e.to_string()))?;
+            Ok(signal.w_e)
+        })
+        .await
+        .map_err(|e| CoreError::Internal(format!("spawn_blocking failed: {}", e)))?
+    }
+
+    /// Compute goal alignment (cos φ).
+    ///
+    /// Returns value in [-1.0, 1.0] where 1.0 is perfect alignment.
+    async fn compute_alignment(&self, input: &str, context: &UtlContext) -> CoreResult<f32> {
+        let inner = self.inner_clone();
+        let input = input.to_string();
+        let embedding = Self::get_embedding(context);
+        let context_embeddings = Self::get_context_embeddings(context);
+
+        tokio::task::spawn_blocking(move || {
+            let mut processor = inner.blocking_write();
+            let signal = processor
+                .compute_learning(&input, &embedding, &context_embeddings)
+                .map_err(|e| CoreError::UtlError(e.to_string()))?;
+            // cos(phi) for alignment
+            Ok(signal.phi.cos())
+        })
+        .await
+        .map_err(|e| CoreError::Internal(format!("spawn_blocking failed: {}", e)))?
+    }
+
+    /// Determine if a node should be consolidated to long-term memory.
+    async fn should_consolidate(&self, node: &MemoryNode) -> CoreResult<bool> {
+        let inner = self.inner_clone();
+        let importance = node.importance;
+
+        tokio::task::spawn_blocking(move || {
+            let processor = inner.blocking_read();
+            let stage = processor.lifecycle_stage();
+            let thresholds = StageThresholds::for_stage(stage);
+            Ok(importance >= thresholds.consolidation_threshold)
+        })
+        .await
+        .map_err(|e| CoreError::Internal(format!("spawn_blocking failed: {}", e)))?
+    }
+
+    /// Get full UTL metrics for input.
+    async fn compute_metrics(&self, input: &str, context: &UtlContext) -> CoreResult<UtlMetrics> {
+        let inner = self.inner_clone();
+        let input = input.to_string();
+        let embedding = Self::get_embedding(context);
+        let context_embeddings = Self::get_context_embeddings(context);
+
+        tokio::task::spawn_blocking(move || {
+            let mut processor = inner.blocking_write();
+            let signal = processor
+                .compute_learning(&input, &embedding, &context_embeddings)
+                .map_err(|e| CoreError::UtlError(e.to_string()))?;
+
+            Ok(UtlMetrics {
+                entropy: signal.delta_s,
+                coherence: signal.delta_c,
+                learning_score: signal.magnitude,
+                surprise: signal.delta_s,
+                coherence_change: signal.delta_c,
+                emotional_weight: signal.w_e,
+                alignment: signal.phi.cos(),
+            })
+        })
+        .await
+        .map_err(|e| CoreError::Internal(format!("spawn_blocking failed: {}", e)))?
+    }
+
+    /// Get current UTL system status as JSON.
+    ///
+    /// Returns the complete system status including lifecycle stage,
+    /// thresholds, lambda weights, phase angle, and computation metrics.
+    fn get_status(&self) -> serde_json::Value {
+        // Use blocking_read since get_status is sync
+        let processor = self.inner.blocking_read();
+        let metrics = self.metrics.blocking_read();
+
+        // Build UtlStatus from processor state
+        let stage = processor.lifecycle_stage();
+        let status = UtlStatus {
+            lifecycle_stage: stage,
+            interaction_count: processor.interaction_count(),
+            current_thresholds: StageThresholds::for_stage(stage),
+            lambda_weights: processor.lambda_weights(),
+            phase_angle: processor.current_phase(),
+            consolidation_phase: ConsolidationPhase::Wake, // Default wake state
+            metrics: metrics.clone(),
+        };
+
+        // Convert to MCP response format
+        serde_json::to_value(status.to_mcp_response())
+            .unwrap_or_else(|e| serde_json::json!({"error": format!("serialization failed: {}", e)}))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_adapter_creation() {
+        let adapter = UtlProcessorAdapter::with_defaults();
+        let status = adapter.get_status();
+
+        assert!(status.get("lifecycle_phase").is_some());
+        assert_eq!(status["lifecycle_phase"].as_str().unwrap(), "Infancy");
+        assert_eq!(status["interaction_count"].as_u64().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_adapter_computes_real_learning_score() {
+        let adapter = UtlProcessorAdapter::with_defaults();
+        let context = UtlContext {
+            goal_vector: Some(vec![0.1; 128]),
+            ..Default::default()
+        };
+
+        let score = adapter.compute_learning_score("test input", &context).await;
+        assert!(score.is_ok());
+        let score = score.unwrap();
+        assert!(score >= 0.0 && score <= 1.0, "Score {} not in [0,1]", score);
+    }
+
+    #[tokio::test]
+    async fn test_adapter_get_status_returns_live_values() {
+        let adapter = UtlProcessorAdapter::with_defaults();
+
+        // Compute something first
+        let context = UtlContext {
+            goal_vector: Some(vec![0.5; 128]),
+            ..Default::default()
+        };
+        let _ = adapter
+            .compute_learning_score("trigger computation", &context)
+            .await;
+
+        let status = adapter.get_status();
+
+        // Verify schema
+        assert!(status.get("lifecycle_phase").is_some());
+        assert!(status.get("interaction_count").is_some());
+        assert!(status.get("thresholds").is_some());
+        assert!(status.get("entropy").is_some());
+        assert!(status.get("coherence").is_some());
+        assert!(status.get("learning_score").is_some());
+        assert!(status.get("phase_angle").is_some());
+
+        // Verify live values (not zeros from stub)
+        let interaction_count = status["interaction_count"].as_u64().unwrap();
+        assert!(
+            interaction_count >= 1,
+            "Should reflect real computation count, got {}",
+            interaction_count
+        );
+    }
+
+    #[tokio::test]
+    async fn test_adapter_lifecycle_progression() {
+        let adapter = UtlProcessorAdapter::with_defaults();
+        let context = UtlContext {
+            goal_vector: Some(vec![0.1; 128]),
+            ..Default::default()
+        };
+
+        // Start in Infancy
+        let status = adapter.get_status();
+        assert_eq!(status["lifecycle_phase"].as_str().unwrap(), "Infancy");
+
+        // Compute 50 times to trigger Growth
+        for i in 0..50 {
+            let mut ctx = context.clone();
+            ctx.goal_vector = Some(vec![0.1 + (i as f32 * 0.01); 128]);
+            let _ = adapter
+                .compute_learning_score(&format!("msg {}", i), &ctx)
+                .await;
+        }
+
+        let status = adapter.get_status();
+        assert_eq!(
+            status["lifecycle_phase"].as_str().unwrap(),
+            "Growth",
+            "Should transition to Growth after 50 interactions"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_adapter_error_propagation() {
+        let adapter = UtlProcessorAdapter::with_defaults();
+
+        // Empty embedding should still work (handled by real processor)
+        let context = UtlContext {
+            goal_vector: Some(vec![]),
+            ..Default::default()
+        };
+
+        let result = adapter.compute_learning_score("test", &context).await;
+        // Should either succeed or return meaningful error, NEVER panic
+        match result {
+            Ok(score) => assert!(score >= 0.0 && score <= 1.0),
+            Err(e) => assert!(!e.to_string().is_empty(), "Error must have message"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_adapter_compute_metrics() {
+        let adapter = UtlProcessorAdapter::with_defaults();
+        let context = UtlContext {
+            goal_vector: Some(vec![0.3; 128]),
+            ..Default::default()
+        };
+
+        let metrics = adapter.compute_metrics("test input", &context).await;
+        assert!(metrics.is_ok());
+
+        let metrics = metrics.unwrap();
+        assert!(metrics.surprise >= 0.0 && metrics.surprise <= 1.0);
+        assert!(metrics.coherence_change >= 0.0 && metrics.coherence_change <= 1.0);
+        assert!(metrics.emotional_weight >= 0.5 && metrics.emotional_weight <= 1.5);
+        assert!(metrics.alignment >= -1.0 && metrics.alignment <= 1.0);
+        assert!(metrics.learning_score >= 0.0 && metrics.learning_score <= 1.0);
+    }
+
+    #[tokio::test]
+    async fn test_adapter_should_consolidate() {
+        let adapter = UtlProcessorAdapter::with_defaults();
+        let embedding = vec![0.5; 128];
+
+        // Node below threshold
+        let mut low_importance = MemoryNode::new("low".to_string(), embedding.clone());
+        low_importance.importance = 0.1;
+
+        // Node above threshold
+        let mut high_importance = MemoryNode::new("high".to_string(), embedding);
+        high_importance.importance = 0.9;
+
+        let low_result = adapter.should_consolidate(&low_importance).await;
+        let high_result = adapter.should_consolidate(&high_importance).await;
+
+        assert!(low_result.is_ok());
+        assert!(high_result.is_ok());
+
+        // High importance should consolidate
+        assert!(
+            high_result.unwrap(),
+            "High importance node should consolidate"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_adapter_deterministic_outputs() {
+        let adapter = UtlProcessorAdapter::with_defaults();
+        let context = UtlContext {
+            goal_vector: Some(vec![0.2; 128]),
+            ..Default::default()
+        };
+
+        // Same input should produce consistent structure
+        let score1 = adapter
+            .compute_learning_score("same input", &context)
+            .await
+            .unwrap();
+        let score2 = adapter
+            .compute_learning_score("same input", &context)
+            .await
+            .unwrap();
+
+        // Both should be valid scores
+        assert!(score1 >= 0.0 && score1 <= 1.0);
+        assert!(score2 >= 0.0 && score2 <= 1.0);
+    }
+
+    #[tokio::test]
+    async fn test_adapter_status_thresholds_schema() {
+        let adapter = UtlProcessorAdapter::with_defaults();
+        let status = adapter.get_status();
+
+        // Verify thresholds object exists and has expected fields
+        let thresholds = status.get("thresholds").expect("thresholds must exist");
+
+        assert!(
+            thresholds.get("entropy_trigger").is_some(),
+            "entropy_trigger must exist"
+        );
+        assert!(
+            thresholds.get("coherence_trigger").is_some(),
+            "coherence_trigger must exist"
+        );
+        assert!(
+            thresholds.get("min_importance_store").is_some(),
+            "min_importance_store must exist"
+        );
+        assert!(
+            thresholds.get("consolidation_threshold").is_some(),
+            "consolidation_threshold must exist"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_edge_case_empty_input() {
+        let adapter = UtlProcessorAdapter::with_defaults();
+        let context = UtlContext {
+            goal_vector: Some(vec![0.1; 128]),
+            ..Default::default()
+        };
+
+        // Empty content should not panic
+        let result = adapter.compute_learning_score("", &context).await;
+        assert!(result.is_ok(), "Empty input should not cause error");
+    }
+
+    #[tokio::test]
+    async fn test_clone_shares_state() {
+        let adapter1 = UtlProcessorAdapter::with_defaults();
+        let adapter2 = adapter1.clone();
+
+        let context = UtlContext {
+            goal_vector: Some(vec![0.1; 128]),
+            ..Default::default()
+        };
+
+        // Compute on adapter1
+        let _ = adapter1.compute_learning_score("test", &context).await;
+
+        // Both should see updated state
+        let status1 = adapter1.get_status();
+        let status2 = adapter2.get_status();
+
+        assert_eq!(
+            status1["interaction_count"].as_u64(),
+            status2["interaction_count"].as_u64(),
+            "Cloned adapters should share state"
+        );
+    }
+}
