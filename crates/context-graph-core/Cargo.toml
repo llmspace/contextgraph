@@ -18,15 +18,8 @@ uuid.workspace = true
 chrono.workspace = true
 rand.workspace = true
 
-# Optional dependency for real UTL processor
-context-graph-utl = { path = "../context-graph-utl", optional = true }
-
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
-
-[features]
-default = []
-real-utl = ["context-graph-utl"]
 
 [[example]]
 name = "cognitive_pulse"

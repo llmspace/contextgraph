@@ -11,10 +11,6 @@
 //! - Error types and result aliases
 //! - Configuration structures
 //!
-//! # Feature Flags
-//!
-//! - `real-utl`: Enables the real UTL processor adapter (bridges to context-graph-utl)
-//!
 //! # Example
 //!
 //! ```
@@ -34,15 +30,7 @@ pub mod stubs;
 pub mod traits;
 pub mod types;
 
-// Adapters module - only available with real-utl feature
-#[cfg(feature = "real-utl")]
-pub mod adapters;
-
 // Re-exports for convenience
 pub use config::Config;
 pub use error::{CoreError, CoreResult};
 pub use marblestone::{Domain, EdgeType, NeurotransmitterWeights};
-
-// Re-export UtlProcessorAdapter when real-utl feature is enabled
-#[cfg(feature = "real-utl")]
-pub use adapters::UtlProcessorAdapter;
