@@ -13,7 +13,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use context_graph_core::adapters::UtlProcessorAdapter;
+//! use context_graph_mcp::adapters::UtlProcessorAdapter;
 //! use context_graph_core::types::UtlContext;
 //!
 //! let adapter = UtlProcessorAdapter::with_defaults();
@@ -23,16 +23,16 @@
 
 use async_trait::async_trait;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use std::sync::RwLock;
+
+use context_graph_core::error::{CoreError, CoreResult};
+use context_graph_core::traits::UtlProcessor;
+use context_graph_core::types::{MemoryNode, UtlContext, UtlMetrics};
 
 use context_graph_utl::config::UtlConfig;
 use context_graph_utl::metrics::{StageThresholds, UtlComputationMetrics, UtlStatus};
 use context_graph_utl::phase::ConsolidationPhase;
 use context_graph_utl::processor::UtlProcessor as RealUtlProcessor;
-
-use crate::error::{CoreError, CoreResult};
-use crate::traits::UtlProcessor;
-use crate::types::{MemoryNode, UtlContext, UtlMetrics};
 
 /// Adapter bridging real UtlProcessor to core trait.
 ///
@@ -144,14 +144,18 @@ impl UtlProcessor for UtlProcessorAdapter {
         let context_embeddings = Self::get_context_embeddings(context);
 
         tokio::task::spawn_blocking(move || {
-            let mut processor = inner.blocking_write();
+            let mut processor = inner
+                .write()
+                .map_err(|e| CoreError::Internal(format!("Lock poisoned: {}", e)))?;
             let signal = processor
                 .compute_learning(&input, &embedding, &context_embeddings)
                 .map_err(|e| CoreError::UtlError(e.to_string()))?;
 
             // Update accumulated metrics
             {
-                let mut metrics = metrics_ref.blocking_write();
+                let mut metrics = metrics_ref
+                    .write()
+                    .map_err(|e| CoreError::Internal(format!("Lock poisoned: {}", e)))?;
                 metrics.record_computation(
                     signal.magnitude,
                     signal.delta_s,
@@ -179,7 +183,9 @@ impl UtlProcessor for UtlProcessorAdapter {
         let context_embeddings = Self::get_context_embeddings(context);
 
         tokio::task::spawn_blocking(move || {
-            let mut processor = inner.blocking_write();
+            let mut processor = inner
+                .write()
+                .map_err(|e| CoreError::Internal(format!("Lock poisoned: {}", e)))?;
             let signal = processor
                 .compute_learning(&input, &embedding, &context_embeddings)
                 .map_err(|e| CoreError::UtlError(e.to_string()))?;
@@ -199,7 +205,9 @@ impl UtlProcessor for UtlProcessorAdapter {
         let context_embeddings = Self::get_context_embeddings(context);
 
         tokio::task::spawn_blocking(move || {
-            let mut processor = inner.blocking_write();
+            let mut processor = inner
+                .write()
+                .map_err(|e| CoreError::Internal(format!("Lock poisoned: {}", e)))?;
             let signal = processor
                 .compute_learning(&input, &embedding, &context_embeddings)
                 .map_err(|e| CoreError::UtlError(e.to_string()))?;
@@ -219,7 +227,9 @@ impl UtlProcessor for UtlProcessorAdapter {
         let context_embeddings = Self::get_context_embeddings(context);
 
         tokio::task::spawn_blocking(move || {
-            let mut processor = inner.blocking_write();
+            let mut processor = inner
+                .write()
+                .map_err(|e| CoreError::Internal(format!("Lock poisoned: {}", e)))?;
             let signal = processor
                 .compute_learning(&input, &embedding, &context_embeddings)
                 .map_err(|e| CoreError::UtlError(e.to_string()))?;
@@ -239,7 +249,9 @@ impl UtlProcessor for UtlProcessorAdapter {
         let context_embeddings = Self::get_context_embeddings(context);
 
         tokio::task::spawn_blocking(move || {
-            let mut processor = inner.blocking_write();
+            let mut processor = inner
+                .write()
+                .map_err(|e| CoreError::Internal(format!("Lock poisoned: {}", e)))?;
             let signal = processor
                 .compute_learning(&input, &embedding, &context_embeddings)
                 .map_err(|e| CoreError::UtlError(e.to_string()))?;
@@ -256,7 +268,9 @@ impl UtlProcessor for UtlProcessorAdapter {
         let importance = node.importance;
 
         tokio::task::spawn_blocking(move || {
-            let processor = inner.blocking_read();
+            let processor = inner
+                .read()
+                .map_err(|e| CoreError::Internal(format!("Lock poisoned: {}", e)))?;
             let stage = processor.lifecycle_stage();
             let thresholds = StageThresholds::for_stage(stage);
             Ok(importance >= thresholds.consolidation_threshold)
@@ -273,7 +287,9 @@ impl UtlProcessor for UtlProcessorAdapter {
         let context_embeddings = Self::get_context_embeddings(context);
 
         tokio::task::spawn_blocking(move || {
-            let mut processor = inner.blocking_write();
+            let mut processor = inner
+                .write()
+                .map_err(|e| CoreError::Internal(format!("Lock poisoned: {}", e)))?;
             let signal = processor
                 .compute_learning(&input, &embedding, &context_embeddings)
                 .map_err(|e| CoreError::UtlError(e.to_string()))?;
@@ -296,10 +312,13 @@ impl UtlProcessor for UtlProcessorAdapter {
     ///
     /// Returns the complete system status including lifecycle stage,
     /// thresholds, lambda weights, phase angle, and computation metrics.
+    ///
+    /// # Panics
+    /// Panics if the internal locks are poisoned.
     fn get_status(&self) -> serde_json::Value {
-        // Use blocking_read since get_status is sync
-        let processor = self.inner.blocking_read();
-        let metrics = self.metrics.blocking_read();
+        // Use std::sync::RwLock read() - safe to call from any context
+        let processor = self.inner.read().expect("Processor lock poisoned");
+        let metrics = self.metrics.read().expect("Metrics lock poisoned");
 
         // Build UtlStatus from processor state
         let stage = processor.lifecycle_stage();

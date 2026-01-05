@@ -10,7 +10,7 @@ This matrix ensures every stub, fake implementation, and silent fallback identif
 
 | Item | Location | Severity | Task ID | Verified |
 |------|----------|----------|---------|----------|
-| StubUtlProcessor | `stubs/utl_stub.rs` | CRITICAL | M06-T01 | [ ] |
+| StubUtlProcessor | `stubs/utl_stub.rs` | CRITICAL | M06-T01 | [x] |
 | InMemoryStore (0.5 similarity) | `stubs/memory_store_stub.rs` | CRITICAL | M06-T05 | [ ] |
 | InMemoryGraphIndex (brute force) | `stubs/graph_index_stub.rs` | HIGH | M06-T06 | [ ] |
 | StubSensingLayer | `stubs/layers_stub.rs` | HIGH | M06-T07 | [ ] |
@@ -27,14 +27,14 @@ This matrix ensures every stub, fake implementation, and silent fallback identif
 | Fake embedding `vec![0.1; 1536]` | `handlers/tools.rs` | 230 | M06-T04, M06-T10 | [ ] |
 | Fake embedding `vec![0.1; 1536]` | `handlers/tools.rs` | 273 | M06-T04, M06-T10 | [ ] |
 | Fake embedding `vec![0.1; 1536]` | `handlers/memory.rs` | 42 | M06-T04, M06-T10 | [ ] |
-| Hash-based UTL metrics | `stubs/utl_stub.rs` | 50-80 | M06-T01 | [ ] |
-| Hardcoded `get_status()` zeros | `stubs/utl_stub.rs` | 104-122 | M06-T01 | [ ] |
+| Hash-based UTL metrics | `stubs/utl_stub.rs` | 50-80 | M06-T01 | [x] |
+| Hardcoded `get_status()` zeros | `stubs/utl_stub.rs` | 104-122 | M06-T01 | [x] |
 
 ### Trait/Implementation Gaps
 
 | Trait | Real Implementation | Gap | Task ID | Verified |
 |-------|---------------------|-----|---------|----------|
-| `core::traits::UtlProcessor` | `utl::processor::UtlProcessor` | No impl, API mismatch (async vs sync) | M06-T01 | [ ] |
+| `core::traits::UtlProcessor` | `utl::processor::UtlProcessor` | **BRIDGED** via `UtlProcessorAdapter` | M06-T01 | [x] |
 | `core::traits::MemoryStore` | N/A (only InMemoryStore stub) | No real implementation | M06-T05 | [ ] |
 | `core::traits::GraphIndex` | `cuda::FaissGpuIndex` | Not connected via trait | M06-T06 | [ ] |
 | `core::traits::NervousLayer` | N/A (5 stubs only) | No real implementations | M06-T07, M06-T08 | [ ] |

@@ -17,7 +17,7 @@ Investigation by 5 subagents revealed the system is running entirely on stub imp
 
 | Issue | Severity | Location |
 |-------|----------|----------|
-| Real UtlProcessor doesn't implement core trait | CRITICAL | `context-graph-utl` vs `context-graph-core` |
+| ~~Real UtlProcessor doesn't implement core trait~~ | ~~CRITICAL~~ | ~~`context-graph-utl` vs `context-graph-core`~~ **RESOLVED: M06-T01** |
 | Fake embeddings `vec![0.1; 1536]` in production | CRITICAL | `handlers/tools.rs:230,273`, `handlers/memory.rs:42` |
 | InMemoryStore returns 0.5 similarity for ALL | CRITICAL | `stubs/memory_store_stub.rs` |
 | StubUtlProcessor uses hash-based fake metrics | CRITICAL | `stubs/utl_stub.rs` |
@@ -69,7 +69,7 @@ graph TD
 
 | # | Task ID | Title | Layer | Depends On | Status | Priority |
 |---|---------|-------|-------|------------|--------|----------|
-| 1 | [M06-T01](M06-T01.md) | Bridge UtlProcessor Trait to Real Implementation | foundation | - | Ready | critical |
+| 1 | [M06-T01](M06-T01.md) | Bridge UtlProcessor Trait to Real Implementation | foundation | - | Complete | critical |
 | 2 | [M06-T02](M06-T02.md) | Define EmbeddingProvider Trait & Factory | foundation | - | Ready | critical |
 | 3 | [M06-T03](M06-T03.md) | Define PersistentMemoryStore Interface | foundation | - | Ready | critical |
 | 4 | [M06-T04](M06-T04.md) | Implement Candle EmbeddingProvider | logic | T02 | Blocked | critical |

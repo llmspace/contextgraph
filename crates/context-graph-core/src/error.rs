@@ -191,6 +191,19 @@ pub enum CoreError {
     /// These errors typically indicate bugs and should be reported.
     #[error("Internal error: {0}")]
     Internal(String),
+
+    /// Embedding generation failed.
+    ///
+    /// # When This Occurs
+    ///
+    /// - Empty content provided for embedding
+    /// - Model not initialized or ready
+    /// - GPU memory exhaustion during embedding
+    /// - Embedding computation timeout
+    ///
+    /// `Constraint: single_embed <10ms, batch_embed_64 <50ms`
+    #[error("Embedding error: {0}")]
+    Embedding(String),
 }
 
 impl From<serde_json::Error> for CoreError {
