@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::tokenizer::TokenizerFamily;
 
-/// Identifies one of the 12 embedding models in the Multi-Array Storage pipeline.
+/// Identifies one of the 13 embedding models in the Multi-Array Storage pipeline.
 ///
 /// # Variants
 ///
@@ -22,6 +22,7 @@ use super::tokenizer::TokenizerFamily;
 /// | Multimodal | CLIP | 768 | Pretrained |
 /// | Entity | all-MiniLM | 384 | Pretrained |
 /// | LateInteraction | ColBERT | 128/token | Pretrained |
+/// | Splade | SPLADE v3 | ~30K sparse | Pretrained |
 ///
 /// # Example
 ///
@@ -60,6 +61,8 @@ pub enum ModelId {
     Entity = 10,
     /// E12: Late interaction using colbert-ir/colbertv2.0 (128D per token)
     LateInteraction = 11,
+    /// E13: SPLADE v3 sparse embedding for Stage 1 recall in 5-stage pipeline
+    Splade = 12,
 }
 
 impl ModelId {
@@ -82,6 +85,7 @@ impl ModelId {
             Self::Multimodal => 768,
             Self::Entity => 384,
             Self::LateInteraction => 128, // Per-token dimension
+            Self::Splade => 30522,        // SPLADE v3 vocab size
         }
     }
 
@@ -93,12 +97,14 @@ impl ModelId {
     /// - Code: 768 (projected from 256 embed_dim)
     /// - Hdc: 1024 (projected from 10K-bit)
     /// - LateInteraction: pooled to single 128D vector
+    /// - Splade: 30K sparse -> 1536D projected
     #[must_use]
     pub const fn projected_dimension(&self) -> usize {
         match self {
             Self::Sparse => 1536,  // 30K -> 1536 via learned projection
             Self::Code => 768,     // 256 embed -> 768 via projection (CodeT5p internal dim)
             Self::Hdc => 1024,     // 10K-bit -> 1024 via projection
+            Self::Splade => 1536,  // 30K -> 1536 via learned projection (same as E6)
             _ => self.dimension(), // No projection needed
         }
     }
@@ -134,6 +140,7 @@ impl ModelId {
             | Self::TemporalPeriodic
             | Self::TemporalPositional
             | Self::Hdc => usize::MAX, // Custom models: no token limit
+            Self::Splade => 512,    // SPLADE v3 uses BERT tokenizer limit
             _ => 512,               // Standard BERT-family limit
         }
     }
@@ -153,6 +160,7 @@ impl ModelId {
             Self::Multimodal => TokenizerFamily::ClipBpe,     // CLIP has its own BPE
             Self::Entity => TokenizerFamily::BertWordpiece,   // all-MiniLM uses BERT
             Self::LateInteraction => TokenizerFamily::BertWordpiece, // ColBERT uses BERT
+            Self::Splade => TokenizerFamily::BertWordpiece,        // SPLADE v3 uses BERT
             Self::TemporalRecent
             | Self::TemporalPeriodic
             | Self::TemporalPositional
@@ -160,9 +168,9 @@ impl ModelId {
         }
     }
 
-    /// Returns all 12 model variants in pipeline order.
+    /// Returns all 13 model variants in pipeline order.
     ///
-    /// Order matches the E1-E12 specification in constitution.yaml.
+    /// Order matches the E1-E13 specification in constitution.yaml.
     #[must_use]
     pub const fn all() -> &'static [ModelId] {
         &[
@@ -178,6 +186,7 @@ impl ModelId {
             Self::Multimodal,         // E10
             Self::Entity,             // E11
             Self::LateInteraction,    // E12
+            Self::Splade,             // E13
         ]
     }
 
@@ -207,6 +216,7 @@ impl ModelId {
             Self::Multimodal => 15,
             Self::Entity => 2,
             Self::LateInteraction => 8,
+            Self::Splade => 3, // Similar to E6 Sparse
         }
     }
 
@@ -228,6 +238,7 @@ impl ModelId {
             Self::Multimodal => "multimodal",
             Self::Entity => "entity",
             Self::LateInteraction => "late_interaction",
+            Self::Splade => "splade",
         }
     }
 }

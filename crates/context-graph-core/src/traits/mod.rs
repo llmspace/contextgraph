@@ -3,11 +3,16 @@
 mod embedding_provider;
 mod graph_index;
 mod memory_store;
+mod multi_array_embedding;
 mod nervous_layer;
 mod utl_processor;
 
 pub use embedding_provider::{EmbeddingOutput, EmbeddingProvider};
 pub use graph_index::GraphIndex;
 pub use memory_store::{MemoryStore, SearchOptions, StorageBackend, StorageConfig};
+pub use multi_array_embedding::{
+    MultiArrayEmbeddingOutput, MultiArrayEmbeddingProvider, SingleEmbedder, SparseEmbedder,
+    TokenEmbedder,
+};
 pub use nervous_layer::NervousLayer;
 pub use utl_processor::UtlProcessor;

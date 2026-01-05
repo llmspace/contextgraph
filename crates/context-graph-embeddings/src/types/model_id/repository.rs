@@ -21,6 +21,7 @@ impl ModelId {
             Self::Multimodal => Some("openai/clip-vit-large-patch14"),
             Self::Entity => Some("sentence-transformers/all-MiniLM-L6-v2"),
             Self::LateInteraction => Some("colbert-ir/colbertv2.0"),
+            Self::Splade => Some("prithivida/Splade_PP_en_v1"),
             Self::TemporalRecent
             | Self::TemporalPeriodic
             | Self::TemporalPositional
@@ -44,6 +45,7 @@ impl ModelId {
             Self::Multimodal => "multimodal",
             Self::Entity => "entity",
             Self::LateInteraction => "late-interaction",
+            Self::Splade => "splade",
         }
     }
 

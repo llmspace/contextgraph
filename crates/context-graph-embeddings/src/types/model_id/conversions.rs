@@ -19,7 +19,8 @@ impl TryFrom<u8> for ModelId {
             9 => Ok(Self::Multimodal),
             10 => Ok(Self::Entity),
             11 => Ok(Self::LateInteraction),
-            _ => Err("Invalid ModelId: must be 0-11"),
+            12 => Ok(Self::Splade),
+            _ => Err("Invalid ModelId: must be 0-12"),
         }
     }
 }

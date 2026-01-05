@@ -17,6 +17,7 @@ impl std::fmt::Display for ModelId {
             Self::Multimodal => "Multimodal (E10)",
             Self::Entity => "Entity (E11)",
             Self::LateInteraction => "LateInteraction (E12)",
+            Self::Splade => "Splade (E13)",
         };
         write!(f, "{name}")
     }

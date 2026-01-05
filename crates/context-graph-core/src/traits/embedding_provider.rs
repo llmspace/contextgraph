@@ -1,7 +1,21 @@
 //! Embedding provider trait for vector generation.
 //!
-//! This module defines the [`EmbeddingProvider`] trait and [`EmbeddingOutput`] struct
-//! for generating semantic embeddings from text content.
+//! **DEPRECATED**: This module contains the legacy [`EmbeddingProvider`] trait and
+//! [`EmbeddingOutput`] struct which produce only a single 1536D vector.
+//!
+//! For new code, use [`MultiArrayEmbeddingProvider`] from the
+//! `multi_array_embedding_provider` module, which generates complete 13-embedding
+//! SemanticFingerprints with all semantic dimensions.
+//!
+//! # Migration Guide
+//!
+//! ```ignore
+//! // OLD (deprecated):
+//! use context_graph_core::traits::{EmbeddingProvider, EmbeddingOutput};
+//!
+//! // NEW (recommended):
+//! use context_graph_core::traits::{MultiArrayEmbeddingProvider, MultiArrayEmbeddingOutput};
+//! ```
 //!
 //! # Performance Requirements (constitution.yaml)
 //!
@@ -9,7 +23,7 @@
 //! - Batch embed (64 items): <50ms latency
 //! - Default dimensions: 1536 (OpenAI text-embedding-3-small compatible)
 //!
-//! # Example
+//! # Example (Legacy)
 //!
 //! ```ignore
 //! use context_graph_core::traits::{EmbeddingProvider, EmbeddingOutput};
@@ -61,6 +75,10 @@ use crate::error::CoreResult;
 /// assert_eq!(output.vector.len(), output.dimensions);
 /// assert!(output.latency < Duration::from_millis(10));
 /// ```
+#[deprecated(
+    since = "0.2.0",
+    note = "Use MultiArrayEmbeddingOutput for complete 13-embedding metrics"
+)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmbeddingOutput {
     /// The embedding vector (1536D by default).
@@ -199,6 +217,10 @@ impl EmbeddingOutput {
 ///     }
 /// }
 /// ```
+#[deprecated(
+    since = "0.2.0",
+    note = "Use MultiArrayEmbeddingProvider for 13-embedding SemanticFingerprint generation. EmbeddingProvider produces only a single 1536D vector."
+)]
 #[async_trait]
 pub trait EmbeddingProvider: Send + Sync {
     /// Generate an embedding for a single piece of content.

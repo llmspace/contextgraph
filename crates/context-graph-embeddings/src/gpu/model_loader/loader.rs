@@ -236,9 +236,7 @@ mod tests {
     use super::*;
     use std::path::Path;
 
-    // Integration tests require GPU - skip in CI
     #[test]
-    #[ignore = "Requires GPU"]
     fn test_load_semantic_model() {
         let loader = GpuModelLoader::new().expect("GPU init failed");
         let model_dir = Path::new("/home/cabdru/contextgraph/models/semantic");
@@ -252,7 +250,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires GPU"]
     fn test_load_entity_model() {
         let loader = GpuModelLoader::new().expect("GPU init failed");
         let model_dir = Path::new("/home/cabdru/contextgraph/models/entity");

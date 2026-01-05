@@ -48,7 +48,7 @@ pub trait ModelFactory: Send + Sync {
     /// Create a model instance for the given ModelId with configuration.
     ///
     /// # Arguments
-    /// * `model_id` - The model variant to create (E1-E12)
+    /// * `model_id` - The model variant to create (E1-E13)
     /// * `config` - Model-specific configuration (device, quantization, etc.)
     ///
     /// # Returns
@@ -80,15 +80,15 @@ pub trait ModelFactory: Send + Sync {
     ///
     /// # Returns
     /// Static slice of supported `ModelId` variants.
-    /// A full factory supports all 12 models.
+    /// A full factory supports all 13 models.
     ///
     /// # Example
     ///
     /// ```
     /// # use context_graph_embeddings::types::ModelId;
-    /// // All 12 model IDs are available
+    /// // All 13 model IDs are available
     /// let all_models = ModelId::all();
-    /// assert_eq!(all_models.len(), 12);
+    /// assert_eq!(all_models.len(), 13);
     /// assert!(all_models.contains(&ModelId::Semantic));
     /// ```
     fn supported_models(&self) -> &[ModelId];

@@ -4,8 +4,8 @@ use super::*;
 use std::path::{Path, PathBuf};
 
 #[test]
-fn test_all_returns_12_variants() {
-    assert_eq!(ModelId::all().len(), 12);
+fn test_all_returns_13_variants() {
+    assert_eq!(ModelId::all().len(), 13);
 }
 
 #[test]
@@ -14,6 +14,7 @@ fn test_variant_order_matches_spec() {
     assert_eq!(all[0], ModelId::Semantic); // E1
     assert_eq!(all[4], ModelId::Causal); // E5
     assert_eq!(all[11], ModelId::LateInteraction); // E12
+    assert_eq!(all[12], ModelId::Splade); // E13
 }
 
 #[test]
@@ -86,7 +87,7 @@ fn test_display() {
 #[test]
 fn test_pretrained_count() {
     let pretrained: Vec<_> = ModelId::pretrained().collect();
-    assert_eq!(pretrained.len(), 8); // 12 total - 4 custom
+    assert_eq!(pretrained.len(), 9); // 13 total - 4 custom
 }
 
 #[test]
@@ -160,25 +161,25 @@ fn test_tokenizer_families() {
 #[test]
 fn test_invalid_u8_conversion() {
     // Before: attempt conversion of invalid value
-    let result = ModelId::try_from(12u8);
+    let result = ModelId::try_from(13u8);
 
     // After: verify error
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "Invalid ModelId: must be 0-11");
-    println!("Edge Case 1 PASSED: Invalid u8 (12) correctly rejected");
+    assert_eq!(result.unwrap_err(), "Invalid ModelId: must be 0-12");
+    println!("Edge Case 1 PASSED: Invalid u8 (13) correctly rejected");
 }
 
 #[test]
 fn test_maximum_enum_value() {
     // Before: get max valid value
-    let max_valid = ModelId::LateInteraction as u8;
+    let max_valid = ModelId::Splade as u8;
     println!("Before: max valid u8 = {}", max_valid);
 
     // After: verify round-trip
     let recovered = ModelId::try_from(max_valid).expect("max valid should convert");
-    assert_eq!(recovered, ModelId::LateInteraction);
+    assert_eq!(recovered, ModelId::Splade);
     println!("After: recovered = {:?}", recovered);
-    println!("Edge Case 2 PASSED: Maximum value (11) converts correctly");
+    println!("Edge Case 2 PASSED: Maximum value (12) converts correctly");
 }
 
 #[test]

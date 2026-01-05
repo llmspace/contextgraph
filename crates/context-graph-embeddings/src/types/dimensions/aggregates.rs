@@ -1,9 +1,9 @@
 //! Aggregate dimensions and compile-time validation.
 //!
-//! This module defines the total dimension for the 12-model Multi-Array Storage.
+//! This module defines the total dimension for the 13-model Multi-Array Storage.
 
 use super::constants::{
-    CAUSAL, CODE, ENTITY, GRAPH, HDC, LATE_INTERACTION, MULTIMODAL, SEMANTIC, SPARSE,
+    CAUSAL, CODE, ENTITY, GRAPH, HDC, LATE_INTERACTION, MULTIMODAL, SEMANTIC, SPARSE, SPLADE,
     TEMPORAL_PERIODIC, TEMPORAL_POSITIONAL, TEMPORAL_RECENT,
 };
 
@@ -11,13 +11,13 @@ use super::constants::{
 // AGGREGATE DIMENSIONS
 // =============================================================================
 
-/// Total dimension across all 12 model embeddings (sum of projected dimensions).
+/// Total dimension across all 13 model embeddings (sum of projected dimensions).
 ///
 /// Each embedding is stored SEPARATELY in Multi-Array Storage at its native dimension.
 /// This constant represents the sum of all dimensions for memory allocation.
 ///
 /// Calculated as:
-/// 1024 + 512 + 512 + 512 + 768 + 1536 + 768 + 384 + 1024 + 768 + 384 + 128 = 8320
+/// 1024 + 512 + 512 + 512 + 768 + 1536 + 768 + 384 + 1024 + 768 + 384 + 128 + 1536 = 9856
 pub const TOTAL_DIMENSION: usize = SEMANTIC
     + TEMPORAL_RECENT
     + TEMPORAL_PERIODIC
@@ -29,10 +29,11 @@ pub const TOTAL_DIMENSION: usize = SEMANTIC
     + HDC
     + MULTIMODAL
     + ENTITY
-    + LATE_INTERACTION;
+    + LATE_INTERACTION
+    + SPLADE;
 
 /// Number of models in the ensemble.
-pub const MODEL_COUNT: usize = 12;
+pub const MODEL_COUNT: usize = 13;
 
 // =============================================================================
 // COMPILE-TIME VALIDATION
@@ -41,9 +42,9 @@ pub const MODEL_COUNT: usize = 12;
 /// Compile-time assertion that TOTAL_DIMENSION equals expected value.
 /// This will cause a compilation error if dimensions change incorrectly.
 const _TOTAL_DIMENSION_CHECK: () = assert!(
-    TOTAL_DIMENSION == 8320,
-    "TOTAL_DIMENSION must equal 8320"
+    TOTAL_DIMENSION == 9856,
+    "TOTAL_DIMENSION must equal 9856"
 );
 
-/// Compile-time assertion that MODEL_COUNT equals 12.
-const _MODEL_COUNT_CHECK: () = assert!(MODEL_COUNT == 12, "MODEL_COUNT must equal 12");
+/// Compile-time assertion that MODEL_COUNT equals 13.
+const _MODEL_COUNT_CHECK: () = assert!(MODEL_COUNT == 13, "MODEL_COUNT must equal 13");

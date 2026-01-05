@@ -3,14 +3,15 @@
 use super::constants::{
     CAUSAL, CAUSAL_NATIVE, CODE, CODE_NATIVE, ENTITY, ENTITY_NATIVE, GRAPH, GRAPH_NATIVE, HDC,
     HDC_NATIVE, LATE_INTERACTION, LATE_INTERACTION_NATIVE, MULTIMODAL, MULTIMODAL_NATIVE,
-    SEMANTIC, SEMANTIC_NATIVE, SPARSE, SPARSE_NATIVE, TEMPORAL_PERIODIC, TEMPORAL_PERIODIC_NATIVE,
-    TEMPORAL_POSITIONAL, TEMPORAL_POSITIONAL_NATIVE, TEMPORAL_RECENT, TEMPORAL_RECENT_NATIVE,
+    SEMANTIC, SEMANTIC_NATIVE, SPARSE, SPARSE_NATIVE, SPLADE, SPLADE_NATIVE, TEMPORAL_PERIODIC,
+    TEMPORAL_PERIODIC_NATIVE, TEMPORAL_POSITIONAL, TEMPORAL_POSITIONAL_NATIVE, TEMPORAL_RECENT,
+    TEMPORAL_RECENT_NATIVE,
 };
 
-/// Returns the projected dimension for a given model index (0-11).
+/// Returns the projected dimension for a given model index (0-12).
 ///
 /// # Panics
-/// Panics if index >= 12.
+/// Panics if index >= 13.
 ///
 /// # Example
 /// ```rust
@@ -34,14 +35,15 @@ pub const fn projected_dimension_by_index(index: usize) -> usize {
         9 => MULTIMODAL,
         10 => ENTITY,
         11 => LATE_INTERACTION,
-        _ => panic!("Invalid model index: must be 0-11"),
+        12 => SPLADE,
+        _ => panic!("Invalid model index: must be 0-12"),
     }
 }
 
-/// Returns the native dimension for a given model index (0-11).
+/// Returns the native dimension for a given model index (0-12).
 ///
 /// # Panics
-/// Panics if index >= 12.
+/// Panics if index >= 13.
 #[must_use]
 pub const fn native_dimension_by_index(index: usize) -> usize {
     match index {
@@ -57,13 +59,14 @@ pub const fn native_dimension_by_index(index: usize) -> usize {
         9 => MULTIMODAL_NATIVE,
         10 => ENTITY_NATIVE,
         11 => LATE_INTERACTION_NATIVE,
-        _ => panic!("Invalid model index: must be 0-11"),
+        12 => SPLADE_NATIVE,
+        _ => panic!("Invalid model index: must be 0-12"),
     }
 }
 
 /// Returns the byte offset for model at index within the total dimension space.
 ///
-/// Used for memory calculations and index offsets (8320D total).
+/// Used for memory calculations and index offsets (9856D total).
 ///
 /// # Example
 /// ```rust
@@ -143,6 +146,20 @@ pub const fn offset_by_index(index: usize) -> usize {
                 + MULTIMODAL
                 + ENTITY
         }
-        _ => panic!("Invalid model index: must be 0-11"),
+        12 => {
+            SEMANTIC
+                + TEMPORAL_RECENT
+                + TEMPORAL_PERIODIC
+                + TEMPORAL_POSITIONAL
+                + CAUSAL
+                + SPARSE
+                + CODE
+                + GRAPH
+                + HDC
+                + MULTIMODAL
+                + ENTITY
+                + LATE_INTERACTION
+        }
+        _ => panic!("Invalid model index: must be 0-12"),
     }
 }

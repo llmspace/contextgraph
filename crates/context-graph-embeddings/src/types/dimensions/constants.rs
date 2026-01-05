@@ -1,4 +1,4 @@
-//! Native and projected dimension constants for the 12-model embedding pipeline.
+//! Native and projected dimension constants for the 13-model embedding pipeline.
 //!
 //! This module defines the exact dimensions for each model in the ensemble:
 //! - Native dimensions: Raw model output sizes
@@ -44,6 +44,9 @@ pub const ENTITY_NATIVE: usize = 384;
 /// E12: Late-interaction native dimension per token (ColBERT)
 pub const LATE_INTERACTION_NATIVE: usize = 128;
 
+/// E13: SPLADE v3 native dimension (30K sparse vocabulary)
+pub const SPLADE_NATIVE: usize = 30522;
+
 // =============================================================================
 // PROJECTED DIMENSIONS (for Multi-Array Storage)
 // =============================================================================
@@ -83,3 +86,6 @@ pub const ENTITY: usize = 384;
 
 /// E12: Late-interaction projected dimension (pooled to single vector)
 pub const LATE_INTERACTION: usize = 128;
+
+/// E13: SPLADE v3 projected dimension (30K sparse -> 1536D via learned projection)
+pub const SPLADE: usize = 1536;

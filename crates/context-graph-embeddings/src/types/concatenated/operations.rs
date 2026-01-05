@@ -17,12 +17,13 @@ impl MultiArrayEmbedding {
     /// This hash is deterministic: same embeddings → same hash.
     ///
     /// # Panics
-    /// Panics if `is_complete() == false`. All 12 models must be present.
+    /// Panics if `is_complete() == false`. All 13 models must be present.
     pub fn compute_hash(&mut self) {
         assert!(
             self.is_complete(),
-            "Cannot compute hash: {} of 12 models missing. Missing: {:?}",
+            "Cannot compute hash: {} of {} models missing. Missing: {:?}",
             MODEL_COUNT - self.filled_count(),
+            MODEL_COUNT,
             self.missing_models()
         );
 

@@ -6,7 +6,7 @@ use crate::types::ModelId;
 
 /// Memory estimates for each model (in bytes, FP32).
 /// These are conservative overestimates.
-pub const MEMORY_ESTIMATES: [(ModelId, usize); 12] = [
+pub const MEMORY_ESTIMATES: [(ModelId, usize); 13] = [
     (ModelId::Semantic, 1_400_000_000),        // 1.3 GB + buffer
     (ModelId::TemporalRecent, 15_000_000),     // 10 MB + buffer
     (ModelId::TemporalPeriodic, 15_000_000),   // 10 MB + buffer
@@ -19,6 +19,7 @@ pub const MEMORY_ESTIMATES: [(ModelId, usize); 12] = [
     (ModelId::Multimodal, 1_600_000_000),      // 1.5 GB + buffer
     (ModelId::Entity, 120_000_000),            // 100 MB + buffer
     (ModelId::LateInteraction, 450_000_000),   // 400 MB + buffer
+    (ModelId::Splade, 550_000_000),            // 500 MB + buffer (similar to E6 Sparse)
 ];
 
 /// Get memory estimate for a ModelId.
@@ -30,17 +31,17 @@ pub fn get_memory_estimate(model_id: ModelId) -> usize {
         .unwrap_or(0)
 }
 
-/// Total memory for all 12 models (FP32).
-/// ~5.5 GB without quantization.
-pub const TOTAL_MEMORY_ESTIMATE: usize = 5_545_000_000;
+/// Total memory for all 13 models (FP32).
+/// ~6.1 GB without quantization.
+pub const TOTAL_MEMORY_ESTIMATE: usize = 6_095_000_000;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_memory_estimates_array_has_12_entries() {
-        assert_eq!(MEMORY_ESTIMATES.len(), 12);
+    fn test_memory_estimates_array_has_13_entries() {
+        assert_eq!(MEMORY_ESTIMATES.len(), 13);
     }
 
     #[test]

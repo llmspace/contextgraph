@@ -246,10 +246,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_queues_created_for_all_12_models() {
-        // Verify that we would create 12 queues - one per ModelId
+    fn test_queues_created_for_all_13_models() {
+        // Verify that we would create 13 queues - one per ModelId
         let all_models = ModelId::all();
-        assert_eq!(all_models.len(), 12, "Expected 12 models");
+        assert_eq!(all_models.len(), 13, "Expected 13 models");
 
         println!("\n========================================");
         println!("QUEUE CREATION VERIFICATION");

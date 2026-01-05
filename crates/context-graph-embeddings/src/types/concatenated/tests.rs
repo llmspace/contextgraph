@@ -2,6 +2,7 @@
 
 use super::MultiArrayEmbedding;
 use crate::error::EmbeddingError;
+use crate::types::dimensions::{MODEL_COUNT, TOTAL_DIMENSION};
 use crate::types::{ModelEmbedding, ModelId};
 
 // ========== Construction Tests ==========
@@ -53,8 +54,8 @@ fn test_set_all_models() {
     }
 
     assert!(mae.is_complete());
-    assert_eq!(mae.filled_count(), 12);
-    assert_eq!(mae.total_latency_us, 1200); // 12 * 100
+    assert_eq!(mae.filled_count(), MODEL_COUNT);
+    assert_eq!(mae.total_latency_us, MODEL_COUNT as u64 * 100); // 13 * 100
 }
 
 #[test]
@@ -103,32 +104,32 @@ fn test_get_vector_returns_slice() {
 // ========== Completion Tests ==========
 
 #[test]
-fn test_is_complete_only_when_all_12() {
+fn test_is_complete_only_when_all_13() {
     let mut mae = MultiArrayEmbedding::new();
 
-    // Fill 11 models
-    for model_id in ModelId::all().iter().take(11) {
+    // Fill 12 models (all but the last)
+    for model_id in ModelId::all().iter().take(MODEL_COUNT - 1) {
         let dim = model_id.projected_dimension();
         let mut emb = ModelEmbedding::new(*model_id, vec![0.1; dim], 100);
         emb.set_projected(true);
         mae.set(emb);
     }
     assert!(!mae.is_complete());
-    assert_eq!(mae.filled_count(), 11);
+    assert_eq!(mae.filled_count(), MODEL_COUNT - 1);
 
-    // Fill last model
-    let mut emb = ModelEmbedding::new(ModelId::LateInteraction, vec![0.1; 128], 100);
+    // Fill last model (Splade)
+    let mut emb = ModelEmbedding::new(ModelId::Splade, vec![0.1; 1536], 100);
     emb.set_projected(true);
     mae.set(emb);
     assert!(mae.is_complete());
-    assert_eq!(mae.filled_count(), 12);
+    assert_eq!(mae.filled_count(), MODEL_COUNT);
 }
 
 #[test]
 fn test_missing_models_returns_correct_list() {
     let mut mae = MultiArrayEmbedding::new();
     let missing = mae.missing_models();
-    assert_eq!(missing.len(), 12);
+    assert_eq!(missing.len(), MODEL_COUNT);
 
     // Set one model
     let mut emb = ModelEmbedding::new(ModelId::Semantic, vec![0.1; 1024], 100);
@@ -136,7 +137,7 @@ fn test_missing_models_returns_correct_list() {
     mae.set(emb);
 
     let missing = mae.missing_models();
-    assert_eq!(missing.len(), 11);
+    assert_eq!(missing.len(), 12); // 13 total - 1 filled = 12 missing
     assert!(!missing.contains(&ModelId::Semantic));
 }
 
@@ -194,7 +195,7 @@ fn test_total_latency_sums_all() {
         mae.set(emb);
     }
 
-    assert_eq!(mae.total_latency_us, 1200); // 12 * 100
+    assert_eq!(mae.total_latency_us, MODEL_COUNT as u64 * 100); // 13 * 100
 }
 
 // ========== Total Dimension Tests ==========
@@ -202,8 +203,8 @@ fn test_total_latency_sums_all() {
 #[test]
 fn test_total_dimension() {
     let mae = create_complete_embedding();
-    // Sum of all projected dimensions
-    assert_eq!(mae.total_dimension(), 8320);
+    // Sum of all projected dimensions (9856 for 13 models)
+    assert_eq!(mae.total_dimension(), TOTAL_DIMENSION);
 }
 
 #[test]
@@ -268,7 +269,7 @@ fn test_iter_returns_all_present() {
 fn edge_case_empty_struct() {
     let mae = MultiArrayEmbedding::new();
     let missing = mae.missing_models();
-    assert_eq!(missing.len(), 12);
+    assert_eq!(missing.len(), MODEL_COUNT);
 }
 
 #[test]
@@ -305,9 +306,9 @@ fn verify_multi_array_storage() {
     let mut mae = create_complete_embedding();
     mae.compute_hash();
 
-    // 1. Verify all 12 embeddings stored separately
+    // 1. Verify all 13 embeddings stored separately
     assert!(mae.is_complete());
-    assert_eq!(mae.filled_count(), 12);
+    assert_eq!(mae.filled_count(), MODEL_COUNT);
 
     // 2. Verify each embedding has correct dimension
     for &model_id in ModelId::all() {
@@ -318,8 +319,8 @@ fn verify_multi_array_storage() {
     // 3. Verify hash is non-zero
     assert_ne!(mae.content_hash, 0);
 
-    // 4. Verify total dimension is sum of all
-    assert_eq!(mae.total_dimension(), 8320);
+    // 4. Verify total dimension is sum of all (9856 for 13 models)
+    assert_eq!(mae.total_dimension(), TOTAL_DIMENSION);
 }
 
 // ========== Helper Functions ==========

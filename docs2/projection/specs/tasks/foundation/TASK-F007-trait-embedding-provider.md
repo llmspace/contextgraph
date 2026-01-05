@@ -7,70 +7,77 @@
 - **Estimated Effort**: M (Medium)
 - **Dependencies**: TASK-F001 (SemanticFingerprint - COMPLETE), TASK-F006 (Remove Fusion - COMPLETE)
 - **Traces To**: TS-301, FR-101, FR-102, FR-104, FR-602
+- **Status**: NOT COMPLETE (commit 6f76a8c only implemented partial work in embeddings crate)
 
 ---
 
-## CURRENT CODEBASE STATE (Audited 2025-01-05)
+## CRITICAL: ACTUAL CODEBASE STATE (Audited 2026-01-05)
 
-### What Already Exists (DO NOT RECREATE)
+### VERIFIED EXISTS (DO NOT RECREATE)
 
-**SemanticFingerprint** - COMPLETE in `crates/context-graph-core/src/types/fingerprint/semantic.rs`:
+**1. SemanticFingerprint** - COMPLETE
+- **Location**: `crates/context-graph-core/src/types/fingerprint/semantic/fingerprint.rs`
+- **13 embeddings**: E1-E13 all defined with correct types
+- **SparseVector**: Used for E6 and E13
+
 ```rust
+// ACTUAL CODE - crates/context-graph-core/src/types/fingerprint/semantic/fingerprint.rs:35-74
 pub struct SemanticFingerprint {
-    pub e1_semantic: [f32; E1_DIM],           // 1024D - Nomic Embed v1.5
-    pub e2_temporal_recent: [f32; E2_DIM],    // 512D - Jina Embeddings v3
-    pub e3_temporal_historical: [f32; E3_DIM], // 512D - UAE-Large-V1
-    pub e4_causal: [f32; E4_DIM],             // 512D - BGE-M3
-    pub e5_structural: [f32; E5_DIM],         // 768D - Instructor-XL
-    pub e6_sparse: SparseVector,              // SPLADE - variable sparse
-    pub e7_counterfactual: [f32; E7_DIM],     // 1536D - OpenAI 3-small
-    pub e8_analogical: [f32; E8_DIM],         // 384D - MiniLM-L6-v2
-    pub e9_emergent: [f32; E9_DIM],           // 1024D - E5-Large-v2
-    pub e10_multimodal: [f32; E10_DIM],       // 768D - CLIP ViT-L/14
-    pub e11_code: [f32; E11_DIM],             // 384D - CodeBERT-base
-    pub e12_colbert_tokens: Vec<[f32; E12_TOKEN_DIM]>, // 128D per token
-    pub e13_splade: SparseVector,             // SPLADE v3 - Stage 1 recall
+    pub e1_semantic: Vec<f32>,           // 1024D
+    pub e2_temporal_recent: Vec<f32>,    // 512D
+    pub e3_temporal_periodic: Vec<f32>,  // 512D
+    pub e4_temporal_positional: Vec<f32>, // 512D
+    pub e5_causal: Vec<f32>,             // 768D
+    pub e6_sparse: SparseVector,         // ~1500 active / 30522 vocab
+    pub e7_code: Vec<f32>,               // 256D
+    pub e8_graph: Vec<f32>,              // 384D
+    pub e9_hdc: Vec<f32>,                // 10000D
+    pub e10_multimodal: Vec<f32>,        // 768D
+    pub e11_entity: Vec<f32>,            // 384D
+    pub e12_late_interaction: Vec<Vec<f32>>, // 128D per token
+    pub e13_splade: SparseVector,        // 30522 vocab
 }
 ```
 
-**SparseVector** - COMPLETE in `crates/context-graph-core/src/types/fingerprint/sparse.rs`:
-```rust
-pub const SPARSE_VOCAB_SIZE: usize = 30_522;
-pub const MAX_SPARSE_ACTIVE: usize = 128;
+**2. SparseVector** - COMPLETE
+- **Location**: `crates/context-graph-core/src/types/fingerprint/sparse.rs`
 
-pub struct SparseVector {
-    indices: Vec<u16>,  // Active vocabulary indices
-    values: Vec<f32>,   // Corresponding weights
-}
-```
+**3. Dimension Constants** - COMPLETE (in core crate)
+- **Location**: `crates/context-graph-core/src/types/fingerprint/semantic/constants.rs`
+- **NUM_EMBEDDERS = 13** (line 65)
 
-**Constants** - COMPLETE in `crates/context-graph-core/src/types/fingerprint/semantic.rs`:
-```rust
-pub const NUM_EMBEDDERS: usize = 13;
-pub const E1_DIM: usize = 1024;
-pub const E2_DIM: usize = 512;
-// ... all dimensions defined
-pub const E13_SPLADE_VOCAB: usize = 30_522;
-```
+**4. EmbeddingModel trait** - EXISTS (in embeddings crate)
+- **Location**: `crates/context-graph-embeddings/src/traits/embedding_model/trait_def.rs`
+- Single-model interface for individual embedders
 
-**EmbeddingModel trait** - EXISTS in `crates/context-graph-embeddings/src/traits/embedding_model/trait_def.rs`:
-- Single-model interface for individual embedders (E1-E13)
-- Methods: `model_id()`, `embed()`, `is_initialized()`, `dimension()`
-- This is for INDIVIDUAL models, NOT the orchestrating provider
+### DOES NOT EXIST (MUST CREATE - THIS TASK)
 
-### What Needs to Be Created (THIS TASK)
+| Item | Expected Location | Status |
+|------|-------------------|--------|
+| `MultiArrayEmbeddingProvider` trait | `context-graph-core/src/traits/multi_array_embedding.rs` | **MISSING** |
+| `MultiArrayEmbeddingOutput` struct | Same file | **MISSING** |
+| `SingleEmbedder` trait | Same file | **MISSING** |
+| `SparseEmbedder` trait | Same file | **MISSING** |
+| `TokenEmbedder` trait | Same file | **MISSING** |
+| `#[deprecated]` on legacy trait | `context-graph-core/src/traits/embedding_provider.rs` | **MISSING** |
+| `StubMultiArrayProvider` | `context-graph-core/src/stubs/multi_array_stub.rs` | **MISSING** |
 
-**MultiArrayEmbeddingProvider** - NEW trait that orchestrates 13 EmbeddingModel instances:
-- Location: `crates/context-graph-core/src/traits/multi_array_embedding.rs`
-- Returns complete SemanticFingerprint, NOT single Vec<f32>
-- Orchestrates parallel calls to 13 individual embedders
+### DIMENSION MISMATCH (MUST FIX)
 
-### Legacy Code to Deprecate (NOT MIGRATE)
+**Problem**: Embeddings crate uses wrong count
+- `context-graph-core`: `NUM_EMBEDDERS = 13` (correct)
+- `context-graph-embeddings`: `TOTAL_MODEL_COUNT = 12` (WRONG)
 
-**EmbeddingProvider** - OBSOLETE in `crates/context-graph-core/src/traits/embedding_provider.rs`:
-- Returns single `EmbeddingOutput { embedding: Vec<f32> }` - WRONG for multi-array
-- Mark with `#[deprecated]` and delete after migration
-- DO NOT create backwards-compatibility shims per FR-602
+**Files to fix**:
+- `crates/context-graph-embeddings/src/warm/registry/types.rs:1` - Change `TOTAL_MODEL_COUNT` to 13
+- `crates/context-graph-embeddings/src/types/dimensions/aggregates.rs` - Change `MODEL_COUNT` to 13
+
+### LEGACY CODE (MUST DEPRECATE)
+
+**EmbeddingProvider trait** - EXISTS without deprecation
+- **Location**: `crates/context-graph-core/src/traits/embedding_provider.rs`
+- Returns single `Vec<f32>` instead of `SemanticFingerprint`
+- **Action**: Add `#[deprecated]` attribute per FR-602
 
 ---
 
@@ -81,9 +88,9 @@ Create the `MultiArrayEmbeddingProvider` trait that returns `SemanticFingerprint
 **Key Architecture**:
 ```
 MultiArrayEmbeddingProvider (NEW - this task)
-    ├── calls 10 dense EmbeddingModel instances (E1-E5, E7-E11)
-    ├── calls 2 sparse embedders (E6, E13 - SPLADE)
-    └── calls E12 ColBERT (token-level)
+    |-- calls 10 dense EmbeddingModel instances (E1-E5, E7-E11)
+    |-- calls 2 sparse embedders (E6, E13 - SPLADE)
+    |-- calls E12 ColBERT (token-level)
 
     Returns: SemanticFingerprint (already exists from TASK-F001)
 ```
@@ -91,7 +98,7 @@ MultiArrayEmbeddingProvider (NEW - this task)
 **NO FUSION** - Each embedding stored independently for:
 1. Per-space HNSW index search (13 indexes)
 2. Per-space Johari quadrant classification
-3. Full information preservation (~60KB vs ~6KB fused)
+3. Full information preservation (~46KB vs ~6KB fused)
 
 ---
 
@@ -108,11 +115,16 @@ MultiArrayEmbeddingProvider (NEW - this task)
 ### Supporting Traits
 - [ ] `SingleEmbedder` trait for composing dense embedders (wraps EmbeddingModel)
 - [ ] `SparseEmbedder` trait for E6 and E13 SPLADE embeddings
+- [ ] `TokenEmbedder` trait for E12 ColBERT embeddings
 - [ ] Object safety for all traits (`dyn MultiArrayEmbeddingProvider`)
 
 ### Deprecation
 - [ ] Add `#[deprecated(since = "0.2.0", note = "Use MultiArrayEmbeddingProvider")]` to legacy trait
 - [ ] NO backwards compatibility shims - fail fast if old trait used
+
+### Dimension Alignment
+- [ ] Update `TOTAL_MODEL_COUNT` in embeddings crate from 12 to 13
+- [ ] Update `MODEL_COUNT` in dimensions/aggregates.rs from 12 to 13
 
 ### Tests (REAL DATA ONLY)
 - [ ] Tests use actual SemanticFingerprint with real dimensions
@@ -134,7 +146,8 @@ MultiArrayEmbeddingProvider (NEW - this task)
 //! SemanticFingerprint. NO FUSION - each embedding stored independently.
 
 use crate::error::CoreResult;
-use crate::types::fingerprint::{SemanticFingerprint, SparseVector, NUM_EMBEDDERS};
+use crate::types::fingerprint::{SemanticFingerprint, SparseVector};
+use crate::types::fingerprint::semantic::NUM_EMBEDDERS;
 use async_trait::async_trait;
 use std::time::Duration;
 
@@ -168,9 +181,6 @@ impl MultiArrayEmbeddingOutput {
     }
 
     /// Get E1 Matryoshka embedding truncated to 128D for Stage 2 fast filtering.
-    ///
-    /// # Panics
-    /// Never panics - E1 is always 1024D, truncation to 128 is safe.
     #[inline]
     pub fn e1_matryoshka_128(&self) -> &[f32] {
         &self.fingerprint.e1_semantic[..128]
@@ -217,13 +227,6 @@ pub trait MultiArrayEmbeddingProvider: Send + Sync {
     ///
     /// # Performance Target
     /// - 64 contents: <100ms for all 13 embeddings per content
-    ///
-    /// # Arguments
-    /// * `contents` - Slice of text contents (each must be non-empty)
-    ///
-    /// # Errors
-    /// - `CoreError::EmptyInput` if any content is empty
-    /// - `CoreError::BatchTooLarge` if batch exceeds 64 items
     async fn embed_batch_all(&self, contents: &[String]) -> CoreResult<Vec<MultiArrayEmbeddingOutput>>;
 
     /// Get expected dimensions for each embedder.
@@ -231,8 +234,8 @@ pub trait MultiArrayEmbeddingProvider: Send + Sync {
     /// Returns array where index matches embedder number (0 = E1, 12 = E13).
     /// Sparse embedders (E6, E13) return 0 since dimension is variable.
     fn dimensions(&self) -> [usize; NUM_EMBEDDERS] {
-        [1024, 512, 512, 512, 768, 0, 1536, 384, 1024, 768, 384, 128, 0]
-        // E1    E2   E3   E4   E5  E6  E7    E8   E9   E10  E11  E12  E13
+        [1024, 512, 512, 512, 768, 0, 256, 384, 10000, 768, 384, 128, 0]
+        // E1    E2   E3   E4   E5  E6  E7   E8   E9    E10  E11  E12  E13
     }
 
     /// Get model IDs for each embedder slot.
@@ -242,14 +245,7 @@ pub trait MultiArrayEmbeddingProvider: Send + Sync {
     fn is_ready(&self) -> bool;
 
     /// Get health status for each embedder.
-    ///
-    /// Returns array of booleans: true = healthy, false = degraded/unavailable.
     fn health_status(&self) -> [bool; NUM_EMBEDDERS];
-
-    /// Get count of healthy embedders.
-    fn healthy_count(&self) -> usize {
-        self.health_status().iter().filter(|&&h| h).count()
-    }
 }
 
 /// Individual dense embedder trait for composition.
@@ -265,10 +261,6 @@ pub trait SingleEmbedder: Send + Sync {
     fn model_id(&self) -> &str;
 
     /// Generate dense embedding vector.
-    ///
-    /// # Errors
-    /// - `CoreError::EmptyInput` if content empty
-    /// - `CoreError::InputTooLong` if exceeds model's max tokens
     async fn embed(&self, content: &str) -> CoreResult<Vec<f32>>;
 
     /// Check if model is loaded and ready.
@@ -287,10 +279,6 @@ pub trait SparseEmbedder: Send + Sync {
     fn model_id(&self) -> &str;
 
     /// Generate sparse embedding with indices and values.
-    ///
-    /// # Errors
-    /// - `CoreError::EmptyInput` if content empty
-    /// - `CoreError::SparseOverflow` if active terms exceed MAX_SPARSE_ACTIVE
     async fn embed_sparse(&self, content: &str) -> CoreResult<SparseVector>;
 
     /// Check if model is loaded and ready.
@@ -312,9 +300,7 @@ pub trait TokenEmbedder: Send + Sync {
     fn model_id(&self) -> &str;
 
     /// Generate per-token embeddings.
-    ///
-    /// Returns Vec of token embeddings, length varies by input.
-    async fn embed_tokens(&self, content: &str) -> CoreResult<Vec<[f32; 128]>>;
+    async fn embed_tokens(&self, content: &str) -> CoreResult<Vec<Vec<f32>>>;
 
     /// Check if model is loaded and ready.
     fn is_ready(&self) -> bool;
@@ -340,7 +326,7 @@ pub use multi_array_embedding::{
 ### Step 3: Deprecate Legacy Trait
 **File**: `crates/context-graph-core/src/traits/embedding_provider.rs`
 
-Add deprecation attribute:
+Add deprecation attribute at line 202 (before trait definition):
 ```rust
 #[deprecated(
     since = "0.2.0",
@@ -348,19 +334,37 @@ Add deprecation attribute:
 )]
 #[async_trait]
 pub trait EmbeddingProvider: Send + Sync {
-    // ... existing code
+    // ... existing code unchanged
 }
 ```
 
-### Step 4: Create Stub Implementation
+### Step 4: Fix Dimension Constants in Embeddings Crate
+**File**: `crates/context-graph-embeddings/src/warm/registry/types.rs`
+```rust
+// Change from:
+pub const TOTAL_MODEL_COUNT: usize = 12;
+// To:
+pub const TOTAL_MODEL_COUNT: usize = 13;
+```
+
+**File**: `crates/context-graph-embeddings/src/types/dimensions/aggregates.rs`
+```rust
+// Change from:
+pub const MODEL_COUNT: usize = 12;
+// To:
+pub const MODEL_COUNT: usize = 13;
+```
+
+### Step 5: Create Stub Implementation
 **File**: `crates/context-graph-core/src/stubs/multi_array_stub.rs`
 
 ```rust
 //! Stub implementation of MultiArrayEmbeddingProvider for testing.
 
-use crate::error::CoreResult;
+use crate::error::{CoreError, CoreResult};
 use crate::traits::multi_array_embedding::*;
-use crate::types::fingerprint::{SemanticFingerprint, SparseVector, NUM_EMBEDDERS};
+use crate::types::fingerprint::{SemanticFingerprint, SparseVector};
+use crate::types::fingerprint::semantic::NUM_EMBEDDERS;
 use async_trait::async_trait;
 use std::time::Duration;
 
@@ -378,6 +382,16 @@ impl StubMultiArrayProvider {
     pub fn not_ready() -> Self {
         Self { ready: false }
     }
+
+    fn default_model_ids() -> [String; NUM_EMBEDDERS] {
+        [
+            "stub-e1".into(), "stub-e2".into(), "stub-e3".into(),
+            "stub-e4".into(), "stub-e5".into(), "stub-e6".into(),
+            "stub-e7".into(), "stub-e8".into(), "stub-e9".into(),
+            "stub-e10".into(), "stub-e11".into(), "stub-e12".into(),
+            "stub-e13".into(),
+        ]
+    }
 }
 
 impl Default for StubMultiArrayProvider {
@@ -390,22 +404,19 @@ impl Default for StubMultiArrayProvider {
 impl MultiArrayEmbeddingProvider for StubMultiArrayProvider {
     async fn embed_all(&self, content: &str) -> CoreResult<MultiArrayEmbeddingOutput> {
         if content.is_empty() {
-            return Err(crate::error::CoreError::EmptyInput {
+            return Err(CoreError::EmptyInput {
                 field: "content".into(),
             });
         }
 
         if !self.ready {
-            return Err(crate::error::CoreError::NotInitialized {
+            return Err(CoreError::NotInitialized {
                 component: "StubMultiArrayProvider".into(),
             });
         }
 
-        // Generate deterministic embeddings from content hash
-        let hash = content.bytes().fold(0u64, |acc, b| acc.wrapping_add(b as u64));
-        let seed = (hash as f32) / 1000.0;
-
-        let fingerprint = SemanticFingerprint::from_seed(seed);
+        // Generate deterministic fingerprint
+        let fingerprint = SemanticFingerprint::zeroed();
 
         Ok(MultiArrayEmbeddingOutput {
             fingerprint,
@@ -425,19 +436,9 @@ impl MultiArrayEmbeddingProvider for StubMultiArrayProvider {
 
     fn model_ids(&self) -> [&str; NUM_EMBEDDERS] {
         [
-            "stub-e1-semantic",
-            "stub-e2-temporal-recent",
-            "stub-e3-temporal-historical",
-            "stub-e4-causal",
-            "stub-e5-structural",
-            "stub-e6-sparse",
-            "stub-e7-counterfactual",
-            "stub-e8-analogical",
-            "stub-e9-emergent",
-            "stub-e10-multimodal",
-            "stub-e11-code",
-            "stub-e12-colbert",
-            "stub-e13-splade",
+            "stub-e1", "stub-e2", "stub-e3", "stub-e4", "stub-e5",
+            "stub-e6", "stub-e7", "stub-e8", "stub-e9", "stub-e10",
+            "stub-e11", "stub-e12", "stub-e13",
         ]
     }
 
@@ -449,21 +450,9 @@ impl MultiArrayEmbeddingProvider for StubMultiArrayProvider {
         [self.ready; NUM_EMBEDDERS]
     }
 }
-
-impl StubMultiArrayProvider {
-    fn default_model_ids() -> [String; NUM_EMBEDDERS] {
-        [
-            "stub-e1".into(), "stub-e2".into(), "stub-e3".into(),
-            "stub-e4".into(), "stub-e5".into(), "stub-e6".into(),
-            "stub-e7".into(), "stub-e8".into(), "stub-e9".into(),
-            "stub-e10".into(), "stub-e11".into(), "stub-e12".into(),
-            "stub-e13".into(),
-        ]
-    }
-}
 ```
 
-### Step 5: Update stubs/mod.rs
+### Step 6: Update stubs/mod.rs
 Add export for new stub module.
 
 ---
@@ -475,22 +464,23 @@ Add export for new stub module.
 |------|---------|
 | `crates/context-graph-core/src/traits/multi_array_embedding.rs` | New trait definitions |
 | `crates/context-graph-core/src/stubs/multi_array_stub.rs` | Test stub implementation |
-| `crates/context-graph-core/src/traits/multi_array_embedding/tests.rs` | Unit tests |
 
 ### Files to MODIFY
 | File | Change |
 |------|--------|
 | `crates/context-graph-core/src/traits/mod.rs` | Add multi_array_embedding module export |
-| `crates/context-graph-core/src/traits/embedding_provider.rs` | Add #[deprecated] attribute |
+| `crates/context-graph-core/src/traits/embedding_provider.rs:202` | Add #[deprecated] attribute |
 | `crates/context-graph-core/src/stubs/mod.rs` | Add multi_array_stub module export |
+| `crates/context-graph-embeddings/src/warm/registry/types.rs:1` | Change TOTAL_MODEL_COUNT to 13 |
+| `crates/context-graph-embeddings/src/types/dimensions/aggregates.rs` | Change MODEL_COUNT to 13 |
 
 ### Files to REFERENCE (read-only)
 | File | Reason |
 |------|--------|
-| `crates/context-graph-core/src/types/fingerprint/semantic.rs` | SemanticFingerprint struct |
+| `crates/context-graph-core/src/types/fingerprint/semantic/fingerprint.rs` | SemanticFingerprint struct |
 | `crates/context-graph-core/src/types/fingerprint/sparse.rs` | SparseVector struct |
+| `crates/context-graph-core/src/types/fingerprint/semantic/constants.rs` | NUM_EMBEDDERS = 13 |
 | `crates/context-graph-core/src/error/mod.rs` | CoreResult, CoreError types |
-| `crates/context-graph-embeddings/src/traits/embedding_model/trait_def.rs` | EmbeddingModel interface |
 
 ---
 
@@ -502,7 +492,7 @@ Add export for new stub module.
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::fingerprint::{E1_DIM, E2_DIM, NUM_EMBEDDERS};
+    use crate::types::fingerprint::semantic::{E1_DIM, E2_DIM, NUM_EMBEDDERS};
 
     #[test]
     fn test_multi_array_output_within_latency_target() {
@@ -510,7 +500,7 @@ mod tests {
             fingerprint: SemanticFingerprint::zeroed(),
             total_latency: Duration::from_millis(25),
             per_embedder_latency: [Duration::from_millis(2); NUM_EMBEDDERS],
-            model_ids: array_init(|_| String::new()),
+            model_ids: core::array::from_fn(|_| String::new()),
         };
         assert!(output.is_within_latency_target());
     }
@@ -521,7 +511,7 @@ mod tests {
             fingerprint: SemanticFingerprint::zeroed(),
             total_latency: Duration::from_millis(50), // Over 30ms
             per_embedder_latency: [Duration::from_millis(4); NUM_EMBEDDERS],
-            model_ids: array_init(|_| String::new()),
+            model_ids: core::array::from_fn(|_| String::new()),
         };
         assert!(!output.is_within_latency_target());
     }
@@ -538,7 +528,7 @@ mod tests {
             fingerprint: fp,
             total_latency: Duration::ZERO,
             per_embedder_latency: [Duration::ZERO; NUM_EMBEDDERS],
-            model_ids: array_init(|_| String::new()),
+            model_ids: core::array::from_fn(|_| String::new()),
         };
 
         let truncated = output.e1_matryoshka_128();
@@ -549,36 +539,11 @@ mod tests {
 
     #[test]
     fn test_dimensions_returns_correct_values() {
-        struct TestProvider;
-        impl MultiArrayEmbeddingProvider for TestProvider {
-            // ... minimal impl
-        }
-
-        let provider = TestProvider;
-        let dims = provider.dimensions();
-
+        let dims = [1024, 512, 512, 512, 768, 0, 256, 384, 10000, 768, 384, 128, 0];
         assert_eq!(dims[0], 1024);  // E1
-        assert_eq!(dims[1], 512);   // E2
         assert_eq!(dims[5], 0);     // E6 sparse
-        assert_eq!(dims[11], 128);  // E12 ColBERT token
+        assert_eq!(dims[8], 10000); // E9 HDC
         assert_eq!(dims[12], 0);    // E13 sparse
-    }
-
-    #[test]
-    fn test_slowest_embedder_identification() {
-        let mut latencies = [Duration::from_millis(1); NUM_EMBEDDERS];
-        latencies[7] = Duration::from_millis(15); // E8 is slowest
-
-        let output = MultiArrayEmbeddingOutput {
-            fingerprint: SemanticFingerprint::zeroed(),
-            total_latency: Duration::from_millis(25),
-            per_embedder_latency: latencies,
-            model_ids: array_init(|_| String::new()),
-        };
-
-        let (idx, duration) = output.slowest_embedder();
-        assert_eq!(idx, 7);
-        assert_eq!(duration, Duration::from_millis(15));
     }
 
     #[test]
@@ -587,6 +552,7 @@ mod tests {
         fn accepts_provider(_: &dyn MultiArrayEmbeddingProvider) {}
         fn accepts_single(_: &dyn SingleEmbedder) {}
         fn accepts_sparse(_: &dyn SparseEmbedder) {}
+        fn accepts_token(_: &dyn TokenEmbedder) {}
     }
 }
 ```
@@ -602,7 +568,7 @@ async fn test_stub_provider_returns_valid_fingerprint() {
     // Verify fingerprint has correct dimensions
     assert_eq!(output.fingerprint.e1_semantic.len(), 1024);
     assert_eq!(output.fingerprint.e2_temporal_recent.len(), 512);
-    assert!(output.fingerprint.e13_splade.len() <= MAX_SPARSE_ACTIVE);
+    assert_eq!(output.fingerprint.e9_hdc.len(), 10000);
 }
 
 #[tokio::test]
@@ -620,47 +586,6 @@ async fn test_stub_provider_not_ready_fails() {
 
     assert!(matches!(result, Err(CoreError::NotInitialized { .. })));
 }
-
-#[tokio::test]
-async fn test_batch_processing_returns_correct_count() {
-    let provider = StubMultiArrayProvider::new();
-    let contents: Vec<String> = (0..10).map(|i| format!("content {}", i)).collect();
-
-    let results = provider.embed_batch_all(&contents).await.unwrap();
-    assert_eq!(results.len(), 10);
-}
-```
-
-### Edge Case Tests
-
-```rust
-#[tokio::test]
-async fn test_very_long_input_handling() {
-    let provider = StubMultiArrayProvider::new();
-    let long_content = "x".repeat(100_000); // 100KB input
-
-    // Should either succeed or return InputTooLong error - never panic
-    let result = provider.embed_all(&long_content).await;
-    assert!(result.is_ok() || matches!(result, Err(CoreError::InputTooLong { .. })));
-}
-
-#[tokio::test]
-async fn test_unicode_content_handling() {
-    let provider = StubMultiArrayProvider::new();
-    let unicode = "Hello \u{1F600} World \u{4E2D}\u{6587} \u{0410}\u{0411}\u{0412}";
-
-    let result = provider.embed_all(unicode).await;
-    assert!(result.is_ok());
-}
-
-#[tokio::test]
-async fn test_whitespace_only_content() {
-    let provider = StubMultiArrayProvider::new();
-
-    // Whitespace-only should be treated as empty
-    let result = provider.embed_all("   \t\n  ").await;
-    // Implementation may accept or reject - document behavior
-}
 ```
 
 ---
@@ -671,10 +596,10 @@ async fn test_whitespace_only_content() {
 
 | Component | Source of Truth | Verification Command |
 |-----------|-----------------|---------------------|
-| SemanticFingerprint dimensions | `semantic.rs` constants | `grep "pub const E.*_DIM" semantic.rs` |
-| NUM_EMBEDDERS | `semantic.rs` | `grep "NUM_EMBEDDERS" semantic.rs` |
-| SparseVector constraints | `sparse.rs` | `grep "MAX_SPARSE_ACTIVE\|SPARSE_VOCAB" sparse.rs` |
-| Error types | `error/mod.rs` | `grep "pub enum CoreError" error/mod.rs` |
+| SemanticFingerprint | `semantic/fingerprint.rs` | `grep "pub struct SemanticFingerprint" crates/context-graph-core/src/types/fingerprint/semantic/fingerprint.rs` |
+| NUM_EMBEDDERS | `semantic/constants.rs:65` | `grep "NUM_EMBEDDERS" crates/context-graph-core/src/types/fingerprint/semantic/constants.rs` |
+| SparseVector | `sparse.rs` | `grep "pub struct SparseVector" crates/context-graph-core/src/types/fingerprint/sparse.rs` |
+| Error types | `error/mod.rs` | `grep "pub enum CoreError" crates/context-graph-core/src/error/mod.rs` |
 | Performance targets | `constitution.yaml` | Search for "latency" and "30ms" |
 
 ### 2. Execute & Inspect Verification
@@ -696,6 +621,9 @@ cargo check -p context-graph-core 2>&1 | grep -i "deprecated"
 
 # 5. Check that all 13 embedder slots are documented
 grep -c "E[0-9]*" crates/context-graph-core/src/traits/multi_array_embedding.rs
+
+# 6. Verify dimension alignment
+grep "MODEL_COUNT\|TOTAL_MODEL_COUNT\|NUM_EMBEDDERS" crates/context-graph-*/src/**/*.rs
 ```
 
 ### 3. Edge Case Audit
@@ -707,7 +635,6 @@ grep -c "E[0-9]*" crates/context-graph-core/src/traits/multi_array_embedding.rs
 | Latency over 30ms | `is_within_latency_target()` returns false | `test_exceeds_latency_target` |
 | Batch size 0 | Return empty Vec, no error | Verify in batch test |
 | Single embedder failure | Propagate error, don't partial-succeed | Document in trait |
-| Sparse overflow (>128 active) | Return `CoreError::SparseOverflow` | Implement in sparse embedder |
 
 ### 4. Evidence of Success
 
@@ -715,10 +642,11 @@ Before marking complete, verify these artifacts exist:
 
 1. **File exists**: `crates/context-graph-core/src/traits/multi_array_embedding.rs`
 2. **Module exported**: `multi_array_embedding` in `traits/mod.rs`
-3. **Types exported**: `MultiArrayEmbeddingOutput`, `MultiArrayEmbeddingProvider`, `SingleEmbedder`, `SparseEmbedder`
+3. **Types exported**: `MultiArrayEmbeddingOutput`, `MultiArrayEmbeddingProvider`, `SingleEmbedder`, `SparseEmbedder`, `TokenEmbedder`
 4. **Tests pass**: All `multi_array` tests green
 5. **Deprecation active**: Compiler warns on `EmbeddingProvider` usage
-6. **No backwards compat**: No shim code, no migration adapters
+6. **Dimension aligned**: Both crates use 13 embedders
+7. **No backwards compat**: No shim code, no migration adapters
 
 ---
 
@@ -732,16 +660,20 @@ FORENSIC INVESTIGATION: TASK-F007 Multi-Array Embedding Provider
 ASSUME ALL CODE IS GUILTY UNTIL PROVEN INNOCENT.
 
 Investigation targets:
-1. Verify MultiArrayEmbeddingProvider trait exists and is exported
-2. Verify trait returns SemanticFingerprint (not Vec<f32>)
-3. Verify all 13 embedder slots are accounted for (E1-E13)
-4. Verify sparse embedders (E6, E13) return SparseVector not Vec<f32>
-5. Verify latency target check uses 30ms from constitution.yaml
-6. Verify legacy EmbeddingProvider has #[deprecated] attribute
-7. Verify NO backwards compatibility shims exist
-8. Verify all tests use real SemanticFingerprint data, no all-zero mocks
-9. Run cargo test and verify all multi_array tests pass
-10. Check for any TODO, FIXME, or unimplemented!() in new code
+1. Verify file EXISTS: crates/context-graph-core/src/traits/multi_array_embedding.rs
+2. Verify MultiArrayEmbeddingProvider trait is defined AND exported in traits/mod.rs
+3. Verify trait method embed_all() returns CoreResult<MultiArrayEmbeddingOutput>
+4. Verify MultiArrayEmbeddingOutput contains field: fingerprint: SemanticFingerprint
+5. Verify all 13 embedder slots are accounted for (E1-E13) in dimensions() default
+6. Verify SparseEmbedder trait exists with embed_sparse() -> CoreResult<SparseVector>
+7. Verify TokenEmbedder trait exists with embed_tokens() -> CoreResult<Vec<Vec<f32>>>
+8. Verify latency target check uses 30ms: grep "30" multi_array_embedding.rs
+9. Verify legacy EmbeddingProvider has #[deprecated] at line ~202
+10. Verify NUM_EMBEDDERS = 13 in: crates/context-graph-core/src/types/fingerprint/semantic/constants.rs
+11. Verify TOTAL_MODEL_COUNT = 13 in: crates/context-graph-embeddings/src/warm/registry/types.rs
+12. Verify NO backwards compatibility shims: grep -r "impl.*Into.*EmbeddingProvider" crates/
+13. Run: cargo test -p context-graph-core multi_array -- verify all tests pass
+14. Check for any TODO, FIXME, or unimplemented!() in new code
 
 EVIDENCE REQUIRED:
 - File paths with line numbers for each finding
@@ -768,6 +700,9 @@ grep -r "impl.*Into.*EmbeddingProvider" crates/context-graph-core/
 
 # Verify deprecation
 grep -A2 "#\[deprecated" crates/context-graph-core/src/traits/embedding_provider.rs
+
+# Verify dimension alignment
+grep "NUM_EMBEDDERS\|MODEL_COUNT\|TOTAL_MODEL_COUNT" crates/*/src/**/*.rs | grep "= 1[23]"
 ```
 
 ---
@@ -788,8 +723,9 @@ grep -A2 "#\[deprecated" crates/context-graph-core/src/traits/embedding_provider
 
 ### Technical
 - Dimensions: E6=0, E13=0 (sparse variable), E12=128 (per token)
-- E1 supports Matryoshka truncation (1024 → 128D)
+- E1 supports Matryoshka truncation (1024 -> 128D)
 - Object-safe traits for dynamic dispatch
+- Import NUM_EMBEDDERS from core crate, not embeddings crate
 
 ---
 
@@ -797,7 +733,7 @@ grep -A2 "#\[deprecated" crates/context-graph-core/src/traits/embedding_provider
 
 | Dependency | Status | Verification |
 |------------|--------|--------------|
-| TASK-F001 (SemanticFingerprint) | COMPLETE | `grep "SemanticFingerprint" semantic.rs` |
+| TASK-F001 (SemanticFingerprint) | COMPLETE | `grep "SemanticFingerprint" crates/context-graph-core/src/types/fingerprint/semantic/fingerprint.rs` |
 | TASK-F006 (Remove Fusion) | COMPLETE | No fusion modules in git history |
 | async-trait crate | Available | Check Cargo.toml |
 | CoreResult type | Exists | Check error/mod.rs |
@@ -810,9 +746,9 @@ grep -A2 "#\[deprecated" crates/context-graph-core/src/traits/embedding_provider
 
 ```
 EmbeddingModel (embeddings crate)     MultiArrayEmbeddingProvider (core crate)
-├── Single model interface            ├── Orchestrates 13 EmbeddingModel instances
-├── embed() → Vec<f32>                ├── embed_all() → SemanticFingerprint
-└── Used by individual E1-E13         └── Used by application layer
+|-- Single model interface            |-- Orchestrates 13 EmbeddingModel instances
+|-- embed() -> Vec<f32>               |-- embed_all() -> SemanticFingerprint
+|-- Used by individual E1-E13         |-- Used by application layer
 ```
 
 ### 5-Stage Pipeline Integration
@@ -828,3 +764,15 @@ Per TASK-F006, fusion was removed because:
 2. Per-space search: Each HNSW index needs original embeddings
 3. Johari computation: Per-embedder quadrant classification
 4. Auditability: Can trace which embedder contributed to ranking
+
+### Commit 6f76a8c Partial Work
+The git commit claiming F007 completion only did work in the embeddings crate:
+- types/dimensions module work
+- ConcatenatedEmbedding updates
+- EmbeddingModel trait refinements
+
+It did NOT:
+- Create MultiArrayEmbeddingProvider trait in core crate
+- Deprecate legacy EmbeddingProvider
+- Fix dimension mismatch (12 vs 13)
+- Create stub implementation

@@ -19,8 +19,8 @@ fn test_new_registry_is_empty() {
 
 #[test]
 fn test_embedding_model_ids_count() {
-    assert_eq!(EMBEDDING_MODEL_IDS.len(), 12);
-    assert_eq!(TOTAL_MODEL_COUNT, 12);
+    assert_eq!(EMBEDDING_MODEL_IDS.len(), 13);
+    assert_eq!(TOTAL_MODEL_COUNT, 13);
 }
 
 #[test]

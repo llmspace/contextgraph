@@ -9,6 +9,7 @@
 mod embedding_stub;
 mod graph_index;
 mod layers;
+mod multi_array_stub;
 mod utl_stub;
 
 pub use embedding_stub::StubEmbeddingProvider;
@@ -16,6 +17,7 @@ pub use graph_index::InMemoryGraphIndex;
 pub use layers::{
     StubCoherenceLayer, StubLearningLayer, StubMemoryLayer, StubReflexLayer, StubSensingLayer,
 };
+pub use multi_array_stub::StubMultiArrayProvider;
 pub use utl_stub::StubUtlProcessor;
 
 // Re-export InMemoryStore from memory module for backward compatibility

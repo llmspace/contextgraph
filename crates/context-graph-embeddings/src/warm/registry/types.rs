@@ -8,8 +8,8 @@ use super::core::WarmModelRegistry;
 use crate::warm::handle::ModelHandle;
 use crate::warm::state::WarmModelState;
 
-/// The 12 embedding model IDs in the system.
-pub const EMBEDDING_MODEL_IDS: [&str; 12] = [
+/// The 13 embedding model IDs in the system.
+pub const EMBEDDING_MODEL_IDS: [&str; 13] = [
     "E1_Semantic",
     "E2_TemporalRecent",
     "E3_TemporalPeriodic",
@@ -22,10 +22,11 @@ pub const EMBEDDING_MODEL_IDS: [&str; 12] = [
     "E10_Multimodal",
     "E11_Entity",
     "E12_LateInteraction",
+    "E13_Splade",
 ];
 
-/// Total number of model components (12 embeddings).
-pub const TOTAL_MODEL_COUNT: usize = 12;
+/// Total number of model components (13 embeddings).
+pub const TOTAL_MODEL_COUNT: usize = 13;
 
 /// Thread-safe shared registry for concurrent access.
 ///

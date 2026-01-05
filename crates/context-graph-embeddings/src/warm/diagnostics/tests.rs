@@ -139,7 +139,8 @@ fn test_status_line_format() {
     assert!(status.contains("WARM:"));
     assert!(status.contains("models"));
     assert!(status.contains("VRAM"));
-    assert!(status.contains("LOADING: 0/12"));
+    // Total models is dynamic based on TOTAL_MODEL_COUNT (13)
+    assert!(status.contains(&format!("LOADING: 0/{}", TOTAL_MODEL_COUNT)));
 }
 
 #[test]
@@ -249,7 +250,8 @@ fn test_full_report_with_warm_models() {
 
     let status = WarmDiagnostics::status_line(&loader);
     assert!(status.contains("OK"));
-    assert!(status.contains("12/12"));
+    // Total models is dynamic based on TOTAL_MODEL_COUNT (13)
+    assert!(status.contains(&format!("{}/{}", TOTAL_MODEL_COUNT, TOTAL_MODEL_COUNT)));
 }
 
 #[test]
