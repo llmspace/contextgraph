@@ -56,6 +56,7 @@ pub mod config;
 pub mod error;
 pub mod hnsw_impl;
 pub mod manager;
+pub mod purpose;
 pub mod splade_impl;
 pub mod status;
 
