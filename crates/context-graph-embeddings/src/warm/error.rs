@@ -144,18 +144,51 @@ pub enum WarmError {
         allocation_history: Vec<String>,
     },
 
-    // === Exit Code 109: CUDA Context Lost ===
-    /// CUDA context unexpectedly destroyed (GPU reset, TDR timeout).
-    #[error("CUDA context lost: {reason}")]
-    CudaContextLost {
-        /// Description of context loss cause.
-        reason: String,
-        /// Last successful CUDA operation.
-        last_successful_op: String,
+    // === Exit Code 109: Fake Allocation Detected ===
+    /// Fake/mock GPU memory allocation detected - Constitution AP-007 violation.
+    ///
+    /// # Constitution Compliance
+    ///
+    /// AP-007: Mock/stub data is FORBIDDEN in production.
+    /// Fake allocations (matching pattern 0x7f80_0000_0000) MUST cause immediate process exit.
+    #[error("[EMB-E009] FAKE_ALLOCATION_DETECTED: Fake GPU memory pointer detected at 0x{detected_address:016x}, expected real CUDA allocation")]
+    FakeAllocationDetected {
+        /// The fake device pointer that was detected.
+        detected_address: u64,
+        /// Tensor name that received the fake allocation.
+        tensor_name: String,
+        /// Expected base address pattern for real allocations.
+        expected_pattern: String,
     },
 
-    // === Exit Code 110: Model Dimension Mismatch ===
+    // === Exit Code 110: Sin Wave Output Detected ===
+    /// Sin wave pattern detected in model output - indicates mock/fake inference.
+    ///
+    /// # Constitution Compliance
+    ///
+    /// AP-007: Mock/stub data is FORBIDDEN in production.
+    /// Sin wave outputs indicate fake inference and MUST cause immediate process exit.
+    ///
+    /// # Detection Algorithm
+    ///
+    /// FFT analysis shows >80% energy concentrated in single frequency band.
+    #[error("[EMB-E010] SIN_WAVE_OUTPUT_DETECTED: Model output contains sin wave pattern (dominant_freq={dominant_frequency_hz:.2}Hz, energy_concentration={energy_concentration:.2}%)")]
+    SinWaveOutputDetected {
+        /// The model identifier.
+        model_id: String,
+        /// Dominant frequency detected in output.
+        dominant_frequency_hz: f32,
+        /// Percentage of energy in dominant frequency band.
+        energy_concentration: f32,
+        /// Number of output elements analyzed.
+        output_size: usize,
+    },
+
+    // === Exit Code 116: Model Dimension Mismatch ===
     /// Model output dimension does not match expected value.
+    ///
+    /// Note: This was formerly exit code 110 but was reassigned to make room
+    /// for SinWaveOutputDetected per TASK-EMB-017.
     #[error("Model dimension mismatch for {model_id}: expected {expected}, got {actual}")]
     ModelDimensionMismatch {
         /// The model identifier.
@@ -289,8 +322,9 @@ impl WarmError {
             Self::CudaInitFailed { .. } => 106,
             Self::CudaCapabilityInsufficient { .. } => 107,
             Self::CudaAllocFailed { .. } => 108,
-            Self::CudaContextLost { .. } => 109,
-            Self::ModelDimensionMismatch { .. } => 110,
+            Self::FakeAllocationDetected { .. } => 109,
+            Self::SinWaveOutputDetected { .. } => 110,
+            Self::ModelDimensionMismatch { .. } => 116,
             Self::WeightFileMissing { .. } => 111,
             Self::WeightFileCorrupted { .. } => 112,
             Self::WeightChecksumMismatch { .. } => 113,
@@ -316,7 +350,8 @@ impl WarmError {
                 | Self::CudaInitFailed { .. }
                 | Self::CudaCapabilityInsufficient { .. }
                 | Self::CudaAllocFailed { .. }
-                | Self::CudaContextLost { .. }
+                | Self::FakeAllocationDetected { .. }
+                | Self::SinWaveOutputDetected { .. }
                 | Self::ModelDimensionMismatch { .. }
                 | Self::WeightFileMissing { .. }
                 | Self::WeightFileCorrupted { .. }
@@ -332,16 +367,15 @@ impl WarmError {
         match self {
             Self::ModelFileMissing { .. } => "MODEL_FILE",
             Self::ModelLoadFailed { .. } => "MODEL_LOAD",
-            Self::ModelValidationFailed { .. } | Self::ModelDimensionMismatch { .. } => {
-                "MODEL_VALIDATION"
-            }
+            Self::ModelValidationFailed { .. } | Self::ModelDimensionMismatch { .. } => "MODEL_VALIDATION",
             Self::VramInsufficientTotal { .. } | Self::VramInsufficientHeadroom { .. } => "VRAM",
             Self::CudaInitFailed { .. }
             | Self::CudaCapabilityInsufficient { .. }
             | Self::CudaAllocFailed { .. }
-            | Self::CudaContextLost { .. }
             | Self::CudaQueryFailed { .. }
             | Self::CudaNotAvailable => "CUDA",
+            Self::FakeAllocationDetected { .. } => "FAKE_DETECTION",
+            Self::SinWaveOutputDetected { .. } => "FAKE_DETECTION",
             Self::ModelAlreadyRegistered { .. }
             | Self::ModelNotRegistered { .. }
             | Self::RegistryLockPoisoned => "REGISTRY",
@@ -368,8 +402,9 @@ impl WarmError {
             Self::CudaInitFailed { .. } => "ERR-WARM-CUDA-INIT",
             Self::CudaCapabilityInsufficient { .. } => "ERR-WARM-CUDA-CAPABILITY",
             Self::CudaAllocFailed { .. } => "ERR-WARM-CUDA-ALLOC",
-            Self::CudaContextLost { .. } => "ERR-WARM-CUDA-CONTEXT",
-            Self::ModelDimensionMismatch { .. } => "ERR-WARM-MODEL-DIMENSION-MISMATCH",
+            Self::FakeAllocationDetected { .. } => "ERR-WARM-FAKE-ALLOC",
+            Self::SinWaveOutputDetected { .. } => "ERR-WARM-SINWAVE-OUTPUT",
+            Self::ModelDimensionMismatch { .. } => "ERR-WARM-MODEL-DIMENSION",
             Self::ModelAlreadyRegistered { .. } => "ERR-WARM-REGISTRY-DUPLICATE",
             Self::ModelNotRegistered { .. } => "ERR-WARM-REGISTRY-MISSING",
             Self::InvalidConfig { .. } => "ERR-WARM-CONFIG-INVALID",

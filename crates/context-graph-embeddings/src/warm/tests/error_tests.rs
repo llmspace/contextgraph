@@ -79,17 +79,19 @@ fn test_exit_codes_fatal_101_to_110() {
         ),
         (
             109,
-            WarmError::CudaContextLost {
-                reason: "TDR timeout".to_string(),
-                last_successful_op: "cudaMemcpy".to_string(),
+            WarmError::FakeAllocationDetected {
+                detected_address: 0x7f80_0000_0000,
+                tensor_name: "embedding_weights".to_string(),
+                expected_pattern: "real CUDA device pointer".to_string(),
             },
         ),
         (
             110,
-            WarmError::ModelDimensionMismatch {
+            WarmError::SinWaveOutputDetected {
                 model_id: "E1_Semantic".to_string(),
-                expected: 1024,
-                actual: 768,
+                dominant_frequency_hz: 0.1,
+                energy_concentration: 0.95,
+                output_size: 768,
             },
         ),
     ];
@@ -233,7 +235,26 @@ fn test_error_codes() {
             actual: 0
         }
         .error_code(),
-        "ERR-WARM-MODEL-DIMENSION-MISMATCH"
+        "ERR-WARM-MODEL-DIMENSION"
+    );
+    assert_eq!(
+        WarmError::FakeAllocationDetected {
+            detected_address: 0x7f80_0000_0000,
+            tensor_name: "".to_string(),
+            expected_pattern: "".to_string()
+        }
+        .error_code(),
+        "ERR-WARM-FAKE-ALLOC"
+    );
+    assert_eq!(
+        WarmError::SinWaveOutputDetected {
+            model_id: "".to_string(),
+            dominant_frequency_hz: 0.0,
+            energy_concentration: 0.0,
+            output_size: 0
+        }
+        .error_code(),
+        "ERR-WARM-SINWAVE-OUTPUT"
     );
 }
 

@@ -1,118 +1,13 @@
-# TASK-EMB-018: Implement Binary Quantization for E9 (HDC)
-
-## Metadata
-
-| Field | Value |
-|-------|-------|
-| **Task ID** | TASK-EMB-018 |
-| **Title** | Implement Binary Quantization for Hyperdimensional Computing |
-| **Status** | ✅ COMPLETE (2026-01-06) |
-| **Layer** | Logic |
-| **Sequence** | 18 |
-| **Implements** | REQ-EMB-005, Constitution `embeddings.quantization.Binary` |
-| **Depends On** | TASK-EMB-004 (BinaryEncoder struct exists in types.rs) |
-| **Blocks** | TASK-EMB-020 (QuantizationRouter) |
-| **Complexity** | Low |
-| **Exit Codes** | 117 (BinaryQuantizationFailed) |
-
----
-
-## CRITICAL RULES - READ FIRST
-
-1. **NO BACKWARDS COMPATIBILITY** - System works or fails fast with clear errors
-2. **NO MOCK DATA** - Tests use real computation, verify actual results
-3. **NO FALLBACKS** - If quantization fails, error out immediately
-4. **NO WORKAROUNDS** - Fix root causes, don't hide broken state
-5. **FAIL FAST** - Every error must log exactly what failed and why
-
----
-
-## Current Codebase State (Verified 2026-01-06)
-
-### Files That EXIST
-
-| File | What It Contains |
-|------|------------------|
-| `crates/context-graph-embeddings/src/quantization/mod.rs` | Module exports `BinaryEncoder` from types |
-| `crates/context-graph-embeddings/src/quantization/types.rs` | `BinaryEncoder` struct (marker only, NO logic), `QuantizationMethod::Binary`, `QuantizationMetadata::Binary` |
-| `crates/context-graph-embeddings/src/types/model_id.rs` | `ModelId::Hdc` enum variant for E9 |
-
-### Files That DO NOT EXIST (You Must Create)
-
-| File | Purpose |
-|------|---------|
-| `crates/context-graph-embeddings/src/quantization/binary.rs` | **YOUR TASK** - Binary quantization implementation |
-
-### What Already Exists in types.rs
-
-```rust
-// In crates/context-graph-embeddings/src/quantization/types.rs
-
-/// Binary encoder (stateless).
-/// Converts f32 values to single bits based on sign threshold.
-/// NOTE: This is a marker struct. Actual encoding logic is in Logic Layer.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct BinaryEncoder;
-
-// QuantizationMetadata::Binary variant:
-Binary {
-    /// Binarization threshold.
-    threshold: f32,
-}
-
-// QuantizationMethod::Binary is used for ModelId::Hdc (E9)
-```
-
----
-
-## Task Objective
-
-Implement binary quantization for E9_HDC (Hyperdimensional Computing) embeddings:
-
-1. **Binarize** f32 vectors: `value >= threshold → 1, else → 0`
-2. **Pack** 8 bits into each byte for 32x compression
-3. **Implement Hamming distance** for similarity (used instead of cosine)
-4. **Provide dequantization** that reconstructs approximate f32 values
-
----
-
-## Constitution Requirements
-
-From `docs2/constitution.yaml`:
-
-```yaml
-embeddings:
-  quantization:
-    Binary: { compression: "32x", recall_impact: "5-10%", embedders: [E9] }
-
-  models:
-    E9_HDC: { dim: "10K-bit->1024", math: XOR_Hamming, hw: VectorUnit, lat: "<1ms", purpose: "V_robustness", quantization: "Binary" }
-```
-
-**Key Constraints:**
-- Compression ratio: **32x** (32 f32 values → 1 byte of 8 bits = 4 bytes → 0.125 bytes, but we pack 8 bits per byte)
-- Recall impact: **5-10%** maximum
-- Similarity metric: **Hamming distance** (count differing bits)
-- Hardware target: VectorUnit (CPU vector ops, not GPU)
-- Latency: **<1ms** for binarization
-
----
-
-## File to Create
-
-**Path:** `crates/context-graph-embeddings/src/quantization/binary.rs`
-
-```rust
 //! Binary quantization for E9_HDC (Hyperdimensional Computing).
 //!
 //! Implements Constitution `embeddings.quantization.Binary`:
-//! - 32x compression (8 f32 values → 1 byte)
+//! - 32x compression (8 f32 values -> 1 byte)
 //! - Hamming distance for similarity
 //! - <1ms latency requirement
 //!
 //! # Algorithm
 //!
-//! 1. Binarize: value >= threshold → 1, else → 0
+//! 1. Binarize: value >= threshold -> 1, else -> 0
 //! 2. Pack 8 bits per byte (MSB first)
 //! 3. Store packed bytes + threshold in metadata
 //!
@@ -121,7 +16,7 @@ embeddings:
 //! - EMB-E012: Binary quantization failed (exit 117)
 
 use super::types::{BinaryEncoder, QuantizationMetadata, QuantizationMethod, QuantizedEmbedding};
-use tracing::{error, info, instrument, warn};
+use tracing::{error, info, instrument};
 
 /// Error type for binary quantization operations.
 #[derive(Debug, thiserror::Error)]
@@ -132,11 +27,21 @@ pub enum BinaryQuantizationError {
 
     /// Input contains NaN or Infinity values.
     #[error("[EMB-E012] BINARY_QUANTIZATION_FAILED: Input contains NaN/Inf at index {index}, value={value}")]
-    InvalidValue { index: usize, value: f32 },
+    InvalidValue {
+        /// Index of the invalid value.
+        index: usize,
+        /// The invalid value (NaN or Infinity).
+        value: f32,
+    },
 
     /// Packed data length mismatch during dequantization.
     #[error("[EMB-E012] BINARY_DEQUANTIZATION_FAILED: Expected {expected} bytes, got {actual}")]
-    DataLengthMismatch { expected: usize, actual: usize },
+    DataLengthMismatch {
+        /// Expected number of bytes.
+        expected: usize,
+        /// Actual number of bytes received.
+        actual: usize,
+    },
 
     /// Metadata type mismatch.
     #[error("[EMB-E012] BINARY_DEQUANTIZATION_FAILED: Expected Binary metadata, got different variant")]
@@ -176,15 +81,15 @@ impl BinaryEncoder {
     ///
     /// # Constitution Compliance
     ///
-    /// - 32x compression: 1024 f32 (4096 bytes) → 128 bytes
+    /// - 32x compression: 1024 f32 (4096 bytes) -> 128 bytes
     /// - <1ms latency for typical HDC dimensions
-    #[instrument(skip(embedding), fields(dim = embedding.len()))]
+    #[instrument(skip(self, embedding), fields(dim = embedding.len()))]
     pub fn quantize(
         &self,
         embedding: &[f32],
         threshold: Option<f32>,
     ) -> Result<QuantizedEmbedding, BinaryQuantizationError> {
-        // Validate input
+        // Validate input: empty check
         if embedding.is_empty() {
             error!(
                 target: "quantization::binary",
@@ -194,7 +99,7 @@ impl BinaryEncoder {
             return Err(BinaryQuantizationError::EmptyInput);
         }
 
-        // Check for NaN/Inf
+        // Validate input: check for NaN/Inf (fail fast with exact index/value)
         for (i, &val) in embedding.iter().enumerate() {
             if !val.is_finite() {
                 error!(
@@ -216,6 +121,10 @@ impl BinaryEncoder {
         let mut packed = vec![0u8; packed_len];
 
         // Pack bits: MSB first within each byte
+        // Bit 7 of byte 0 corresponds to index 0 of input
+        // Bit 6 of byte 0 corresponds to index 1 of input
+        // ...
+        // Bit 0 of byte 0 corresponds to index 7 of input
         for (i, &val) in embedding.iter().enumerate() {
             if val >= thresh {
                 let byte_idx = i / 8;
@@ -248,7 +157,7 @@ impl BinaryEncoder {
     ///
     /// 1. Validate data length matches expected
     /// 2. Unpack bits from bytes (MSB first)
-    /// 3. Convert: 1 → +1.0, 0 → -1.0 (bipolar representation)
+    /// 3. Convert: 1 -> +1.0, 0 -> -1.0 (bipolar representation)
     ///
     /// # Arguments
     ///
@@ -262,8 +171,11 @@ impl BinaryEncoder {
     ///
     /// - `DataLengthMismatch` if packed data doesn't match original_dim
     /// - `MetadataMismatch` if metadata is not Binary variant
-    #[instrument(skip(quantized), fields(dim = quantized.original_dim))]
-    pub fn dequantize(&self, quantized: &QuantizedEmbedding) -> Result<Vec<f32>, BinaryQuantizationError> {
+    #[instrument(skip(self, quantized), fields(dim = quantized.original_dim))]
+    pub fn dequantize(
+        &self,
+        quantized: &QuantizedEmbedding,
+    ) -> Result<Vec<f32>, BinaryQuantizationError> {
         // Validate metadata type
         let _threshold = match &quantized.metadata {
             QuantizationMetadata::Binary { threshold } => *threshold,
@@ -300,7 +212,7 @@ impl BinaryEncoder {
             let byte_idx = i / 8;
             let bit_idx = 7 - (i % 8);
             let bit = (quantized.data[byte_idx] >> bit_idx) & 1;
-            // Bipolar: 1 → +1.0, 0 → -1.0
+            // Bipolar: 1 -> +1.0, 0 -> -1.0
             result.push(if bit == 1 { 1.0 } else { -1.0 });
         }
 
@@ -339,9 +251,11 @@ impl BinaryEncoder {
             a.original_dim, b.original_dim
         );
         assert_eq!(
-            a.data.len(), b.data.len(),
+            a.data.len(),
+            b.data.len(),
             "Data length mismatch: {} vs {}",
-            a.data.len(), b.data.len()
+            a.data.len(),
+            b.data.len()
         );
 
         // Count differing bits using XOR + popcount
@@ -385,7 +299,9 @@ mod tests {
         let encoder = BinaryEncoder::new();
         let input = vec![0.5, -0.3, 0.1, -0.8, 0.0, 0.9, -0.1, 0.2];
 
-        let result = encoder.quantize(&input, None).expect("quantization should succeed");
+        let result = encoder
+            .quantize(&input, None)
+            .expect("quantization should succeed");
 
         assert_eq!(result.method, QuantizationMethod::Binary);
         assert_eq!(result.original_dim, 8);
@@ -411,11 +327,12 @@ mod tests {
         let encoder = BinaryEncoder::new();
         let input = vec![0.5, 0.3, 0.1, 0.8];
 
-        let result = encoder.quantize(&input, Some(0.4)).expect("quantization should succeed");
+        let result = encoder
+            .quantize(&input, Some(0.4))
+            .expect("quantization should succeed");
 
-        // Bits with threshold 0.4: [1, 0, 0, 1] → 10010000 (padded) = 0x90
-        // Wait, only 4 values, so we have 4 bits in MSB positions
-        // Byte: [1,0,0,1,0,0,0,0] = 0b10010000 = 144
+        // Bits with threshold 0.4: [1, 0, 0, 1] (only 0.5 and 0.8 >= 0.4)
+        // MSB first in one byte: [1,0,0,1,0,0,0,0] = 0b10010000 = 144
         assert_eq!(result.data[0], 0b10010000);
     }
 
@@ -453,7 +370,11 @@ mod tests {
 
         // Compression ratio: 4096 / 128 = 32x
         let ratio = result.compression_ratio();
-        assert!((ratio - 32.0).abs() < 0.1, "Expected 32x compression, got {}x", ratio);
+        assert!(
+            (ratio - 32.0).abs() < 0.1,
+            "Expected 32x compression, got {}x",
+            ratio
+        );
     }
 
     #[test]
@@ -491,7 +412,11 @@ mod tests {
         let b = encoder.quantize(&b_input, None).expect("quantize");
 
         let sim = BinaryEncoder::hamming_similarity(&a, &b);
-        assert!((sim - 0.5).abs() < 0.01, "Expected 50% similarity, got {}", sim);
+        assert!(
+            (sim - 0.5).abs() < 0.01,
+            "Expected 50% similarity, got {}",
+            sim
+        );
     }
 
     // ==========================================
@@ -546,7 +471,10 @@ mod tests {
             method: QuantizationMethod::Binary,
             original_dim: 8,
             data: vec![0xFF],
-            metadata: QuantizationMetadata::Float8 { scale: 1.0, bias: 0.0 },
+            metadata: QuantizationMetadata::Float8 {
+                scale: 1.0,
+                bias: 0.0,
+            },
         };
 
         let encoder = BinaryEncoder::new();
@@ -660,226 +588,32 @@ mod tests {
         let reconstructed = encoder.dequantize(&result).expect("dequantize");
         assert_eq!(reconstructed.len(), 10000);
     }
+
+    #[test]
+    fn test_negative_infinity_input_fails() {
+        let encoder = BinaryEncoder::new();
+        let input = vec![1.0, f32::NEG_INFINITY, 2.0];
+        let result = encoder.quantize(&input, None);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            BinaryQuantizationError::InvalidValue { index, .. } => {
+                assert_eq!(index, 1, "NEG_INFINITY should be detected at index 1");
+            }
+            e => panic!("Expected InvalidValue, got {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_bipolar_reconstruction_values() {
+        let encoder = BinaryEncoder::new();
+        let input = vec![0.5, -0.5]; // positive, negative
+
+        let quantized = encoder.quantize(&input, None).expect("quantize");
+        let reconstructed = encoder.dequantize(&quantized).expect("dequantize");
+
+        // Should reconstruct as bipolar: +1.0 and -1.0
+        assert_eq!(reconstructed[0], 1.0);
+        assert_eq!(reconstructed[1], -1.0);
+    }
 }
-```
-
----
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `crates/context-graph-embeddings/src/quantization/mod.rs` | Add `pub mod binary;` and re-export |
-
-**Updated mod.rs:**
-
-```rust
-//! Quantization types for Constitution-aligned embedding compression.
-//! ...existing docs...
-
-mod types;
-pub mod binary;  // ADD THIS LINE
-
-#[cfg(test)]
-mod edge_case_verification;
-
-pub use types::{
-    BinaryEncoder, Float8Encoder, PQ8Codebook, QuantizationMetadata, QuantizationMethod,
-    QuantizedEmbedding,
-};
-
-// ADD THESE RE-EXPORTS
-pub use binary::BinaryQuantizationError;
-```
-
----
-
-## Full State Verification Protocol
-
-After implementing the logic, you MUST perform these verification steps:
-
-### 1. Source of Truth Identification
-
-The source of truth for binary quantization is:
-- **Packed byte data** in `QuantizedEmbedding.data`
-- **Bit pattern** must match input signs exactly
-
-### 2. Execute & Inspect Procedure
-
-```bash
-cd /home/cabdru/contextgraph
-
-# Step 1: Build and verify no compile errors
-cargo build -p context-graph-embeddings 2>&1 | tee /tmp/build_output.txt
-if grep -q "error\[" /tmp/build_output.txt; then
-    echo "BUILD FAILED - fix errors first"
-    exit 1
-fi
-
-# Step 2: Run all binary quantization tests
-cargo test -p context-graph-embeddings quantization::binary -- --nocapture 2>&1 | tee /tmp/test_output.txt
-
-# Step 3: Verify test count and all pass
-grep -E "test result:" /tmp/test_output.txt
-# Expected: "test result: ok. X passed; 0 failed"
-
-# Step 4: Print the actual packed bytes for verification
-cargo test -p context-graph-embeddings test_quantize_basic -- --nocapture 2>&1 | grep -A5 "Binary quantization complete"
-```
-
-### 3. Edge Case Audit (Manual Simulation)
-
-You MUST manually verify these 3 edge cases by printing state before/after:
-
-#### Edge Case 1: Empty Input
-```rust
-// Before: input = []
-// Action: encoder.quantize(&[], None)
-// After: Error::EmptyInput returned
-// VERIFY: Error message contains "EMB-E012"
-```
-
-#### Edge Case 2: Dimension Not Multiple of 8
-```rust
-// Before: input = [1.0; 13], expected_bytes = 2
-// Action: encoder.quantize(&input, None)
-// After: result.data.len() == 2, result.original_dim == 13
-// VERIFY: Roundtrip preserves all 13 values
-```
-
-#### Edge Case 3: Maximum HDC Dimension (10K)
-```rust
-// Before: input = [alternating 1.0, -1.0; 10000]
-// Action: quantize → dequantize
-// After: 1250 bytes packed, roundtrip exact sign match
-// VERIFY: compression_ratio == 32.0 ± 0.1
-```
-
-### 4. Evidence of Success
-
-Provide log output showing:
-
-```
-=== BINARY QUANTIZATION VERIFICATION LOG ===
-
-Test: test_quantize_basic
-  Input: [0.5, -0.3, 0.1, -0.8, 0.0, 0.9, -0.1, 0.2]
-  Expected bits: [1,0,1,0,1,1,0,1] = 0xAD
-  Actual packed byte: 0xAD ✓
-
-Test: test_compression_ratio_32x
-  Input size: 4096 bytes (1024 f32)
-  Output size: 128 bytes
-  Ratio: 32.0x ✓
-
-Test: test_roundtrip_preserves_signs
-  Dimension: 1024
-  Sign mismatches: 0 ✓
-
-All 15 tests passed.
-```
-
----
-
-## Validation Criteria (Checklist)
-
-- [x] File `crates/context-graph-embeddings/src/quantization/binary.rs` created
-- [x] `mod.rs` updated with `pub mod binary;`
-- [x] `BinaryEncoder::quantize()` implemented with validation
-- [x] `BinaryEncoder::dequantize()` implemented
-- [x] `BinaryEncoder::hamming_distance()` implemented
-- [x] `BinaryEncoder::hamming_similarity()` implemented
-- [x] All error cases return `BinaryQuantizationError` with EMB-E012 code
-- [x] Tests pass: `cargo test -p context-graph-embeddings quantization::binary`
-- [x] Compression ratio verified as 32x
-- [x] Roundtrip preserves all signs
-- [x] Edge cases verified (empty, non-multiple-of-8, 10K dimension)
-- [x] No mock data used in any test
-- [x] All failures produce clear error messages with codes
-
-## Implementation Summary (2026-01-06)
-
-### Files Created
-- `crates/context-graph-embeddings/src/quantization/binary.rs` - 620 lines
-- `crates/context-graph-embeddings/tests/task_emb_018_physical_verification.rs` - 180 lines
-
-### Files Modified
-- `crates/context-graph-embeddings/src/quantization/mod.rs` - Added `pub mod binary;` and re-export
-
-### Test Results
-- **Unit tests**: 20/20 passed
-- **Physical verification tests**: 8/8 passed
-
-### Verified Behaviors
-| Verification | Result |
-|-------------|--------|
-| Bit pattern 0xAD for basic input | ✅ PASS |
-| 32x compression ratio (1024 f32 → 128 bytes) | ✅ PASS |
-| 10K dimension HDC support | ✅ PASS |
-| Empty input fails with EMB-E012 | ✅ PASS |
-| NaN detection at exact index | ✅ PASS |
-| Infinity detection at exact index | ✅ PASS |
-| Hamming distance identical = 0 | ✅ PASS |
-| Hamming distance opposite = dim | ✅ PASS |
-| Hamming similarity 50% = 0.5 | ✅ PASS |
-| Bipolar dequantization (+1/-1) | ✅ PASS |
-| Non-multiple-of-8 dimension | ✅ PASS |
-| All EMB-E012 error codes | ✅ PASS |
-
----
-
-## Test Commands
-
-```bash
-cd /home/cabdru/contextgraph
-
-# Build
-cargo build -p context-graph-embeddings
-
-# Run all binary quantization tests
-cargo test -p context-graph-embeddings quantization::binary -- --nocapture
-
-# Run specific test with output
-cargo test -p context-graph-embeddings test_compression_ratio_32x -- --nocapture
-
-# Check for any panics or failures
-cargo test -p context-graph-embeddings quantization::binary 2>&1 | grep -E "(FAILED|panicked|error)"
-
-# Verify no mock/stub references in binary.rs
-grep -n "mock\|stub\|fake\|simulate" crates/context-graph-embeddings/src/quantization/binary.rs
-# Expected: No matches
-```
-
----
-
-## Error Codes Reference
-
-| Code | Exit | Error | Description |
-|------|------|-------|-------------|
-| EMB-E012 | 117 | BinaryQuantizationError | Any binary quantization/dequantization failure |
-
----
-
-## Dependencies
-
-### Upstream (Must Be Complete)
-- **TASK-EMB-004**: Foundation layer must have created `BinaryEncoder` struct in `types.rs` ✓ VERIFIED EXISTS
-
-### Downstream (Blocked By This Task)
-- **TASK-EMB-020**: QuantizationRouter needs binary quantization to route E9_HDC embeddings
-
----
-
-## Notes for Implementing Agent
-
-1. **The `BinaryEncoder` struct already exists** in `types.rs` as a marker struct. You are implementing the methods on it in `binary.rs`.
-
-2. **Use MSB-first bit packing** for consistency with other systems. Bit 7 of each byte is the first element in that group of 8.
-
-3. **Threshold defaults to 0.0** which gives sign-based binarization (standard for HDC).
-
-4. **Dequantization produces bipolar values** (+1.0 or -1.0), not the original magnitudes. This is intentional for HDC.
-
-5. **Hamming distance is the native similarity metric** for binary embeddings. Do NOT use cosine similarity on binary data.
-
-6. **NO FALLBACKS** - If quantization fails for any reason, return an error immediately. Do not try to recover.

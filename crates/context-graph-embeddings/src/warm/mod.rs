@@ -67,7 +67,9 @@ pub use memory_pool::{ModelAllocation, ModelMemoryPool, WarmMemoryPools, Working
 // Re-export CUDA allocation types for convenient access
 pub use cuda_alloc::{
     GpuInfo, VramAllocation, WarmCudaAllocator,
+    FAKE_ALLOCATION_BASE_PATTERN, GOLDEN_SIMILARITY_THRESHOLD,
     MINIMUM_VRAM_BYTES, REQUIRED_COMPUTE_MAJOR, REQUIRED_COMPUTE_MINOR,
+    SIN_WAVE_ENERGY_THRESHOLD,
 };
 
 // Re-export loader types for convenient access
@@ -88,5 +90,8 @@ pub use diagnostics::{
 // Re-export integration types for convenient access
 pub use integration::WarmEmbeddingPipeline;
 
-// Re-export inference types for convenient access (TASK-EMB-015)
-pub use inference::InferenceEngine;
+// Re-export inference types for convenient access (TASK-EMB-015, TASK-EMB-017)
+pub use inference::{
+    cosine_similarity, detect_sin_wave_pattern, validate_inference_output_ap007,
+    InferenceEngine,
+};

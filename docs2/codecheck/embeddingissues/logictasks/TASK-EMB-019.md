@@ -1,46 +1,83 @@
-# TASK-EMB-009: Create Weight File Spec
+# TASK-EMB-019: Remove Stub Mode from Preflight
 
-<task_spec id="TASK-EMB-009" version="1.0">
+<task_spec id="TASK-EMB-019" version="2.0">
 
 ## Metadata
 
 | Field | Value |
 |-------|-------|
-| **Title** | Create Weight File Spec |
+| **Title** | Remove Fake GPU from Preflight Checks |
 | **Status** | ready |
-| **Layer** | foundation |
-| **Sequence** | 9 |
-| **Implements** | REQ-EMB-001 |
-| **Depends On** | TASK-EMB-002 |
+| **Layer** | logic |
+| **Sequence** | 19 |
+| **Implements** | REQ-EMB-004 |
+| **Depends On** | TASK-EMB-014 |
 | **Estimated Complexity** | low |
-| **Parallel Group** | C |
+| **Parallel Group** | N/A (sequential) |
+| **Constitution Reference** | v4.0.0, AP-007, stack.gpu |
 
 ---
 
 ## Context
 
-TECH-EMB-001 specifies loading a learned projection matrix from SafeTensors format. This task documents the exact file format specification so that:
-1. Weight files can be validated before loading
-2. Training pipelines produce compatible files
-3. Tests can generate valid fixtures
+TECH-EMB-002 identifies that `preflight.rs` returns "Simulated RTX 5090" when CUDA feature is disabled. This is a **CRITICAL VIOLATION** of AP-007 ("Stub data in prod → use tests/fixtures/").
+
+The Constitution mandates RTX 5090 with CUDA 13.1 and 32GB VRAM. There is **NO CPU fallback** and **NO stub mode** permitted in production code.
+
+This task replaces the stub with a compile-time error, ensuring no deployment can occur without real GPU support.
 
 ---
 
 ## Input Context Files
 
-| Purpose | File Path |
-|---------|-----------|
-| ProjectionMatrix | `crates/context-graph-embeddings/src/models/pretrained/sparse/projection.rs` (TASK-EMB-002) |
-| Tech spec | `docs2/codecheck/embeddingissues/TECH-EMB-001-sparse-projection.md` |
-| SafeTensors docs | https://huggingface.co/docs/safetensors |
+| Purpose | File Path | Status |
+|---------|-----------|--------|
+| **Target file (contains stub code)** | `crates/context-graph-embeddings/src/warm/loader/preflight.rs` | EXISTS - lines 31-43 and 99-104 contain stub code |
+| Tech spec | `docs2/codecheck/embeddingissues/TECH-EMB-002-warm-loading.md` | Reference |
+| Error taxonomy | `docs2/codecheck/embeddingissues/SPEC-EMB-001-error-taxonomy.md` | EMB-E001 CUDA_UNAVAILABLE |
+| Constitution | `docs2/constitution.yaml` | v4.0.0 - RTX 5090, CUDA 13.1 |
 
 ---
 
 ## Prerequisites
 
-- [ ] TASK-EMB-002 completed (ProjectionMatrix constants defined)
-- [ ] Read SafeTensors format specification
-- [ ] Understand dimension requirements
+- [x] TASK-EMB-014 completed (real VRAM allocation works)
+- [x] `WarmCudaAllocator` exists at `crates/context-graph-embeddings/src/warm/cuda_alloc/allocator_cuda.rs`
+- [x] `GpuInfo` struct exists at `crates/context-graph-embeddings/src/warm/cuda_alloc/mod.rs`
+- [x] Error types exist at `crates/context-graph-embeddings/src/warm/error.rs`
+
+---
+
+## Current Codebase State (VERIFIED 2026-01-06)
+
+### File: `crates/context-graph-embeddings/src/warm/loader/preflight.rs`
+
+**STUB CODE TO DELETE (lines 31-43):**
+```rust
+    #[cfg(not(feature = "cuda"))]
+    {
+        tracing::warn!("CUDA feature not enabled, running in stub mode");
+        // In stub mode, we simulate successful checks for testing
+        *gpu_info = Some(GpuInfo::new(
+            0,
+            "Simulated RTX 5090".to_string(),
+            (REQUIRED_COMPUTE_MAJOR, REQUIRED_COMPUTE_MINOR),
+            MINIMUM_VRAM_BYTES,
+            "Simulated".to_string(),
+        ));
+        Ok(())
+    }
+```
+
+**STUB CODE TO DELETE (lines 99-104):**
+```rust
+    #[cfg(not(feature = "cuda"))]
+    {
+        // In stub mode, we don't have a real allocator
+        tracing::warn!("CUDA feature not enabled, skipping allocator initialization");
+        Ok(None)
+    }
+```
 
 ---
 
@@ -48,327 +85,400 @@ TECH-EMB-001 specifies loading a learned projection matrix from SafeTensors form
 
 ### In Scope
 
-- Document weight file format in code
-- Create `WeightFileSpec` struct with validation
-- Define expected metadata fields
-- Create file validation function
-- Add integrity checking utilities
+- DELETE both `#[cfg(not(feature = "cuda"))]` blocks returning fake GPU data
+- Replace with `compile_error!()` that fails at compile time
+- Add runtime panic if GPU unavailable even with feature enabled
+- Ensure error message references EMB-E001 and includes remediation steps
 
 ### Out of Scope
 
-- Actual weight generation (training process)
-- Loading implementation (TASK-EMB-011)
-- GPU transfer (TASK-EMB-011)
+- CUDA feature configuration (Cargo.toml)
+- CI/CD pipeline updates
+- Test fixture generation
 
 ---
 
 ## Definition of Done
 
-### Signatures
+### Code to DELETE (EXACT MATCH REQUIRED)
+
+**Block 1 - `run_preflight_checks` function (lines 31-43):**
+```rust
+    #[cfg(not(feature = "cuda"))]
+    {
+        tracing::warn!("CUDA feature not enabled, running in stub mode");
+        // In stub mode, we simulate successful checks for testing
+        *gpu_info = Some(GpuInfo::new(
+            0,
+            "Simulated RTX 5090".to_string(),
+            (REQUIRED_COMPUTE_MAJOR, REQUIRED_COMPUTE_MINOR),
+            MINIMUM_VRAM_BYTES,
+            "Simulated".to_string(),
+        ));
+        Ok(())
+    }
+```
+
+**Block 2 - `initialize_cuda_allocator` function (lines 99-104):**
+```rust
+    #[cfg(not(feature = "cuda"))]
+    {
+        // In stub mode, we don't have a real allocator
+        tracing::warn!("CUDA feature not enabled, skipping allocator initialization");
+        Ok(None)
+    }
+```
+
+### Replacement Implementation
+
+Replace the entire file with the following implementation:
 
 ```rust
-// File: crates/context-graph-embeddings/src/models/pretrained/sparse/weight_spec.rs
+//! Pre-flight checks and CUDA initialization for warm model loading.
+//!
+//! CRITICAL: This module has NO stub mode. CUDA is REQUIRED.
+//! Constitution Reference: v4.0.0, stack.gpu, AP-007
 
-use std::path::Path;
-use sha2::{Sha256, Digest};
-use safetensors::SafeTensors;
+// CRITICAL: CUDA feature is REQUIRED. No stub mode.
+#[cfg(not(feature = "cuda"))]
+compile_error!(
+    "[EMB-E001] CUDA_UNAVAILABLE: The 'cuda' feature MUST be enabled.
 
-use crate::config::constants::{SPARSE_VOCAB_SIZE, SPARSE_PROJECTED_DIMENSION};
-use super::projection::{PROJECTION_WEIGHT_FILE, PROJECTION_TENSOR_NAME};
+    Context Graph embeddings require GPU acceleration.
+    There is NO CPU fallback and NO stub mode.
 
-/// Weight file format specification for sparse projection matrix.
+    Target Hardware (Constitution v4.0.0):
+    - GPU: RTX 5090 (Blackwell architecture)
+    - CUDA: 13.1+
+    - VRAM: 32GB minimum
+
+    Remediation:
+    1. Install CUDA 13.1+
+    2. Ensure RTX 5090 or compatible GPU is available
+    3. Build with: cargo build --features cuda
+
+    Constitution Reference: stack.gpu, AP-007
+    Exit Code: 101 (CUDA_UNAVAILABLE)"
+);
+
+#[cfg(feature = "cuda")]
+use crate::warm::cuda_alloc::{
+    GpuInfo, WarmCudaAllocator, MINIMUM_VRAM_BYTES, REQUIRED_COMPUTE_MAJOR, REQUIRED_COMPUTE_MINOR,
+};
+#[cfg(feature = "cuda")]
+use crate::warm::config::WarmConfig;
+#[cfg(feature = "cuda")]
+use crate::warm::error::{WarmError, WarmResult};
+#[cfg(feature = "cuda")]
+use super::constants::{GB, MODEL_SIZES};
+#[cfg(feature = "cuda")]
+use super::helpers::format_bytes;
+
+/// Run pre-flight checks before loading.
 ///
-/// # File Format: SafeTensors
+/// Verifies:
+/// - GPU meets compute capability requirements (12.0+ for RTX 5090)
+/// - Sufficient VRAM available (32GB)
+/// - CUDA context is valid
+/// - GPU is NOT simulated/stub
 ///
-/// SafeTensors is a safe, fast, and portable tensor serialization format
-/// developed by Hugging Face. It provides:
-/// - Memory-mapped loading (fast)
-/// - No arbitrary code execution (safe)
-/// - Cross-platform compatibility (portable)
+/// # Errors
 ///
-/// # Required Contents
+/// Returns `WarmError::CudaUnavailable` with EMB-E001 if:
+/// - No CUDA device found
+/// - GPU is simulated/stub (contains "Simulated" or "Stub" in name)
 ///
-/// ## Tensor: "projection_matrix"
-/// - **Shape**: [30522, 1536]
-/// - **DType**: F32
-/// - **Description**: Learned projection weights from vocab to dense space
+/// Returns `WarmError::CudaCapabilityInsufficient` with EMB-E002 if:
+/// - Compute capability below 12.0
 ///
-/// ## Metadata (Optional but Recommended)
-/// - `version`: Weight file version (e.g., "1.0.0")
-/// - `training_date`: ISO 8601 timestamp
-/// - `training_dataset`: Dataset used for training
-/// - `training_steps`: Number of training steps
-/// - `constitution_version`: Constitution version (e.g., "4.0.0")
-///
-/// # File Path Convention
-///
-/// Weights should be stored at:
-/// ```
-/// {model_dir}/sparse_projection.safetensors
-/// ```
-///
-/// # Example Training Output
-///
-/// The training pipeline should produce:
-/// ```python
-/// import torch
-/// from safetensors.torch import save_file
-///
-/// weights = torch.randn(30522, 1536)  # Or trained weights
-/// tensors = {"projection_matrix": weights}
-/// metadata = {
-///     "version": "1.0.0",
-///     "constitution_version": "4.0.0",
-///     "training_date": "2026-01-06T00:00:00Z",
-/// }
-/// save_file(tensors, "sparse_projection.safetensors", metadata=metadata)
-/// ```
-pub struct WeightFileSpec;
+/// Returns `WarmError::VramInsufficientTotal` with EMB-E003 if:
+/// - Total VRAM below 32GB
+#[cfg(feature = "cuda")]
+pub fn run_preflight_checks(
+    config: &WarmConfig,
+    gpu_info: &mut Option<GpuInfo>,
+) -> WarmResult<()> {
+    tracing::info!("Running pre-flight checks...");
 
-impl WeightFileSpec {
-    /// Expected file name.
-    pub const FILE_NAME: &'static str = PROJECTION_WEIGHT_FILE;
+    // Try to create a temporary allocator to query GPU info
+    let allocator = WarmCudaAllocator::new(config.cuda_device_id)?;
+    let info = allocator.get_gpu_info()?;
 
-    /// Expected tensor name.
-    pub const TENSOR_NAME: &'static str = PROJECTION_TENSOR_NAME;
-
-    /// Expected tensor shape.
-    pub const EXPECTED_SHAPE: [usize; 2] = [SPARSE_VOCAB_SIZE, SPARSE_PROJECTED_DIMENSION];
-
-    /// Expected data type (F32).
-    pub const EXPECTED_DTYPE: &'static str = "F32";
-
-    /// Minimum expected file size (bytes).
-    /// 30522 × 1536 × 4 bytes = ~187MB uncompressed
-    pub const MIN_FILE_SIZE: usize = SPARSE_VOCAB_SIZE * SPARSE_PROJECTED_DIMENSION * 4;
-
-    /// Validate a weight file without loading to GPU.
-    ///
-    /// # Checks
-    /// 1. File exists and is readable
-    /// 2. File parses as valid SafeTensors
-    /// 3. Contains tensor with correct name
-    /// 4. Tensor has correct shape [30522, 1536]
-    /// 5. Tensor has correct dtype (F32)
-    ///
-    /// # Returns
-    /// `Ok(ValidationResult)` with metadata if valid.
-    /// `Err(ValidationError)` with specific failure reason.
-    pub fn validate(path: &Path) -> Result<ValidationResult, ValidationError> {
-        // Check file exists
-        if !path.exists() {
-            return Err(ValidationError::FileNotFound {
-                path: path.to_path_buf()
-            });
-        }
-
-        // Read file bytes
-        let bytes = std::fs::read(path).map_err(|e| ValidationError::IoError {
-            path: path.to_path_buf(),
-            details: e.to_string(),
-        })?;
-
-        // Check minimum size
-        if bytes.len() < Self::MIN_FILE_SIZE {
-            return Err(ValidationError::FileTooSmall {
-                path: path.to_path_buf(),
-                actual: bytes.len(),
-                minimum: Self::MIN_FILE_SIZE,
-            });
-        }
-
-        // Compute SHA256
-        let mut hasher = Sha256::new();
-        hasher.update(&bytes);
-        let checksum: [u8; 32] = hasher.finalize().into();
-
-        // Parse SafeTensors
-        let tensors = SafeTensors::deserialize(&bytes).map_err(|e| {
-            ValidationError::ParseError {
-                path: path.to_path_buf(),
-                details: e.to_string(),
-            }
-        })?;
-
-        // Get tensor
-        let tensor = tensors.tensor(Self::TENSOR_NAME).map_err(|_| {
-            ValidationError::TensorMissing {
-                path: path.to_path_buf(),
-                tensor_name: Self::TENSOR_NAME.to_string(),
-            }
-        })?;
-
-        // Check shape
-        let shape = tensor.shape();
-        if shape != Self::EXPECTED_SHAPE {
-            return Err(ValidationError::ShapeMismatch {
-                path: path.to_path_buf(),
-                expected: Self::EXPECTED_SHAPE.to_vec(),
-                actual: shape.to_vec(),
-            });
-        }
-
-        // Check dtype
-        let dtype = format!("{:?}", tensor.dtype());
-        if !dtype.contains("F32") {
-            return Err(ValidationError::DtypeMismatch {
-                path: path.to_path_buf(),
-                expected: Self::EXPECTED_DTYPE.to_string(),
-                actual: dtype,
-            });
-        }
-
-        // Extract metadata
-        let metadata = Self::extract_metadata(&tensors);
-
-        Ok(ValidationResult {
-            path: path.to_path_buf(),
-            checksum,
-            file_size: bytes.len(),
-            metadata,
-        })
+    // CRITICAL: Verify this is NOT a simulated GPU
+    let name_lower = info.name.to_lowercase();
+    if name_lower.contains("simulated") || name_lower.contains("stub") || name_lower.contains("fake") {
+        tracing::error!(
+            "[EMB-E001] DETECTED SIMULATED GPU: '{}' - Real GPU required!",
+            info.name
+        );
+        return Err(WarmError::CudaUnavailable {
+            message: format!(
+                "[EMB-E001] CUDA_UNAVAILABLE: Detected simulated/stub GPU: '{}'. \
+                 Real RTX 5090 (Blackwell, CC 12.0) required. \
+                 Constitution Reference: stack.gpu, AP-007",
+                info.name
+            ),
+        });
     }
 
-    /// Extract metadata from SafeTensors file.
-    fn extract_metadata(tensors: &SafeTensors) -> WeightMetadata {
-        // SafeTensors metadata is stored in the header
-        // Note: actual API may vary by safetensors version
-        WeightMetadata {
-            version: None,  // Extract from header if available
-            training_date: None,
-            training_dataset: None,
-            training_steps: None,
-            constitution_version: None,
-        }
+    tracing::info!(
+        "GPU detected: {} (CC {}, {} VRAM)",
+        info.name,
+        info.compute_capability_string(),
+        format_bytes(info.total_memory_bytes)
+    );
+
+    // Check compute capability
+    if !info.meets_compute_requirement(REQUIRED_COMPUTE_MAJOR, REQUIRED_COMPUTE_MINOR) {
+        tracing::error!(
+            "[EMB-E002] GPU compute capability {}.{} below required {}.{}",
+            info.compute_capability.0,
+            info.compute_capability.1,
+            REQUIRED_COMPUTE_MAJOR,
+            REQUIRED_COMPUTE_MINOR
+        );
+        return Err(WarmError::CudaCapabilityInsufficient {
+            actual_cc: info.compute_capability_string(),
+            required_cc: format!("{}.{}", REQUIRED_COMPUTE_MAJOR, REQUIRED_COMPUTE_MINOR),
+            gpu_name: info.name.clone(),
+        });
     }
 
-    /// Generate a test fixture file (for testing only).
-    ///
-    /// # Warning
-    /// This generates RANDOM weights, not trained weights.
-    /// Only use for testing file format handling.
-    #[cfg(test)]
-    pub fn generate_test_fixture(output_path: &Path) -> std::io::Result<()> {
-        use std::io::Write;
-
-        // This would use safetensors::serialize in practice
-        // Simplified for specification purposes
-        unimplemented!("Use Python safetensors to generate fixtures")
+    // Check VRAM
+    if info.total_memory_bytes < MINIMUM_VRAM_BYTES {
+        let required_gb = MINIMUM_VRAM_BYTES as f64 / GB as f64;
+        let available_gb = info.total_memory_bytes as f64 / GB as f64;
+        tracing::error!(
+            "[EMB-E003] Insufficient VRAM: {:.1} GB available, {:.1} GB required",
+            available_gb,
+            required_gb
+        );
+        return Err(WarmError::VramInsufficientTotal {
+            required_bytes: MINIMUM_VRAM_BYTES,
+            available_bytes: info.total_memory_bytes,
+            required_gb,
+            available_gb,
+            model_breakdown: MODEL_SIZES
+                .iter()
+                .map(|(id, size)| (id.to_string(), *size))
+                .collect(),
+        });
     }
+
+    *gpu_info = Some(info);
+    tracing::info!("Pre-flight checks passed - Real GPU verified");
+    Ok(())
 }
 
-/// Result of weight file validation.
-#[derive(Debug, Clone)]
-pub struct ValidationResult {
-    /// Path to validated file.
-    pub path: std::path::PathBuf,
+/// Initialize the CUDA allocator.
+///
+/// # Errors
+///
+/// Returns `WarmError::CudaUnavailable` if CUDA device cannot be initialized.
+#[cfg(feature = "cuda")]
+pub fn initialize_cuda_allocator(config: &WarmConfig) -> WarmResult<WarmCudaAllocator> {
+    tracing::info!(
+        "Initializing CUDA allocator for device {}",
+        config.cuda_device_id
+    );
 
-    /// SHA256 checksum.
-    pub checksum: [u8; 32],
-
-    /// File size in bytes.
-    pub file_size: usize,
-
-    /// Extracted metadata.
-    pub metadata: WeightMetadata,
-}
-
-impl ValidationResult {
-    /// Get checksum as hex string.
-    pub fn checksum_hex(&self) -> String {
-        hex::encode(&self.checksum)
-    }
-
-    /// Check if file size is reasonable.
-    pub fn size_reasonable(&self) -> bool {
-        // Should be close to MIN_FILE_SIZE (slight variation for header)
-        let expected = WeightFileSpec::MIN_FILE_SIZE;
-        self.file_size >= expected && self.file_size <= expected * 2
-    }
-}
-
-/// Metadata from weight file.
-#[derive(Debug, Clone, Default)]
-pub struct WeightMetadata {
-    /// Weight file version.
-    pub version: Option<String>,
-
-    /// Training date (ISO 8601).
-    pub training_date: Option<String>,
-
-    /// Dataset used for training.
-    pub training_dataset: Option<String>,
-
-    /// Number of training steps.
-    pub training_steps: Option<u64>,
-
-    /// Constitution version weights were trained for.
-    pub constitution_version: Option<String>,
-}
-
-/// Validation error types.
-#[derive(Debug, thiserror::Error)]
-pub enum ValidationError {
-    #[error("Weight file not found: {path}")]
-    FileNotFound { path: std::path::PathBuf },
-
-    #[error("IO error reading {path}: {details}")]
-    IoError { path: std::path::PathBuf, details: String },
-
-    #[error("File too small: {path} is {actual} bytes, minimum is {minimum}")]
-    FileTooSmall { path: std::path::PathBuf, actual: usize, minimum: usize },
-
-    #[error("Failed to parse SafeTensors {path}: {details}")]
-    ParseError { path: std::path::PathBuf, details: String },
-
-    #[error("Tensor '{tensor_name}' not found in {path}")]
-    TensorMissing { path: std::path::PathBuf, tensor_name: String },
-
-    #[error("Shape mismatch in {path}: expected {expected:?}, got {actual:?}")]
-    ShapeMismatch { path: std::path::PathBuf, expected: Vec<usize>, actual: Vec<usize> },
-
-    #[error("Dtype mismatch in {path}: expected {expected}, got {actual}")]
-    DtypeMismatch { path: std::path::PathBuf, expected: String, actual: String },
+    let allocator = WarmCudaAllocator::new(config.cuda_device_id)?;
+    tracing::info!("CUDA allocator initialized successfully");
+    Ok(allocator)
 }
 ```
 
-### Constraints
+### Constraints (NO EXCEPTIONS)
 
-- Shape MUST be exactly [30522, 1536]
-- DType MUST be F32
-- File MUST be valid SafeTensors format
-- Validation MUST work without GPU
+| Constraint | Enforcement |
+|------------|-------------|
+| NO `#[cfg(not(feature = "cuda"))]` returning fake data | `compile_error!()` replaces it |
+| NO "Simulated" or "Stub" in any output | Runtime check rejects these GPU names |
+| NO `Option<WarmCudaAllocator>` return type | Changed to `WarmResult<WarmCudaAllocator>` |
+| MUST fail at compile time without cuda feature | `compile_error!()` ensures this |
+| MUST reference EMB-E001 error code | All error paths include it |
+| MUST log error codes before returning | `tracing::error!` with code prefix |
 
-### Verification
+### Verification Commands
 
-- `validate()` returns Ok for valid files
-- `validate()` returns specific errors for invalid files
-- Checksum is computed correctly
+```bash
+cd /home/cabdru/contextgraph
+
+# 1. Verify compile fails WITHOUT cuda feature
+cargo build -p context-graph-embeddings 2>&1 | grep -q "EMB-E001" && echo "PASS: Compile error present" || echo "FAIL: Missing compile_error"
+
+# 2. Verify no "Simulated" strings remain
+grep -rn "Simulated" crates/context-graph-embeddings/src/warm/ && echo "FAIL: Simulated string found" || echo "PASS: No Simulated strings"
+
+# 3. Verify no "stub mode" strings remain
+grep -rn "stub mode" crates/context-graph-embeddings/src/warm/ && echo "FAIL: stub mode string found" || echo "PASS: No stub mode strings"
+
+# 4. Verify compile succeeds WITH cuda feature
+cargo check -p context-graph-embeddings --features cuda
+
+# 5. Run preflight tests (requires real GPU)
+cargo test -p context-graph-embeddings preflight:: --features cuda -- --nocapture
+```
 
 ---
-
-## Files to Create
-
-| File Path | Description |
-|-----------|-------------|
-| `crates/context-graph-embeddings/src/models/pretrained/sparse/weight_spec.rs` | Weight file specification and validation |
 
 ## Files to Modify
 
 | File Path | Change |
 |-----------|--------|
-| `crates/context-graph-embeddings/src/models/pretrained/sparse/mod.rs` | Add `pub mod weight_spec;` |
+| `crates/context-graph-embeddings/src/warm/loader/preflight.rs` | DELETE stub blocks, REPLACE entire file with new implementation |
+
+---
+
+## Full State Verification Protocol
+
+### Source of Truth
+
+| Item | Location | Current State |
+|------|----------|---------------|
+| Stub code to remove | `preflight.rs:31-43` | EXISTS - "Simulated RTX 5090" |
+| Stub code to remove | `preflight.rs:99-104` | EXISTS - "skipping allocator initialization" |
+| Error code EMB-E001 | `SPEC-EMB-001-error-taxonomy.md` | DEFINED |
+| Constitution AP-007 | `constitution.yaml` | "Stub data in prod → use tests/fixtures/" |
+
+### Execute & Inspect Checklist
+
+| Step | Command | Expected Output |
+|------|---------|-----------------|
+| 1 | `cargo build -p context-graph-embeddings` | FAIL with EMB-E001 compile_error |
+| 2 | `grep "Simulated RTX 5090" crates/context-graph-embeddings/` | NO MATCHES |
+| 3 | `grep "stub mode" crates/context-graph-embeddings/` | NO MATCHES |
+| 4 | `grep "compile_error" crates/context-graph-embeddings/src/warm/loader/preflight.rs` | 1 MATCH |
+| 5 | `cargo check -p context-graph-embeddings --features cuda` | SUCCESS (requires cuda toolchain) |
+
+### Edge Cases with Before/After State
+
+#### Edge Case 1: Build without cuda feature
+
+**Before State:**
+```
+$ cargo build -p context-graph-embeddings
+   Compiling context-graph-embeddings v0.1.0
+    Finished dev [unoptimized + debuginfo]   <-- WRONG: Should not succeed
+```
+
+**After State:**
+```
+$ cargo build -p context-graph-embeddings
+error[E0080]: evaluation of constant value failed
+  --> crates/context-graph-embeddings/src/warm/loader/preflight.rs:X:X
+   |
+   = note: [EMB-E001] CUDA_UNAVAILABLE: The 'cuda' feature MUST be enabled...
+   = note: Exit Code: 101 (CUDA_UNAVAILABLE)
+
+error: aborting due to previous error
+```
+
+**Log Evidence:**
+- `[EMB-E001]` appears in compiler output
+- Exit code is non-zero
+- Message includes remediation steps
+
+#### Edge Case 2: Runtime detection of simulated GPU
+
+**Before State:**
+```
+INFO: Running pre-flight checks...
+WARN: CUDA feature not enabled, running in stub mode   <-- WRONG
+INFO: Pre-flight checks passed                          <-- WRONG: Fake GPU accepted
+```
+
+**After State:**
+```
+INFO: Running pre-flight checks...
+ERROR: [EMB-E001] DETECTED SIMULATED GPU: 'Simulated RTX 5090' - Real GPU required!
+```
+
+**Log Evidence:**
+- `[EMB-E001]` appears in runtime logs
+- No "stub mode" message
+- Error returned, not success
+
+#### Edge Case 3: Real GPU passes checks
+
+**Before State:** (unchanged behavior, but with better logging)
+
+**After State:**
+```
+INFO: Running pre-flight checks...
+INFO: GPU detected: NVIDIA RTX 5090 (CC 12.0, 32.0 GB VRAM)
+INFO: Pre-flight checks passed - Real GPU verified
+INFO: CUDA allocator initialized successfully
+```
+
+**Log Evidence:**
+- Real GPU name (not "Simulated")
+- "Real GPU verified" message
+- Allocator initialized (not None)
+
+### Evidence of Success
+
+After implementation, the following MUST be true:
+
+1. **Compile-time enforcement:**
+   ```bash
+   $ cargo build -p context-graph-embeddings 2>&1 | grep "EMB-E001"
+   # Output contains EMB-E001 error
+   ```
+
+2. **No stub strings in codebase:**
+   ```bash
+   $ grep -rn "Simulated\|stub mode" crates/context-graph-embeddings/src/warm/loader/
+   # No output (exit code 1)
+   ```
+
+3. **compile_error! present:**
+   ```bash
+   $ grep -c "compile_error!" crates/context-graph-embeddings/src/warm/loader/preflight.rs
+   1
+   ```
+
+4. **Return type changed:**
+   ```bash
+   $ grep "-> WarmResult<WarmCudaAllocator>" crates/context-graph-embeddings/src/warm/loader/preflight.rs
+   # Match found (not Option<>)
+   ```
+
+---
+
+## Manual Verification Requirements
+
+### Physical Output Verification
+
+After implementation, the implementer MUST manually verify:
+
+1. **Run `cargo build -p context-graph-embeddings`**
+   - [ ] Build FAILS with EMB-E001 error
+   - [ ] Error message mentions "CUDA feature MUST be enabled"
+   - [ ] Error message mentions "RTX 5090"
+   - [ ] Error message mentions "Constitution Reference"
+
+2. **Search for removed strings:**
+   - [ ] `grep -r "Simulated RTX 5090" crates/` returns NO results
+   - [ ] `grep -r "stub mode" crates/` returns NO results in warm module
+   - [ ] `grep -r "skipping allocator" crates/` returns NO results
+
+3. **Verify new code structure:**
+   - [ ] `preflight.rs` contains `compile_error!` macro
+   - [ ] `initialize_cuda_allocator` returns `WarmResult<WarmCudaAllocator>` (not Option)
+   - [ ] `run_preflight_checks` includes simulated GPU detection check
 
 ---
 
 ## Validation Criteria
 
-- [ ] `WeightFileSpec` struct with all constants
-- [ ] `validate()` function with 5+ validation checks
-- [ ] `ValidationResult` with checksum and metadata
-- [ ] `WeightMetadata` for training provenance
-- [ ] `ValidationError` enum with specific error types
-- [ ] `cargo check -p context-graph-embeddings` passes
+- [ ] `cargo build -p context-graph-embeddings` without cuda feature FAILS at compile time
+- [ ] Error message includes EMB-E001 error code
+- [ ] Error message includes remediation steps
+- [ ] No "Simulated" or "Stub" strings anywhere in warm module
+- [ ] `initialize_cuda_allocator` returns `WarmResult<WarmCudaAllocator>` not `Option<>`
+- [ ] Runtime check rejects GPU names containing "simulated", "stub", or "fake"
+- [ ] Real GPU info reported correctly when cuda feature enabled
 
 ---
 
@@ -376,8 +486,17 @@ pub enum ValidationError {
 
 ```bash
 cd /home/cabdru/contextgraph
-cargo check -p context-graph-embeddings
-cargo test -p context-graph-embeddings weight_spec:: -- --nocapture
+
+# Test 1: Verify compile fails without cuda feature (EXPECTED: FAIL)
+cargo build -p context-graph-embeddings 2>&1 | tee /tmp/emb019-compile-test.log
+grep "EMB-E001" /tmp/emb019-compile-test.log || exit 1
+
+# Test 2: Verify no stub strings remain
+! grep -rn "Simulated RTX 5090" crates/context-graph-embeddings/src/warm/
+! grep -rn "stub mode" crates/context-graph-embeddings/src/warm/
+
+# Test 3: Run with cuda feature (requires CUDA toolchain)
+cargo check -p context-graph-embeddings --features cuda
 ```
 
 ---
@@ -385,36 +504,45 @@ cargo test -p context-graph-embeddings weight_spec:: -- --nocapture
 ## Pseudo Code
 
 ```
-weight_spec.rs:
-  Define WeightFileSpec struct with constants:
-    FILE_NAME = "sparse_projection.safetensors"
-    TENSOR_NAME = "projection_matrix"
-    EXPECTED_SHAPE = [30522, 1536]
-    EXPECTED_DTYPE = "F32"
-    MIN_FILE_SIZE = ~187MB
+preflight.rs:
+  // At module level - BEFORE any functions
+  #[cfg(not(feature = "cuda"))]
+  compile_error!("[EMB-E001] CUDA feature required...")
 
-  Impl WeightFileSpec:
-    validate(path) -> Result<ValidationResult, ValidationError>
-      Check file exists
-      Read bytes
-      Check minimum size
-      Compute SHA256 checksum
-      Parse SafeTensors
-      Get tensor by name
-      Validate shape
-      Validate dtype
-      Extract metadata
-      Return ValidationResult
+  // Only compiled when cuda feature enabled
+  #[cfg(feature = "cuda")]
+  fn run_preflight_checks(config, gpu_info) -> WarmResult<()>
+    Create allocator
+    Get GPU info
 
-  Define ValidationResult:
-    path, checksum, file_size, metadata
-    checksum_hex() method
+    // NEW CHECK: Reject simulated GPUs
+    IF gpu_name contains "simulated" OR "stub" OR "fake"
+      LOG ERROR "[EMB-E001] DETECTED SIMULATED GPU"
+      RETURN Err(CudaUnavailable)
 
-  Define WeightMetadata:
-    version, training_date, training_dataset, training_steps, constitution_version
+    Check compute capability >= 12.0
+    Check VRAM >= 32GB
 
-  Define ValidationError enum:
-    FileNotFound, IoError, FileTooSmall, ParseError, TensorMissing, ShapeMismatch, DtypeMismatch
+    Set gpu_info
+    LOG "Real GPU verified"
+    RETURN Ok
+
+  #[cfg(feature = "cuda")]
+  fn initialize_cuda_allocator(config) -> WarmResult<WarmCudaAllocator>  // NOT Option!
+    Create allocator
+    RETURN Ok(allocator)  // NOT Ok(Some(allocator))
 ```
+
+---
+
+## Anti-Patterns to Avoid
+
+| Anti-Pattern | Why It's Wrong | Correct Approach |
+|--------------|----------------|------------------|
+| `#[cfg(not(feature = "cuda"))] { return Ok(...) }` | Allows build without GPU | Use `compile_error!()` |
+| `Option<WarmCudaAllocator>` return type | Implies allocator is optional | Return `WarmResult<WarmCudaAllocator>` |
+| `tracing::warn!("stub mode")` | Acknowledges stub mode exists | Remove entirely, use compile_error |
+| Accepting GPU names with "Simulated" | Allows fake GPU to pass | Runtime check and reject |
+| Silent success on missing GPU | Hides critical failures | Explicit error with EMB-E001 |
 
 </task_spec>

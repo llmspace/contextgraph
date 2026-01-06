@@ -219,3 +219,171 @@ fn test_constants() {
     assert_eq!(REQUIRED_COMPUTE_MINOR, 0);
     assert_eq!(MINIMUM_VRAM_BYTES, 32 * 1024 * 1024 * 1024);
 }
+
+// ============================================================================
+// Fake Allocation Detection Tests (TASK-EMB-017)
+// ============================================================================
+
+#[test]
+fn test_fake_allocation_constant() {
+    // Verify the fake allocation pattern is correctly defined
+    assert_eq!(FAKE_ALLOCATION_BASE_PATTERN, 0x7f80_0000_0000u64);
+}
+
+#[test]
+fn test_is_fake_pointer_detects_fake_pattern() {
+    // The exact fake pattern MUST be detected
+    assert!(
+        WarmCudaAllocator::is_fake_pointer(FAKE_ALLOCATION_BASE_PATTERN),
+        "Fake pointer pattern 0x7f80_0000_0000 MUST be detected"
+    );
+
+    // Variations in the fake range should also be detected
+    assert!(
+        WarmCudaAllocator::is_fake_pointer(0x7f80_0000_1000),
+        "Fake pointer with offset MUST be detected"
+    );
+
+    assert!(
+        WarmCudaAllocator::is_fake_pointer(0x7f80_1234_5678),
+        "Fake pointer variation MUST be detected"
+    );
+}
+
+#[test]
+fn test_is_fake_pointer_allows_real_pointers() {
+    // Real CUDA pointers are typically in lower address ranges
+    assert!(
+        !WarmCudaAllocator::is_fake_pointer(0x0000_7fff_0000_1000),
+        "Real low-address pointer should NOT be detected as fake"
+    );
+
+    // NULL pointer is not fake (it's invalid, but not fake)
+    assert!(
+        !WarmCudaAllocator::is_fake_pointer(0),
+        "NULL pointer should NOT be detected as fake pattern"
+    );
+
+    // High device addresses that don't match fake pattern
+    assert!(
+        !WarmCudaAllocator::is_fake_pointer(0x0001_0000_0000_0000),
+        "Different high address should NOT be detected as fake"
+    );
+}
+
+#[test]
+fn test_verify_real_allocation_rejects_null() {
+    let result = WarmCudaAllocator::verify_real_allocation(0, "test_tensor");
+
+    assert!(result.is_err(), "NULL pointer should be rejected");
+
+    match result.unwrap_err() {
+        crate::warm::error::WarmError::CudaAllocFailed { cuda_error, .. } => {
+            assert!(cuda_error.contains("NULL"), "Error should mention NULL");
+        }
+        other => panic!("Expected CudaAllocFailed, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_verify_real_allocation_rejects_fake_pattern() {
+    let result = WarmCudaAllocator::verify_real_allocation(
+        FAKE_ALLOCATION_BASE_PATTERN,
+        "embedding_tensor",
+    );
+
+    assert!(result.is_err(), "Fake pointer MUST be rejected");
+
+    match result.unwrap_err() {
+        crate::warm::error::WarmError::FakeAllocationDetected {
+            detected_address,
+            tensor_name,
+            ..
+        } => {
+            assert_eq!(detected_address, FAKE_ALLOCATION_BASE_PATTERN);
+            assert_eq!(tensor_name, "embedding_tensor");
+        }
+        other => panic!("Expected FakeAllocationDetected (exit 109), got {:?}", other),
+    }
+}
+
+#[test]
+fn test_verify_real_allocation_accepts_valid_pointer() {
+    // A valid-looking CUDA pointer
+    let valid_ptr = 0x0000_7fff_8000_0000u64;
+
+    let result = WarmCudaAllocator::verify_real_allocation(valid_ptr, "real_tensor");
+
+    assert!(
+        result.is_ok(),
+        "Valid pointer should be accepted: {:?}",
+        result
+    );
+}
+
+#[test]
+fn test_fake_allocation_exit_code_is_109() {
+    use crate::warm::error::WarmError;
+
+    let error = WarmError::FakeAllocationDetected {
+        detected_address: 0x7f80_0000_0000,
+        tensor_name: "test".to_string(),
+        expected_pattern: "real".to_string(),
+    };
+
+    assert_eq!(
+        error.exit_code(),
+        109,
+        "FakeAllocationDetected MUST have exit code 109"
+    );
+    assert!(error.is_fatal(), "FakeAllocationDetected MUST be fatal");
+    assert_eq!(
+        error.category(),
+        "FAKE_DETECTION",
+        "FakeAllocationDetected MUST have FAKE_DETECTION category"
+    );
+}
+
+#[test]
+fn test_sin_wave_exit_code_is_110() {
+    use crate::warm::error::WarmError;
+
+    let error = WarmError::SinWaveOutputDetected {
+        model_id: "test_model".to_string(),
+        dominant_frequency_hz: 0.1,
+        energy_concentration: 0.95,
+        output_size: 768,
+    };
+
+    assert_eq!(
+        error.exit_code(),
+        110,
+        "SinWaveOutputDetected MUST have exit code 110"
+    );
+    assert!(error.is_fatal(), "SinWaveOutputDetected MUST be fatal");
+    assert_eq!(
+        error.category(),
+        "FAKE_DETECTION",
+        "SinWaveOutputDetected MUST have FAKE_DETECTION category"
+    );
+}
+
+// ============================================================================
+// Sin Wave Energy Threshold Tests
+// ============================================================================
+
+#[test]
+fn test_sin_wave_energy_threshold() {
+    assert!(
+        (SIN_WAVE_ENERGY_THRESHOLD - 0.80).abs() < 0.001,
+        "Sin wave energy threshold should be 80%"
+    );
+}
+
+#[test]
+fn test_golden_similarity_threshold() {
+    assert!(
+        (GOLDEN_SIMILARITY_THRESHOLD - 0.99).abs() < 0.001,
+        "Golden similarity threshold should be 0.99"
+    );
+}

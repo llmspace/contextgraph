@@ -15,6 +15,7 @@
 //! | TokenPruning | E12 | ~50% | <2% |
 
 mod types;
+pub mod binary;
 
 #[cfg(test)]
 mod edge_case_verification;
@@ -23,3 +24,4 @@ pub use types::{
     BinaryEncoder, Float8Encoder, PQ8Codebook, QuantizationMetadata, QuantizationMethod,
     QuantizedEmbedding,
 };
+pub use binary::BinaryQuantizationError;
