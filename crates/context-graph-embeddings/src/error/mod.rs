@@ -25,5 +25,5 @@ mod tests;
 #[cfg(test)]
 mod tests_extended;
 
-// Re-export all public types for backwards compatibility
-pub use types::{EmbeddingError, EmbeddingResult};
+// Re-export all public types
+pub use types::{EmbeddingError, EmbeddingResult, ErrorSeverity};
