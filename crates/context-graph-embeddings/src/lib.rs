@@ -57,6 +57,7 @@ pub mod storage;
 pub mod traits;
 pub mod types;
 pub mod warm;
+pub mod quantization;
 
 // NOTE: cache module removed - now handled by context-graph-teleology crate
 
@@ -79,6 +80,12 @@ pub use types::{
 
 // Re-export dimensions module for constant access
 pub use types::dimensions;
+
+// Quantization re-exports
+pub use quantization::{
+    BinaryEncoder, Float8Encoder, PQ8Codebook, QuantizationMetadata, QuantizationMethod,
+    QuantizedEmbedding,
+};
 
 // Model registry re-exports
 pub use models::{MemoryTracker, ModelRegistry, ModelRegistryConfig, RegistryStats};

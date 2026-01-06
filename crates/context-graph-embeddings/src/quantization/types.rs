@@ -1,124 +1,3 @@
-# TASK-EMB-004: Create Quantization Data Structures
-
-<task_spec id="TASK-EMB-004" version="2.0" updated="2026-01-06">
-
-## Metadata
-
-| Field | Value |
-|-------|-------|
-| **Task ID** | TASK-EMB-004 |
-| **Title** | Create Quantization Data Structures |
-| **Status** | COMPLETED |
-| **Layer** | foundation |
-| **Sequence** | 4 |
-| **Implements** | REQ-EMB-005, ISSUE-006 |
-| **Depends On** | TASK-EMB-001 (COMPLETED - dimension constants exist) |
-| **Estimated Complexity** | medium |
-| **Constitution Ref** | `embeddings.quantization`, `embeddings.quantization_by_embedder` |
-
----
-
-## Critical Context
-
-### What This Task Creates
-
-This task creates **DATA STRUCTURES ONLY** for embedding quantization. You are NOT implementing the actual quantization logic (compression algorithms). That is handled by Logic Layer tasks (TASK-EMB-016, 017, 018).
-
-### Why This Matters
-
-The Constitution mandates per-embedder quantization to reduce storage from 46KB to ~17KB per TeleologicalFingerprint (63% reduction). Currently, the codebase has:
-- An OLD `QuantizationMode` enum at `traits/model_factory/quantization.rs` (Int8, Fp16, Bf16 - WRONG approach)
-- NO actual quantization types aligned with Constitution
-- NO per-embedder quantization strategy mapping
-
-This task creates the **correct** data structures that match the Constitution's quantization requirements.
-
----
-
-## Current Codebase State (Verified 2026-01-06)
-
-### Existing Files (DO NOT MODIFY THESE)
-
-| File | Purpose | Status |
-|------|---------|--------|
-| `crates/context-graph-embeddings/src/types/model_id/core.rs` | `ModelId` enum with 13 variants (E1-E13) | ✅ EXISTS - 13 embedders defined |
-| `crates/context-graph-embeddings/src/types/dimensions/constants.rs` | Dimension constants (SEMANTIC=1024, etc.) | ✅ EXISTS - All dimensions correct |
-| `crates/context-graph-embeddings/src/traits/model_factory/quantization.rs` | Old `QuantizationMode` enum | ⚠️ EXISTS but WRONG - uses Int8/Fp16/Bf16 |
-
-### Files to CREATE
-
-| File | Purpose |
-|------|---------|
-| `crates/context-graph-embeddings/src/quantization/mod.rs` | Module exports |
-| `crates/context-graph-embeddings/src/quantization/types.rs` | All quantization types (enums, structs) |
-
-### Files to MODIFY
-
-| File | Change |
-|------|--------|
-| `crates/context-graph-embeddings/src/lib.rs` | Add `pub mod quantization;` after line 58 |
-
----
-
-## Constitution Reference (Source of Truth)
-
-From `/home/cabdru/contextgraph/docs2/constitution.yaml`:
-
-```yaml
-embeddings:
-  quantization:
-    PQ_8: { compression: "32x", recall_impact: "<5%", embedders: [E1, E5, E7, E10] }
-    Float8: { compression: "4x", recall_impact: "<0.3%", embedders: [E2, E3, E4, E8, E11] }
-    Binary: { compression: "32x", recall_impact: "5-10%", embedders: [E9] }
-    Sparse: { compression: "native", recall_impact: "0%", embedders: [E6, E13] }
-    TokenPruning: { compression: "~50%", recall_impact: "<2%", embedders: [E12] }
-
-  quantization_by_embedder:
-    PQ_8: [E1, E5, E7, E10]       # Semantic, Causal, Code, Multimodal
-    Float8: [E2, E3, E4, E8, E11] # Temporal(x3), Graph, Entity
-    Binary: [E9]                   # HDC
-    Sparse: [E6, E13]              # Sparse, SPLADE
-    TokenPruning: [E12]            # LateInteraction
-```
-
----
-
-## Exact Implementation Required
-
-### Step 1: Create Module File
-
-**Create file:** `crates/context-graph-embeddings/src/quantization/mod.rs`
-
-```rust
-//! Quantization types for Constitution-aligned embedding compression.
-//!
-//! This module provides data structures for quantized embeddings as specified
-//! in the Constitution's `embeddings.quantization` section. Actual quantization
-//! implementations are in the Logic Layer (TASK-EMB-016, 017, 018).
-//!
-//! # Constitution Alignment
-//!
-//! | Method | Embedders | Compression | Max Recall Loss |
-//! |--------|-----------|-------------|-----------------|
-//! | PQ_8 | E1, E5, E7, E10 | 32x | <5% |
-//! | Float8 | E2, E3, E4, E8, E11 | 4x | <0.3% |
-//! | Binary | E9 | 32x | 5-10% |
-//! | Sparse | E6, E13 | native | 0% |
-//! | TokenPruning | E12 | ~50% | <2% |
-
-mod types;
-
-pub use types::{
-    BinaryEncoder, Float8Encoder, PQ8Codebook, QuantizationMetadata, QuantizationMethod,
-    QuantizedEmbedding,
-};
-```
-
-### Step 2: Create Types File
-
-**Create file:** `crates/context-graph-embeddings/src/quantization/types.rs`
-
-```rust
 //! Core quantization types aligned with Constitution.
 //!
 //! CRITICAL: These are DATA STRUCTURES ONLY. The actual quantization/dequantization
@@ -178,10 +57,10 @@ impl QuantizationMethod {
     pub const fn for_model_id(model_id: ModelId) -> Self {
         match model_id {
             // PQ-8: Dense semantic embeddings
-            ModelId::Semantic => Self::PQ8,     // E1
-            ModelId::Causal => Self::PQ8,       // E5
-            ModelId::Code => Self::PQ8,         // E7
-            ModelId::Multimodal => Self::PQ8,   // E10
+            ModelId::Semantic => Self::PQ8,   // E1
+            ModelId::Causal => Self::PQ8,     // E5
+            ModelId::Code => Self::PQ8,       // E7
+            ModelId::Multimodal => Self::PQ8, // E10
 
             // Float8: Temporal and graph embeddings
             ModelId::TemporalRecent => Self::Float8E4M3,     // E2
@@ -511,250 +390,54 @@ mod tests {
             _ => panic!("Wrong metadata variant"),
         }
     }
+
+    /// Verify all 13 ModelId variants are covered by iterating through ModelId::all().
+    #[test]
+    fn test_all_model_ids_covered() {
+        let all_models = ModelId::all();
+        assert_eq!(all_models.len(), 13, "Expected 13 ModelId variants");
+
+        // Verify each has a quantization method (no panic)
+        for model_id in all_models {
+            let method = QuantizationMethod::for_model_id(*model_id);
+            // Just verify it returns without panic
+            let _ = method.compression_ratio();
+            let _ = method.max_recall_loss();
+        }
+    }
+
+    /// Edge case: Empty data vector (valid for all-zero sparse vectors).
+    #[test]
+    fn test_empty_data_vector() {
+        let qe = QuantizedEmbedding {
+            method: QuantizationMethod::SparseNative,
+            original_dim: 30522,
+            data: vec![], // Empty for all-zero sparse vector
+            metadata: QuantizationMetadata::Sparse {
+                vocab_size: 30522,
+                nnz: 0,
+            },
+        };
+        assert_eq!(qe.size_bytes(), 0);
+        // compression_ratio() should handle this gracefully (divides by max(1, len))
+        let ratio = qe.compression_ratio();
+        assert!(ratio > 0.0, "Compression ratio should handle empty data");
+    }
+
+    /// Edge case: Large dimension handling without overflow.
+    #[test]
+    fn test_large_dimension_no_overflow() {
+        let qe = QuantizedEmbedding {
+            method: QuantizationMethod::Float8E4M3,
+            original_dim: 1_000_000, // Large but reasonable
+            data: vec![0u8; 1000],
+            metadata: QuantizationMetadata::Float8 {
+                scale: 1.0,
+                bias: 0.0,
+            },
+        };
+        // Should not panic
+        let ratio = qe.compression_ratio();
+        assert!(ratio > 0.0);
+    }
 }
-```
-
-### Step 3: Modify lib.rs
-
-**File:** `crates/context-graph-embeddings/src/lib.rs`
-
-**Change:** Add `pub mod quantization;` after line 58 (after `pub mod warm;`)
-
-**Before:**
-```rust
-pub mod warm;
-
-// NOTE: cache module removed - now handled by context-graph-teleology crate
-```
-
-**After:**
-```rust
-pub mod warm;
-pub mod quantization;
-
-// NOTE: cache module removed - now handled by context-graph-teleology crate
-```
-
-**Also add to re-exports around line 77:**
-```rust
-// Quantization re-exports
-pub use quantization::{
-    QuantizationMethod, QuantizedEmbedding, QuantizationMetadata,
-    PQ8Codebook, Float8Encoder, BinaryEncoder,
-};
-```
-
----
-
-## Verification Commands
-
-Execute these in order. ALL must pass.
-
-```bash
-# 1. Verify files exist
-ls -la crates/context-graph-embeddings/src/quantization/
-
-# 2. Compile check
-cargo check -p context-graph-embeddings
-
-# 3. Run quantization tests
-cargo test -p context-graph-embeddings quantization::tests -- --nocapture
-
-# 4. Verify exports work
-cargo doc -p context-graph-embeddings --no-deps 2>&1 | grep -i "quantization\|error"
-```
-
----
-
-## Full State Verification Protocol
-
-### Source of Truth Locations
-
-| Data | Location | How to Verify |
-|------|----------|---------------|
-| Module exists | `src/quantization/mod.rs` | `ls crates/context-graph-embeddings/src/quantization/` |
-| Types file exists | `src/quantization/types.rs` | `stat crates/context-graph-embeddings/src/quantization/types.rs` |
-| Module exported | `src/lib.rs` | `grep "pub mod quantization" crates/context-graph-embeddings/src/lib.rs` |
-| Types exported | `src/lib.rs` | `grep "QuantizationMethod" crates/context-graph-embeddings/src/lib.rs` |
-
-### Evidence of Success
-
-After completing, provide this exact log:
-
-```
-[VERIFICATION LOG - TASK-EMB-004]
-1. Files Created:
-   - crates/context-graph-embeddings/src/quantization/mod.rs: EXISTS
-   - crates/context-graph-embeddings/src/quantization/types.rs: EXISTS
-
-2. Compilation:
-   $ cargo check -p context-graph-embeddings
-   Finished dev [unoptimized + debuginfo] target(s) in X.XXs
-
-3. Tests Passed:
-   $ cargo test -p context-graph-embeddings quantization::tests
-   running 6 tests
-   test quantization::types::tests::test_method_for_all_model_ids ... ok
-   test quantization::types::tests::test_compression_ratios ... ok
-   test quantization::types::tests::test_max_recall_loss ... ok
-   test quantization::types::tests::test_quantized_embedding_size ... ok
-   test quantization::types::tests::test_serde_roundtrip ... ok
-   test quantization::types::tests::test_metadata_serde ... ok
-
-4. Types Exported:
-   $ grep "QuantizationMethod" crates/context-graph-embeddings/src/lib.rs
-   pub use quantization::{QuantizationMethod, ...
-
-5. Constitution Alignment Verified:
-   - All 13 ModelId variants mapped: YES
-   - Compression ratios match: YES
-   - Max recall loss values match: YES
-```
-
-### Edge Cases to Manually Verify
-
-**Edge Case 1: All 13 embedders covered**
-```rust
-// Execute in test: Every ModelId variant has a mapping
-for model_id in ModelId::all() {
-    let method = QuantizationMethod::for_model_id(*model_id);
-    println!("{:?} -> {:?}", model_id, method);
-}
-// Expected: No panics, all 13 print their method
-```
-
-**Edge Case 2: Empty data vector**
-```rust
-// This is valid - represents zero-byte quantized embedding
-let qe = QuantizedEmbedding {
-    method: QuantizationMethod::SparseNative,
-    original_dim: 30522,
-    data: vec![], // Empty for all-zero sparse vector
-    metadata: QuantizationMetadata::Sparse { vocab_size: 30522, nnz: 0 },
-};
-assert_eq!(qe.size_bytes(), 0);
-// compression_ratio() should handle this gracefully (divides by max(1, len))
-```
-
-**Edge Case 3: Large dimension handling**
-```rust
-// Verify no overflow in size calculations
-let qe = QuantizedEmbedding {
-    method: QuantizationMethod::Float8E4M3,
-    original_dim: usize::MAX / 8, // Large but not overflow-inducing
-    data: vec![0u8; 1000],
-    metadata: QuantizationMetadata::Float8 { scale: 1.0, bias: 0.0 },
-};
-// Should not panic
-let _ = qe.compression_ratio();
-```
-
----
-
-## What NOT to Do
-
-| Action | Why Forbidden |
-|--------|---------------|
-| Implement actual quantization logic | Logic Layer task (TASK-EMB-016, 017, 018) |
-| Modify `QuantizationMode` in `traits/model_factory/quantization.rs` | Will be deprecated, not replaced here |
-| Add codebook loading/training | Logic Layer task |
-| Add dequantization implementations | Logic Layer task |
-| Create tests that require actual compression | Foundation layer = data structures only |
-
----
-
-## Scope Boundaries
-
-### In Scope (This Task)
-- Create `QuantizationMethod` enum with 5 variants
-- Create `QuantizedEmbedding` struct
-- Create `QuantizationMetadata` enum
-- Create `PQ8Codebook` struct (data only, no methods)
-- Create `Float8Encoder` struct (marker, no methods)
-- Create `BinaryEncoder` struct (marker, no methods)
-- Add module exports to `lib.rs`
-- Write unit tests for type correctness and serde
-
-### Out of Scope (Logic Layer)
-- Quantization algorithm implementations
-- Dequantization implementations
-- Codebook loading/training
-- Recall loss measurement
-- Integration with storage layer
-
----
-
-## Dependencies
-
-| Task | Status | Required For |
-|------|--------|--------------|
-| TASK-EMB-001 | ✅ COMPLETED | Dimension constants exist |
-| TASK-EMB-002 | N/A | Not a dependency |
-| TASK-EMB-003 | N/A | Not a dependency |
-
----
-
-## Post-Implementation Checklist
-
-- [ ] Created `src/quantization/mod.rs`
-- [ ] Created `src/quantization/types.rs`
-- [ ] Modified `src/lib.rs` to export quantization module
-- [ ] Modified `src/lib.rs` to re-export quantization types
-- [ ] `QuantizationMethod` has exactly 5 variants
-- [ ] `for_model_id()` covers all 13 ModelId variants
-- [ ] Compression ratios match Constitution
-- [ ] Max recall loss values match Constitution
-- [ ] `cargo check -p context-graph-embeddings` succeeds
-- [ ] `cargo test -p context-graph-embeddings quantization::tests` all pass
-- [ ] Serde serialization roundtrip works
-- [ ] Full verification log provided with actual output
-- [ ] Edge cases manually verified with before/after state
-
----
-
-## IMPORTANT: Trigger Events and Outcome Verification
-
-When you complete this task, the following must be manually verifiable:
-
-### Trigger Event
-Running `cargo test -p context-graph-embeddings quantization` triggers test execution.
-
-### Observable Outcome (Source of Truth)
-1. **Test output** shows all 6 tests passing
-2. **Files exist** at the specified paths
-3. **Types compile** with `cargo check`
-4. **Types are usable** - can be imported from `context_graph_embeddings::quantization`
-
-### How to Verify Outcome Exists
-```bash
-# 1. Verify files exist
-test -f crates/context-graph-embeddings/src/quantization/mod.rs && echo "mod.rs EXISTS" || echo "MISSING"
-test -f crates/context-graph-embeddings/src/quantization/types.rs && echo "types.rs EXISTS" || echo "MISSING"
-
-# 2. Verify compilation
-cargo check -p context-graph-embeddings 2>&1 | tail -1
-
-# 3. Verify tests pass
-cargo test -p context-graph-embeddings quantization::tests 2>&1 | grep -E "^test.*ok|^test.*FAILED|running [0-9]+ tests"
-
-# 4. Verify types are exported (use cargo doc or attempt import)
-echo 'use context_graph_embeddings::quantization::QuantizationMethod;' | cargo +nightly rustfmt --check 2>/dev/null && echo "Export syntax valid"
-```
-
-If any of these checks fail, the task is NOT complete.
-
----
-
-## Traceability
-
-| Requirement | Constitution Section | Implementation |
-|-------------|---------------------|----------------|
-| PQ-8 for E1, E5, E7, E10 | `embeddings.quantization.PQ_8` | `QuantizationMethod::PQ8` |
-| Float8 for E2-E4, E8, E11 | `embeddings.quantization.Float8` | `QuantizationMethod::Float8E4M3` |
-| Binary for E9 | `embeddings.quantization.Binary` | `QuantizationMethod::Binary` |
-| Sparse for E6, E13 | `embeddings.quantization.Sparse` | `QuantizationMethod::SparseNative` |
-| TokenPruning for E12 | `embeddings.quantization.TokenPruning` | `QuantizationMethod::TokenPruning` |
-| 32x compression (PQ-8) | `embeddings.quantization.PQ_8.compression` | `compression_ratio() = 32.0` |
-| <5% recall loss (PQ-8) | `embeddings.quantization.PQ_8.recall_impact` | `max_recall_loss() = 0.05` |
-
-</task_spec>
