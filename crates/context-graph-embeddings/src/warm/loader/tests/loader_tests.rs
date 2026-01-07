@@ -85,21 +85,48 @@ fn test_loading_order_uses_registry() {
 /// Test that preflight checks verify GPU requirements.
 ///
 /// CUDA feature required because run_preflight_checks() is only defined with cuda feature.
+///
+/// # Note
+///
+/// This test validates that the GPU:
+/// - Meets compute capability requirements (12.0 for RTX 5090)
+/// - Has sufficient VRAM (accounting for ~1.5% reserved by driver/OS)
+///
+/// The RTX 5090 reports ~32607 MiB (~31.8 GiB) available VRAM even though
+/// it has 32GB physical GDDR7, due to driver/OS reservations.
 #[test]
 #[cfg(feature = "cuda")]
 fn test_preflight_checks_gpu_requirements() {
     let config = test_config();
     let mut loader = WarmLoader::new(config).expect("Failed to create loader");
 
-    // In non-CUDA mode, preflight should succeed with simulated GPU
+    // Run preflight checks - should succeed on RTX 5090 with real CUDA Driver API queries
     let result = loader.run_preflight_checks();
-    assert!(result.is_ok());
+
+    // If the result is an error, print detailed diagnostic info
+    if let Err(ref e) = result {
+        eprintln!("Preflight check failed: {:?}", e);
+
+        // Also try to query GPU info directly for comparison
+        if let Some(info) = loader.gpu_info() {
+            eprintln!("GPU Info from loader:");
+            eprintln!("  Name: {}", info.name);
+            eprintln!("  Compute Capability: {}.{}", info.compute_capability.0, info.compute_capability.1);
+            eprintln!("  Total Memory: {} bytes ({:.2} GiB)", info.total_memory_bytes, info.total_memory_bytes as f64 / (1024.0 * 1024.0 * 1024.0));
+            eprintln!("  Driver Version: {}", info.driver_version);
+        }
+    }
+
+    assert!(result.is_ok(), "Preflight checks failed: {:?}", result.err());
 
     // Verify GPU info is populated
     let gpu_info = loader.gpu_info();
-    assert!(gpu_info.is_some());
+    assert!(gpu_info.is_some(), "GPU info should be populated after preflight");
     let info = gpu_info.unwrap();
-    assert!(info.meets_compute_requirement(REQUIRED_COMPUTE_MAJOR, REQUIRED_COMPUTE_MINOR));
+    assert!(info.meets_compute_requirement(REQUIRED_COMPUTE_MAJOR, REQUIRED_COMPUTE_MINOR),
+            "GPU must meet compute capability requirements ({}.{} required, got {}.{})",
+            REQUIRED_COMPUTE_MAJOR, REQUIRED_COMPUTE_MINOR,
+            info.compute_capability.0, info.compute_capability.1);
 }
 
 // ============================================================================

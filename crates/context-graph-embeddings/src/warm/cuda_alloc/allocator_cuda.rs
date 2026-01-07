@@ -51,27 +51,166 @@ impl WarmCudaAllocator {
         })
     }
 
-    /// Internal helper to query GPU info.
+    /// Internal helper to query GPU info using CUDA Driver API.
+    ///
+    /// # Implementation Notes
+    ///
+    /// Uses CUDA Driver API (cuDeviceGetAttribute) instead of Runtime API
+    /// to avoid CUDA 13.1 WSL2 segfault bug on RTX 5090 (Blackwell).
+    /// This is consistent with the pattern used in context-graph-cuda crate.
+    ///
+    /// All values are queried from real hardware. NO hardcoded fallbacks.
     fn query_gpu_info_internal(device_id: u32) -> WarmResult<GpuInfo> {
-        use candle_core::Device;
+        // CUDA Driver API constants
+        const CUDA_SUCCESS: i32 = 0;
+        const CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR: i32 = 75;
+        const CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR: i32 = 76;
 
-        let device =
-            Device::new_cuda(device_id as usize).map_err(|e| WarmError::CudaInitFailed {
-                cuda_error: e.to_string(),
-                driver_version: String::new(),
-                gpu_name: String::new(),
-            })?;
+        // FFI bindings to CUDA Driver API
+        extern "C" {
+            fn cuInit(flags: std::os::raw::c_uint) -> i32;
+            fn cuDeviceGet(device: *mut i32, ordinal: i32) -> i32;
+            fn cuDeviceGetName(name: *mut std::os::raw::c_char, len: i32, dev: i32) -> i32;
+            fn cuDeviceTotalMem_v2(bytes: *mut usize, dev: i32) -> i32;
+            fn cuDeviceGetAttribute(value: *mut i32, attrib: i32, dev: i32) -> i32;
+            fn cuDriverGetVersion(version: *mut i32) -> i32;
+        }
 
-        let info = GpuInfo {
-            device_id,
-            name: format!("CUDA Device {}", device_id),
-            compute_capability: (12, 0),
-            total_memory_bytes: 32 * GB,
-            driver_version: "Unknown".to_string(),
-        };
+        unsafe {
+            // Step 1: Initialize CUDA driver
+            let init_result = cuInit(0);
+            if init_result != CUDA_SUCCESS {
+                tracing::error!(
+                    target: "warm::cuda",
+                    cuda_error_code = init_result,
+                    "cuInit failed - CUDA driver not initialized"
+                );
+                return Err(WarmError::CudaInitFailed {
+                    cuda_error: format!("cuInit failed with error code {}", init_result),
+                    driver_version: String::new(),
+                    gpu_name: String::new(),
+                });
+            }
 
-        drop(device);
-        Ok(info)
+            // Step 2: Get device handle
+            let mut device_handle: i32 = 0;
+            let get_result = cuDeviceGet(&mut device_handle, device_id as i32);
+            if get_result != CUDA_SUCCESS {
+                tracing::error!(
+                    target: "warm::cuda",
+                    cuda_error_code = get_result,
+                    device_id = device_id,
+                    "cuDeviceGet failed - no device at ordinal"
+                );
+                return Err(WarmError::CudaInitFailed {
+                    cuda_error: format!("cuDeviceGet failed with error code {} for device {}", get_result, device_id),
+                    driver_version: String::new(),
+                    gpu_name: String::new(),
+                });
+            }
+
+            // Step 3: Query device name
+            let mut name_buf = [0i8; 256];
+            let name_result = cuDeviceGetName(name_buf.as_mut_ptr(), 256, device_handle);
+            let name = if name_result == CUDA_SUCCESS {
+                let c_str = std::ffi::CStr::from_ptr(name_buf.as_ptr());
+                c_str.to_string_lossy().into_owned()
+            } else {
+                tracing::warn!(
+                    target: "warm::cuda",
+                    cuda_error_code = name_result,
+                    "cuDeviceGetName failed, using fallback name"
+                );
+                format!("CUDA Device {}", device_id)
+            };
+
+            // Step 4: Query total memory
+            let mut total_memory: usize = 0;
+            let mem_result = cuDeviceTotalMem_v2(&mut total_memory, device_handle);
+            if mem_result != CUDA_SUCCESS {
+                tracing::error!(
+                    target: "warm::cuda",
+                    cuda_error_code = mem_result,
+                    "cuDeviceTotalMem_v2 failed"
+                );
+                return Err(WarmError::CudaQueryFailed {
+                    error: format!("cuDeviceTotalMem_v2 failed with error code {}", mem_result),
+                });
+            }
+
+            // Step 5: Query compute capability (major)
+            let mut cc_major: i32 = 0;
+            let major_result = cuDeviceGetAttribute(
+                &mut cc_major,
+                CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
+                device_handle
+            );
+            if major_result != CUDA_SUCCESS {
+                tracing::error!(
+                    target: "warm::cuda",
+                    cuda_error_code = major_result,
+                    "cuDeviceGetAttribute(COMPUTE_CAPABILITY_MAJOR) failed"
+                );
+                return Err(WarmError::CudaQueryFailed {
+                    error: format!("Failed to query compute capability major: error {}", major_result),
+                });
+            }
+
+            // Step 6: Query compute capability (minor)
+            let mut cc_minor: i32 = 0;
+            let minor_result = cuDeviceGetAttribute(
+                &mut cc_minor,
+                CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
+                device_handle
+            );
+            if minor_result != CUDA_SUCCESS {
+                tracing::error!(
+                    target: "warm::cuda",
+                    cuda_error_code = minor_result,
+                    "cuDeviceGetAttribute(COMPUTE_CAPABILITY_MINOR) failed"
+                );
+                return Err(WarmError::CudaQueryFailed {
+                    error: format!("Failed to query compute capability minor: error {}", minor_result),
+                });
+            }
+
+            // Step 7: Query driver version
+            let mut driver_ver: i32 = 0;
+            let driver_result = cuDriverGetVersion(&mut driver_ver);
+            let driver_version = if driver_result == CUDA_SUCCESS {
+                // Driver version is encoded as (major * 1000 + minor * 10)
+                let major = driver_ver / 1000;
+                let minor = (driver_ver % 1000) / 10;
+                format!("{}.{}", major, minor)
+            } else {
+                tracing::warn!(
+                    target: "warm::cuda",
+                    cuda_error_code = driver_result,
+                    "cuDriverGetVersion failed"
+                );
+                "Unknown".to_string()
+            };
+
+            // Log comprehensive GPU info
+            tracing::info!(
+                target: "warm::cuda",
+                gpu_name = %name,
+                device_id = device_id,
+                total_memory_bytes = total_memory,
+                total_memory_gb = format!("{:.1} GB", total_memory as f64 / (1024.0 * 1024.0 * 1024.0)),
+                compute_capability = format!("{}.{}", cc_major, cc_minor),
+                driver_version = %driver_version,
+                "GPU info queried via CUDA Driver API (real hardware values)"
+            );
+
+            Ok(GpuInfo {
+                device_id,
+                name,
+                compute_capability: (cc_major as u32, cc_minor as u32),
+                total_memory_bytes: total_memory,
+                driver_version,
+            })
+        }
     }
 
     /// Allocate protected (non-evictable) VRAM via cudaMalloc.

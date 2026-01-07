@@ -131,7 +131,7 @@ impl Handlers {
                 );
                 return JsonRpcResponse::error(
                     id,
-                    error_codes::STORAGE_ERROR,
+                    error_codes::NORTH_STAR_NOT_CONFIGURED,
                     "Goal hierarchy not configured. Cannot compute purpose vector. \
                      Use purpose/north_star_update endpoint to set North Star goal.",
                 );

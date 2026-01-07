@@ -23,7 +23,6 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use context_graph_core::alignment::{DefaultAlignmentCalculator, GoalAlignmentCalculator};
-use context_graph_core::purpose::GoalHierarchy;
 use context_graph_core::stubs::{InMemoryTeleologicalStore, StubMultiArrayProvider, StubUtlProcessor};
 use context_graph_core::traits::{MultiArrayEmbeddingProvider, TeleologicalMemoryStore, UtlProcessor};
 
@@ -31,7 +30,7 @@ use crate::handlers::Handlers;
 use crate::protocol::{JsonRpcId, JsonRpcRequest};
 
 // Import shared test helpers for RocksDB integration tests
-use super::create_test_handlers_with_rocksdb_store_access;
+use super::{create_test_handlers_with_rocksdb_store_access, create_test_hierarchy};
 
 /// Create test handlers AND return direct access to the store for verification.
 ///
@@ -48,7 +47,8 @@ fn create_handlers_with_store_access() -> (
         Arc::new(StubMultiArrayProvider::new());
     let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
         Arc::new(DefaultAlignmentCalculator::new());
-    let goal_hierarchy = GoalHierarchy::new();
+    // Must use test hierarchy with North Star - store handler requires it (AP-007)
+    let goal_hierarchy = create_test_hierarchy();
 
     let handlers = Handlers::new(
         Arc::clone(&teleological_store),

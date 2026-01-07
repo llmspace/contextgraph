@@ -4,7 +4,7 @@
 //!
 //! | Exit Code | Error Variant | Description |
 //! |-----------|---------------|-------------|
-//! | 101 | `ModelFileMissing` | Model weight file not found |
+//! | 101 | `CudaUnavailable`, `ModelFileMissing` | CUDA unavailable (AP-007) or model file not found |
 //! | 102 | `ModelLoadFailed` | Model loading failed |
 //! | 103 | `ModelValidationFailed` | Model validation failed |
 //! | 104 | `VramInsufficientTotal` | Insufficient VRAM for models |
@@ -12,13 +12,14 @@
 //! | 106 | `CudaInitFailed` | CUDA initialization failed |
 //! | 107 | `CudaCapabilityInsufficient` | GPU compute capability too low |
 //! | 108 | `CudaAllocFailed` | CUDA allocation failed |
-//! | 109 | `CudaContextLost` | CUDA context unexpectedly lost |
-//! | 110 | `ModelDimensionMismatch` | Model output dimension mismatch |
+//! | 109 | `FakeAllocationDetected` | Fake GPU memory allocation detected (AP-007) |
+//! | 110 | `SinWaveOutputDetected` | Sin wave pattern in output (AP-007) |
 //! | 111 | `WeightFileMissing` | SafeTensors weight file not found |
 //! | 112 | `WeightFileCorrupted` | SafeTensors file failed to parse |
 //! | 113 | `WeightChecksumMismatch` | SHA256 checksum verification failed |
 //! | 114 | `InferenceInitFailed` | Inference initialization failed |
 //! | 115 | `InferenceFailed` | Inference execution failed |
+//! | 116 | `ModelDimensionMismatch` | Model output dimension mismatch |
 //!
 //! # Design Principles
 //!
@@ -31,7 +32,7 @@ use thiserror::Error;
 /// Error type for warm loading operations.
 ///
 /// Each variant includes diagnostic information for debugging.
-/// Fatal startup errors (exit codes 101-110) prevent inference requests.
+/// Fatal startup errors (exit codes 101-116) prevent inference requests.
 #[derive(Debug, Error)]
 pub enum WarmError {
     // === Exit Code 101: Model File Missing ===
@@ -327,7 +328,8 @@ pub enum WarmError {
 impl WarmError {
     /// Get the process exit code for this error.
     ///
-    /// Returns exit codes 101-110 for fatal errors, 1 for non-fatal.
+    /// Returns exit codes 101-116 for fatal errors, 1 for non-fatal.
+    /// See module documentation for the complete exit code mapping.
     #[must_use]
     pub fn exit_code(&self) -> i32 {
         match self {

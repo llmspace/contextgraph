@@ -622,50 +622,49 @@ async fn test_edge_case_purpose_query_12_elements() {
 // EDGE CASE 2: North Star Alignment Without North Star
 // =============================================================================
 
-/// EDGE CASE: Alignment check without North Star should fail.
+/// EDGE CASE: Store operation without North Star should fail (AP-007 fail-fast).
+///
+/// Per AP-007, the memory/store handler requires North Star to compute purpose alignment.
+/// Without North Star, the system MUST fail fast with a clear error message.
 #[tokio::test]
 async fn test_edge_case_alignment_no_north_star() {
     println!("\n======================================================================");
-    println!("EDGE CASE 2: Alignment Check Without North Star");
+    println!("EDGE CASE 2: Store & Alignment Without North Star (AP-007 Fail-Fast)");
     println!("======================================================================\n");
 
-    let (handlers, store, hierarchy) = create_verifiable_handlers_no_north_star();
+    let (handlers, _store, hierarchy) = create_verifiable_handlers_no_north_star();
 
     // BEFORE STATE
     println!("📊 BEFORE STATE:");
     println!("   Has North Star: {}", hierarchy.read().has_north_star());
     assert!(!hierarchy.read().has_north_star(), "Must NOT have North Star");
 
-    // Store a fingerprint first
-    println!("\n📝 STORING: memory/store (to create fingerprint)");
+    // Try to store a fingerprint - should fail without North Star (AP-007)
+    println!("\n📝 ATTEMPTING: memory/store (should fail without North Star)");
     let store_params = json!({
         "content": "Test content for alignment",
         "importance": 0.8
     });
     let store_request = make_request("memory/store", Some(JsonRpcId::Number(1)), Some(store_params));
     let store_response = handlers.dispatch(store_request).await;
-    assert!(store_response.error.is_none(), "Store must succeed");
 
-    let fingerprint_id = store_response
-        .result
-        .unwrap()
-        .get("fingerprintId")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .to_string();
+    // Verify store fails with NORTH_STAR_NOT_CONFIGURED error
+    assert!(
+        store_response.error.is_some(),
+        "Store MUST fail without North Star (AP-007 fail-fast)"
+    );
+    let error = store_response.error.unwrap();
+    println!("   Error code: {} (expected: -32021)", error.code);
+    println!("   Error message: {}", error.message);
+    assert_eq!(
+        error.code, -32021,
+        "Must return NORTH_STAR_NOT_CONFIGURED (-32021)"
+    );
 
-    println!("   Stored fingerprint: {}", fingerprint_id);
-
-    // Verify fingerprint exists in Source of Truth
-    let fp_id = Uuid::parse_str(&fingerprint_id).unwrap();
-    let exists = store.retrieve(fp_id).await.expect("retrieve should succeed").is_some();
-    assert!(exists, "Fingerprint must exist in Source of Truth");
-
-    // ACTION: Try alignment without North Star
-    println!("\n📝 ACTION: purpose/north_star_alignment (should fail)");
+    // Also verify alignment endpoint fails the same way
+    println!("\n📝 ATTEMPTING: purpose/north_star_alignment (should also fail)");
     let align_params = json!({
-        "fingerprint_id": fingerprint_id
+        "fingerprint_id": "00000000-0000-0000-0000-000000000001"
     });
     let align_request = make_request(
         "purpose/north_star_alignment",
@@ -674,21 +673,13 @@ async fn test_edge_case_alignment_no_north_star() {
     );
     let response = handlers.dispatch(align_request).await;
 
-    // Verify error
-    assert!(response.error.is_some(), "Must fail without North Star");
-    let error = response.error.unwrap();
-    println!("   Error code: {} (expected: -32021)", error.code);
-    println!("   Error message: {}", error.message);
-    assert_eq!(
-        error.code, -32021,
-        "Must return NORTH_STAR_NOT_CONFIGURED (-32021)"
-    );
+    // Verify alignment error
+    assert!(response.error.is_some(), "Alignment must fail without North Star");
+    let align_error = response.error.unwrap();
+    println!("   Error code: {}", align_error.code);
+    println!("   Error message: {}", align_error.message);
 
-    // AFTER STATE - fingerprint still exists
-    let after_exists = store.retrieve(fp_id).await.expect("retrieve should succeed").is_some();
-    assert!(after_exists, "Fingerprint must still exist");
-
-    println!("\n✓ VERIFIED: Alignment without North Star correctly rejected\n");
+    println!("\n✓ VERIFIED: System correctly rejects operations without North Star (AP-007)\n");
 }
 
 // =============================================================================

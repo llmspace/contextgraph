@@ -22,7 +22,6 @@ use serde_json::json;
 use uuid::Uuid;
 
 use context_graph_core::alignment::{DefaultAlignmentCalculator, GoalAlignmentCalculator};
-use context_graph_core::purpose::GoalHierarchy;
 use context_graph_core::stubs::{InMemoryTeleologicalStore, StubMultiArrayProvider, StubUtlProcessor};
 use context_graph_core::traits::{
     MultiArrayEmbeddingProvider, TeleologicalMemoryStore, UtlProcessor,
@@ -32,7 +31,7 @@ use context_graph_core::types::fingerprint::NUM_EMBEDDERS;
 use crate::handlers::Handlers;
 use crate::protocol::JsonRpcId;
 
-use super::make_request;
+use super::{make_request, create_test_hierarchy};
 
 /// Create test handlers with SHARED access to the store for direct verification.
 ///
@@ -45,7 +44,8 @@ fn create_verifiable_handlers() -> (Handlers, Arc<InMemoryTeleologicalStore>) {
         Arc::new(StubMultiArrayProvider::new());
     let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
         Arc::new(DefaultAlignmentCalculator::new());
-    let goal_hierarchy = GoalHierarchy::new();
+    // Must use test hierarchy with North Star - store handler requires it (AP-007)
+    let goal_hierarchy = create_test_hierarchy();
 
     // Create handlers with our store (need to clone for both uses)
     let store_for_handlers: Arc<dyn TeleologicalMemoryStore> = store.clone();

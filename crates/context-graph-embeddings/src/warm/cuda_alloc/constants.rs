@@ -11,11 +11,19 @@ pub const REQUIRED_COMPUTE_MAJOR: u32 = 12;
 /// Required compute capability minor version for RTX 5090.
 pub const REQUIRED_COMPUTE_MINOR: u32 = 0;
 
-/// Minimum VRAM required in bytes (32GB for RTX 5090).
+/// Minimum VRAM required in bytes (31GB for RTX 5090).
 ///
-/// This is the total VRAM on an RTX 5090. We require the full amount
-/// to ensure all 12 embedding models can be loaded.
-pub const MINIMUM_VRAM_BYTES: usize = 32 * 1024 * 1024 * 1024;
+/// The RTX 5090 has 32GB GDDR7 physical memory, but the OS/driver
+/// reserves ~0.5-1.5% (~160-512MB). The GPU typically reports
+/// ~32607 MiB (~31.84 GiB) as usable via `cuDeviceTotalMem`.
+///
+/// We set the minimum to 31GB to account for this variance while
+/// ensuring we have sufficient memory for all 13 embedding models
+/// (total ~6.4GB across all models).
+///
+/// Reference: NVIDIA GPU memory reservation varies by driver version
+/// and OS configuration (Windows/Linux/WSL2).
+pub const MINIMUM_VRAM_BYTES: usize = 31 * 1024 * 1024 * 1024;
 
 /// One gigabyte in bytes.
 pub const GB: usize = 1024 * 1024 * 1024;

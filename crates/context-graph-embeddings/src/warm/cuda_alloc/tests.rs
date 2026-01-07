@@ -217,7 +217,9 @@ fn test_format_bytes() {
 fn test_constants() {
     assert_eq!(REQUIRED_COMPUTE_MAJOR, 12);
     assert_eq!(REQUIRED_COMPUTE_MINOR, 0);
-    assert_eq!(MINIMUM_VRAM_BYTES, 32 * 1024 * 1024 * 1024);
+    // RTX 5090 has 32GB GDDR7 but reports ~31.84GB usable due to driver/OS reservations.
+    // The minimum is set to 31GB to account for this variance.
+    assert_eq!(MINIMUM_VRAM_BYTES, 31 * 1024 * 1024 * 1024);
 }
 
 // ============================================================================

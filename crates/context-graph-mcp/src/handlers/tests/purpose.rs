@@ -368,28 +368,35 @@ async fn test_north_star_alignment_not_found_fails() {
 }
 
 /// Test purpose/north_star_alignment fails without North Star configured.
+///
+/// Per AP-007, both store and alignment require North Star to be configured.
+/// This test verifies both operations correctly fail fast.
 #[tokio::test]
 async fn test_north_star_alignment_no_north_star_fails() {
     let handlers = create_test_handlers_no_north_star();
 
-    // Store content
+    // Try to store content - should fail without North Star (AP-007)
     let store_params = json!({
         "content": "Test content",
         "importance": 0.8
     });
     let store_request = make_request("memory/store", Some(JsonRpcId::Number(1)), Some(store_params));
     let store_response = handlers.dispatch(store_request).await;
-    let fingerprint_id = store_response
-        .result
-        .unwrap()
-        .get("fingerprintId")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .to_string();
 
+    // Store should fail with NORTH_STAR_NOT_CONFIGURED
+    assert!(
+        store_response.error.is_some(),
+        "memory/store must fail without North Star configured (AP-007)"
+    );
+    let store_error = store_response.error.unwrap();
+    assert_eq!(
+        store_error.code, -32021,
+        "Store should return NORTH_STAR_NOT_CONFIGURED error code"
+    );
+
+    // Also verify alignment fails with fake fingerprint
     let align_params = json!({
-        "fingerprint_id": fingerprint_id
+        "fingerprint_id": "00000000-0000-0000-0000-000000000001"
     });
     let align_request = make_request(
         "purpose/north_star_alignment",
@@ -401,11 +408,6 @@ async fn test_north_star_alignment_no_north_star_fails() {
     assert!(
         response.error.is_some(),
         "purpose/north_star_alignment must fail without North Star configured"
-    );
-    let error = response.error.unwrap();
-    assert_eq!(
-        error.code, -32021,
-        "Should return NORTH_STAR_NOT_CONFIGURED error code"
     );
 }
 
@@ -898,28 +900,35 @@ async fn test_drift_check_empty_ids_fails() {
 }
 
 /// Test purpose/drift_check fails without North Star configured.
+///
+/// Per AP-007, both store and drift_check require North Star to be configured.
+/// This test verifies both operations correctly fail fast.
 #[tokio::test]
 async fn test_drift_check_no_north_star_fails() {
     let handlers = create_test_handlers_no_north_star();
 
-    // Store content
+    // Try to store content - should fail without North Star (AP-007)
     let store_params = json!({
         "content": "Test content",
         "importance": 0.8
     });
     let store_request = make_request("memory/store", Some(JsonRpcId::Number(1)), Some(store_params));
     let store_response = handlers.dispatch(store_request).await;
-    let fingerprint_id = store_response
-        .result
-        .unwrap()
-        .get("fingerprintId")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .to_string();
 
+    // Store should fail with NORTH_STAR_NOT_CONFIGURED
+    assert!(
+        store_response.error.is_some(),
+        "memory/store must fail without North Star configured (AP-007)"
+    );
+    let store_error = store_response.error.unwrap();
+    assert_eq!(
+        store_error.code, -32021,
+        "Store should return NORTH_STAR_NOT_CONFIGURED error code"
+    );
+
+    // Also verify drift_check fails with fake fingerprint
     let drift_params = json!({
-        "fingerprint_ids": [fingerprint_id]
+        "fingerprint_ids": ["00000000-0000-0000-0000-000000000001"]
     });
     let drift_request = make_request(
         "purpose/drift_check",
