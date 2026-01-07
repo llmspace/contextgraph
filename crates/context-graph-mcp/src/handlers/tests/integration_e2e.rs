@@ -1063,24 +1063,31 @@ async fn test_fsv_meta_utl_prediction_validation_cycle() {
     println!("   ✓ VERIFIED: Validation processed correctly\n");
 
     // =========================================================================
-    // STEP 6: HEALTH METRICS
+    // STEP 6: HEALTH METRICS (Verifies fail-fast behavior)
     // =========================================================================
-    println!("📝 STEP 6: meta_utl/health_metrics");
+    // TASK-EMB-024: StubSystemMonitor intentionally fails with NotImplemented.
+    // This is CORRECT behavior - no fake/simulated metrics allowed.
+    println!("📝 STEP 6: meta_utl/health_metrics (verify fail-fast)");
     let health_request = make_request("meta_utl/health_metrics", 5, json!({
         "include_targets": true,
         "include_recommendations": true
     }));
     let health_response = ctx.handlers.dispatch(health_request).await;
 
-    assert!(health_response.error.is_none(), "Health metrics MUST succeed");
-    let health_result = health_response.result.unwrap();
-
-    let metrics = &health_result["metrics"];
-    let per_space = metrics["per_space_accuracy"].as_array().unwrap();
-    assert_eq!(per_space.len(), NUM_EMBEDDERS, "MUST have 13 per-space accuracy values");
-    println!("   - Per-space accuracy count: {}", per_space.len());
-    println!("   - Overall status: {}", health_result["overall_status"]);
-    println!("   ✓ VERIFIED: Health metrics complete\n");
+    // VERIFY FAIL-FAST BEHAVIOR
+    assert!(
+        health_response.error.is_some(),
+        "health_metrics MUST fail when using StubSystemMonitor (TASK-EMB-024)"
+    );
+    let health_error = health_response.error.as_ref().unwrap();
+    assert_eq!(
+        health_error.code,
+        error_codes::SYSTEM_MONITOR_ERROR,
+        "Should return SYSTEM_MONITOR_ERROR"
+    );
+    println!("   - Error code: {} (SYSTEM_MONITOR_ERROR)", health_error.code);
+    println!("   - Error message: {}", health_error.message);
+    println!("   ✓ VERIFIED: Fail-fast behavior working correctly\n");
 
     // =========================================================================
     // EVIDENCE OF SUCCESS
@@ -1094,7 +1101,7 @@ async fn test_fsv_meta_utl_prediction_validation_cycle() {
     println!("  1. learning_trajectory: 13 embedder trajectories");
     println!("  2. predict_storage: Prediction stored in tracker");
     println!("  3. validate_prediction: Prediction removed, count incremented");
-    println!("  4. health_metrics: 13 per-space accuracy values");
+    println!("  4. health_metrics: Correctly fails with StubSystemMonitor (TASK-EMB-024)");
     println!("");
     println!("Physical Evidence:");
     println!("  - Prediction ID: {}", prediction_id);
