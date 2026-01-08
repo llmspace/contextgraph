@@ -1,9 +1,11 @@
 //! TASK-EMB-020 Physical Verification Tests
 //!
 //! These tests verify the QuantizationRouter implementation meets all requirements:
-//! - Binary quantization works end-to-end for E9_Hdc
-//! - PQ8/Float8 return QuantizerNotImplemented error
-//! - SparseNative rejects dense vectors
+//! - Binary quantization works end-to-end for E9_Hdc (32x compression)
+//! - PQ8 quantization works for E1,E5,E7,E10 (32x compression)
+//! - Float8E4M3 quantization works for E2,E3,E4,E8,E11 (4x compression)
+//! - SparseNative rejects dense vectors (use dedicated sparse format)
+//! - TokenPruning returns UnsupportedOperation (out of scope)
 //! - All 13 ModelIds have method assignments
 //!
 //! Per Constitution AP-007: NO STUB DATA. All tests use real algorithms.
@@ -102,46 +104,55 @@ fn pv_003_binary_roundtrip_preserves_signs() {
 }
 
 // ============================================================================
-// Physical Verification: PQ8/Float8 Return QuantizerNotImplemented
+// Physical Verification: PQ8 Quantization (IMPLEMENTED)
 // ============================================================================
 
-/// PV-004: PQ8 quantization returns QuantizerNotImplemented error.
+/// PV-004: PQ8 quantization succeeds with 32x compression.
 ///
 /// Affected models: E1 (Semantic), E5 (Causal), E7 (Code), E10 (Multimodal)
+/// Constitution: 32x compression, <5% recall loss (with trained codebook)
 #[test]
-fn pv_004_pq8_returns_not_implemented() {
+fn pv_004_pq8_quantization_succeeds() {
     let router = QuantizationRouter::new();
 
+    // PQ8 models with their expected dimensions from router's pre-built encoders
     let pq8_models = [
-        (ModelId::Semantic, "E1"),
-        (ModelId::Causal, "E5"),
-        (ModelId::Code, "E7"),
-        (ModelId::Multimodal, "E10"),
+        (ModelId::Semantic, "E1", 1024),
+        (ModelId::Causal, "E5", 768),
+        (ModelId::Code, "E7", 1536),
+        (ModelId::Multimodal, "E10", 768),
     ];
 
-    println!("PV-004 Evidence:");
+    println!("PV-004 Evidence (PQ8 IMPLEMENTED):");
 
-    for (model_id, name) in pq8_models {
-        let embedding = vec![0.5f32; 1024];
+    for (model_id, name, dim) in pq8_models {
+        let embedding: Vec<f32> = (0..dim).map(|i| (i as f32 / dim as f32) - 0.5).collect();
         let result = router.quantize(model_id, &embedding);
 
-        assert!(result.is_err(), "{} should fail", name);
+        assert!(result.is_ok(), "{} should succeed", name);
 
-        match result.unwrap_err() {
-            EmbeddingError::QuantizerNotImplemented { model_id: m, method } => {
-                println!("  {} ({:?}): QuantizerNotImplemented, method={}", name, m, method);
-                assert_eq!(method, "PQ8");
-            }
-            e => panic!("Expected QuantizerNotImplemented for {}, got {:?}", name, e),
-        }
+        let quantized = result.unwrap();
+        assert_eq!(quantized.method, QuantizationMethod::PQ8);
+        assert_eq!(quantized.data.len(), 8, "PQ8 produces 8 bytes (8 subvectors)");
+        assert_eq!(quantized.original_dim, dim);
+
+        // Verify round-trip
+        let dequantized = router.dequantize(model_id, &quantized);
+        assert!(dequantized.is_ok(), "{} dequantize should succeed", name);
+        assert_eq!(dequantized.unwrap().len(), dim);
+
+        let compression = (dim * 4) as f32 / quantized.data.len() as f32;
+        println!("  {} ({:?}): SUCCESS, dim={}, compressed=8 bytes, ratio={:.1}x",
+                 name, model_id, dim, compression);
     }
 }
 
-/// PV-005: Float8E4M3 quantization returns QuantizerNotImplemented error.
+/// PV-005: Float8E4M3 quantization succeeds with 4x compression.
 ///
 /// Affected models: E2-E4 (Temporal), E8 (Graph), E11 (Entity)
+/// Constitution: 4x compression, <0.3% recall loss
 #[test]
-fn pv_005_float8_returns_not_implemented() {
+fn pv_005_float8_quantization_succeeds() {
     let router = QuantizationRouter::new();
 
     let float8_models = [
@@ -152,21 +163,28 @@ fn pv_005_float8_returns_not_implemented() {
         (ModelId::Entity, "E11"),
     ];
 
-    println!("PV-005 Evidence:");
+    println!("PV-005 Evidence (Float8E4M3 IMPLEMENTED):");
 
     for (model_id, name) in float8_models {
-        let embedding = vec![0.5f32; 512];
+        let dim = 512;
+        let embedding: Vec<f32> = (0..dim).map(|i| (i as f32 / dim as f32) - 0.5).collect();
         let result = router.quantize(model_id, &embedding);
 
-        assert!(result.is_err(), "{} should fail", name);
+        assert!(result.is_ok(), "{} should succeed", name);
 
-        match result.unwrap_err() {
-            EmbeddingError::QuantizerNotImplemented { model_id: m, method } => {
-                println!("  {} ({:?}): QuantizerNotImplemented, method={}", name, m, method);
-                assert_eq!(method, "Float8E4M3");
-            }
-            e => panic!("Expected QuantizerNotImplemented for {}, got {:?}", name, e),
-        }
+        let quantized = result.unwrap();
+        assert_eq!(quantized.method, QuantizationMethod::Float8E4M3);
+        assert_eq!(quantized.data.len(), dim, "Float8 produces 1 byte per element");
+        assert_eq!(quantized.original_dim, dim);
+
+        // Verify round-trip
+        let dequantized = router.dequantize(model_id, &quantized);
+        assert!(dequantized.is_ok(), "{} dequantize should succeed", name);
+        assert_eq!(dequantized.unwrap().len(), dim);
+
+        let compression = (dim * 4) as f32 / quantized.data.len() as f32;
+        println!("  {} ({:?}): SUCCESS, dim={}, compressed={} bytes, ratio={:.1}x",
+                 name, model_id, dim, quantized.data.len(), compression);
     }
 }
 

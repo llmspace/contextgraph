@@ -15,12 +15,19 @@
 //!   - Bidirectional: A <-> B (mutual influence)
 //!   - Bridge: Cross-domain causal bridging
 //!   - Abduction: Best hypothesis for observation
+//! - **E5 Asymmetric Similarity**: Constitution-specified causal similarity
+//!   with direction modifiers (cause→effect=1.2, effect→cause=0.8)
 //!
 //! ## NO BACKWARDS COMPATIBILITY - FAIL FAST WITH ROBUST LOGGING
 
+pub mod asymmetric;
 pub mod inference;
 pub mod scm;
 
+pub use asymmetric::{
+    compute_asymmetric_similarity, compute_asymmetric_similarity_simple, adjust_batch_similarities,
+    CausalDirection, InterventionContext,
+};
 pub use inference::{InferenceDirection, InferenceResult, OmniInfer};
 pub use scm::{CausalEdge, CausalGraph, CausalNode};
 

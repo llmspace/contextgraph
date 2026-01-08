@@ -288,30 +288,32 @@ fn fsv_error_variant_verification() {
 
     // Test each error variant is produced correctly
 
-    // 1. QuantizerNotImplemented (PQ8)
-    println!("1. Testing QuantizerNotImplemented (PQ8):");
+    // 1. PQ8 SUCCESS (IMPLEMENTED)
+    println!("1. Testing PQ8 quantization (IMPLEMENTED):");
     let pq8_result = router.quantize(ModelId::Semantic, &vec![1.0f32; 1024]);
     match pq8_result {
-        Err(EmbeddingError::QuantizerNotImplemented { model_id, method }) => {
-            println!("   ✓ Error variant: QuantizerNotImplemented");
-            println!("   ✓ model_id: {:?}", model_id);
-            println!("   ✓ method: {}", method);
-            assert_eq!(method, "PQ8");
+        Ok(quantized) => {
+            println!("   ✓ PQ8 quantization succeeded");
+            println!("   ✓ method: {:?}", quantized.method);
+            println!("   ✓ data size: {} bytes (32x compression)", quantized.data.len());
+            assert_eq!(quantized.method, QuantizationMethod::PQ8);
+            assert_eq!(quantized.data.len(), 8); // 8 subvector indices
         }
-        other => panic!("Expected QuantizerNotImplemented, got {:?}", other),
+        Err(e) => panic!("Expected PQ8 quantization to succeed, got {:?}", e),
     }
 
-    // 2. QuantizerNotImplemented (Float8)
-    println!("\n2. Testing QuantizerNotImplemented (Float8E4M3):");
+    // 2. Float8 SUCCESS (IMPLEMENTED)
+    println!("\n2. Testing Float8E4M3 quantization (IMPLEMENTED):");
     let float8_result = router.quantize(ModelId::TemporalRecent, &vec![1.0f32; 512]);
     match float8_result {
-        Err(EmbeddingError::QuantizerNotImplemented { model_id, method }) => {
-            println!("   ✓ Error variant: QuantizerNotImplemented");
-            println!("   ✓ model_id: {:?}", model_id);
-            println!("   ✓ method: {}", method);
-            assert_eq!(method, "Float8E4M3");
+        Ok(quantized) => {
+            println!("   ✓ Float8E4M3 quantization succeeded");
+            println!("   ✓ method: {:?}", quantized.method);
+            println!("   ✓ data size: {} bytes (4x compression)", quantized.data.len());
+            assert_eq!(quantized.method, QuantizationMethod::Float8E4M3);
+            assert_eq!(quantized.data.len(), 512); // 1 byte per element
         }
-        other => panic!("Expected QuantizerNotImplemented, got {:?}", other),
+        Err(e) => panic!("Expected Float8 quantization to succeed, got {:?}", e),
     }
 
     // 3. InvalidModelInput (Sparse)
@@ -424,19 +426,32 @@ fn fsv_all_model_ids_have_methods() {
     println!("\nPHYSICAL VERIFICATION:");
 
     // Verify specific assignments per Constitution
+    // IMPLEMENTED: Binary (E9), PQ8 (E1,E5,E7,E10), Float8E4M3 (E2,E3,E4,E8,E11)
     let verifications = [
-        (ModelId::Semantic, QuantizationMethod::PQ8, false),
-        (ModelId::TemporalRecent, QuantizationMethod::Float8E4M3, false),
-        (ModelId::TemporalPeriodic, QuantizationMethod::Float8E4M3, false),
-        (ModelId::TemporalPositional, QuantizationMethod::Float8E4M3, false),
-        (ModelId::Causal, QuantizationMethod::PQ8, false),
+        // PQ8 - IMPLEMENTED
+        (ModelId::Semantic, QuantizationMethod::PQ8, true),
+        // Float8E4M3 - IMPLEMENTED
+        (ModelId::TemporalRecent, QuantizationMethod::Float8E4M3, true),
+        // Float8E4M3 - IMPLEMENTED
+        (ModelId::TemporalPeriodic, QuantizationMethod::Float8E4M3, true),
+        (ModelId::TemporalPositional, QuantizationMethod::Float8E4M3, true),
+        // PQ8 - IMPLEMENTED
+        (ModelId::Causal, QuantizationMethod::PQ8, true),
+        // SparseNative - Invalid path for dense quantization
         (ModelId::Sparse, QuantizationMethod::SparseNative, false),
-        (ModelId::Code, QuantizationMethod::PQ8, false),
-        (ModelId::Graph, QuantizationMethod::Float8E4M3, false),
+        // PQ8 - IMPLEMENTED
+        (ModelId::Code, QuantizationMethod::PQ8, true),
+        // Float8E4M3 - IMPLEMENTED
+        (ModelId::Graph, QuantizationMethod::Float8E4M3, true),
+        // Binary - IMPLEMENTED
         (ModelId::Hdc, QuantizationMethod::Binary, true),
-        (ModelId::Multimodal, QuantizationMethod::PQ8, false),
-        (ModelId::Entity, QuantizationMethod::Float8E4M3, false),
+        // PQ8 - IMPLEMENTED
+        (ModelId::Multimodal, QuantizationMethod::PQ8, true),
+        // Float8E4M3 - IMPLEMENTED
+        (ModelId::Entity, QuantizationMethod::Float8E4M3, true),
+        // TokenPruning - NOT IMPLEMENTED (out of scope)
         (ModelId::LateInteraction, QuantizationMethod::TokenPruning, false),
+        // SparseNative - Invalid path for dense quantization
         (ModelId::Splade, QuantizationMethod::SparseNative, false),
     ];
 
@@ -451,8 +466,9 @@ fn fsv_all_model_ids_have_methods() {
     }
 
     println!("  ✓ All 13 ModelIds have correct method assignments");
-    println!("  ✓ Only E9 (Hdc) can_quantize = true (Binary implemented)");
-    println!("  ✓ All other models return appropriate errors");
+    println!("  ✓ Binary (E9), PQ8 (E1,E5,E7,E10), Float8 (E2,E3,E4,E8,E11) implemented");
+    println!("  ✓ Sparse (E6,E13) returns InvalidModelInput - use dedicated sparse format");
+    println!("  ✓ TokenPruning (E12) returns UnsupportedOperation - out of scope");
 
     println!("\n✅ ALL 13 MODEL IDS VERIFIED CORRECTLY\n");
 }
