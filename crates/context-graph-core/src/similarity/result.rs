@@ -135,7 +135,7 @@ impl CrossSpaceSimilarity {
     /// Create a result indicating insufficient active spaces.
     ///
     /// This is used when the minimum space requirement is not met.
-    pub fn insufficient_spaces(required: usize, found: u32) -> Self {
+    pub fn insufficient_spaces(_required: usize, _found: u32) -> Self {
         Self {
             score: 0.0,
             raw_score: 0.0,

@@ -47,6 +47,7 @@ pub struct NremPhase {
     learning_rate: f32,
 
     /// Batch size for memory processing
+    #[allow(dead_code)]
     batch_size: usize,
 
     /// Weight decay factor
@@ -150,10 +151,10 @@ impl NremPhase {
     pub async fn process(
         &mut self,
         interrupt_flag: &Arc<AtomicBool>,
-        amortizer: &mut AmortizedLearner,
+        _amortizer: &mut AmortizedLearner,
     ) -> CoreResult<NremReport> {
         let start = Instant::now();
-        let deadline = start + self.duration;
+        let _deadline = start + self.duration;
 
         info!("Starting NREM phase: coupling={}, recency_bias={}", self.coupling, self.recency_bias);
 

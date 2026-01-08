@@ -41,9 +41,15 @@ use context_graph_core::config::Config;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // CRITICAL: MCP servers must be silent - set this BEFORE any config loading
+    // This ensures no banners/warnings corrupt the JSON-RPC stdio protocol
+    // Especially important for WSL environments where env vars may not pass correctly
+    env::set_var("CONTEXT_GRAPH_MCP_QUIET", "1");
+
     // Initialize logging - CRITICAL: Must write to stderr, not stdout!
     // MCP protocol requires stdout to be exclusively for JSON-RPC messages
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn")); // Default to warn to reduce noise
+    // Default to error-only to keep stderr clean for MCP clients
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("error"));
 
     fmt()
         .with_writer(io::stderr) // CRITICAL: stderr only!

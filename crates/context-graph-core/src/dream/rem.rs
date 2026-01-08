@@ -46,15 +46,19 @@ pub struct RemPhase {
     query_limit: usize,
 
     /// New edge initial weight
+    #[allow(dead_code)]
     new_edge_weight: f32,
 
     /// New edge initial confidence
+    #[allow(dead_code)]
     new_edge_confidence: f32,
 
     /// Exploration bias for random walk
+    #[allow(dead_code)]
     exploration_bias: f32,
 
     /// Random walk step size
+    #[allow(dead_code)]
     walk_step_size: f32,
 }
 

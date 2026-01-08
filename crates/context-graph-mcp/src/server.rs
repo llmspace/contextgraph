@@ -266,7 +266,11 @@ impl McpServer {
     /// Priority order:
     /// 1. `CONTEXT_GRAPH_STORAGE_PATH` environment variable
     /// 2. `config.storage.path` from configuration
-    /// 3. Default: `./contextgraph_data` in current directory
+    /// 3. Default: `contextgraph_data` directory NEXT TO EXECUTABLE (not current dir!)
+    ///
+    /// CRITICAL: Uses executable directory as base, NOT current working directory.
+    /// This prevents permission errors when MCP clients spawn the server from
+    /// unpredictable directories (e.g., `/` or their own installation path).
     ///
     /// Creates the directory if it doesn't exist.
     fn resolve_storage_path(config: &Config) -> PathBuf {
@@ -286,11 +290,19 @@ impl McpServer {
             return path;
         }
 
-        // Default path
-        let default_path = std::env::current_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
+        // FIXED: Use executable's directory instead of current_dir
+        // This ensures the server works regardless of working directory,
+        // which is critical for MCP clients that may launch from any directory.
+        let default_path = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| {
+                // Fallback to current_dir only if we can't get executable path
+                warn!("Could not determine executable directory, falling back to current_dir");
+                std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+            })
             .join("contextgraph_data");
-        info!("Using default storage path: {:?}", default_path);
+        info!("Using default storage path (relative to executable): {:?}", default_path);
         Self::ensure_directory_exists(&default_path);
         default_path
     }
@@ -300,7 +312,11 @@ impl McpServer {
     /// Priority order:
     /// 1. `CONTEXT_GRAPH_MODELS_PATH` environment variable
     /// 2. `config.models.path` from configuration (if exists)
-    /// 3. Default: `./models` in current directory
+    /// 3. Default: `models` directory NEXT TO EXECUTABLE (not current dir!)
+    ///
+    /// CRITICAL: Uses executable directory as base, NOT current working directory.
+    /// This prevents path resolution issues when MCP clients spawn the server from
+    /// unpredictable directories (e.g., `/` or their own installation path).
     ///
     /// Does NOT create the directory - models must be pre-downloaded.
     fn resolve_models_path(_config: &Config) -> PathBuf {
@@ -311,11 +327,18 @@ impl McpServer {
             return path;
         }
 
-        // Default path: ./models relative to current directory
-        let default_path = std::env::current_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
+        // FIXED: Use executable's directory instead of current_dir
+        // This ensures the server finds models regardless of working directory.
+        let default_path = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| {
+                // Fallback to current_dir only if we can't get executable path
+                warn!("Could not determine executable directory, falling back to current_dir");
+                std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+            })
             .join("models");
-        info!("Using default models path: {:?}", default_path);
+        info!("Using default models path (relative to executable): {:?}", default_path);
         default_path
     }
 

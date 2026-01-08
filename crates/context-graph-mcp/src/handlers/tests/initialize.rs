@@ -86,29 +86,18 @@ async fn test_initialize_returns_server_info() {
 }
 
 #[tokio::test]
-async fn test_initialize_has_cognitive_pulse_extension() {
+async fn test_initialize_has_no_cognitive_pulse_extension() {
     let handlers = create_test_handlers();
     let request = make_request("initialize", Some(JsonRpcId::Number(1)), None);
 
     let response = handlers.dispatch(request).await;
 
-    // Context Graph Extension: cognitive_pulse header
-    let pulse = response
-        .cognitive_pulse
-        .expect("Initialize should include cognitive pulse");
-
-    // Verify entropy is in valid range [0.0, 1.0]
+    // CRITICAL: The initialize response MUST NOT include cognitive_pulse
+    // Claude Code's MCP client rejects responses with extension fields during handshake
+    // The X-Cognitive-Pulse extension is ONLY for tool call responses, not lifecycle methods
     assert!(
-        pulse.entropy >= 0.0 && pulse.entropy <= 1.0,
-        "Entropy must be in [0.0, 1.0], got {}",
-        pulse.entropy
-    );
-
-    // Verify coherence is in valid range [0.0, 1.0]
-    assert!(
-        pulse.coherence >= 0.0 && pulse.coherence <= 1.0,
-        "Coherence must be in [0.0, 1.0], got {}",
-        pulse.coherence
+        response.cognitive_pulse.is_none(),
+        "Initialize response must NOT include cognitive_pulse - breaks Claude Code MCP connection"
     );
 }
 

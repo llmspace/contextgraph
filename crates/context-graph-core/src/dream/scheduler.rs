@@ -64,6 +64,7 @@ pub struct DreamScheduler {
 
 /// A single activity measurement with timestamp
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 struct ActivitySample {
     /// Activity level [0.0, 1.0]
     activity: f32,

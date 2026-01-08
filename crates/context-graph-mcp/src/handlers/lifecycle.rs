@@ -3,8 +3,6 @@
 use serde_json::json;
 use tracing::info;
 
-use context_graph_core::types::{CognitivePulse, SuggestedAction};
-
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
 
 use super::Handlers;
@@ -13,22 +11,16 @@ impl Handlers {
     /// Handle MCP initialize request.
     ///
     /// Returns server capabilities following MCP 2024-11-05 protocol specification.
+    ///
+    /// **CRITICAL**: The initialize response MUST be strict JSON-RPC 2.0 format with
+    /// no extension fields. Claude Code's MCP client rejects responses with extra fields
+    /// like X-Cognitive-Pulse during the handshake. Cognitive pulse is ONLY included in
+    /// tool call responses, NOT in initialize/shutdown/tools_list.
     pub(super) async fn handle_initialize(&self, id: Option<JsonRpcId>) -> JsonRpcResponse {
         info!("Handling initialize request");
 
-        // Initialize defaults - system hasn't processed any data yet
-        // These will be updated with real values after first operations
-        // Note: parameters are (entropy, coherence, coherence_delta, emotional_weight, action, source_layer)
-        let pulse = CognitivePulse::new(
-            0.5,  // entropy: neutral starting point
-            0.5,  // coherence: neutral starting point (not fake 0.8)
-            0.0,  // coherence_delta: no change yet (not fake 1.0)
-            0.5,  // emotional_weight: neutral starting point
-            SuggestedAction::Ready,
-            None,  // source_layer: None during initialization (no layer has processed yet)
-        );
-
-        // MCP-compliant initialize response
+        // MCP-compliant initialize response - NO EXTENSIONS ALLOWED
+        // Claude Code's MCP client requires strict JSON-RPC 2.0 format for handshake
         JsonRpcResponse::success(
             id,
             json!({
@@ -42,7 +34,8 @@ impl Handlers {
                 }
             }),
         )
-        .with_pulse(pulse)
+        // NOTE: DO NOT add .with_pulse() here - it breaks Claude Code MCP connection!
+        // The X-Cognitive-Pulse extension is only for tool call responses.
     }
 
     /// Handle notifications/initialized - this is a notification, not a request.

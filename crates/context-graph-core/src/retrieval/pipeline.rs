@@ -146,6 +146,7 @@ where
     alignment_calculator: Arc<A>,
 
     /// Johari manager for quadrant classification (Stage 4).
+    #[allow(dead_code)]
     johari_manager: Arc<J>,
 
     /// Teleological memory store for fetching fingerprints (Stage 4).

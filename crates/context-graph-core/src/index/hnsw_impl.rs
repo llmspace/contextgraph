@@ -24,7 +24,7 @@
 use async_trait::async_trait;
 use hnsw_rs::prelude::*;
 use hnsw_rs::hnsw::Hnsw;
-use serde::{Deserialize, Serialize};
+// Note: Deserialize, Serialize not currently needed but retained for future persistence
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};

@@ -792,7 +792,8 @@ impl NervousLayer for MemoryLayer {
         let elapsed = start.elapsed();
 
         // Should complete well within budget
-        Ok(elapsed < Duration::from_micros(500) && count >= 0)
+        let _ = count; // Silence unused variable warning (count validates allocation)
+        Ok(elapsed < Duration::from_micros(500))
     }
 }
 

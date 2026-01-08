@@ -170,6 +170,7 @@ pub struct DreamController {
     gpu_budget: f32,
 
     /// Maximum synthetic queries during REM (Constitution: 100)
+    #[allow(dead_code)]
     query_limit: usize,
 
     /// Maximum wake latency (Constitution: 100ms)
@@ -348,7 +349,7 @@ impl DreamController {
         debug!("Starting NREM phase");
 
         let phase_start = Instant::now();
-        let phase_duration = constants::NREM_DURATION;
+        let _ = constants::NREM_DURATION; // phase_duration used for future progress tracking
 
         // Run NREM processing
         let report = self

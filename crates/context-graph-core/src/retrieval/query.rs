@@ -22,7 +22,7 @@
 //! assert!(query.validate().is_ok());
 //! ```
 
-use crate::config::constants::{alignment, pipeline, similarity};
+use crate::config::constants::{pipeline, similarity};
 use crate::error::{CoreError, CoreResult};
 use crate::types::fingerprint::NUM_EMBEDDERS;
 

@@ -64,7 +64,7 @@ impl Gardener {
     ///
     /// # Returns
     /// GardenerFeedback with pruning recommendations and health metrics.
-    pub fn evaluate(&self, edge_count: usize, orphan_count: usize, connectivity: f32) -> GardenerFeedback {
+    pub fn evaluate(&self, _edge_count: usize, orphan_count: usize, connectivity: f32) -> GardenerFeedback {
         // Note: In a real implementation, edges_pruned would be computed
         // by analyzing actual edge weights. Here we report the orphan count
         // as a proxy for maintenance needs.

@@ -498,7 +498,7 @@ impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
 
     async fn search_text(
         &self,
-        text: &str,
+        _text: &str,
         _options: TeleologicalSearchOptions,
     ) -> CoreResult<Vec<TeleologicalSearchResult>> {
         // In-memory stub cannot generate embeddings

@@ -526,7 +526,7 @@ impl DefaultAlignmentCalculator {
     fn compute_splade_alignment(
         &self,
         splade: &crate::types::fingerprint::SparseVector,
-        goal: &GoalNode,
+        _goal: &GoalNode,
     ) -> f32 {
         if splade.is_empty() {
             return 0.5; // Neutral alignment

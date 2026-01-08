@@ -169,6 +169,7 @@ impl DefaultPurposeComputer {
     /// # Returns
     ///
     /// `SpladeAlignment` with term matches, coverage, and overlap score.
+    #[allow(dead_code)]
     fn compute_splade_alignment(
         memory_splade: &SparseVector,
         goal_keywords: &[String],

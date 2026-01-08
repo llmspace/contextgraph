@@ -185,11 +185,15 @@ impl Config {
         }
 
         // Phase-specific handling
+        // Check if MCP mode suppresses warnings (for clean stdio MCP protocol)
+        let suppress_warnings = std::env::var("CONTEXT_GRAPH_MCP_QUIET").is_ok();
+
         match self.phase {
             Phase::Ghost => {
                 // Ghost phase allows stubs - it's the scaffolding phase
                 // But emit warning to stderr so developers know what's happening
-                if !dangerous_configs.is_empty() {
+                // Unless CONTEXT_GRAPH_MCP_QUIET is set (for MCP servers)
+                if !dangerous_configs.is_empty() && !suppress_warnings {
                     eprintln!("\n╔════════════════════════════════════════════════════════════════╗");
                     eprintln!("║ ⚠️  GHOST PHASE: Running with stub/development configuration   ║");
                     eprintln!("╠════════════════════════════════════════════════════════════════╣");
@@ -202,7 +206,8 @@ impl Config {
             }
             Phase::Development => {
                 // Development phase warns but allows stubs for active development
-                if !dangerous_configs.is_empty() {
+                // Unless CONTEXT_GRAPH_MCP_QUIET is set (for MCP servers)
+                if !dangerous_configs.is_empty() && !suppress_warnings {
                     eprintln!("\n╔════════════════════════════════════════════════════════════════╗");
                     eprintln!("║ ⚠️  DEVELOPMENT PHASE: Stub configurations detected            ║");
                     eprintln!("║ You should be implementing real backends, not using stubs!     ║");

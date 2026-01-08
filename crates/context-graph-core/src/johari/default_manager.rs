@@ -42,6 +42,7 @@ pub struct DefaultJohariManager<S: TeleologicalMemoryStore> {
     blind_spot_threshold: f32,
 
     /// Maximum transition history per memory (default: 100)
+    #[allow(dead_code)]
     max_history_per_memory: usize,
 
     /// In-memory transition history storage
@@ -115,6 +116,7 @@ pub struct DynDefaultJohariManager {
     blind_spot_threshold: f32,
 
     /// Maximum transition history per memory (default: 100)
+    #[allow(dead_code)]
     max_history_per_memory: usize,
 
     /// In-memory transition history storage
