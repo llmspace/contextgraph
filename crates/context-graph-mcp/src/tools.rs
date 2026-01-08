@@ -387,6 +387,164 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                 "required": ["level"]
             }),
         ),
+
+        // ========== DREAM TOOLS (TASK-DREAM-MCP) ==========
+
+        // trigger_dream - Manually trigger a dream consolidation cycle
+        ToolDefinition::new(
+            "trigger_dream",
+            "Manually trigger a dream consolidation cycle. System must be idle (activity < 0.15). \
+             Executes NREM (3 min) + REM (2 min) phases. Returns DreamReport with metrics. \
+             Aborts automatically on external query (wake latency < 100ms).",
+            json!({
+                "type": "object",
+                "properties": {
+                    "force": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Force dream even if activity is above threshold (not recommended)"
+                    }
+                },
+                "required": []
+            }),
+        ),
+
+        // get_dream_status - Get current dream system status
+        ToolDefinition::new(
+            "get_dream_status",
+            "Get current dream system status including state (Awake/NREM/REM/Waking), \
+             GPU usage, activity level, and time since last dream cycle.",
+            json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
+        ),
+
+        // abort_dream - Abort current dream cycle
+        ToolDefinition::new(
+            "abort_dream",
+            "Abort the current dream cycle. Must complete wake within 100ms (constitution mandate). \
+             Returns wake latency and partial dream report.",
+            json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
+        ),
+
+        // get_amortized_shortcuts - Get shortcut candidates from amortized learning
+        ToolDefinition::new(
+            "get_amortized_shortcuts",
+            "Get shortcut candidates from amortized learning. Returns paths traversed 5+ times \
+             with 3+ hops that qualify for direct edge creation.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "min_confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.7,
+                        "description": "Minimum confidence threshold for shortcuts"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "default": 20,
+                        "description": "Maximum shortcuts to return"
+                    }
+                },
+                "required": []
+            }),
+        ),
+
+        // ========== NEUROMODULATION TOOLS (TASK-NEUROMOD-MCP) ==========
+
+        // get_neuromodulation_state - Get all 4 neuromodulator levels
+        ToolDefinition::new(
+            "get_neuromodulation_state",
+            "Get current neuromodulation state including all 4 modulators: \
+             Dopamine (hopfield.beta [1,5]), Serotonin (space_weights [0,1]), \
+             Noradrenaline (attention.temp [0.5,2]), Acetylcholine (utl.lr [0.001,0.002]).",
+            json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
+        ),
+
+        // adjust_neuromodulator - Adjust a specific modulator
+        ToolDefinition::new(
+            "adjust_neuromodulator",
+            "Adjust a specific neuromodulator level. ACh is read-only (managed by GWT). \
+             Changes are clamped to constitution-mandated ranges.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "modulator": {
+                        "type": "string",
+                        "enum": ["dopamine", "serotonin", "noradrenaline"],
+                        "description": "Which modulator to adjust (ACh is read-only)"
+                    },
+                    "delta": {
+                        "type": "number",
+                        "description": "Amount to add (positive) or subtract (negative) from current level"
+                    }
+                },
+                "required": ["modulator", "delta"]
+            }),
+        ),
+
+        // ========== STEERING TOOLS (TASK-STEERING-001) ==========
+
+        // get_steering_feedback - Get steering feedback from Gardener, Curator, Assessor
+        ToolDefinition::new(
+            "get_steering_feedback",
+            "Get steering feedback from the Gardener (graph health), Curator (memory quality), \
+             and Assessor (performance) components. Returns a SteeringReward in [-1, 1] \
+             with detailed component scores and recommendations.",
+            json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
+        ),
+
+        // ========== CAUSAL INFERENCE TOOLS (TASK-CAUSAL-001) ==========
+
+        // omni_infer - Perform omni-directional causal inference
+        ToolDefinition::new(
+            "omni_infer",
+            "Perform omni-directional causal inference. Supports 5 directions: \
+             forward (A->B effect), backward (B->A cause), bidirectional (A<->B mutual), \
+             bridge (cross-domain), and abduction (best hypothesis). \
+             Constitution ref: line 539.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Source node UUID for inference"
+                    },
+                    "target": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Target node UUID (required for forward/backward/bidirectional)"
+                    },
+                    "direction": {
+                        "type": "string",
+                        "enum": ["forward", "backward", "bidirectional", "bridge", "abduction"],
+                        "default": "forward",
+                        "description": "Inference direction: forward (A->B), backward (B->A), \
+                                       bidirectional (A<->B), bridge (cross-domain), abduction (best hypothesis)"
+                    }
+                },
+                "required": ["source"]
+            }),
+        ),
     ]
 }
 
@@ -419,6 +577,34 @@ pub mod tool_names {
     pub const GET_CALIBRATION_METRICS: &str = "get_calibration_metrics";
     /// TASK-ATC-001: Manually trigger recalibration at a specific level
     pub const TRIGGER_RECALIBRATION: &str = "trigger_recalibration";
+
+    // ========== DREAM TOOLS (TASK-DREAM-MCP) ==========
+
+    /// TASK-DREAM-MCP: Manually trigger a dream consolidation cycle
+    pub const TRIGGER_DREAM: &str = "trigger_dream";
+    /// TASK-DREAM-MCP: Get current dream system status
+    pub const GET_DREAM_STATUS: &str = "get_dream_status";
+    /// TASK-DREAM-MCP: Abort current dream cycle
+    pub const ABORT_DREAM: &str = "abort_dream";
+    /// TASK-DREAM-MCP: Get shortcut candidates from amortized learning
+    pub const GET_AMORTIZED_SHORTCUTS: &str = "get_amortized_shortcuts";
+
+    // ========== NEUROMODULATION TOOLS (TASK-NEUROMOD-MCP) ==========
+
+    /// TASK-NEUROMOD-MCP: Get all 4 neuromodulator levels
+    pub const GET_NEUROMODULATION_STATE: &str = "get_neuromodulation_state";
+    /// TASK-NEUROMOD-MCP: Adjust a specific modulator
+    pub const ADJUST_NEUROMODULATOR: &str = "adjust_neuromodulator";
+
+    // ========== STEERING TOOLS (TASK-STEERING-001) ==========
+
+    /// TASK-STEERING-001: Get steering feedback from Gardener, Curator, Assessor
+    pub const GET_STEERING_FEEDBACK: &str = "get_steering_feedback";
+
+    // ========== CAUSAL INFERENCE TOOLS (TASK-CAUSAL-001) ==========
+
+    /// TASK-CAUSAL-001: Perform omni-directional causal inference
+    pub const OMNI_INFER: &str = "omni_infer";
 }
 
 #[cfg(test)]
@@ -428,8 +614,8 @@ mod tests {
     #[test]
     fn test_get_tool_definitions() {
         let tools = get_tool_definitions();
-        // 6 original + 6 GWT tools + 3 ATC tools = 15 total
-        assert_eq!(tools.len(), 15);
+        // 6 original + 6 GWT tools + 3 ATC tools + 4 Dream tools + 2 Neuromod tools + 1 Steering + 1 Causal = 23 total
+        assert_eq!(tools.len(), 23);
 
         let tool_names: Vec<_> = tools.iter().map(|t| t.name.as_str()).collect();
         // Original 6 tools
@@ -450,6 +636,18 @@ mod tests {
         assert!(tool_names.contains(&"get_threshold_status"));
         assert!(tool_names.contains(&"get_calibration_metrics"));
         assert!(tool_names.contains(&"trigger_recalibration"));
+        // Dream tools (TASK-DREAM-MCP)
+        assert!(tool_names.contains(&"trigger_dream"));
+        assert!(tool_names.contains(&"get_dream_status"));
+        assert!(tool_names.contains(&"abort_dream"));
+        assert!(tool_names.contains(&"get_amortized_shortcuts"));
+        // Neuromod tools (TASK-NEUROMOD-MCP)
+        assert!(tool_names.contains(&"get_neuromodulation_state"));
+        assert!(tool_names.contains(&"adjust_neuromodulator"));
+        // Steering tools (TASK-STEERING-001)
+        assert!(tool_names.contains(&"get_steering_feedback"));
+        // Causal tools (TASK-CAUSAL-001)
+        assert!(tool_names.contains(&"omni_infer"));
     }
 
     #[test]

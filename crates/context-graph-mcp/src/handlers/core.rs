@@ -268,6 +268,30 @@ pub struct Handlers {
     /// TASK-ATC-001: Required for get_threshold_status, get_calibration_metrics, trigger_recalibration.
     /// Uses RwLock because calibration operations mutate internal state.
     pub(super) atc: Option<Arc<RwLock<context_graph_core::atc::AdaptiveThresholdCalibration>>>,
+
+    // ========== DREAM CONSOLIDATION (TASK-DREAM-MCP) ==========
+
+    /// Dream controller for managing dream consolidation cycles.
+    /// TASK-DREAM-MCP: Required for trigger_dream, get_dream_status, abort_dream.
+    /// Uses RwLock because dream cycle operations mutate internal state.
+    pub(super) dream_controller: Option<Arc<RwLock<context_graph_core::dream::DreamController>>>,
+
+    /// Dream scheduler for determining when to trigger dream cycles.
+    /// TASK-DREAM-MCP: Required for trigger_dream, get_dream_status.
+    /// Uses RwLock because activity tracking mutates internal state.
+    pub(super) dream_scheduler: Option<Arc<RwLock<context_graph_core::dream::DreamScheduler>>>,
+
+    /// Amortized learner for shortcut creation during dreams.
+    /// TASK-DREAM-MCP: Required for get_amortized_shortcuts.
+    /// Uses RwLock because shortcut tracking mutates internal state.
+    pub(super) amortized_learner: Option<Arc<RwLock<context_graph_core::dream::AmortizedLearner>>>,
+
+    // ========== NEUROMODULATION (TASK-NEUROMOD-MCP) ==========
+
+    /// Neuromodulation manager for controlling system behavior modulation.
+    /// TASK-NEUROMOD-MCP: Required for get_neuromodulation_state, adjust_neuromodulator.
+    /// Uses RwLock because modulator adjustments mutate internal state.
+    pub(super) neuromod_manager: Option<Arc<RwLock<context_graph_core::neuromod::NeuromodulationManager>>>,
 }
 
 impl Handlers {
@@ -320,6 +344,12 @@ impl Handlers {
             self_ego: None,
             // TASK-ATC-001: ATC defaults to None - use with_atc() for full ATC support
             atc: None,
+            // TASK-DREAM-MCP: Dream fields default to None - use with_dream() for full dream support
+            dream_controller: None,
+            dream_scheduler: None,
+            amortized_learner: None,
+            // TASK-NEUROMOD-MCP: Neuromod defaults to None - use with_neuromod() for full support
+            neuromod_manager: None,
         }
     }
 
@@ -373,6 +403,12 @@ impl Handlers {
             meta_cognitive: None,
             self_ego: None,
             atc: None,
+            // TASK-DREAM-MCP: Dream fields default to None
+            dream_controller: None,
+            dream_scheduler: None,
+            amortized_learner: None,
+            // TASK-NEUROMOD-MCP: Neuromod defaults to None
+            neuromod_manager: None,
         }
     }
 
@@ -424,6 +460,12 @@ impl Handlers {
             meta_cognitive: None,
             self_ego: None,
             atc: None,
+            // TASK-DREAM-MCP: Dream fields default to None
+            dream_controller: None,
+            dream_scheduler: None,
+            amortized_learner: None,
+            // TASK-NEUROMOD-MCP: Neuromod defaults to None
+            neuromod_manager: None,
         }
     }
 
@@ -467,6 +509,12 @@ impl Handlers {
             meta_cognitive: None,
             self_ego: None,
             atc: None,
+            // TASK-DREAM-MCP: Dream fields default to None
+            dream_controller: None,
+            dream_scheduler: None,
+            amortized_learner: None,
+            // TASK-NEUROMOD-MCP: Neuromod defaults to None
+            neuromod_manager: None,
         }
     }
 
@@ -514,6 +562,12 @@ impl Handlers {
             self_ego: None,
             // TASK-ATC-001: ATC provider default to None - use with_atc() for ATC support
             atc: None,
+            // TASK-DREAM-MCP: Dream fields default to None
+            dream_controller: None,
+            dream_scheduler: None,
+            amortized_learner: None,
+            // TASK-NEUROMOD-MCP: Neuromod defaults to None
+            neuromod_manager: None,
         }
     }
 
@@ -572,6 +626,12 @@ impl Handlers {
             self_ego: Some(self_ego),
             // TASK-ATC-001: ATC provider default to None - use with_atc() for ATC support
             atc: None,
+            // TASK-DREAM-MCP: Dream fields default to None
+            dream_controller: None,
+            dream_scheduler: None,
+            amortized_learner: None,
+            // TASK-NEUROMOD-MCP: Neuromod defaults to None
+            neuromod_manager: None,
         }
     }
 
@@ -639,6 +699,12 @@ impl Handlers {
             self_ego: Some(self_ego),
             // TASK-ATC-001: ATC provider default to None - use with_atc() for ATC support
             atc: None,
+            // TASK-DREAM-MCP: Dream fields default to None
+            dream_controller: None,
+            dream_scheduler: None,
+            amortized_learner: None,
+            // TASK-NEUROMOD-MCP: Neuromod defaults to None
+            neuromod_manager: None,
         }
     }
 

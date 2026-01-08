@@ -21,6 +21,9 @@ rand_distr.workspace = true
 dashmap = "5.5"
 bincode.workspace = true
 
+# PII detection regex patterns for L1 Sensing Layer (SEC-01, SEC-02)
+regex = "1.10"
+
 # Real HNSW implementation - NO FALLBACKS
 hnsw_rs = "0.3"
 

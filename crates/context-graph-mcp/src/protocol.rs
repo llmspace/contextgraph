@@ -182,6 +182,48 @@ pub mod error_codes {
     pub const SELF_EGO_ERROR: i32 = -32066;
     /// Identity continuity check failed
     pub const IDENTITY_CONTINUITY_ERROR: i32 = -32067;
+
+    // Dream consolidation error codes (-32070 to -32079) - TASK-DREAM-MCP
+    /// Dream controller/scheduler not initialized
+    pub const DREAM_NOT_INITIALIZED: i32 = -32070;
+    /// Dream cycle start/trigger failed
+    pub const DREAM_CYCLE_ERROR: i32 = -32071;
+    /// Dream abort failed
+    pub const DREAM_ABORT_ERROR: i32 = -32072;
+    /// Amortized learning error
+    pub const AMORTIZED_LEARNING_ERROR: i32 = -32073;
+
+    // Neuromodulation error codes (-32080 to -32089) - TASK-NEUROMOD-MCP
+    /// Neuromodulation manager not initialized
+    pub const NEUROMOD_NOT_INITIALIZED: i32 = -32080;
+    /// Neuromodulator adjustment failed
+    pub const NEUROMOD_ADJUSTMENT_ERROR: i32 = -32081;
+    /// Acetylcholine is read-only (managed by GWT)
+    pub const NEUROMOD_ACH_READ_ONLY: i32 = -32082;
+
+    // Steering error codes (-32090 to -32099) - TASK-STEERING-001
+    /// Steering system not initialized
+    pub const STEERING_NOT_INITIALIZED: i32 = -32090;
+    /// Steering feedback computation failed
+    pub const STEERING_FEEDBACK_ERROR: i32 = -32091;
+    /// Gardener component error
+    pub const GARDENER_ERROR: i32 = -32092;
+    /// Curator component error
+    pub const CURATOR_ERROR: i32 = -32093;
+    /// Assessor component error
+    pub const ASSESSOR_ERROR: i32 = -32094;
+
+    // Causal inference error codes (-32100 to -32109) - TASK-CAUSAL-001
+    /// Causal inference engine not initialized
+    pub const CAUSAL_NOT_INITIALIZED: i32 = -32100;
+    /// Invalid inference direction
+    pub const CAUSAL_INVALID_DIRECTION: i32 = -32101;
+    /// Causal inference failed
+    pub const CAUSAL_INFERENCE_ERROR: i32 = -32102;
+    /// Target node required for this direction
+    pub const CAUSAL_TARGET_REQUIRED: i32 = -32103;
+    /// Causal graph operation failed
+    pub const CAUSAL_GRAPH_ERROR: i32 = -32104;
 }
 
 /// MCP method names.

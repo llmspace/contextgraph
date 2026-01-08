@@ -17,14 +17,20 @@
 //! - `gwt_traits`: GWT provider traits for consciousness/Kuramoto integration (TASK-GWT-001)
 //! - `gwt_providers`: Real GWT provider implementations wrapping actual components (TASK-GWT-001)
 //! - `atc`: Adaptive Threshold Calibration handlers (TASK-ATC-001)
+//! - `steering`: Steering subsystem handlers (TASK-STEERING-001)
+//! - `causal`: Causal inference handlers (TASK-CAUSAL-001)
 
 mod atc;
+mod causal;
 mod core;
+mod dream;
 mod johari;
 mod lifecycle;
 mod memory;
+mod neuromod;
 mod purpose;
 mod search;
+mod steering;
 mod system;
 mod tools;
 mod utl;

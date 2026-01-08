@@ -103,6 +103,28 @@ impl Handlers {
             tool_names::TRIGGER_RECALIBRATION => {
                 self.handle_trigger_recalibration(id, Some(arguments)).await
             }
+            // TASK-DREAM-MCP: Dream consolidation tools
+            tool_names::TRIGGER_DREAM => self.call_trigger_dream(id, arguments).await,
+            tool_names::GET_DREAM_STATUS => self.call_get_dream_status(id).await,
+            tool_names::ABORT_DREAM => self.call_abort_dream(id, arguments).await,
+            tool_names::GET_AMORTIZED_SHORTCUTS => {
+                self.call_get_amortized_shortcuts(id, arguments).await
+            }
+            // TASK-NEUROMOD-MCP: Neuromodulation tools
+            tool_names::GET_NEUROMODULATION_STATE => {
+                self.call_get_neuromodulation_state(id).await
+            }
+            tool_names::ADJUST_NEUROMODULATOR => {
+                self.call_adjust_neuromodulator(id, arguments).await
+            }
+            // TASK-STEERING-001: Steering tools
+            tool_names::GET_STEERING_FEEDBACK => {
+                self.call_get_steering_feedback(id).await
+            }
+            // TASK-CAUSAL-001: Causal inference tools
+            tool_names::OMNI_INFER => {
+                self.call_omni_infer(id, arguments).await
+            }
             _ => JsonRpcResponse::error(
                 id,
                 error_codes::TOOL_NOT_FOUND,

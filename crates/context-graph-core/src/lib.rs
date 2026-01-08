@@ -28,16 +28,21 @@
 
 pub mod alignment;
 pub mod atc;
+pub mod causal;
 pub mod config;
+pub mod dream;
 pub mod error;
 pub mod gwt;
 pub mod index;
 pub mod johari;
+pub mod layers;
 pub mod marblestone;
 pub mod monitoring;
+pub mod neuromod;
 pub mod purpose;
 pub mod retrieval;
 pub mod similarity;
+pub mod steering;
 pub mod stubs;
 pub mod traits;
 pub mod types;
