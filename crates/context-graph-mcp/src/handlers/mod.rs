@@ -16,7 +16,9 @@
 //! - `system`: System status and health handlers
 //! - `gwt_traits`: GWT provider traits for consciousness/Kuramoto integration (TASK-GWT-001)
 //! - `gwt_providers`: Real GWT provider implementations wrapping actual components (TASK-GWT-001)
+//! - `atc`: Adaptive Threshold Calibration handlers (TASK-ATC-001)
 
+mod atc;
 mod core;
 mod johari;
 mod lifecycle;

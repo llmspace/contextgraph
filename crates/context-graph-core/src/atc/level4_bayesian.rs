@@ -42,6 +42,13 @@ pub struct GaussianProcessTracker {
 }
 
 impl GaussianProcessTracker {
+    /// Signal variance for the RBF kernel (controls amplitude of function variation)
+    const SIGNAL_VARIANCE: f64 = 1.0;
+    /// Length scale for the RBF kernel (controls smoothness - lower = more local)
+    const LENGTH_SCALE: f64 = 0.1;
+    /// Observation noise variance
+    const NOISE_VARIANCE: f64 = 0.01;
+
     pub fn new() -> Self {
         Self {
             observations: Vec::new(),
@@ -85,11 +92,95 @@ impl GaussianProcessTracker {
         self.variance = variance.max(0.01); // Avoid zero variance
     }
 
-    /// Estimate performance for a threshold configuration (simplified)
-    pub fn predict_performance(&self, _thresholds: &HashMap<String, f32>) -> (f32, f32) {
-        // Simplified: return mean ± sqrt(variance)
-        // In a real implementation, this would use actual GP prediction
-        (self.mean, self.variance.sqrt())
+    /// Squared Exponential (RBF) kernel function
+    /// k(x, x') = sigma^2 * exp(-||x - x'||^2 / (2 * l^2))
+    ///
+    /// This kernel measures similarity between two threshold configurations.
+    /// Close configurations have high kernel values (near 1), distant ones have low (near 0).
+    fn kernel(&self, config1: &HashMap<String, f32>, config2: &HashMap<String, f32>) -> f64 {
+        // Collect all keys from both configurations
+        let mut all_keys: Vec<&String> = config1.keys().collect();
+        for key in config2.keys() {
+            if !config1.contains_key(key) {
+                all_keys.push(key);
+            }
+        }
+
+        // Compute squared Euclidean distance between configurations
+        let mut sq_dist = 0.0_f64;
+        for key in &all_keys {
+            let v1 = config1.get(*key).copied().unwrap_or(0.0) as f64;
+            let v2 = config2.get(*key).copied().unwrap_or(0.0) as f64;
+            sq_dist += (v1 - v2).powi(2);
+        }
+
+        // RBF kernel: k(x, x') = sigma^2 * exp(-||x - x'||^2 / (2 * l^2))
+        Self::SIGNAL_VARIANCE * (-sq_dist / (2.0 * Self::LENGTH_SCALE.powi(2))).exp()
+    }
+
+    /// Predict performance for a threshold configuration using GP posterior
+    ///
+    /// Uses kernel-weighted averaging as an efficient approximation to the full GP posterior:
+    /// - GP posterior mean: mu* = k*^T (K + sigma^2 I)^{-1} y
+    /// - GP posterior variance: sigma*^2 = k** - k*^T (K + sigma^2 I)^{-1} k*
+    ///
+    /// The simplified approach:
+    /// - Mean: blend between prior and kernel-weighted observation mean, based on total kernel weight
+    /// - Variance: decreases near observations (high kernel similarity), high far from them
+    pub fn predict_performance(&self, thresholds: &HashMap<String, f32>) -> (f32, f32) {
+        // Prior parameters
+        const PRIOR_MEAN: f64 = 0.5;
+        const PRIOR_STD: f64 = 0.3;
+
+        // Return prior when no observations
+        if self.observations.is_empty() {
+            return (PRIOR_MEAN as f32, PRIOR_STD as f32);
+        }
+
+        // Compute kernel similarity to all past observations
+        let mut kernel_weights: Vec<f64> = Vec::with_capacity(self.observations.len());
+        let mut weight_sum = 0.0_f64;
+        let mut max_kernel = 0.0_f64;
+
+        for obs in &self.observations {
+            let k = self.kernel(thresholds, &obs.thresholds);
+            kernel_weights.push(k);
+            weight_sum += k;
+            if k > max_kernel {
+                max_kernel = k;
+            }
+        }
+
+        // If input is very far from all observations (all kernels near zero),
+        // return prior with high uncertainty
+        if weight_sum < 1e-10 {
+            return (PRIOR_MEAN as f32, PRIOR_STD as f32);
+        }
+
+        // Compute kernel-weighted mean of observations
+        // mu_obs = sum_i(k_i * y_i) / sum_i(k_i)
+        let mut obs_weighted_mean = 0.0_f64;
+        for (i, obs) in self.observations.iter().enumerate() {
+            obs_weighted_mean += (kernel_weights[i] / weight_sum) * obs.performance as f64;
+        }
+
+        // The key insight: blend between prior and observation mean based on confidence
+        // When max_kernel is high (query near an observation), trust the data more
+        // When max_kernel is low (query far from all observations), revert to prior
+        //
+        // The effective number of observations at this point is proportional to weight_sum
+        // We use max_kernel as a blend factor since it represents how "close" we are to data
+        let blend_factor = max_kernel; // 1.0 = at observation, 0.0 = far from all
+        let predicted_mean = blend_factor * obs_weighted_mean + (1.0 - blend_factor) * PRIOR_MEAN;
+
+        // Posterior variance: decreases near observations
+        // sigma*^2 = prior_variance * (1 - max_kernel) + noise
+        // At an observation (max_kernel=1): variance = noise only
+        // Far from observations (max_kernel=0): variance = prior_variance + noise
+        let prior_var = PRIOR_STD.powi(2);
+        let predicted_variance = (prior_var * (1.0 - max_kernel) + Self::NOISE_VARIANCE).max(0.01);
+
+        (predicted_mean as f32, predicted_variance.sqrt() as f32)
     }
 
     /// Compute Expected Improvement
@@ -381,5 +472,185 @@ mod tests {
         let gp = GaussianProcessTracker::new();
         let ei = gp.expected_improvement(0.6, 0.1);
         assert!(ei >= 0.0);
+    }
+
+    #[test]
+    fn test_gp_prediction_varies_with_input() {
+        let mut gp = GaussianProcessTracker::new();
+
+        // Add an observation at a specific point
+        let obs = ThresholdObservation {
+            thresholds: HashMap::from([
+                ("theta_opt".to_string(), 0.75),
+                ("theta_acc".to_string(), 0.70),
+            ]),
+            performance: 0.90,
+            timestamp: Utc::now(),
+        };
+        gp.add_observation(obs);
+
+        // Prediction at same point should be close to observed value
+        let same_config = HashMap::from([
+            ("theta_opt".to_string(), 0.75),
+            ("theta_acc".to_string(), 0.70),
+        ]);
+        let (mean_same, std_same) = gp.predict_performance(&same_config);
+
+        // Prediction at a different point should differ
+        let diff_config = HashMap::from([
+            ("theta_opt".to_string(), 0.60),
+            ("theta_acc".to_string(), 0.55),
+        ]);
+        let (mean_diff, std_diff) = gp.predict_performance(&diff_config);
+
+        // Near observation: prediction should be close to observed value
+        assert!(
+            (mean_same - 0.90).abs() < 0.1,
+            "Prediction at observed point should be close to observed value, got {} vs 0.90",
+            mean_same
+        );
+
+        // Far from observation: predictions should differ
+        assert!(
+            (mean_same - mean_diff).abs() > 0.01,
+            "Predictions should vary with input: same={} vs diff={}",
+            mean_same,
+            mean_diff
+        );
+
+        // Uncertainty should be higher far from observations
+        assert!(
+            std_diff > std_same,
+            "Uncertainty should be higher far from observations: std_diff={} vs std_same={}",
+            std_diff,
+            std_same
+        );
+    }
+
+    #[test]
+    fn test_gp_prediction_empty_returns_prior() {
+        let gp = GaussianProcessTracker::new();
+        let config = HashMap::from([("theta_opt".to_string(), 0.75)]);
+        let (mean, std) = gp.predict_performance(&config);
+
+        // Should return prior: mean=0.5, high uncertainty
+        assert!(
+            (mean - 0.5).abs() < 0.1,
+            "Empty GP should return prior mean ~0.5, got {}",
+            mean
+        );
+        assert!(
+            std > 0.2,
+            "Empty GP should have high uncertainty (std > 0.2), got {}",
+            std
+        );
+    }
+
+    #[test]
+    fn test_kernel_similarity() {
+        let gp = GaussianProcessTracker::new();
+
+        // Identical configurations should have kernel = 1.0
+        let config1 = HashMap::from([
+            ("theta_opt".to_string(), 0.75),
+            ("theta_acc".to_string(), 0.70),
+        ]);
+        let k_same = gp.kernel(&config1, &config1);
+        assert!(
+            (k_same - 1.0).abs() < 0.01,
+            "Kernel of identical configs should be ~1.0, got {}",
+            k_same
+        );
+
+        // Different configurations should have lower kernel
+        let config2 = HashMap::from([
+            ("theta_opt".to_string(), 0.60),
+            ("theta_acc".to_string(), 0.55),
+        ]);
+        let k_diff = gp.kernel(&config1, &config2);
+        assert!(
+            k_diff < k_same,
+            "Kernel of different configs should be less than identical: {} vs {}",
+            k_diff,
+            k_same
+        );
+        assert!(
+            k_diff > 0.0,
+            "Kernel should be positive, got {}",
+            k_diff
+        );
+    }
+
+    #[test]
+    fn test_gp_multiple_observations() {
+        let mut gp = GaussianProcessTracker::new();
+
+        // Add observation at low performance point
+        gp.add_observation(ThresholdObservation {
+            thresholds: HashMap::from([
+                ("theta_opt".to_string(), 0.65),
+                ("theta_acc".to_string(), 0.60),
+            ]),
+            performance: 0.60,
+            timestamp: Utc::now(),
+        });
+
+        // Add observation at high performance point
+        gp.add_observation(ThresholdObservation {
+            thresholds: HashMap::from([
+                ("theta_opt".to_string(), 0.85),
+                ("theta_acc".to_string(), 0.80),
+            ]),
+            performance: 0.95,
+            timestamp: Utc::now(),
+        });
+
+        // Prediction near low-performance observation
+        let near_low = HashMap::from([
+            ("theta_opt".to_string(), 0.65),
+            ("theta_acc".to_string(), 0.60),
+        ]);
+        let (mean_low, _) = gp.predict_performance(&near_low);
+
+        // Prediction near high-performance observation
+        let near_high = HashMap::from([
+            ("theta_opt".to_string(), 0.85),
+            ("theta_acc".to_string(), 0.80),
+        ]);
+        let (mean_high, _) = gp.predict_performance(&near_high);
+
+        // Should reflect the different performance values
+        assert!(
+            mean_high > mean_low,
+            "Prediction near high-perf obs ({}) should be > near low-perf obs ({})",
+            mean_high,
+            mean_low
+        );
+    }
+
+    #[test]
+    fn test_bayesian_optimizer_suggest_varies() {
+        let constraints = ThresholdConstraints::default();
+        let mut optimizer = BayesianOptimizer::new(constraints);
+
+        // First suggestion (no observations) - should return midpoint
+        let first_suggestion = optimizer.suggest_next();
+
+        // Add observation
+        optimizer.observe(
+            HashMap::from([
+                ("theta_opt".to_string(), 0.75),
+                ("theta_acc".to_string(), 0.70),
+                ("theta_warn".to_string(), 0.55),
+            ]),
+            0.85,
+        );
+
+        // Second suggestion should potentially differ (EI-driven exploration)
+        let second_suggestion = optimizer.suggest_next();
+
+        // Both should be valid
+        assert!(optimizer.constraints.is_valid(&first_suggestion));
+        assert!(optimizer.constraints.is_valid(&second_suggestion));
     }
 }

@@ -715,11 +715,19 @@ mod tests {
         )
         .unwrap();
 
-        let results = index.search(&query).unwrap();
+        // FAIL-FAST: Searching an empty index should return an error, not silently return empty
+        let result = index.search(&query);
+        assert!(result.is_err(), "Search on empty index should fail fast with IndexEmpty error");
 
-        assert!(results.is_empty());
+        let err = result.unwrap_err();
+        let err_msg = err.to_string();
+        assert!(
+            err_msg.contains("IndexEmpty") || err_msg.contains("empty"),
+            "Expected IndexEmpty error, got: {}",
+            err_msg
+        );
 
-        println!("[VERIFIED] Search on empty index returns empty results");
+        println!("[VERIFIED] Search on empty index fails fast with error: {}", err_msg);
     }
 
     #[test]

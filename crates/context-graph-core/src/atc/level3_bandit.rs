@@ -10,6 +10,8 @@
 
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
+use rand::prelude::*;
+use rand_distr::Beta;
 
 /// Arm of the bandit (threshold candidate)
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -106,23 +108,48 @@ impl ThresholdBandit {
     }
 
     /// Select arm using Thompson sampling
-    /// (Simplified: uses Beta mean instead of sampling for determinism)
+    ///
+    /// For each arm, samples from Beta(α, β) distribution and selects the arm
+    /// with the highest sampled value. This provides proper exploration-exploitation
+    /// balance: arms with uncertain rewards (high variance) have a chance to be
+    /// selected even if their mean is lower.
     pub fn select_thompson(&self) -> Option<ThresholdArm> {
         if self.arms.is_empty() {
             return None;
         }
 
+        let mut rng = thread_rng();
         let mut best_arm_idx = 0;
-        let mut best_score = -1.0f32;
+        let mut best_sample = f32::NEG_INFINITY;
 
         for (idx, _) in self.arms.iter().enumerate() {
             if let Some(stats) = self.stats.get(&(idx as u32)) {
-                let (alpha, beta) = stats.get_beta_params();
+                let (alpha, beta_param) = stats.get_beta_params();
 
-                // Use Beta mean: α/(α+β) as proxy for sampling
-                let mean = alpha / (alpha + beta);
-                if mean > best_score {
-                    best_score = mean;
+                // Sample from Beta distribution for true Thompson sampling
+                let sample = match Beta::new(alpha as f64, beta_param as f64) {
+                    Ok(dist) => dist.sample(&mut rng) as f32,
+                    Err(e) => {
+                        // Invalid Beta parameters should not happen with proper alpha/beta (both >= 1.0)
+                        // This is a programming error, not a runtime condition to handle silently
+                        tracing::error!(
+                            alpha = alpha,
+                            beta = beta_param,
+                            error = %e,
+                            "Invalid Beta distribution parameters - this indicates a bug"
+                        );
+                        // Return error by panicking in debug, use mean in release as last resort
+                        #[cfg(debug_assertions)]
+                        panic!("Invalid Beta distribution parameters: alpha={}, beta={}", alpha, beta_param);
+                        #[cfg(not(debug_assertions))]
+                        {
+                            alpha / (alpha + beta_param)
+                        }
+                    }
+                };
+
+                if sample > best_sample {
+                    best_sample = sample;
                     best_arm_idx = idx;
                 }
             }
@@ -344,5 +371,126 @@ mod tests {
         let (best, mean) = bandit.get_best_arm().unwrap();
         assert_eq!(best.value, 0.80);
         assert_eq!(mean, 1.0);
+    }
+
+    #[test]
+    fn test_thompson_sampling_explores() {
+        // This test verifies that Thompson sampling actually explores
+        // rather than always picking the empirically best arm (greedy behavior)
+        let arms = vec![
+            ThresholdArm { value: 0.70 },
+            ThresholdArm { value: 0.75 },
+            ThresholdArm { value: 0.80 },
+        ];
+        let mut bandit = ThresholdBandit::new(arms.clone(), 1.5);
+
+        // Give arm 0.80 a perfect record (10 successes, 0 failures)
+        // Beta(11, 1) - very confident this is good
+        for _ in 0..10 {
+            bandit.record_outcome(ThresholdArm { value: 0.80 }, true);
+        }
+
+        // Give arm 0.70 a decent record (5 successes, 2 failures)
+        // Beta(6, 3) - less data, more uncertainty
+        for _ in 0..5 {
+            bandit.record_outcome(ThresholdArm { value: 0.70 }, true);
+        }
+        for _ in 0..2 {
+            bandit.record_outcome(ThresholdArm { value: 0.70 }, false);
+        }
+
+        // Give arm 0.75 minimal data (1 success)
+        // Beta(2, 1) - high uncertainty
+        bandit.record_outcome(ThresholdArm { value: 0.75 }, true);
+
+        // Run many selections - Thompson sampling should sometimes pick non-optimal arms
+        // due to the stochastic nature of sampling from the Beta distributions
+        let mut selected_counts = std::collections::HashMap::new();
+        for _ in 0..1000 {
+            let selected = bandit.select_thompson().unwrap();
+            *selected_counts.entry(ordered_float(selected.value)).or_insert(0u32) += 1;
+        }
+
+        let count_080 = *selected_counts.get(&ordered_float(0.80)).unwrap_or(&0);
+        let count_075 = *selected_counts.get(&ordered_float(0.75)).unwrap_or(&0);
+        let count_070 = *selected_counts.get(&ordered_float(0.70)).unwrap_or(&0);
+        let other_count = count_075 + count_070;
+
+        // Thompson sampling MUST explore: other arms should be selected sometimes
+        // With Beta(11,1), Beta(6,3), Beta(2,1), the uncertain arms will occasionally
+        // sample higher than the best arm
+        assert!(
+            other_count > 0,
+            "Thompson sampling should explore other arms, but only selected 0.80 arm. \
+             This indicates the implementation is greedy, not stochastic. \
+             Counts: 0.80={}, 0.75={}, 0.70={}",
+            count_080, count_075, count_070
+        );
+
+        // But the best arm should still be selected most often (it has highest mean)
+        assert!(
+            count_080 > other_count,
+            "Best arm (0.80) should still be selected most often. \
+             Counts: 0.80={}, others={}",
+            count_080, other_count
+        );
+
+        // Sanity check: all selections should sum to 1000
+        assert_eq!(count_080 + count_075 + count_070, 1000);
+    }
+
+    /// Helper to create a hashable key from f32 for test purposes
+    fn ordered_float(f: f32) -> u32 {
+        // Convert to bits for exact comparison (works for our test values)
+        f.to_bits()
+    }
+
+    #[test]
+    fn test_thompson_sampling_with_uniform_priors() {
+        // When all arms have no data (uniform Beta(1,1) priors),
+        // Thompson sampling should explore all arms roughly equally
+        let arms = vec![
+            ThresholdArm { value: 0.70 },
+            ThresholdArm { value: 0.75 },
+            ThresholdArm { value: 0.80 },
+        ];
+        let bandit = ThresholdBandit::new(arms.clone(), 1.5);
+
+        let mut selected_counts = std::collections::HashMap::new();
+        for _ in 0..3000 {
+            let selected = bandit.select_thompson().unwrap();
+            *selected_counts.entry(ordered_float(selected.value)).or_insert(0u32) += 1;
+        }
+
+        // With uniform priors, each arm should be selected roughly 1000 times
+        // Allow for statistical variance (should be within 600-1400 range for 3000 trials)
+        for arm in &arms {
+            let count = *selected_counts.get(&ordered_float(arm.value)).unwrap_or(&0);
+            assert!(
+                count >= 600 && count <= 1400,
+                "With uniform priors, arm {} should be selected ~1000 times but got {}",
+                arm.value, count
+            );
+        }
+    }
+
+    #[test]
+    fn test_thompson_sampling_returns_some() {
+        let arms = vec![
+            ThresholdArm { value: 0.70 },
+            ThresholdArm { value: 0.75 },
+        ];
+        let bandit = ThresholdBandit::new(arms, 1.5);
+
+        // Should always return Some for non-empty bandit
+        for _ in 0..100 {
+            assert!(bandit.select_thompson().is_some());
+        }
+    }
+
+    #[test]
+    fn test_thompson_sampling_empty_bandit() {
+        let bandit = ThresholdBandit::new(vec![], 1.5);
+        assert!(bandit.select_thompson().is_none());
     }
 }

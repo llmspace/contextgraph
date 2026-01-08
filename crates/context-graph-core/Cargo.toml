@@ -17,6 +17,7 @@ toml.workspace = true
 uuid.workspace = true
 chrono.workspace = true
 rand.workspace = true
+rand_distr.workspace = true
 dashmap = "5.5"
 bincode.workspace = true
 

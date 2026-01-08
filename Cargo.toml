@@ -48,6 +48,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Utilities
 rand = "0.8"
+rand_distr = "0.4"
 
 # GPU/ML - Candle framework (HuggingFace)
 # https://github.com/huggingface/candle

@@ -24,13 +24,14 @@ async fn test_tools_list_returns_all_12_tools() {
         .as_array()
         .expect("tools must be an array");
 
-    // Verify exactly 12 tools returned:
+    // Verify exactly 15 tools returned:
     // Original 6: inject_context, store_memory, get_memetic_status, get_graph_manifest, search_graph, utl_status
     // GWT 6: get_consciousness_state, get_kuramoto_sync, get_workspace_status, get_ego_state, trigger_workspace_broadcast, adjust_coupling
+    // ATC 3 (TASK-ATC-001): get_threshold_status, get_calibration_metrics, trigger_recalibration
     assert_eq!(
         tools.len(),
-        12,
-        "Must return exactly 12 tools, got {}",
+        15,
+        "Must return exactly 15 tools, got {}",
         tools.len()
     );
 }

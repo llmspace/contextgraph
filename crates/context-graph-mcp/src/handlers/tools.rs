@@ -93,6 +93,16 @@ impl Handlers {
                 self.call_trigger_workspace_broadcast(id, arguments).await
             }
             tool_names::ADJUST_COUPLING => self.call_adjust_coupling(id, arguments).await,
+            // TASK-ATC-001: Adaptive Threshold Calibration tools
+            tool_names::GET_THRESHOLD_STATUS => {
+                self.handle_get_threshold_status(id, Some(arguments)).await
+            }
+            tool_names::GET_CALIBRATION_METRICS => {
+                self.handle_get_calibration_metrics(id, Some(arguments)).await
+            }
+            tool_names::TRIGGER_RECALIBRATION => {
+                self.handle_trigger_recalibration(id, Some(arguments)).await
+            }
             _ => JsonRpcResponse::error(
                 id,
                 error_codes::TOOL_NOT_FOUND,

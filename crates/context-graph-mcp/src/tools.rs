@@ -312,6 +312,81 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                 "required": ["new_K"]
             }),
         ),
+
+        // ========== ADAPTIVE THRESHOLD CALIBRATION (ATC) TOOLS ==========
+
+        // get_threshold_status - Get current threshold status (TASK-ATC-001)
+        ToolDefinition::new(
+            "get_threshold_status",
+            "Get current ATC threshold status including all thresholds, calibration state, \
+             and adaptation metrics. Returns per-embedder temperatures, drift scores, and \
+             bandit exploration stats. Requires ATC provider to be initialized.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "domain": {
+                        "type": "string",
+                        "enum": ["Code", "Medical", "Legal", "Creative", "Research", "General"],
+                        "default": "General",
+                        "description": "Domain for threshold context (affects priors)"
+                    },
+                    "embedder_id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 13,
+                        "description": "Optional: specific embedder (1-13) for detailed temperature info"
+                    }
+                },
+                "required": []
+            }),
+        ),
+
+        // get_calibration_metrics - Get calibration quality metrics (TASK-ATC-001)
+        ToolDefinition::new(
+            "get_calibration_metrics",
+            "Get calibration quality metrics: ECE (Expected Calibration Error), \
+             MCE (Maximum Calibration Error), Brier Score, drift scores per threshold, \
+             and calibration status. Targets: ECE < 0.05 (excellent), < 0.10 (good).",
+            json!({
+                "type": "object",
+                "properties": {
+                    "timeframe": {
+                        "type": "string",
+                        "enum": ["1h", "24h", "7d", "30d"],
+                        "default": "24h",
+                        "description": "Timeframe for metrics aggregation"
+                    }
+                },
+                "required": []
+            }),
+        ),
+
+        // trigger_recalibration - Manually trigger recalibration (TASK-ATC-001)
+        ToolDefinition::new(
+            "trigger_recalibration",
+            "Manually trigger recalibration at a specific ATC level. \
+             Level 1: EWMA drift adjustment. Level 2: Temperature scaling. \
+             Level 3: Thompson Sampling exploration. Level 4: Bayesian meta-optimization. \
+             Returns new thresholds and number of observations used.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "level": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 4,
+                        "description": "ATC level to trigger (1=EWMA, 2=Temperature, 3=Bandit, 4=Bayesian)"
+                    },
+                    "domain": {
+                        "type": "string",
+                        "enum": ["Code", "Medical", "Legal", "Creative", "Research", "General"],
+                        "default": "General",
+                        "description": "Domain context for recalibration"
+                    }
+                },
+                "required": ["level"]
+            }),
+        ),
     ]
 }
 
@@ -335,6 +410,15 @@ pub mod tool_names {
     pub const TRIGGER_WORKSPACE_BROADCAST: &str = "trigger_workspace_broadcast";
     /// TASK-GWT-001: Adjust Kuramoto coupling strength K
     pub const ADJUST_COUPLING: &str = "adjust_coupling";
+
+    // ========== ADAPTIVE THRESHOLD CALIBRATION (ATC) TOOLS (TASK-ATC-001) ==========
+
+    /// TASK-ATC-001: Get current ATC threshold status
+    pub const GET_THRESHOLD_STATUS: &str = "get_threshold_status";
+    /// TASK-ATC-001: Get calibration quality metrics (ECE, MCE, Brier)
+    pub const GET_CALIBRATION_METRICS: &str = "get_calibration_metrics";
+    /// TASK-ATC-001: Manually trigger recalibration at a specific level
+    pub const TRIGGER_RECALIBRATION: &str = "trigger_recalibration";
 }
 
 #[cfg(test)]
@@ -344,8 +428,8 @@ mod tests {
     #[test]
     fn test_get_tool_definitions() {
         let tools = get_tool_definitions();
-        // 6 original + 6 GWT tools = 12 total
-        assert_eq!(tools.len(), 12);
+        // 6 original + 6 GWT tools + 3 ATC tools = 15 total
+        assert_eq!(tools.len(), 15);
 
         let tool_names: Vec<_> = tools.iter().map(|t| t.name.as_str()).collect();
         // Original 6 tools
@@ -362,6 +446,10 @@ mod tests {
         assert!(tool_names.contains(&"get_ego_state"));
         assert!(tool_names.contains(&"trigger_workspace_broadcast"));
         assert!(tool_names.contains(&"adjust_coupling"));
+        // ATC tools (TASK-ATC-001)
+        assert!(tool_names.contains(&"get_threshold_status"));
+        assert!(tool_names.contains(&"get_calibration_metrics"));
+        assert!(tool_names.contains(&"trigger_recalibration"));
     }
 
     #[test]

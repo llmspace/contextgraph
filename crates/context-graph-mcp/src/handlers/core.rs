@@ -261,6 +261,13 @@ pub struct Handlers {
     /// Self-ego node provider for system identity tracking.
     /// TASK-GWT-001: Required for identity continuity monitoring.
     pub(super) self_ego: Option<Arc<tokio::sync::RwLock<dyn SelfEgoProvider>>>,
+
+    // ========== ADAPTIVE THRESHOLD CALIBRATION (TASK-ATC-001) ==========
+
+    /// Adaptive Threshold Calibration system for self-learning thresholds.
+    /// TASK-ATC-001: Required for get_threshold_status, get_calibration_metrics, trigger_recalibration.
+    /// Uses RwLock because calibration operations mutate internal state.
+    pub(super) atc: Option<Arc<RwLock<context_graph_core::atc::AdaptiveThresholdCalibration>>>,
 }
 
 impl Handlers {
@@ -311,6 +318,8 @@ impl Handlers {
             workspace_provider: None,
             meta_cognitive: None,
             self_ego: None,
+            // TASK-ATC-001: ATC defaults to None - use with_atc() for full ATC support
+            atc: None,
         }
     }
 
@@ -363,6 +372,7 @@ impl Handlers {
             workspace_provider: None,
             meta_cognitive: None,
             self_ego: None,
+            atc: None,
         }
     }
 
@@ -413,6 +423,7 @@ impl Handlers {
             workspace_provider: None,
             meta_cognitive: None,
             self_ego: None,
+            atc: None,
         }
     }
 
@@ -455,6 +466,7 @@ impl Handlers {
             workspace_provider: None,
             meta_cognitive: None,
             self_ego: None,
+            atc: None,
         }
     }
 
@@ -500,6 +512,8 @@ impl Handlers {
             workspace_provider: None,
             meta_cognitive: None,
             self_ego: None,
+            // TASK-ATC-001: ATC provider default to None - use with_atc() for ATC support
+            atc: None,
         }
     }
 
@@ -556,6 +570,8 @@ impl Handlers {
             workspace_provider: Some(workspace_provider),
             meta_cognitive: Some(meta_cognitive),
             self_ego: Some(self_ego),
+            // TASK-ATC-001: ATC provider default to None - use with_atc() for ATC support
+            atc: None,
         }
     }
 
@@ -621,6 +637,8 @@ impl Handlers {
             workspace_provider: Some(workspace_provider),
             meta_cognitive: Some(meta_cognitive),
             self_ego: Some(self_ego),
+            // TASK-ATC-001: ATC provider default to None - use with_atc() for ATC support
+            atc: None,
         }
     }
 

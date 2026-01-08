@@ -34,17 +34,17 @@ use async_trait::async_trait;
 use tracing::{debug, error, instrument, warn};
 use uuid::Uuid;
 
-use crate::alignment::{AlignmentConfig, AlignmentResult, GoalAlignmentCalculator};
-use crate::config::constants::estimation;
+use crate::alignment::{AlignmentConfig, GoalAlignmentCalculator};
 use crate::error::{CoreError, CoreResult};
-use crate::johari::{ClassificationContext, JohariTransitionManager};
+use crate::johari::JohariTransitionManager;
 use crate::purpose::GoalHierarchy;
+use crate::traits::TeleologicalMemoryStore;
 use crate::types::fingerprint::{TeleologicalFingerprint, NUM_EMBEDDERS};
 use crate::types::JohariQuadrant;
 
 use super::teleological_query::TeleologicalQuery;
 use super::teleological_result::{
-    AlignmentLevel, PipelineBreakdown, ScoredMemory, TeleologicalRetrievalResult,
+    PipelineBreakdown, ScoredMemory, TeleologicalRetrievalResult,
 };
 use super::{AggregatedMatch, MultiEmbeddingQueryExecutor, MultiEmbeddingResult, PipelineStageTiming};
 
@@ -132,11 +132,12 @@ pub struct PipelineHealth {
 ///
 /// All internal components are wrapped in `Arc` for shared access
 /// across async tasks.
-pub struct DefaultTeleologicalPipeline<E, A, J>
+pub struct DefaultTeleologicalPipeline<E, A, J, S>
 where
     E: MultiEmbeddingQueryExecutor,
     A: GoalAlignmentCalculator,
     J: JohariTransitionManager,
+    S: TeleologicalMemoryStore,
 {
     /// Multi-embedding executor (Stages 1-3, 5).
     executor: Arc<E>,
@@ -146,6 +147,9 @@ where
 
     /// Johari manager for quadrant classification (Stage 4).
     johari_manager: Arc<J>,
+
+    /// Teleological memory store for fetching fingerprints (Stage 4).
+    store: Arc<S>,
 
     /// Goal hierarchy for alignment computation.
     goal_hierarchy: Arc<GoalHierarchy>,
@@ -157,11 +161,12 @@ where
     last_query_time: std::sync::RwLock<Option<Duration>>,
 }
 
-impl<E, A, J> DefaultTeleologicalPipeline<E, A, J>
+impl<E, A, J, S> DefaultTeleologicalPipeline<E, A, J, S>
 where
     E: MultiEmbeddingQueryExecutor,
     A: GoalAlignmentCalculator,
     J: JohariTransitionManager,
+    S: TeleologicalMemoryStore,
 {
     /// Create a new pipeline with all required components.
     ///
@@ -169,17 +174,20 @@ where
     /// * `executor` - Multi-embedding query executor
     /// * `alignment_calculator` - Goal alignment calculator
     /// * `johari_manager` - Johari transition manager
+    /// * `store` - Teleological memory store for fingerprint retrieval (Stage 4)
     /// * `goal_hierarchy` - Goal hierarchy for alignment
     pub fn new(
         executor: Arc<E>,
         alignment_calculator: Arc<A>,
         johari_manager: Arc<J>,
+        store: Arc<S>,
         goal_hierarchy: GoalHierarchy,
     ) -> Self {
         Self {
             executor,
             alignment_calculator,
             johari_manager,
+            store,
             goal_hierarchy: Arc::new(goal_hierarchy),
             index_size: std::sync::atomic::AtomicUsize::new(0),
             last_query_time: std::sync::RwLock::new(None),
@@ -359,11 +367,12 @@ where
 }
 
 #[async_trait]
-impl<E, A, J> TeleologicalRetrievalPipeline for DefaultTeleologicalPipeline<E, A, J>
+impl<E, A, J, S> TeleologicalRetrievalPipeline for DefaultTeleologicalPipeline<E, A, J, S>
 where
     E: MultiEmbeddingQueryExecutor + Send + Sync,
     A: GoalAlignmentCalculator + Send + Sync,
     J: JohariTransitionManager + Send + Sync,
+    S: TeleologicalMemoryStore + Send + Sync,
 {
     #[instrument(skip(self, query), fields(query_text = %query.text))]
     async fn execute(&self, query: &TeleologicalQuery) -> CoreResult<TeleologicalRetrievalResult> {
@@ -412,10 +421,40 @@ where
         // Stage 4: Teleological filtering
         let stage4_start = Instant::now();
 
-        // We need fingerprints for Stage 4 - for now create placeholder
-        // In production, this would fetch from the store
-        let stage4_results = self.stage4_placeholder_filtering(&me_result, query, &config).await;
+        // Fetch actual fingerprints from store for Stage 4 teleological computation
+        let memory_ids: Vec<Uuid> = me_result.results.iter().map(|r| r.memory_id).collect();
+        let fingerprints = self.store.retrieve_batch(&memory_ids).await.map_err(|e| {
+            error!(error = %e, "Failed to fetch fingerprints for Stage 4");
+            CoreError::StorageError(format!("Stage 4 fingerprint fetch failed: {}", e))
+        })?;
+
+        // Pair fingerprints with their aggregated matches
+        let mut candidates: Vec<(&TeleologicalFingerprint, &AggregatedMatch)> = Vec::new();
+        for (i, maybe_fp) in fingerprints.iter().enumerate() {
+            if let Some(fp) = maybe_fp {
+                candidates.push((fp, &me_result.results[i]));
+            } else {
+                warn!(
+                    memory_id = %memory_ids[i],
+                    "Fingerprint not found in store - skipping candidate"
+                );
+            }
+        }
+
+        // Apply proper Stage 4 filtering with real fingerprints
+        let (stage4_results, filtered_count, avg_filtered_alignment) = self
+            .apply_stage4_filtering(&candidates, query)
+            .await?;
+
         let stage4_time = stage4_start.elapsed();
+
+        debug!(
+            candidates_in = candidates.len(),
+            results_out = stage4_results.len(),
+            filtered = filtered_count,
+            avg_filtered_alignment = avg_filtered_alignment,
+            "Stage 4 teleological filtering complete"
+        );
 
         // Build timing from executor result + Stage 4
         let timing = if let Some(ref me_timing) = me_result.stage_timings {
@@ -552,62 +591,13 @@ where
     }
 }
 
-impl<E, A, J> DefaultTeleologicalPipeline<E, A, J>
+impl<E, A, J, S> DefaultTeleologicalPipeline<E, A, J, S>
 where
     E: MultiEmbeddingQueryExecutor,
     A: GoalAlignmentCalculator,
     J: JohariTransitionManager,
+    S: TeleologicalMemoryStore,
 {
-    /// Placeholder Stage 4 filtering when we don't have full fingerprints.
-    ///
-    /// In production, this would fetch fingerprints from the store.
-    /// For now, we create scored memories from the aggregated results.
-    async fn stage4_placeholder_filtering(
-        &self,
-        me_result: &MultiEmbeddingResult,
-        query: &TeleologicalQuery,
-        config: &super::PipelineStageConfig,
-    ) -> Vec<ScoredMemory> {
-        let mut results: Vec<ScoredMemory> = me_result
-            .results
-            .iter()
-            .map(|agg| {
-                let content_sim = self.compute_avg_similarity(agg);
-                // Use purpose_alignment if available, otherwise estimate from aggregate_score
-                let purpose_alignment = agg.purpose_alignment.unwrap_or(agg.aggregate_score);
-                // Estimate goal alignment from content similarity
-                // NOTE: This is a placeholder per estimation::CONTENT_TO_GOAL_FACTOR
-                // In production, use proper teleological computation
-                let goal_alignment = content_sim * estimation::CONTENT_TO_GOAL_FACTOR;
-
-                ScoredMemory::new(
-                    agg.memory_id,
-                    agg.aggregate_score,
-                    content_sim,
-                    purpose_alignment,
-                    goal_alignment,
-                    JohariQuadrant::Open, // Default quadrant
-                    agg.space_count,
-                )
-            })
-            .collect();
-
-        // Apply Johari filter if specified
-        if let Some(ref allowed_quadrants) = query.johari_filter {
-            results.retain(|r| allowed_quadrants.contains(&r.johari_quadrant));
-        }
-
-        // Sort by score
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
-
-        // Limit to teleological_limit
-        if results.len() > config.teleological_limit {
-            results.truncate(config.teleological_limit);
-        }
-
-        results
-    }
-
     /// Build pipeline breakdown from multi-embedding result.
     fn build_breakdown(&self, me_result: &MultiEmbeddingResult) -> PipelineBreakdown {
         let mut breakdown = PipelineBreakdown::new();
@@ -646,6 +636,7 @@ mod tests {
     use crate::alignment::DefaultAlignmentCalculator;
     use crate::johari::DefaultJohariManager;
     use crate::purpose::{GoalId, GoalLevel, GoalNode};
+    use crate::retrieval::teleological_result::AlignmentLevel;
     use crate::retrieval::InMemoryMultiEmbeddingExecutor;
     use crate::stubs::{InMemoryTeleologicalStore, StubMultiArrayProvider};
     use std::sync::Arc;
@@ -683,11 +674,12 @@ mod tests {
         InMemoryMultiEmbeddingExecutor,
         DefaultAlignmentCalculator,
         DefaultJohariManager<InMemoryTeleologicalStore>,
+        InMemoryTeleologicalStore,
     > {
         let store = InMemoryTeleologicalStore::new();
         let provider = StubMultiArrayProvider::new();
 
-        // Store needs to be Arc-wrapped for sharing between executor and johari_manager
+        // Store needs to be Arc-wrapped for sharing between executor, johari_manager, and pipeline
         let store_arc = Arc::new(store);
 
         let executor = Arc::new(InMemoryMultiEmbeddingExecutor::with_arcs(
@@ -696,10 +688,10 @@ mod tests {
         ));
 
         let alignment_calc = Arc::new(DefaultAlignmentCalculator::new());
-        let johari_manager = Arc::new(DefaultJohariManager::new(store_arc));
+        let johari_manager = Arc::new(DefaultJohariManager::new(store_arc.clone()));
         let hierarchy = create_test_hierarchy();
 
-        DefaultTeleologicalPipeline::new(executor, alignment_calc, johari_manager, hierarchy)
+        DefaultTeleologicalPipeline::new(executor, alignment_calc, johari_manager, store_arc, hierarchy)
     }
 
     #[tokio::test]
