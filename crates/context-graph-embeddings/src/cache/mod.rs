@@ -200,18 +200,16 @@ pub fn estimate_embedding_memory(embedding: &MultiArrayEmbedding) -> u32 {
     let mut total_bytes: usize = 0;
 
     // Count actual vector bytes
-    for opt_emb in &embedding.embeddings {
-        if let Some(emb) = opt_emb {
-            // Vector data: dimension * sizeof(f32)
-            total_bytes += emb.vector.len() * std::mem::size_of::<f32>();
-            // Attention weights if present
-            if let Some(ref attn) = &emb.attention_weights {
-                let attn_vec: &Vec<f32> = attn;
-                total_bytes += attn_vec.len() * std::mem::size_of::<f32>();
-            }
-            // ModelEmbedding struct overhead
-            total_bytes += std::mem::size_of::<crate::types::ModelEmbedding>();
+    for emb in embedding.embeddings.iter().flatten() {
+        // Vector data: dimension * sizeof(f32)
+        total_bytes += emb.vector.len() * std::mem::size_of::<f32>();
+        // Attention weights if present
+        if let Some(ref attn) = &emb.attention_weights {
+            let attn_vec: &Vec<f32> = attn;
+            total_bytes += attn_vec.len() * std::mem::size_of::<f32>();
         }
+        // ModelEmbedding struct overhead
+        total_bytes += std::mem::size_of::<crate::types::ModelEmbedding>();
     }
 
     // MultiArrayEmbedding struct overhead

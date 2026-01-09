@@ -293,8 +293,8 @@ async fn test_full_state_verification_batch_all_or_nothing() {
 
     // Create fingerprint with first 5 embedders as Unknown
     let mut quadrants = [JohariQuadrant::Open; NUM_EMBEDDERS];
-    for i in 0..5 {
-        quadrants[i] = JohariQuadrant::Unknown;
+    for quad in quadrants.iter_mut().take(5) {
+        *quad = JohariQuadrant::Unknown;
     }
 
     let fp = create_test_fingerprint_with_johari(quadrants);
@@ -598,8 +598,8 @@ async fn test_full_state_verification_batch_success() {
 
     // Create fingerprint with first 3 embedders as Unknown
     let mut quadrants = [JohariQuadrant::Open; NUM_EMBEDDERS];
-    for i in 0..3 {
-        quadrants[i] = JohariQuadrant::Unknown;
+    for quad in quadrants.iter_mut().take(3) {
+        *quad = JohariQuadrant::Unknown;
     }
 
     let fp = create_test_fingerprint_with_johari(quadrants);

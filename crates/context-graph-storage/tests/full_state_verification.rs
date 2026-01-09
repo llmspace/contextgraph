@@ -114,12 +114,12 @@ fn generate_real_johari_fingerprint() -> JohariFingerprint {
     // Create quadrants: [[Open, Hidden, Blind, Unknown]; NUM_EMBEDDERS]
     // Each row must sum to 1.0
     let mut quadrants = [[0.0f32; 4]; NUM_EMBEDDERS];
-    for i in 0..NUM_EMBEDDERS {
+    for quad in quadrants.iter_mut() {
         let a: f32 = rng.gen_range(0.1..0.4);
         let b: f32 = rng.gen_range(0.1..0.3);
         let c: f32 = rng.gen_range(0.1..0.3);
         let d: f32 = 1.0 - a - b - c; // Ensure sum = 1.0
-        quadrants[i] = [a, b, c, d.max(0.0)];
+        *quad = [a, b, c, d.max(0.0)];
     }
 
     // Confidence per embedder
@@ -130,13 +130,13 @@ fn generate_real_johari_fingerprint() -> JohariFingerprint {
 
     // Transition probabilities: each row must sum to 1.0
     let mut transition_probs = [[[0.0f32; 4]; 4]; NUM_EMBEDDERS];
-    for embedder in 0..NUM_EMBEDDERS {
-        for from_q in 0..4 {
+    for embedder_probs in transition_probs.iter_mut() {
+        for from_q_probs in embedder_probs.iter_mut() {
             let a: f32 = rng.gen_range(0.1..0.4);
             let b: f32 = rng.gen_range(0.1..0.3);
             let c: f32 = rng.gen_range(0.1..0.3);
             let d: f32 = 1.0 - a - b - c;
-            transition_probs[embedder][from_q] = [a, b, c, d.max(0.0)];
+            *from_q_probs = [a, b, c, d.max(0.0)];
         }
     }
 
