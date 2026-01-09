@@ -24,6 +24,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use super::comparison_error::{ComparisonValidationError, ComparisonValidationResult, WeightValues};
 use super::groups::{GroupAlignments, GroupType, NUM_GROUPS};
 use super::synergy_matrix::{SynergyMatrix, CROSS_CORRELATION_COUNT};
 use super::types::NUM_EMBEDDERS;
@@ -129,10 +130,94 @@ impl ComponentWeights {
         }
     }
 
-    /// Validate weights sum to 1.0
-    pub fn validate(&self) -> bool {
-        let sum = self.purpose_vector + self.cross_correlations + self.group_alignments + self.confidence;
-        (sum - 1.0).abs() < 0.001
+    /// Tolerance for weight sum validation (0.1%)
+    pub const WEIGHT_SUM_TOLERANCE: f32 = 0.001;
+
+    /// Validate all weight invariants.
+    ///
+    /// Returns `Ok(())` if:
+    /// - All weights are in [0.0, 1.0]
+    /// - Weights sum to 1.0 (±tolerance)
+    ///
+    /// Returns detailed error describing exactly what failed.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use context_graph_core::teleological::ComponentWeights;
+    ///
+    /// let valid = ComponentWeights::default();
+    /// assert!(valid.validate().is_ok());
+    ///
+    /// let mut invalid = ComponentWeights::default();
+    /// invalid.purpose_vector = 2.0; // Out of range
+    /// assert!(invalid.validate().is_err());
+    /// ```
+    pub fn validate(&self) -> ComparisonValidationResult<()> {
+        // Check individual weight ranges
+        if !(0.0..=1.0).contains(&self.purpose_vector) {
+            return Err(ComparisonValidationError::WeightOutOfRange {
+                field_name: "purpose_vector",
+                value: self.purpose_vector,
+                min: 0.0,
+                max: 1.0,
+            });
+        }
+
+        if !(0.0..=1.0).contains(&self.cross_correlations) {
+            return Err(ComparisonValidationError::WeightOutOfRange {
+                field_name: "cross_correlations",
+                value: self.cross_correlations,
+                min: 0.0,
+                max: 1.0,
+            });
+        }
+
+        if !(0.0..=1.0).contains(&self.group_alignments) {
+            return Err(ComparisonValidationError::WeightOutOfRange {
+                field_name: "group_alignments",
+                value: self.group_alignments,
+                min: 0.0,
+                max: 1.0,
+            });
+        }
+
+        if !(0.0..=1.0).contains(&self.confidence) {
+            return Err(ComparisonValidationError::WeightOutOfRange {
+                field_name: "confidence",
+                value: self.confidence,
+                min: 0.0,
+                max: 1.0,
+            });
+        }
+
+        // Check sum
+        let sum = self.purpose_vector + self.cross_correlations
+                + self.group_alignments + self.confidence;
+
+        if (sum - 1.0).abs() > Self::WEIGHT_SUM_TOLERANCE {
+            return Err(ComparisonValidationError::WeightsNotNormalized {
+                actual_sum: sum,
+                expected_sum: 1.0,
+                tolerance: Self::WEIGHT_SUM_TOLERANCE,
+                weights: WeightValues {
+                    purpose_vector: self.purpose_vector,
+                    cross_correlations: self.cross_correlations,
+                    group_alignments: self.group_alignments,
+                    confidence: self.confidence,
+                },
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Check if weights are valid (returns bool for simple checks).
+    ///
+    /// For detailed error information, use `validate()` instead.
+    #[inline]
+    pub fn is_valid(&self) -> bool {
+        self.validate().is_ok()
     }
 
     /// Normalize weights to sum to 1.0
@@ -1328,14 +1413,42 @@ mod tests {
 
     #[test]
     fn test_component_weights_validation() {
+        use crate::teleological::comparison_error::ComparisonValidationError;
+
         let mut weights = ComponentWeights::default();
-        assert!(weights.validate(), "Default weights should sum to 1.0");
+        assert!(weights.validate().is_ok(), "Default weights should sum to 1.0");
+        assert!(weights.is_valid(), "Default weights should be valid");
 
         weights.purpose_vector = 0.5;
-        assert!(!weights.validate(), "Modified weights should not sum to 1.0");
+        let err = weights.validate();
+        assert!(err.is_err(), "Modified weights should not sum to 1.0");
+
+        // Verify error type is WeightsNotNormalized
+        match err {
+            Err(ComparisonValidationError::WeightsNotNormalized { actual_sum, .. }) => {
+                assert!((actual_sum - 1.1).abs() < 0.01, "Sum should be ~1.1");
+                println!("  Got expected error with sum: {}", actual_sum);
+            }
+            _ => panic!("Expected WeightsNotNormalized error"),
+        }
 
         weights.normalize();
-        assert!(weights.validate(), "Normalized weights should sum to 1.0");
+        assert!(weights.validate().is_ok(), "Normalized weights should sum to 1.0");
+        assert!(weights.is_valid(), "Normalized weights should be valid");
+
+        // Test out-of-range weight
+        let mut bad_weights = ComponentWeights::default();
+        bad_weights.confidence = -0.5;
+        let range_err = bad_weights.validate();
+        assert!(range_err.is_err(), "Negative weight should fail validation");
+        match range_err {
+            Err(ComparisonValidationError::WeightOutOfRange { field_name, value, .. }) => {
+                assert_eq!(field_name, "confidence");
+                assert!((value - (-0.5)).abs() < f32::EPSILON);
+                println!("  Got expected range error for {}: {}", field_name, value);
+            }
+            _ => panic!("Expected WeightOutOfRange error"),
+        }
 
         println!("[PASS] Component weights validation works");
     }

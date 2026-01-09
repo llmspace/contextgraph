@@ -356,11 +356,20 @@ impl SynergyService {
 
     /// Validate matrix invariants.
     ///
-    /// # Panics
-    ///
-    /// Panics if any invariant is violated (FAIL FAST).
-    pub fn validate(&self) {
-        self.matrix.validate();
+    /// Returns `Ok(())` if matrix is valid, or detailed error describing what failed.
+    pub fn validate(&self) -> crate::teleological::ComparisonValidationResult<()> {
+        self.matrix.validate()
+    }
+
+    /// Check if service matrix is valid (returns bool for simple checks).
+    #[inline]
+    pub fn is_valid(&self) -> bool {
+        self.matrix.is_valid()
+    }
+
+    /// Assert service is valid, panicking with detailed error on failure.
+    pub fn assert_valid(&self) {
+        self.matrix.assert_valid();
     }
 }
 
@@ -566,7 +575,8 @@ mod tests {
     #[test]
     fn test_validate() {
         let service = SynergyService::new();
-        service.validate(); // Should not panic
+        assert!(service.validate().is_ok(), "New service should be valid");
+        assert!(service.is_valid(), "is_valid() should return true");
 
         println!("[PASS] validate passes for valid service");
     }

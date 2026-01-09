@@ -86,6 +86,9 @@ pub mod profile;
 // Matrix search: cross-correlation search across all 13 embedders
 pub mod matrix_search;
 
+// Comparison validation errors (TASK-CORE-004)
+pub mod comparison_error;
+
 // Teleological services (TELEO-007 through TELEO-015)
 pub mod services;
 
@@ -104,4 +107,7 @@ pub use vector::TeleologicalVector;
 pub use matrix_search::{
     ComparisonScope, ComponentWeights, ComprehensiveComparison, MatrixSearchConfig,
     SearchStrategy, SimilarityBreakdown, TeleologicalMatrixSearch, embedder_names,
+};
+pub use comparison_error::{
+    ComparisonValidationError, ComparisonValidationResult, WeightValues,
 };

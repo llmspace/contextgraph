@@ -13,6 +13,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use super::comparison_error::{ComparisonValidationError, ComparisonValidationResult};
+
 /// Number of embedding dimensions in the synergy matrix.
 pub const SYNERGY_DIM: usize = 13;
 
@@ -114,6 +116,219 @@ impl SynergyMatrix {
             computed_at: Utc::now(),
             sample_count: 0,
         }
+    }
+
+    // =========================================================================
+    // Predefined Matrix Constructors (TASK-CORE-004)
+    // =========================================================================
+    //
+    // These constructors create SynergyMatrix instances optimized for specific
+    // use cases. Each modifies the base synergies to emphasize certain
+    // embedder pairs.
+
+    /// Create a semantic-focused synergy matrix.
+    ///
+    /// Emphasizes E1_Semantic relationships with E5_Analogical, E11_Abstract,
+    /// and E12_Factual (strong synergies boosted to 0.95).
+    ///
+    /// Use for: semantic similarity search, meaning extraction, concept matching.
+    pub fn semantic_focused() -> Self {
+        let mut matrix = Self::with_base_synergies();
+
+        // Boost E1_Semantic pairs
+        // E1 + E5_Analogical: strong semantic relationship
+        matrix.values[0][4] = 0.95;
+        matrix.values[4][0] = 0.95;
+        // E1 + E11_Abstract: semantic abstractions
+        matrix.values[0][10] = 0.95;
+        matrix.values[10][0] = 0.95;
+        // E1 + E12_Factual: semantic facts
+        matrix.values[0][11] = 0.95;
+        matrix.values[11][0] = 0.95;
+
+        // Also boost E5_Analogical + E11_Abstract relationship
+        matrix.values[4][10] = 0.95;
+        matrix.values[10][4] = 0.95;
+
+        matrix.computed_at = Utc::now();
+        matrix
+    }
+
+    /// Create a code-heavy synergy matrix.
+    ///
+    /// Emphasizes E6_Code relationships with E4_Causal, E7_Procedural,
+    /// E8_Spatial, and E13_Sparse (code analysis embedders).
+    ///
+    /// Use for: code search, implementation matching, algorithm similarity.
+    pub fn code_heavy() -> Self {
+        let mut matrix = Self::with_base_synergies();
+
+        // Boost E6_Code pairs
+        // E6 + E4_Causal: code causes effects
+        matrix.values[5][3] = 0.95;
+        matrix.values[3][5] = 0.95;
+        // E6 + E7_Procedural: code is procedural
+        matrix.values[5][6] = 0.95;
+        matrix.values[6][5] = 0.95;
+        // E6 + E8_Spatial: code structure
+        matrix.values[5][7] = 0.95;
+        matrix.values[7][5] = 0.95;
+        // E6 + E13_Sparse: code tokens
+        matrix.values[5][12] = 0.95;
+        matrix.values[12][5] = 0.95;
+
+        // Also boost E4_Causal + E7_Procedural (logic flow)
+        matrix.values[3][6] = 0.95;
+        matrix.values[6][3] = 0.95;
+
+        matrix.computed_at = Utc::now();
+        matrix
+    }
+
+    /// Create a temporal-focused synergy matrix.
+    ///
+    /// Emphasizes E2_Episodic and E3_Temporal relationships for
+    /// sequence-aware retrieval.
+    ///
+    /// Use for: timeline queries, event sequences, historical context.
+    pub fn temporal_focused() -> Self {
+        let mut matrix = Self::with_base_synergies();
+
+        // Boost E2_Episodic + E3_Temporal
+        matrix.values[1][2] = 0.95;
+        matrix.values[2][1] = 0.95;
+
+        // Boost E3_Temporal + E4_Causal (temporal causation)
+        matrix.values[2][3] = 0.95;
+        matrix.values[3][2] = 0.95;
+
+        // Boost E2_Episodic + E9_Social (episodic social events)
+        matrix.values[1][8] = 0.95;
+        matrix.values[8][1] = 0.95;
+
+        // Boost E3_Temporal + E7_Procedural (procedure timing)
+        matrix.values[2][6] = 0.95;
+        matrix.values[6][2] = 0.95;
+
+        matrix.computed_at = Utc::now();
+        matrix
+    }
+
+    /// Create a causal reasoning synergy matrix.
+    ///
+    /// Emphasizes E4_Causal relationships for understanding cause-effect.
+    ///
+    /// Use for: debugging, root cause analysis, impact assessment.
+    pub fn causal_reasoning() -> Self {
+        let mut matrix = Self::with_base_synergies();
+
+        // Boost E4_Causal pairs
+        // E4 + E3_Temporal: causation is temporal
+        matrix.values[3][2] = 0.95;
+        matrix.values[2][3] = 0.95;
+        // E4 + E6_Code: code causes behavior
+        matrix.values[3][5] = 0.95;
+        matrix.values[5][3] = 0.95;
+        // E4 + E7_Procedural: procedures have effects
+        matrix.values[3][6] = 0.95;
+        matrix.values[6][3] = 0.95;
+        // E4 + E11_Abstract: abstract causation
+        matrix.values[3][10] = 0.95;
+        matrix.values[10][3] = 0.95;
+        // E4 + E12_Factual: factual consequences
+        matrix.values[3][11] = 0.95;
+        matrix.values[11][3] = 0.95;
+
+        matrix.computed_at = Utc::now();
+        matrix
+    }
+
+    /// Create a relational synergy matrix.
+    ///
+    /// Emphasizes E5_Analogical, E8_Spatial, and E9_Social for
+    /// understanding relationships between entities.
+    ///
+    /// Use for: knowledge graph queries, entity relationships, social context.
+    pub fn relational() -> Self {
+        let mut matrix = Self::with_base_synergies();
+
+        // Boost relational group pairs
+        // E5_Analogical + E8_Spatial
+        matrix.values[4][7] = 0.9;
+        matrix.values[7][4] = 0.9;
+        // E5_Analogical + E9_Social
+        matrix.values[4][8] = 0.9;
+        matrix.values[8][4] = 0.9;
+        // E8_Spatial + E9_Social
+        matrix.values[7][8] = 0.9;
+        matrix.values[8][7] = 0.9;
+
+        // Also boost E9_Social + E10_Emotional (social emotions)
+        matrix.values[8][9] = 0.95;
+        matrix.values[9][8] = 0.95;
+
+        matrix.computed_at = Utc::now();
+        matrix
+    }
+
+    /// Create a qualitative reasoning synergy matrix.
+    ///
+    /// Emphasizes E10_Emotional and E11_Abstract for understanding
+    /// subjective and abstract concepts.
+    ///
+    /// Use for: sentiment analysis, opinion mining, conceptual reasoning.
+    pub fn qualitative() -> Self {
+        let mut matrix = Self::with_base_synergies();
+
+        // Boost qualitative group pairs
+        // E10_Emotional + E11_Abstract
+        matrix.values[9][10] = 0.9;
+        matrix.values[10][9] = 0.9;
+
+        // Also boost E1_Semantic + E10_Emotional (semantic sentiment)
+        matrix.values[0][9] = 0.85;
+        matrix.values[9][0] = 0.85;
+
+        // E5_Analogical + E10_Emotional (emotional analogies)
+        matrix.values[4][9] = 0.85;
+        matrix.values[9][4] = 0.85;
+
+        // E9_Social + E10_Emotional (social emotions)
+        matrix.values[8][9] = 0.95;
+        matrix.values[9][8] = 0.95;
+
+        matrix.computed_at = Utc::now();
+        matrix
+    }
+
+    /// Create a balanced synergy matrix.
+    ///
+    /// Uses moderate synergies (0.6) across all pairs for unbiased retrieval.
+    ///
+    /// Use for: general-purpose search, exploration, discovery.
+    pub fn balanced() -> Self {
+        let mut values = [[0.6f32; SYNERGY_DIM]; SYNERGY_DIM];
+
+        // Set diagonal to 1.0
+        for i in 0..SYNERGY_DIM {
+            values[i][i] = 1.0;
+        }
+
+        Self {
+            values,
+            weights: [[1.0f32; SYNERGY_DIM]; SYNERGY_DIM],
+            computed_at: Utc::now(),
+            sample_count: 0,
+        }
+    }
+
+    /// Create an identity synergy matrix.
+    ///
+    /// Diagonal is 1.0, all off-diagonal is 0.0 (no cross-embedder synergy).
+    ///
+    /// Use for: per-embedder independent search, testing, baseline comparison.
+    pub fn identity() -> Self {
+        Self::new()
     }
 
     /// Get synergy value between embeddings i and j.
@@ -267,24 +482,94 @@ impl SynergyMatrix {
         true
     }
 
-    /// Validate the matrix satisfies all invariants.
+    /// Default tolerance for matrix validation
+    pub const VALIDATION_TOLERANCE: f32 = 1e-6;
+
+    /// Validate all matrix invariants.
     ///
-    /// # Panics
+    /// Returns `Ok(())` if:
+    /// - Matrix is symmetric (within tolerance)
+    /// - All diagonal values are 1.0 (within tolerance)
+    /// - All values are in [0.0, 1.0]
     ///
-    /// Panics if any invariant is violated (FAIL FAST).
-    pub fn validate(&self) {
-        assert!(
-            self.is_symmetric(f32::EPSILON),
-            "FAIL FAST: synergy matrix must be symmetric"
-        );
-        assert!(
-            self.has_unit_diagonal(f32::EPSILON),
-            "FAIL FAST: synergy matrix diagonal must be 1.0"
-        );
-        assert!(
-            self.values_in_range(),
-            "FAIL FAST: synergy values must be in [0.0, 1.0]"
-        );
+    /// Returns detailed error describing exactly what failed.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use context_graph_core::teleological::SynergyMatrix;
+    ///
+    /// let valid = SynergyMatrix::with_base_synergies();
+    /// assert!(valid.validate().is_ok());
+    /// ```
+    pub fn validate(&self) -> ComparisonValidationResult<()> {
+        self.validate_with_tolerance(Self::VALIDATION_TOLERANCE)
+    }
+
+    /// Validate matrix invariants with custom tolerance.
+    pub fn validate_with_tolerance(&self, tolerance: f32) -> ComparisonValidationResult<()> {
+        // Check symmetry
+        for i in 0..SYNERGY_DIM {
+            for j in (i + 1)..SYNERGY_DIM {
+                let diff = (self.values[i][j] - self.values[j][i]).abs();
+                if diff > tolerance {
+                    return Err(ComparisonValidationError::MatrixNotSymmetric {
+                        row: i,
+                        col: j,
+                        value_ij: self.values[i][j],
+                        value_ji: self.values[j][i],
+                        tolerance,
+                    });
+                }
+            }
+        }
+
+        // Check diagonal is 1.0
+        for i in 0..SYNERGY_DIM {
+            if (self.values[i][i] - 1.0).abs() > tolerance {
+                return Err(ComparisonValidationError::DiagonalNotUnity {
+                    index: i,
+                    actual: self.values[i][i],
+                    expected: 1.0,
+                    tolerance,
+                });
+            }
+        }
+
+        // Check values in range
+        for i in 0..SYNERGY_DIM {
+            for j in 0..SYNERGY_DIM {
+                let value = self.values[i][j];
+                if !(0.0..=1.0).contains(&value) {
+                    return Err(ComparisonValidationError::SynergyOutOfRange {
+                        row: i,
+                        col: j,
+                        value,
+                        min: 0.0,
+                        max: 1.0,
+                    });
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Check if matrix is valid (returns bool for simple checks).
+    ///
+    /// For detailed error information, use `validate()` instead.
+    #[inline]
+    pub fn is_valid(&self) -> bool {
+        self.validate().is_ok()
+    }
+
+    /// Assert matrix is valid, panicking with detailed error on failure.
+    ///
+    /// Use this for cases where validation failure is a programmer error.
+    pub fn assert_valid(&self) {
+        if let Err(e) = self.validate() {
+            panic!("FAIL FAST: SynergyMatrix validation failed: {}", e);
+        }
     }
 
     /// Get weighted synergy value (value * weight).
@@ -535,10 +820,66 @@ mod tests {
 
     #[test]
     fn test_synergy_matrix_validate() {
-        let matrix = SynergyMatrix::with_base_synergies();
-        matrix.validate(); // Should not panic
+        use crate::teleological::comparison_error::ComparisonValidationError;
 
-        println!("[PASS] validate() passes for valid matrix");
+        // Valid matrix should pass
+        let matrix = SynergyMatrix::with_base_synergies();
+        assert!(matrix.validate().is_ok(), "Base synergies should be valid");
+        assert!(matrix.is_valid(), "is_valid() should return true");
+
+        // All predefined matrices should be valid
+        assert!(SynergyMatrix::semantic_focused().validate().is_ok());
+        assert!(SynergyMatrix::code_heavy().validate().is_ok());
+        assert!(SynergyMatrix::temporal_focused().validate().is_ok());
+        assert!(SynergyMatrix::causal_reasoning().validate().is_ok());
+        assert!(SynergyMatrix::relational().validate().is_ok());
+        assert!(SynergyMatrix::qualitative().validate().is_ok());
+        assert!(SynergyMatrix::balanced().validate().is_ok());
+        assert!(SynergyMatrix::identity().validate().is_ok());
+
+        // Test invalid matrix: asymmetric
+        let mut asymmetric = SynergyMatrix::with_base_synergies();
+        asymmetric.values[0][5] = 0.8; // Only change one direction
+        let err = asymmetric.validate();
+        assert!(err.is_err(), "Asymmetric matrix should fail");
+        match err {
+            Err(ComparisonValidationError::MatrixNotSymmetric { row, col, .. }) => {
+                assert_eq!(row, 0);
+                assert_eq!(col, 5);
+                println!("  Got expected MatrixNotSymmetric error at [{}, {}]", row, col);
+            }
+            _ => panic!("Expected MatrixNotSymmetric error"),
+        }
+
+        // Test invalid matrix: bad diagonal
+        let mut bad_diag = SynergyMatrix::with_base_synergies();
+        bad_diag.values[3][3] = 0.5;
+        let err = bad_diag.validate();
+        assert!(err.is_err(), "Bad diagonal should fail");
+        match err {
+            Err(ComparisonValidationError::DiagonalNotUnity { index, actual, .. }) => {
+                assert_eq!(index, 3);
+                assert!((actual - 0.5).abs() < f32::EPSILON);
+                println!("  Got expected DiagonalNotUnity error at index {}", index);
+            }
+            _ => panic!("Expected DiagonalNotUnity error"),
+        }
+
+        // Test invalid matrix: out of range
+        let mut out_of_range = SynergyMatrix::with_base_synergies();
+        out_of_range.values[2][7] = 1.5;
+        out_of_range.values[7][2] = 1.5; // Keep symmetric
+        let err = out_of_range.validate();
+        assert!(err.is_err(), "Out of range value should fail");
+        match err {
+            Err(ComparisonValidationError::SynergyOutOfRange { row, col, value, .. }) => {
+                assert_eq!(value, 1.5);
+                println!("  Got expected SynergyOutOfRange error at [{}, {}] = {}", row, col, value);
+            }
+            _ => panic!("Expected SynergyOutOfRange error"),
+        }
+
+        println!("[PASS] validate() returns correct Results");
     }
 
     #[test]
@@ -697,5 +1038,260 @@ mod tests {
         assert!((matrix.get_synergy(0, 4) - 0.9).abs() < f32::EPSILON);
 
         println!("[PASS] Default uses base synergies");
+    }
+
+    // =========================================================================
+    // Predefined Constructor Tests (TASK-CORE-004)
+    // =========================================================================
+
+    #[test]
+    fn test_semantic_focused_constructor() {
+        let matrix = SynergyMatrix::semantic_focused();
+
+        // Matrix should be valid
+        assert!(matrix.validate().is_ok(), "semantic_focused should produce valid matrix");
+
+        // Verify boosted synergies
+        // E1_Semantic (0) + E5_Analogical (4) should be 0.95
+        assert!((matrix.get_synergy(0, 4) - 0.95).abs() < f32::EPSILON,
+            "E1+E5 should be boosted to 0.95");
+        // E1_Semantic (0) + E11_Abstract (10) should be 0.95
+        assert!((matrix.get_synergy(0, 10) - 0.95).abs() < f32::EPSILON,
+            "E1+E11 should be boosted to 0.95");
+        // E1_Semantic (0) + E12_Factual (11) should be 0.95
+        assert!((matrix.get_synergy(0, 11) - 0.95).abs() < f32::EPSILON,
+            "E1+E12 should be boosted to 0.95");
+        // E5_Analogical (4) + E11_Abstract (10) should be 0.95
+        assert!((matrix.get_synergy(4, 10) - 0.95).abs() < f32::EPSILON,
+            "E5+E11 should be boosted to 0.95");
+
+        // Verify symmetry
+        assert!(matrix.is_symmetric(f32::EPSILON));
+        // Verify diagonal
+        assert!(matrix.has_unit_diagonal(f32::EPSILON));
+
+        println!("[PASS] semantic_focused constructor creates valid boosted matrix");
+    }
+
+    #[test]
+    fn test_code_heavy_constructor() {
+        let matrix = SynergyMatrix::code_heavy();
+
+        // Matrix should be valid
+        assert!(matrix.validate().is_ok(), "code_heavy should produce valid matrix");
+
+        // Verify boosted synergies
+        // E6_Code (5) + E4_Causal (3) should be 0.95
+        assert!((matrix.get_synergy(5, 3) - 0.95).abs() < f32::EPSILON,
+            "E6+E4 should be boosted to 0.95");
+        // E6_Code (5) + E7_Procedural (6) should be 0.95
+        assert!((matrix.get_synergy(5, 6) - 0.95).abs() < f32::EPSILON,
+            "E6+E7 should be boosted to 0.95");
+        // E6_Code (5) + E8_Spatial (7) should be 0.95
+        assert!((matrix.get_synergy(5, 7) - 0.95).abs() < f32::EPSILON,
+            "E6+E8 should be boosted to 0.95");
+        // E6_Code (5) + E13_Sparse (12) should be 0.95
+        assert!((matrix.get_synergy(5, 12) - 0.95).abs() < f32::EPSILON,
+            "E6+E13 should be boosted to 0.95");
+
+        // Verify symmetry
+        assert!(matrix.is_symmetric(f32::EPSILON));
+
+        println!("[PASS] code_heavy constructor creates valid boosted matrix");
+    }
+
+    #[test]
+    fn test_temporal_focused_constructor() {
+        let matrix = SynergyMatrix::temporal_focused();
+
+        assert!(matrix.validate().is_ok(), "temporal_focused should produce valid matrix");
+
+        // E2_Episodic (1) + E3_Temporal (2) should be 0.95
+        assert!((matrix.get_synergy(1, 2) - 0.95).abs() < f32::EPSILON,
+            "E2+E3 should be boosted to 0.95");
+        // E3_Temporal (2) + E4_Causal (3) should be 0.95
+        assert!((matrix.get_synergy(2, 3) - 0.95).abs() < f32::EPSILON,
+            "E3+E4 should be boosted to 0.95");
+
+        println!("[PASS] temporal_focused constructor creates valid boosted matrix");
+    }
+
+    #[test]
+    fn test_causal_reasoning_constructor() {
+        let matrix = SynergyMatrix::causal_reasoning();
+
+        assert!(matrix.validate().is_ok(), "causal_reasoning should produce valid matrix");
+
+        // E4_Causal (3) should have multiple strong synergies
+        assert!((matrix.get_synergy(3, 2) - 0.95).abs() < f32::EPSILON,
+            "E4+E3 should be boosted to 0.95");
+        assert!((matrix.get_synergy(3, 5) - 0.95).abs() < f32::EPSILON,
+            "E4+E6 should be boosted to 0.95");
+        assert!((matrix.get_synergy(3, 6) - 0.95).abs() < f32::EPSILON,
+            "E4+E7 should be boosted to 0.95");
+        assert!((matrix.get_synergy(3, 10) - 0.95).abs() < f32::EPSILON,
+            "E4+E11 should be boosted to 0.95");
+        assert!((matrix.get_synergy(3, 11) - 0.95).abs() < f32::EPSILON,
+            "E4+E12 should be boosted to 0.95");
+
+        println!("[PASS] causal_reasoning constructor creates valid boosted matrix");
+    }
+
+    #[test]
+    fn test_relational_constructor() {
+        let matrix = SynergyMatrix::relational();
+
+        assert!(matrix.validate().is_ok(), "relational should produce valid matrix");
+
+        // E5_Analogical (4), E8_Spatial (7), E9_Social (8) should have boosted pairs
+        assert!((matrix.get_synergy(4, 7) - 0.9).abs() < f32::EPSILON,
+            "E5+E8 should be 0.9");
+        assert!((matrix.get_synergy(4, 8) - 0.9).abs() < f32::EPSILON,
+            "E5+E9 should be 0.9");
+        assert!((matrix.get_synergy(7, 8) - 0.9).abs() < f32::EPSILON,
+            "E8+E9 should be 0.9");
+        // E9_Social (8) + E10_Emotional (9) should be 0.95
+        assert!((matrix.get_synergy(8, 9) - 0.95).abs() < f32::EPSILON,
+            "E9+E10 should be boosted to 0.95");
+
+        println!("[PASS] relational constructor creates valid boosted matrix");
+    }
+
+    #[test]
+    fn test_qualitative_constructor() {
+        let matrix = SynergyMatrix::qualitative();
+
+        assert!(matrix.validate().is_ok(), "qualitative should produce valid matrix");
+
+        // E10_Emotional (9) + E11_Abstract (10) should be 0.9
+        assert!((matrix.get_synergy(9, 10) - 0.9).abs() < f32::EPSILON,
+            "E10+E11 should be 0.9");
+        // E9_Social (8) + E10_Emotional (9) should be 0.95
+        assert!((matrix.get_synergy(8, 9) - 0.95).abs() < f32::EPSILON,
+            "E9+E10 should be boosted to 0.95");
+
+        println!("[PASS] qualitative constructor creates valid boosted matrix");
+    }
+
+    #[test]
+    fn test_balanced_constructor() {
+        let matrix = SynergyMatrix::balanced();
+
+        assert!(matrix.validate().is_ok(), "balanced should produce valid matrix");
+
+        // All off-diagonal values should be 0.6
+        for i in 0..SYNERGY_DIM {
+            for j in 0..SYNERGY_DIM {
+                if i == j {
+                    assert!((matrix.get_synergy(i, j) - 1.0).abs() < f32::EPSILON,
+                        "Diagonal should be 1.0");
+                } else {
+                    assert!((matrix.get_synergy(i, j) - 0.6).abs() < f32::EPSILON,
+                        "Off-diagonal [{}, {}] should be 0.6", i, j);
+                }
+            }
+        }
+
+        println!("[PASS] balanced constructor creates valid uniform 0.6 matrix");
+    }
+
+    #[test]
+    fn test_identity_constructor() {
+        let matrix = SynergyMatrix::identity();
+
+        assert!(matrix.validate().is_ok(), "identity should produce valid matrix");
+
+        // Diagonal should be 1.0, off-diagonal should be 0.0
+        for i in 0..SYNERGY_DIM {
+            for j in 0..SYNERGY_DIM {
+                if i == j {
+                    assert!((matrix.get_synergy(i, j) - 1.0).abs() < f32::EPSILON,
+                        "Diagonal should be 1.0");
+                } else {
+                    assert!(matrix.get_synergy(i, j).abs() < f32::EPSILON,
+                        "Off-diagonal [{}, {}] should be 0.0", i, j);
+                }
+            }
+        }
+
+        println!("[PASS] identity constructor creates valid identity matrix");
+    }
+
+    #[test]
+    fn test_all_predefined_matrices_are_valid() {
+        // Comprehensive validation of all predefined matrices
+        let matrices = [
+            ("base", SynergyMatrix::with_base_synergies()),
+            ("semantic_focused", SynergyMatrix::semantic_focused()),
+            ("code_heavy", SynergyMatrix::code_heavy()),
+            ("temporal_focused", SynergyMatrix::temporal_focused()),
+            ("causal_reasoning", SynergyMatrix::causal_reasoning()),
+            ("relational", SynergyMatrix::relational()),
+            ("qualitative", SynergyMatrix::qualitative()),
+            ("balanced", SynergyMatrix::balanced()),
+            ("identity", SynergyMatrix::identity()),
+        ];
+
+        for (name, matrix) in matrices.iter() {
+            // Validate returns Ok
+            let result = matrix.validate();
+            assert!(result.is_ok(), "{} matrix validation failed: {:?}", name, result);
+
+            // is_valid returns true
+            assert!(matrix.is_valid(), "{} matrix is_valid() returned false", name);
+
+            // Symmetry check
+            assert!(matrix.is_symmetric(f32::EPSILON), "{} matrix is not symmetric", name);
+
+            // Diagonal check
+            assert!(matrix.has_unit_diagonal(f32::EPSILON), "{} matrix has non-unity diagonal", name);
+
+            // Range check
+            assert!(matrix.values_in_range(), "{} matrix has values out of range", name);
+
+            println!("  {} matrix: valid, symmetric, unit diagonal, in range", name);
+        }
+
+        println!("[PASS] All predefined matrices pass comprehensive validation");
+    }
+
+    #[test]
+    fn test_predefined_matrix_properties() {
+        // Test that semantic_focused has higher average synergy for semantic embedders
+        let semantic = SynergyMatrix::semantic_focused();
+        let base = SynergyMatrix::with_base_synergies();
+
+        // E1_Semantic row average should be higher in semantic_focused
+        let semantic_e1_avg: f32 = (0..SYNERGY_DIM)
+            .filter(|&j| j != 0)
+            .map(|j| semantic.get_synergy(0, j))
+            .sum::<f32>() / 12.0;
+        let base_e1_avg: f32 = (0..SYNERGY_DIM)
+            .filter(|&j| j != 0)
+            .map(|j| base.get_synergy(0, j))
+            .sum::<f32>() / 12.0;
+
+        assert!(semantic_e1_avg > base_e1_avg,
+            "semantic_focused E1 average ({}) should be higher than base ({})",
+            semantic_e1_avg, base_e1_avg);
+
+        // Test that code_heavy has higher average synergy for code embedders
+        let code = SynergyMatrix::code_heavy();
+
+        // E6_Code row average should be higher in code_heavy
+        let code_e6_avg: f32 = (0..SYNERGY_DIM)
+            .filter(|&j| j != 5)
+            .map(|j| code.get_synergy(5, j))
+            .sum::<f32>() / 12.0;
+        let base_e6_avg: f32 = (0..SYNERGY_DIM)
+            .filter(|&j| j != 5)
+            .map(|j| base.get_synergy(5, j))
+            .sum::<f32>() / 12.0;
+
+        assert!(code_e6_avg > base_e6_avg,
+            "code_heavy E6 average ({}) should be higher than base ({})",
+            code_e6_avg, base_e6_avg);
+
+        println!("[PASS] Predefined matrices have expected statistical properties");
     }
 }
