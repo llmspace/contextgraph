@@ -24,7 +24,10 @@ mod edge_case_verification;
 
 pub use binary::BinaryQuantizationError;
 pub use float8::{Float8E4M3Encoder, Float8QuantizationError};
-pub use pq8::{PQ8Encoder, PQ8QuantizationError};
+pub use pq8::{
+    generate_realistic_embeddings, KMeansConfig, PQ8Encoder, PQ8QuantizationError,
+    NUM_CENTROIDS, NUM_SUBVECTORS,
+};
 pub use router::QuantizationRouter;
 pub use types::{
     BinaryEncoder, Float8Encoder, PQ8Codebook, QuantizationMetadata, QuantizationMethod,

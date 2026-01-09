@@ -205,7 +205,7 @@ pub enum QuantizationMetadata {
 /// # Note
 /// This is a DATA STRUCTURE. The actual quantize/dequantize methods
 /// are implemented in Logic Layer (TASK-EMB-016).
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PQ8Codebook {
     /// Embedding dimension this codebook was trained for.
     pub embedding_dim: usize,
