@@ -83,21 +83,9 @@ impl McpServer {
             db_path
         );
 
-        // CRITICAL: Initialize HNSW indexes BEFORE wrapping in Arc<dyn>
-        // Without this, store operations fail with "Index for E1Semantic not initialized"
-        // This was a production bug - tests called initialize_hnsw() but server didn't!
-        rocksdb_store
-            .initialize_hnsw()
-            .await
-            .map_err(|e| {
-                error!("FATAL: Failed to initialize HNSW indexes: {}", e);
-                anyhow::anyhow!(
-                    "Failed to initialize HNSW indexes: {}. \
-                     This is required for search operations to work.",
-                    e
-                )
-            })?;
-        info!("Initialized HNSW indexes for all 13 embedders");
+        // Note: EmbedderIndexRegistry is initialized in the constructor,
+        // so no separate initialization step is needed.
+        info!("Created store with EmbedderIndexRegistry (12 HNSW-capable embedders initialized)");
 
         let teleological_store: Arc<dyn TeleologicalMemoryStore> = Arc::new(rocksdb_store);
 

@@ -82,10 +82,7 @@ async fn create_handlers_with_rocksdb_and_gwt() -> (Handlers, TempDir) {
 
     let rocksdb_store = RocksDbTeleologicalStore::open(&db_path)
         .expect("Failed to open RocksDbTeleologicalStore");
-    rocksdb_store
-        .initialize_hnsw()
-        .await
-        .expect("Failed to initialize HNSW indexes");
+    // Note: EmbedderIndexRegistry is initialized in constructor
 
     // Create in-memory store for Johari manager (separate from RocksDB store)
     let johari_store = Arc::new(InMemoryTeleologicalStore::new());

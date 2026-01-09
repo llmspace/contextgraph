@@ -281,12 +281,7 @@ pub(crate) async fn create_test_handlers_with_rocksdb() -> (Handlers, TempDir) {
     let rocksdb_store = RocksDbTeleologicalStore::open(&db_path)
         .expect("Failed to open RocksDbTeleologicalStore in test");
 
-    // CRITICAL: Initialize HNSW indexes BEFORE wrapping in Arc<dyn>
-    // Without this, store operations fail with "Index for E1Semantic not initialized"
-    rocksdb_store
-        .initialize_hnsw()
-        .await
-        .expect("Failed to initialize HNSW indexes in test");
+    // Note: EmbedderIndexRegistry is initialized in constructor
 
     let teleological_store: Arc<dyn TeleologicalMemoryStore> = Arc::new(rocksdb_store);
 
@@ -342,11 +337,7 @@ pub(crate) async fn create_test_handlers_with_rocksdb_no_north_star() -> (Handle
     let rocksdb_store = RocksDbTeleologicalStore::open(&db_path)
         .expect("Failed to open RocksDbTeleologicalStore in test");
 
-    // CRITICAL: Initialize HNSW indexes BEFORE wrapping in Arc<dyn>
-    rocksdb_store
-        .initialize_hnsw()
-        .await
-        .expect("Failed to initialize HNSW indexes in test");
+    // Note: EmbedderIndexRegistry is initialized in constructor
 
     let teleological_store: Arc<dyn TeleologicalMemoryStore> = Arc::new(rocksdb_store);
 
@@ -481,11 +472,7 @@ pub(crate) async fn create_test_handlers_with_rocksdb_store_access() -> (
     let rocksdb_store = RocksDbTeleologicalStore::open(&db_path)
         .expect("Failed to open RocksDbTeleologicalStore in FSV test");
 
-    // CRITICAL: Initialize HNSW indexes BEFORE wrapping in Arc<dyn>
-    rocksdb_store
-        .initialize_hnsw()
-        .await
-        .expect("Failed to initialize HNSW indexes in FSV test");
+    // Note: EmbedderIndexRegistry is initialized in constructor
 
     let teleological_store: Arc<dyn TeleologicalMemoryStore> = Arc::new(rocksdb_store);
 
@@ -571,11 +558,7 @@ pub(crate) async fn create_test_handlers_with_real_embeddings() -> (Handlers, Te
     let rocksdb_store = RocksDbTeleologicalStore::open(&db_path)
         .expect("Failed to open RocksDbTeleologicalStore in FSV test with real embeddings");
 
-    // CRITICAL: Initialize HNSW indexes BEFORE wrapping in Arc<dyn>
-    rocksdb_store
-        .initialize_hnsw()
-        .await
-        .expect("Failed to initialize HNSW indexes in FSV test");
+    // Note: EmbedderIndexRegistry is initialized in constructor
 
     let teleological_store: Arc<dyn TeleologicalMemoryStore> = Arc::new(rocksdb_store);
 
@@ -626,11 +609,7 @@ pub(crate) async fn create_test_handlers_with_real_embeddings_store_access() -> 
     let rocksdb_store = RocksDbTeleologicalStore::open(&db_path)
         .expect("Failed to open RocksDbTeleologicalStore in FSV test");
 
-    // CRITICAL: Initialize HNSW indexes BEFORE wrapping in Arc<dyn>
-    rocksdb_store
-        .initialize_hnsw()
-        .await
-        .expect("Failed to initialize HNSW indexes in FSV test");
+    // Note: EmbedderIndexRegistry is initialized in constructor
 
     let teleological_store: Arc<dyn TeleologicalMemoryStore> = Arc::new(rocksdb_store);
 
@@ -826,10 +805,7 @@ pub(crate) async fn create_test_handlers_with_warm_gwt_rocksdb() -> (Handlers, T
 
     let rocksdb_store = RocksDbTeleologicalStore::open(&db_path)
         .expect("Failed to open RocksDbTeleologicalStore");
-    rocksdb_store
-        .initialize_hnsw()
-        .await
-        .expect("Failed to initialize HNSW indexes");
+    // Note: EmbedderIndexRegistry is initialized in constructor
 
     // Create in-memory store for Johari manager (separate from RocksDB)
     let johari_store = Arc::new(InMemoryTeleologicalStore::new());

@@ -37,10 +37,11 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use context_graph_core::error::{CoreError, CoreResult};
-use context_graph_core::index::{
-    HnswMultiSpaceIndex, MultiSpaceIndexManager, EmbedderIndex,
-};
 use context_graph_core::teleological::ComparisonValidationError;
+
+use super::indexes::{
+    EmbedderIndex, EmbedderIndexOps, EmbedderIndexRegistry, IndexError,
+};
 use context_graph_core::traits::{
     TeleologicalMemoryStore, TeleologicalSearchOptions, TeleologicalSearchResult,
     TeleologicalStorageBackend,
@@ -59,9 +60,9 @@ use super::schema::{
     purpose_vector_key,
 };
 use super::serialization::{
-    deserialize_memory_id_list, deserialize_purpose_vector,
-    deserialize_teleological_fingerprint, serialize_e1_matryoshka_128, serialize_memory_id_list,
-    serialize_purpose_vector, serialize_teleological_fingerprint,
+    deserialize_memory_id_list, deserialize_teleological_fingerprint,
+    serialize_e1_matryoshka_128, serialize_memory_id_list, serialize_purpose_vector,
+    serialize_teleological_fingerprint,
 };
 
 // ============================================================================
@@ -227,9 +228,10 @@ pub struct RocksDbTeleologicalStore {
     fingerprint_count: RwLock<Option<usize>>,
     /// Soft-deleted IDs (tracked in memory for filtering).
     soft_deleted: RwLock<HashMap<Uuid, bool>>,
-    /// HNSW multi-space index for O(log n) ANN search.
-    /// Uses real hnsw_rs library - NO FALLBACKS.
-    hnsw_index: Arc<tokio::sync::RwLock<HnswMultiSpaceIndex>>,
+    /// Per-embedder index registry with 12 HNSW indexes for O(log n) ANN search.
+    /// E6, E12, E13 use different index types (inverted/MaxSim).
+    /// NO FALLBACKS - FAIL FAST on invalid operations.
+    index_registry: Arc<EmbedderIndexRegistry>,
 }
 
 impl RocksDbTeleologicalStore {
@@ -307,13 +309,14 @@ impl RocksDbTeleologicalStore {
             }
         })?;
 
-        info!(
-            "Successfully opened RocksDbTeleologicalStore with {} column families",
-            TELEOLOGICAL_CFS.len() + QUANTIZED_EMBEDDER_CFS.len()
-        );
+        // Create per-embedder index registry (12 HNSW indexes)
+        let index_registry = Arc::new(EmbedderIndexRegistry::new());
 
-        // Create HNSW index (uninitialized - call initialize_hnsw() for O(log n) search)
-        let hnsw_index = Arc::new(tokio::sync::RwLock::new(HnswMultiSpaceIndex::new()));
+        info!(
+            "Successfully opened RocksDbTeleologicalStore with {} column families and {} per-embedder indexes",
+            TELEOLOGICAL_CFS.len() + QUANTIZED_EMBEDDER_CFS.len(),
+            index_registry.len()
+        );
 
         Ok(Self {
             db: Arc::new(db),
@@ -321,33 +324,8 @@ impl RocksDbTeleologicalStore {
             path: path_buf,
             fingerprint_count: RwLock::new(None),
             soft_deleted: RwLock::new(HashMap::new()),
-            hnsw_index,
+            index_registry,
         })
-    }
-
-    /// Initialize HNSW indexes for O(log n) ANN search.
-    ///
-    /// **MUST be called before using search operations** for optimal performance.
-    /// Without initialization, search falls back to O(n) linear scan.
-    ///
-    /// # Errors
-    ///
-    /// Returns error if HNSW initialization fails (e.g., invalid configuration).
-    pub async fn initialize_hnsw(&self) -> CoreResult<()> {
-        let mut hnsw = self.hnsw_index.write().await;
-        hnsw.initialize().await.map_err(|e| {
-            error!("FATAL: Failed to initialize HNSW indexes: {}", e);
-            CoreError::IndexError(e.to_string())
-        })?;
-        info!("HNSW indexes initialized for O(log n) search");
-        Ok(())
-    }
-
-    /// Check if HNSW indexes are initialized.
-    pub async fn is_hnsw_initialized(&self) -> bool {
-        let hnsw = self.hnsw_index.read().await;
-        // Check if any index has been added (via status)
-        !hnsw.status().iter().all(|s| s.element_count == 0)
     }
 
     /// Get a column family handle by name.
@@ -495,40 +473,123 @@ impl RocksDbTeleologicalStore {
         Ok(())
     }
 
-    /// Add fingerprint to HNSW indexes for O(log n) search.
+    /// Add fingerprint to per-embedder HNSW indexes for O(log n) search.
     ///
-    /// This adds the fingerprint's semantic embeddings and purpose vector
-    /// to the in-memory HNSW indexes managed by HnswMultiSpaceIndex.
-    async fn add_to_hnsw_indexes(&self, fp: &TeleologicalFingerprint) -> CoreResult<()> {
-        let mut hnsw = self.hnsw_index.write().await;
+    /// Inserts vectors into all 12 HNSW-capable embedder indexes plus PurposeVector.
+    /// E6, E12, E13 are skipped (they use different index types).
+    ///
+    /// # FAIL FAST
+    ///
+    /// - DimensionMismatch: panic with detailed error
+    /// - InvalidVector (NaN/Inf): panic with location
+    fn add_to_indexes(&self, fp: &TeleologicalFingerprint) -> Result<(), IndexError> {
+        let id = fp.id;
 
-        // Add full semantic fingerprint (all 13 embedders)
-        hnsw.add_fingerprint(fp.id, &fp.semantic).await.map_err(|e| {
-            error!("Failed to add fingerprint {} to HNSW indexes: {}", fp.id, e);
-            CoreError::IndexError(e.to_string())
-        })?;
+        // Add to all HNSW-capable dense embedder indexes
+        for embedder in EmbedderIndex::all_hnsw() {
+            // Skip PurposeVector - handled separately at the end
+            if embedder == EmbedderIndex::PurposeVector {
+                continue;
+            }
 
-        // Add purpose vector
-        hnsw.add_purpose_vector(fp.id, &fp.purpose_vector.alignments)
-            .await
-            .map_err(|e| {
-                error!("Failed to add purpose vector {} to HNSW: {}", fp.id, e);
-                CoreError::IndexError(e.to_string())
-            })?;
+            if let Some(index) = self.index_registry.get(embedder) {
+                let vector = Self::get_embedder_vector(&fp.semantic, embedder);
+                index.insert(id, vector)?;
+            }
+        }
 
-        debug!("Added fingerprint {} to HNSW indexes", fp.id);
+        // Add purpose vector to its dedicated 13D index
+        if let Some(pv_index) = self.index_registry.get(EmbedderIndex::PurposeVector) {
+            pv_index.insert(id, &fp.purpose_vector.alignments)?;
+        }
+
+        debug!(
+            "Added fingerprint {} to {} indexes",
+            id,
+            self.index_registry.len()
+        );
         Ok(())
     }
 
-    /// Remove fingerprint from HNSW indexes.
-    async fn remove_from_hnsw_indexes(&self, id: Uuid) -> CoreResult<()> {
-        let mut hnsw = self.hnsw_index.write().await;
-        hnsw.remove(id).await.map_err(|e| {
-            error!("Failed to remove {} from HNSW indexes: {}", id, e);
-            CoreError::IndexError(e.to_string())
-        })?;
-        debug!("Removed fingerprint {} from HNSW indexes", id);
+    /// Extract vector for specific embedder from SemanticFingerprint.
+    ///
+    /// Returns the appropriate vector slice for the given embedder index.
+    ///
+    /// # FAIL FAST
+    ///
+    /// Panics for embedders that don't use HNSW:
+    /// - E6Sparse: Use inverted index
+    /// - E12LateInteraction: Use MaxSim
+    /// - E13Splade: Use inverted index
+    /// - PurposeVector: Use purpose_vector.alignments directly
+    fn get_embedder_vector(semantic: &SemanticFingerprint, embedder: EmbedderIndex) -> &[f32] {
+        match embedder {
+            EmbedderIndex::E1Semantic => &semantic.e1_semantic,
+            EmbedderIndex::E1Matryoshka128 => {
+                // Truncate E1 to 128D - return first 128 elements
+                &semantic.e1_semantic[..128.min(semantic.e1_semantic.len())]
+            }
+            EmbedderIndex::E2TemporalRecent => &semantic.e2_temporal_recent,
+            EmbedderIndex::E3TemporalPeriodic => &semantic.e3_temporal_periodic,
+            EmbedderIndex::E4TemporalPositional => &semantic.e4_temporal_positional,
+            EmbedderIndex::E5Causal => &semantic.e5_causal,
+            EmbedderIndex::E6Sparse => {
+                panic!("FAIL FAST: E6 is sparse - use inverted index, not HNSW")
+            }
+            EmbedderIndex::E7Code => &semantic.e7_code,
+            EmbedderIndex::E8Graph => &semantic.e8_graph,
+            EmbedderIndex::E9HDC => &semantic.e9_hdc,
+            EmbedderIndex::E10Multimodal => &semantic.e10_multimodal,
+            EmbedderIndex::E11Entity => &semantic.e11_entity,
+            EmbedderIndex::E12LateInteraction => {
+                panic!("FAIL FAST: E12 is late-interaction - use MaxSim, not HNSW")
+            }
+            EmbedderIndex::E13Splade => {
+                panic!("FAIL FAST: E13 is sparse - use inverted index, not HNSW")
+            }
+            EmbedderIndex::PurposeVector => {
+                panic!("FAIL FAST: PurposeVector is not in SemanticFingerprint - use purpose_vector.alignments")
+            }
+        }
+    }
+
+    /// Remove fingerprint from all per-embedder indexes.
+    ///
+    /// Removes the ID from all 12 HNSW indexes.
+    fn remove_from_indexes(&self, id: Uuid) -> Result<(), IndexError> {
+        for (_embedder, index) in self.index_registry.iter() {
+            // Remove returns bool (found or not), we ignore it
+            let _ = index.remove(id)?;
+        }
+        debug!("Removed fingerprint {} from all indexes", id);
         Ok(())
+    }
+
+    /// Compute similarity scores for all 13 embedders.
+    ///
+    /// Uses cosine similarity for dense embedders.
+    /// E6 and E13 (sparse) return 0.0 - use search_sparse() separately.
+    /// E12 (late-interaction) returns 0.0 - use MaxSim separately.
+    fn compute_embedder_scores(
+        &self,
+        query: &SemanticFingerprint,
+        stored: &SemanticFingerprint,
+    ) -> [f32; 13] {
+        [
+            compute_cosine_similarity(&query.e1_semantic, &stored.e1_semantic),
+            compute_cosine_similarity(&query.e2_temporal_recent, &stored.e2_temporal_recent),
+            compute_cosine_similarity(&query.e3_temporal_periodic, &stored.e3_temporal_periodic),
+            compute_cosine_similarity(&query.e4_temporal_positional, &stored.e4_temporal_positional),
+            compute_cosine_similarity(&query.e5_causal, &stored.e5_causal),
+            0.0, // E6 sparse - use search_sparse()
+            compute_cosine_similarity(&query.e7_code, &stored.e7_code),
+            compute_cosine_similarity(&query.e8_graph, &stored.e8_graph),
+            compute_cosine_similarity(&query.e9_hdc, &stored.e9_hdc),
+            compute_cosine_similarity(&query.e10_multimodal, &stored.e10_multimodal),
+            compute_cosine_similarity(&query.e11_entity, &stored.e11_entity),
+            0.0, // E12 late-interaction - use MaxSim
+            0.0, // E13 SPLADE - use search_sparse()
+        ]
     }
 
     /// Retrieve raw fingerprint bytes from RocksDB.
@@ -622,8 +683,8 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
         // Store in RocksDB (primary storage)
         self.store_fingerprint_internal(&fingerprint)?;
 
-        // Add to HNSW indexes for O(log n) search
-        self.add_to_hnsw_indexes(&fingerprint).await?;
+        // Add to per-embedder indexes for O(log n) search
+        self.add_to_indexes(&fingerprint).map_err(|e| CoreError::IndexError(e.to_string()))?;
 
         Ok(id)
     }
@@ -667,14 +728,14 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
             })?;
         }
 
-        // Remove from HNSW indexes (will be re-added with updated vectors)
-        self.remove_from_hnsw_indexes(id).await?;
+        // Remove from per-embedder indexes (will be re-added with updated vectors)
+        self.remove_from_indexes(id).map_err(|e| CoreError::IndexError(e.to_string()))?;
 
         // Store updated fingerprint in RocksDB
         self.store_fingerprint_internal(&fingerprint)?;
 
-        // Add updated fingerprint to HNSW indexes
-        self.add_to_hnsw_indexes(&fingerprint).await?;
+        // Add updated fingerprint to per-embedder indexes
+        self.add_to_indexes(&fingerprint).map_err(|e| CoreError::IndexError(e.to_string()))?;
 
         Ok(true)
     }
@@ -728,8 +789,8 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
                 *count = None;
             }
 
-            // Remove from HNSW indexes
-            self.remove_from_hnsw_indexes(id).await?;
+            // Remove from per-embedder indexes
+            self.remove_from_indexes(id).map_err(|e| CoreError::IndexError(e.to_string()))?;
         }
 
         info!("Deleted fingerprint {} (soft={})", id, soft);
@@ -744,28 +805,32 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
         options: TeleologicalSearchOptions,
     ) -> CoreResult<Vec<TeleologicalSearchResult>> {
         debug!(
-            "Searching semantic with top_k={}, min_similarity={} using O(log n) HNSW",
+            "Searching semantic with top_k={}, min_similarity={} using entry-point pattern",
             options.top_k, options.min_similarity
         );
 
-        // Use HNSW index for O(log n) approximate nearest neighbor search
-        let hnsw = self.hnsw_index.read().await;
+        // ARCH-04: Entry-point discovery - search E1 Semantic first
+        let entry_embedder = EmbedderIndex::E1Semantic;
+        let entry_index = self.index_registry.get(entry_embedder)
+            .ok_or_else(|| CoreError::IndexError(
+                format!("Entry-point index {:?} not found", entry_embedder)
+            ))?;
 
-        // Search E1 semantic space (primary embedder) with 2x top_k to allow filtering
+        // Search E1 semantic space with 2x top_k to allow filtering
         let k = (options.top_k * 2).max(20);
-        let candidates = hnsw.search(EmbedderIndex::E1Semantic, &query.e1_semantic, k)
-            .await
+        let candidates = entry_index.search(&query.e1_semantic, k, None)
             .map_err(|e| {
-                error!("HNSW search failed: {}", e);
+                error!("Entry-point search failed: {}", e);
                 CoreError::IndexError(e.to_string())
             })?;
-
-        drop(hnsw); // Release lock before DB operations
 
         // Fetch full fingerprints for candidates
         let mut results = Vec::with_capacity(candidates.len());
 
-        for (id, similarity) in candidates {
+        for (id, distance) in candidates {
+            // Convert distance to similarity (HNSW returns distance, not similarity)
+            let similarity = 1.0 - distance.min(1.0);
+
             // Skip soft-deleted
             if !options.include_deleted && self.is_soft_deleted(&id) {
                 continue;
@@ -780,20 +845,8 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
             if let Some(data) = self.get_fingerprint_raw(id)? {
                 let fp = deserialize_teleological_fingerprint(&data);
 
-                // Compute all 13 embedder scores
-                let mut embedder_scores = [0.0f32; 13];
-                embedder_scores[0] = similarity; // E1 semantic
-                embedder_scores[1] = compute_cosine_similarity(&query.e2_temporal_recent, &fp.semantic.e2_temporal_recent);
-                embedder_scores[2] = compute_cosine_similarity(&query.e3_temporal_periodic, &fp.semantic.e3_temporal_periodic);
-                embedder_scores[3] = compute_cosine_similarity(&query.e4_temporal_positional, &fp.semantic.e4_temporal_positional);
-                embedder_scores[4] = compute_cosine_similarity(&query.e5_causal, &fp.semantic.e5_causal);
-                // E6 is sparse - skip for now (use search_sparse separately)
-                embedder_scores[6] = compute_cosine_similarity(&query.e7_code, &fp.semantic.e7_code);
-                embedder_scores[7] = compute_cosine_similarity(&query.e8_graph, &fp.semantic.e8_graph);
-                embedder_scores[8] = compute_cosine_similarity(&query.e9_hdc, &fp.semantic.e9_hdc);
-                embedder_scores[9] = compute_cosine_similarity(&query.e10_multimodal, &fp.semantic.e10_multimodal);
-                embedder_scores[10] = compute_cosine_similarity(&query.e11_entity, &fp.semantic.e11_entity);
-                // E12 late interaction and E13 SPLADE computed separately
+                // Compute all 13 embedder scores using helper
+                let embedder_scores = self.compute_embedder_scores(query, &fp.semantic);
 
                 let purpose_alignment = query_purpose_alignment(&fp.purpose_vector);
 
@@ -806,7 +859,7 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
             }
         }
 
-        // Results already sorted by HNSW, but re-sort to ensure correct order after filtering
+        // Sort by similarity descending
         results.sort_by(|a, b| {
             b.similarity
                 .partial_cmp(&a.similarity)
@@ -816,7 +869,7 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
         // Truncate to top_k
         results.truncate(options.top_k);
 
-        debug!("HNSW semantic search returned {} results", results.len());
+        debug!("Entry-point search returned {} results", results.len());
         Ok(results)
     }
 
@@ -826,28 +879,31 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
         options: TeleologicalSearchOptions,
     ) -> CoreResult<Vec<TeleologicalSearchResult>> {
         debug!(
-            "Searching by purpose vector with top_k={} using O(log n) HNSW",
+            "Searching by purpose vector with top_k={} using per-embedder index",
             options.top_k
         );
 
-        // Use HNSW index for O(log n) purpose vector search
-        let hnsw = self.hnsw_index.read().await;
+        // Use PurposeVector index for O(log n) search
+        let pv_index = self.index_registry.get(EmbedderIndex::PurposeVector)
+            .ok_or_else(|| CoreError::IndexError(
+                "PurposeVector index not found".to_string()
+            ))?;
 
         // Search purpose vector space with 2x top_k to allow filtering
         let k = (options.top_k * 2).max(20);
-        let candidates = hnsw.search_purpose(&query.alignments, k)
-            .await
+        let candidates = pv_index.search(&query.alignments, k, None)
             .map_err(|e| {
-                error!("HNSW purpose search failed: {}", e);
+                error!("Purpose vector search failed: {}", e);
                 CoreError::IndexError(e.to_string())
             })?;
-
-        drop(hnsw); // Release lock before DB operations
 
         // Fetch full fingerprints for candidates
         let mut results = Vec::with_capacity(candidates.len());
 
-        for (id, similarity) in candidates {
+        for (id, distance) in candidates {
+            // Convert distance to similarity
+            let similarity = 1.0 - distance.min(1.0);
+
             // Skip soft-deleted
             if !options.include_deleted && self.is_soft_deleted(&id) {
                 continue;
@@ -877,7 +933,7 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
             }
         }
 
-        // Results already sorted by HNSW, but re-sort after filtering
+        // Sort by similarity descending
         results.sort_by(|a, b| {
             b.similarity
                 .partial_cmp(&a.similarity)
@@ -887,7 +943,7 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
         // Truncate to top_k
         results.truncate(options.top_k);
 
-        debug!("HNSW purpose search returned {} results", results.len());
+        debug!("Purpose vector search returned {} results", results.len());
         Ok(results)
     }
 
@@ -1419,24 +1475,25 @@ mod tests {
         create_test_fingerprint_with_seed(42)
     }
 
-    /// Helper to create store with initialized HNSW indexes.
-    async fn create_initialized_store(path: &std::path::Path) -> RocksDbTeleologicalStore {
-        let store = RocksDbTeleologicalStore::open(path).unwrap();
-        store.initialize_hnsw().await.unwrap();
-        store
+    /// Helper to create store with initialized indexes.
+    ///
+    /// Note: EmbedderIndexRegistry is initialized in the constructor,
+    /// so no separate initialization step is needed.
+    fn create_initialized_store(path: &std::path::Path) -> RocksDbTeleologicalStore {
+        RocksDbTeleologicalStore::open(path).unwrap()
     }
 
     #[tokio::test]
     async fn test_open_and_health_check() {
         let tmp = TempDir::new().unwrap();
-        let store = create_initialized_store(tmp.path()).await;
+        let store = create_initialized_store(tmp.path());
         assert!(store.health_check().is_ok());
     }
 
     #[tokio::test]
     async fn test_store_and_retrieve() {
         let tmp = TempDir::new().unwrap();
-        let store = create_initialized_store(tmp.path()).await;
+        let store = create_initialized_store(tmp.path());
 
         let fp = create_test_fingerprint();
         let id = fp.id;
@@ -1462,14 +1519,14 @@ mod tests {
 
         // Store and close
         {
-            let store = create_initialized_store(&path).await;
+            let store = create_initialized_store(&path);
             store.store(fp.clone()).await.unwrap();
             store.flush().await.unwrap();
         }
 
         // Reopen and verify
         {
-            let store = create_initialized_store(&path).await;
+            let store = create_initialized_store(&path);
             let retrieved = store.retrieve(id).await.unwrap();
             assert!(
                 retrieved.is_some(),
@@ -1480,7 +1537,7 @@ mod tests {
 
         // Verify raw bytes exist in RocksDB
         {
-            let store = create_initialized_store(&path).await;
+            let store = create_initialized_store(&path);
             let raw = store.get_fingerprint_raw(id).unwrap();
             assert!(raw.is_some(), "Raw bytes should exist in RocksDB");
             let raw_bytes = raw.unwrap();
@@ -1496,7 +1553,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_soft() {
         let tmp = TempDir::new().unwrap();
-        let store = create_initialized_store(tmp.path()).await;
+        let store = create_initialized_store(tmp.path());
 
         let fp = create_test_fingerprint();
         let id = fp.id;
@@ -1513,7 +1570,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_hard() {
         let tmp = TempDir::new().unwrap();
-        let store = create_initialized_store(tmp.path()).await;
+        let store = create_initialized_store(tmp.path());
 
         let fp = create_test_fingerprint();
         let id = fp.id;
@@ -1530,7 +1587,7 @@ mod tests {
     #[tokio::test]
     async fn test_count() {
         let tmp = TempDir::new().unwrap();
-        let store = create_initialized_store(tmp.path()).await;
+        let store = create_initialized_store(tmp.path());
 
         assert_eq!(store.count().await.unwrap(), 0);
 
@@ -1544,7 +1601,7 @@ mod tests {
     #[tokio::test]
     async fn test_backend_type() {
         let tmp = TempDir::new().unwrap();
-        let store = create_initialized_store(tmp.path()).await;
+        let store = create_initialized_store(tmp.path());
         assert_eq!(store.backend_type(), TeleologicalStorageBackend::RocksDb);
     }
 }
