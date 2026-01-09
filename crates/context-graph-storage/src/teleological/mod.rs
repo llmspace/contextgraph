@@ -1,18 +1,21 @@
 //! Teleological fingerprint storage extensions.
 //!
-//! Adds 17 column families for TeleologicalFingerprint storage:
-//! - 4 core teleological CFs (~63KB fingerprints, purpose vectors, indexes)
+//! Adds 20 column families for TeleologicalFingerprint storage:
+//! - 7 core teleological CFs (~63KB fingerprints, purpose vectors, indexes, teleological vectors)
 //! - 13 quantized embedder CFs (per-embedder quantized storage)
 //!
-//! # Column Families (17 new, 29 total with base 12)
+//! # Column Families (20 new, 32 total with base 12)
 //!
-//! ## Core Teleological (4 CFs)
+//! ## Core Teleological (7 CFs)
 //! | Name | Purpose | Key Format | Value Size |
 //! |------|---------|------------|------------|
 //! | fingerprints | Primary ~63KB TeleologicalFingerprints | UUID (16 bytes) | ~63KB |
 //! | purpose_vectors | 13D purpose vectors | UUID (16 bytes) | 52 bytes |
 //! | e13_splade_inverted | Inverted index for E13 SPLADE | term_id (2 bytes) | Vec<UUID> |
 //! | e1_matryoshka_128 | E1 Matryoshka 128D truncated vectors | UUID (16 bytes) | 512 bytes |
+//! | synergy_matrix | Singleton 13x13 synergy matrix | "synergy" (7 bytes) | ~700 bytes |
+//! | teleological_profiles | Task-specific profiles | profile_id string | ~200-500 bytes |
+//! | teleological_vectors | Per-memory 13D vectors | UUID (16 bytes) | 52 bytes |
 //!
 //! ## Quantized Embedder (13 CFs)
 //! | Name | Purpose | Key Format | Value Size |
@@ -53,6 +56,10 @@ pub use column_families::{
     e1_matryoshka_128_cf_options, e13_splade_inverted_cf_options, fingerprint_cf_options,
     get_teleological_cf_descriptors, purpose_vector_cf_options, CF_E1_MATRYOSHKA_128,
     CF_E13_SPLADE_INVERTED, CF_FINGERPRINTS, CF_PURPOSE_VECTORS, TELEOLOGICAL_CFS,
+    TELEOLOGICAL_CF_COUNT,
+    // TASK-TELEO-006: New teleological vector column families
+    CF_SYNERGY_MATRIX, CF_TELEOLOGICAL_PROFILES, CF_TELEOLOGICAL_VECTORS,
+    synergy_matrix_cf_options, teleological_profiles_cf_options, teleological_vectors_cf_options,
     // Quantized embedder column families (TASK-EMB-022)
     quantized_embedder_cf_options, get_quantized_embedder_cf_descriptors,
     get_all_teleological_cf_descriptors,
@@ -70,6 +77,10 @@ pub use quantized::{
 pub use schema::{
     e13_splade_inverted_key, e1_matryoshka_128_key, fingerprint_key, parse_e13_splade_key,
     parse_fingerprint_key, purpose_vector_key, parse_purpose_vector_key, parse_e1_matryoshka_key,
+    // TASK-TELEO-006: New key format functions
+    SYNERGY_MATRIX_KEY,
+    teleological_profile_key, parse_teleological_profile_key,
+    teleological_vector_key, parse_teleological_vector_key,
 };
 
 // Re-export serialization types

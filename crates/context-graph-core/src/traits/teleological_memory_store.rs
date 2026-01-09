@@ -35,7 +35,7 @@ use uuid::Uuid;
 use crate::config::constants::alignment;
 use crate::error::CoreResult;
 use crate::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
+    PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
 };
 
 /// Storage backend types for teleological memory stores.
@@ -587,6 +587,7 @@ impl<T: TeleologicalMemoryStore> TeleologicalMemoryStoreExt for T {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::fingerprint::JohariFingerprint;
 
     #[test]
     fn test_search_options_default() {

@@ -22,7 +22,7 @@ use tracing::{debug, error, instrument};
 use uuid::Uuid;
 
 use context_graph_core::johari::{
-    ExternalSignal, JohariTransitionManager, QuadrantPattern, NUM_EMBEDDERS,
+    QuadrantPattern, NUM_EMBEDDERS,
 };
 use context_graph_core::types::{JohariQuadrant, TransitionTrigger};
 

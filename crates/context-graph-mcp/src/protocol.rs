@@ -120,6 +120,8 @@ pub mod error_codes {
     pub const CHECKPOINT_ERROR: i32 = -32017;
     /// Batch operation failed
     pub const BATCH_OPERATION_ERROR: i32 = -32018;
+    /// Tool not yet implemented - FAIL FAST per AP-007
+    pub const TOOL_NOT_IMPLEMENTED: i32 = -32019;
 
     // Goal/alignment specific error codes (-32020 to -32029) - TASK-S003
     /// Goal not found in hierarchy

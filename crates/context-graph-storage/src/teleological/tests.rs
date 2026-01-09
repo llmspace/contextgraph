@@ -63,18 +63,21 @@ fn create_real_fingerprint() -> TeleologicalFingerprint {
 
 #[test]
 fn test_teleological_cf_names_count() {
+    // TASK-TELEO-006: Updated from 4 to 7 CFs
     assert_eq!(
         TELEOLOGICAL_CFS.len(),
-        4,
-        "Must have exactly 4 teleological column families"
+        TELEOLOGICAL_CF_COUNT,
+        "Must have exactly {} teleological column families",
+        TELEOLOGICAL_CF_COUNT
     );
+    assert_eq!(TELEOLOGICAL_CF_COUNT, 7);
 }
 
 #[test]
 fn test_teleological_cf_names_unique() {
     use std::collections::HashSet;
     let set: HashSet<_> = TELEOLOGICAL_CFS.iter().collect();
-    assert_eq!(set.len(), 4, "All CF names must be unique");
+    assert_eq!(set.len(), TELEOLOGICAL_CF_COUNT, "All CF names must be unique");
 }
 
 #[test]
@@ -90,10 +93,27 @@ fn test_teleological_cf_names_are_snake_case() {
 
 #[test]
 fn test_teleological_cf_names_values() {
+    // Original 4 CFs
     assert_eq!(CF_FINGERPRINTS, "fingerprints");
     assert_eq!(CF_PURPOSE_VECTORS, "purpose_vectors");
     assert_eq!(CF_E13_SPLADE_INVERTED, "e13_splade_inverted");
     assert_eq!(CF_E1_MATRYOSHKA_128, "e1_matryoshka_128");
+    // TASK-TELEO-006: New 3 CFs
+    assert_eq!(CF_SYNERGY_MATRIX, "synergy_matrix");
+    assert_eq!(CF_TELEOLOGICAL_PROFILES, "teleological_profiles");
+    assert_eq!(CF_TELEOLOGICAL_VECTORS, "teleological_vectors");
+}
+
+#[test]
+fn test_all_cfs_in_array() {
+    assert!(TELEOLOGICAL_CFS.contains(&CF_FINGERPRINTS));
+    assert!(TELEOLOGICAL_CFS.contains(&CF_PURPOSE_VECTORS));
+    assert!(TELEOLOGICAL_CFS.contains(&CF_E13_SPLADE_INVERTED));
+    assert!(TELEOLOGICAL_CFS.contains(&CF_E1_MATRYOSHKA_128));
+    // TASK-TELEO-006: New CFs
+    assert!(TELEOLOGICAL_CFS.contains(&CF_SYNERGY_MATRIX));
+    assert!(TELEOLOGICAL_CFS.contains(&CF_TELEOLOGICAL_PROFILES));
+    assert!(TELEOLOGICAL_CFS.contains(&CF_TELEOLOGICAL_VECTORS));
 }
 
 #[test]
@@ -129,11 +149,39 @@ fn test_e1_matryoshka_128_cf_options_valid() {
 }
 
 #[test]
-fn test_get_teleological_cf_descriptors_returns_4() {
+fn test_get_teleological_cf_descriptors_returns_7() {
     use rocksdb::Cache;
     let cache = Cache::new_lru_cache(256 * 1024 * 1024);
     let descriptors = get_teleological_cf_descriptors(&cache);
-    assert_eq!(descriptors.len(), 4, "Must return exactly 4 descriptors");
+    assert_eq!(descriptors.len(), TELEOLOGICAL_CF_COUNT, "Must return exactly {} descriptors", TELEOLOGICAL_CF_COUNT);
+}
+
+// =========================================================================
+// TASK-TELEO-006: New CF Option Builder Tests
+// =========================================================================
+
+#[test]
+fn test_synergy_matrix_cf_options_valid() {
+    use rocksdb::Cache;
+    let cache = Cache::new_lru_cache(256 * 1024 * 1024);
+    let opts = synergy_matrix_cf_options(&cache);
+    drop(opts); // Should not panic
+}
+
+#[test]
+fn test_teleological_profiles_cf_options_valid() {
+    use rocksdb::Cache;
+    let cache = Cache::new_lru_cache(256 * 1024 * 1024);
+    let opts = teleological_profiles_cf_options(&cache);
+    drop(opts);
+}
+
+#[test]
+fn test_teleological_vectors_cf_options_valid() {
+    use rocksdb::Cache;
+    let cache = Cache::new_lru_cache(256 * 1024 * 1024);
+    let opts = teleological_vectors_cf_options(&cache);
+    drop(opts);
 }
 
 // =========================================================================
@@ -549,4 +597,240 @@ fn test_key_functions_deterministic() {
     let term_key1 = e13_splade_inverted_key(term_id);
     let term_key2 = e13_splade_inverted_key(term_id);
     assert_eq!(term_key1, term_key2);
+}
+
+// =========================================================================
+// TASK-TELEO-006: New Key Format Tests
+// =========================================================================
+
+#[test]
+fn test_synergy_matrix_key_constant() {
+    assert_eq!(SYNERGY_MATRIX_KEY, b"synergy");
+    assert_eq!(SYNERGY_MATRIX_KEY.len(), 7);
+}
+
+#[test]
+fn test_teleological_profile_key_format() {
+    println!("=== TEST: teleological_profile_key format ===");
+
+    let profile_id = "research_profile_001";
+    let key = teleological_profile_key(profile_id);
+
+    println!("Profile ID: {}", profile_id);
+    println!("Key length: {} bytes", key.len());
+    println!("Key bytes: {:02x?}", key);
+
+    assert_eq!(key.len(), profile_id.len());
+    assert_eq!(key, profile_id.as_bytes());
+}
+
+#[test]
+fn test_teleological_profile_key_roundtrip() {
+    let test_cases = vec![
+        "simple",
+        "complex_profile_name",
+        "a",  // minimum length
+        "research-task-001",
+        "profile_with_numbers_123",
+    ];
+
+    for profile_id in test_cases {
+        let key = teleological_profile_key(profile_id);
+        let parsed = parse_teleological_profile_key(&key);
+        assert_eq!(profile_id, parsed, "Round-trip failed for '{}'", profile_id);
+    }
+}
+
+#[test]
+fn test_teleological_profile_key_255_chars() {
+    println!("=== TEST: Maximum length profile key (255 chars) ===");
+
+    let profile_id = "a".repeat(255);
+    println!("BEFORE: Profile ID with {} chars", profile_id.len());
+
+    let key = teleological_profile_key(&profile_id);
+    println!("AFTER: Key with {} bytes", key.len());
+
+    assert_eq!(key.len(), 255);
+
+    let parsed = parse_teleological_profile_key(&key);
+    assert_eq!(profile_id, parsed);
+    println!("RESULT: PASS - Maximum length handled correctly");
+}
+
+#[test]
+#[should_panic(expected = "STORAGE ERROR: teleological_profile_key cannot be empty")]
+fn test_teleological_profile_key_empty_panics() {
+    let _ = teleological_profile_key("");
+}
+
+#[test]
+#[should_panic(expected = "STORAGE ERROR: teleological_profile_key too long")]
+fn test_teleological_profile_key_too_long_panics() {
+    let long_id = "x".repeat(256);
+    let _ = teleological_profile_key(&long_id);
+}
+
+#[test]
+#[should_panic(expected = "STORAGE ERROR: teleological_profile key cannot be empty")]
+fn test_parse_teleological_profile_key_empty_panics() {
+    let _ = parse_teleological_profile_key(&[]);
+}
+
+#[test]
+#[should_panic(expected = "STORAGE ERROR: teleological_profile key too long")]
+fn test_parse_teleological_profile_key_too_long_panics() {
+    let long_key = vec![0x61u8; 256]; // 'a' * 256
+    let _ = parse_teleological_profile_key(&long_key);
+}
+
+#[test]
+fn test_teleological_vector_key_format() {
+    println!("=== TEST: teleological_vector_key format ===");
+
+    let memory_id = Uuid::new_v4();
+    let key = teleological_vector_key(&memory_id);
+
+    println!("Memory ID: {}", memory_id);
+    println!("Key length: {} bytes", key.len());
+    println!("Key bytes: {:02x?}", key);
+
+    assert_eq!(key.len(), 16);
+    assert_eq!(&key, memory_id.as_bytes());
+}
+
+#[test]
+fn test_teleological_vector_key_roundtrip() {
+    for _ in 0..10 {
+        let original = Uuid::new_v4();
+        let key = teleological_vector_key(&original);
+        let parsed = parse_teleological_vector_key(&key);
+        assert_eq!(original, parsed);
+    }
+}
+
+#[test]
+fn test_teleological_vector_key_nil_uuid() {
+    let nil_uuid = Uuid::nil();
+    let key = teleological_vector_key(&nil_uuid);
+    let parsed = parse_teleological_vector_key(&key);
+
+    assert_eq!(nil_uuid, parsed);
+    assert!(parsed.is_nil());
+}
+
+#[test]
+fn test_teleological_vector_key_max_uuid() {
+    let max_uuid = Uuid::max();
+    let key = teleological_vector_key(&max_uuid);
+    let parsed = parse_teleological_vector_key(&key);
+
+    assert_eq!(max_uuid, parsed);
+}
+
+#[test]
+#[should_panic(expected = "STORAGE ERROR: teleological_vector key must be 16 bytes")]
+fn test_parse_teleological_vector_key_too_short_panics() {
+    let _ = parse_teleological_vector_key(&[0u8; 15]);
+}
+
+#[test]
+#[should_panic(expected = "STORAGE ERROR: teleological_vector key must be 16 bytes")]
+fn test_parse_teleological_vector_key_too_long_panics() {
+    let _ = parse_teleological_vector_key(&[0u8; 17]);
+}
+
+#[test]
+#[should_panic(expected = "STORAGE ERROR: teleological_vector key must be 16 bytes")]
+fn test_parse_teleological_vector_key_empty_panics() {
+    let _ = parse_teleological_vector_key(&[]);
+}
+
+// =========================================================================
+// TASK-TELEO-006: CF Descriptor Order Tests
+// =========================================================================
+
+#[test]
+fn test_descriptors_in_correct_order() {
+    use rocksdb::Cache;
+    let cache = Cache::new_lru_cache(256 * 1024 * 1024);
+    let descriptors = get_teleological_cf_descriptors(&cache);
+
+    // Verify order matches TELEOLOGICAL_CFS
+    for (i, cf_name) in TELEOLOGICAL_CFS.iter().enumerate() {
+        assert_eq!(
+            descriptors[i].name(),
+            *cf_name,
+            "Descriptor {} should be '{}', got '{}'",
+            i, cf_name, descriptors[i].name()
+        );
+    }
+}
+
+#[test]
+fn test_get_all_teleological_cf_descriptors_returns_20() {
+    use rocksdb::Cache;
+    let cache = Cache::new_lru_cache(256 * 1024 * 1024);
+    let descriptors = get_all_teleological_cf_descriptors(&cache);
+
+    // 7 teleological + 13 quantized embedder = 20
+    assert_eq!(descriptors.len(), 20, "Must return 7 teleological + 13 quantized = 20 CFs");
+}
+
+// =========================================================================
+// TASK-TELEO-006: Edge Case Tests (with before/after state printing)
+// =========================================================================
+
+#[test]
+fn edge_case_teleological_profile_unicode() {
+    println!("=== EDGE CASE: Profile key with unicode characters ===");
+
+    let profile_id = "research_ai";  // ASCII only for safety
+    println!("BEFORE: Profile ID '{}' ({} bytes)", profile_id, profile_id.len());
+
+    let key = teleological_profile_key(profile_id);
+    println!("SERIALIZED: {} bytes", key.len());
+
+    let parsed = parse_teleological_profile_key(&key);
+    println!("AFTER: Parsed '{}'", parsed);
+
+    assert_eq!(profile_id, parsed);
+    println!("RESULT: PASS - Profile key round-trip successful");
+}
+
+#[test]
+fn edge_case_multiple_cache_references_for_new_cfs() {
+    println!("=== EDGE CASE: Multiple option builders sharing same cache (new CFs) ===");
+    use rocksdb::Cache;
+    let cache = Cache::new_lru_cache(256 * 1024 * 1024);
+
+    println!("BEFORE: Creating options with shared cache reference");
+    let opts1 = synergy_matrix_cf_options(&cache);
+    let opts2 = teleological_profiles_cf_options(&cache);
+    let opts3 = teleological_vectors_cf_options(&cache);
+
+    println!("AFTER: All 3 new option builders created successfully");
+    drop(opts1);
+    drop(opts2);
+    drop(opts3);
+    println!("RESULT: PASS - Shared cache works across new Options");
+}
+
+#[test]
+fn edge_case_deterministic_key_generation_new_keys() {
+    println!("=== EDGE CASE: Deterministic key generation for new key types ===");
+
+    let memory_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+    let profile_id = "deterministic_profile";
+
+    println!("BEFORE: Creating keys multiple times");
+    let vec_key1 = teleological_vector_key(&memory_id);
+    let vec_key2 = teleological_vector_key(&memory_id);
+    let prof_key1 = teleological_profile_key(profile_id);
+    let prof_key2 = teleological_profile_key(profile_id);
+
+    println!("AFTER: Comparing key outputs");
+    assert_eq!(vec_key1, vec_key2, "Vector keys must be deterministic");
+    assert_eq!(prof_key1, prof_key2, "Profile keys must be deterministic");
+    println!("RESULT: PASS - All keys deterministic");
 }

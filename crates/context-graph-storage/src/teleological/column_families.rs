@@ -8,7 +8,7 @@
 //! All option builders are infallible at construction time. Errors only
 //! occur at DB open time, and those are surfaced by RocksDB itself.
 
-use rocksdb::{BlockBasedOptions, Cache, ColumnFamilyDescriptor, Options};
+use rocksdb::{BlockBasedOptions, Cache, ColumnFamilyDescriptor, Options, SliceTransform};
 
 /// Column family for ~63KB TeleologicalFingerprints.
 ///
@@ -43,13 +43,46 @@ pub const CF_E13_SPLADE_INVERTED: &str = "e13_splade_inverted";
 /// preserving reasonable accuracy for coarse filtering.
 pub const CF_E1_MATRYOSHKA_128: &str = "e1_matryoshka_128";
 
-/// All teleological column family names (4 total).
+// =============================================================================
+// TELEOLOGICAL VECTOR COLUMN FAMILIES (TASK-TELEO-006)
+// =============================================================================
+
+/// Column family for synergy matrix singleton storage.
+///
+/// Stores the global 13x13 synergy matrix that captures co-occurrence
+/// patterns between teleological dimensions. Singleton with key "synergy".
+/// Key: "synergy" (7 bytes fixed)
+/// Value: SynergyMatrix serialized via bincode (~700 bytes: 13x13 f32 + metadata)
+pub const CF_SYNERGY_MATRIX: &str = "synergy_matrix";
+
+/// Column family for teleological profiles.
+///
+/// Stores task-specific teleological profiles that define purpose weighting.
+/// Key: profile_id string bytes (variable length, typically 1-64 bytes)
+/// Value: TeleologicalProfile serialized via bincode (~200-500 bytes)
+pub const CF_TELEOLOGICAL_PROFILES: &str = "teleological_profiles";
+
+/// Column family for teleological vectors per-memory storage.
+///
+/// Stores the 13D TeleologicalVector for each memory, capturing purpose alignment.
+/// Key: memory_id UUID (16 bytes)
+/// Value: TeleologicalVector serialized via bincode (52 bytes: 13 x f32)
+pub const CF_TELEOLOGICAL_VECTORS: &str = "teleological_vectors";
+
+/// All teleological column family names (7 total: 4 original + 3 new).
 pub const TELEOLOGICAL_CFS: &[&str] = &[
     CF_FINGERPRINTS,
     CF_PURPOSE_VECTORS,
     CF_E13_SPLADE_INVERTED,
     CF_E1_MATRYOSHKA_128,
+    // TASK-TELEO-006: New teleological vector CFs
+    CF_SYNERGY_MATRIX,
+    CF_TELEOLOGICAL_PROFILES,
+    CF_TELEOLOGICAL_VECTORS,
 ];
+
+/// Total count of teleological CFs (should be 7).
+pub const TELEOLOGICAL_CF_COUNT: usize = 7;
 
 // =============================================================================
 // QUANTIZED EMBEDDER COLUMN FAMILIES (13 CFs for per-embedder storage)
@@ -214,6 +247,86 @@ pub fn e1_matryoshka_128_cf_options(cache: &Cache) -> Options {
     opts
 }
 
+// =============================================================================
+// TASK-TELEO-006: CF OPTION BUILDERS FOR TELEOLOGICAL VECTOR STORAGE
+// =============================================================================
+
+/// Options for synergy matrix singleton storage (~700 bytes).
+///
+/// # Configuration
+/// - No compression (small singleton, compression overhead not worth it)
+/// - Bloom filter for fast lookups
+/// - Optimized for point lookups (singleton access pattern)
+///
+/// # FAIL FAST Policy
+/// No fallback options - let RocksDB error on open if misconfigured.
+pub fn synergy_matrix_cf_options(cache: &Cache) -> Options {
+    let mut block_opts = BlockBasedOptions::default();
+    block_opts.set_block_cache(cache);
+    block_opts.set_bloom_filter(10.0, false);
+    block_opts.set_cache_index_and_filter_blocks(true);
+
+    let mut opts = Options::default();
+    opts.set_block_based_table_factory(&block_opts);
+    opts.set_compression_type(rocksdb::DBCompressionType::None); // Small singleton
+    opts.optimize_for_point_lookup(16); // 16MB hint for point lookups
+    opts.create_if_missing(true);
+    opts
+}
+
+/// Options for teleological profiles storage (~200-500 bytes per profile).
+///
+/// # Configuration
+/// - LZ4 compression (profiles may have repetitive string patterns)
+/// - Bloom filter for fast lookups
+/// - Cache index and filter blocks
+///
+/// # Key Format
+/// Variable-length profile_id strings (typically 1-64 bytes).
+///
+/// # FAIL FAST Policy
+/// No fallback options - let RocksDB error on open if misconfigured.
+pub fn teleological_profiles_cf_options(cache: &Cache) -> Options {
+    let mut block_opts = BlockBasedOptions::default();
+    block_opts.set_block_cache(cache);
+    block_opts.set_bloom_filter(10.0, false);
+    block_opts.set_cache_index_and_filter_blocks(true);
+
+    let mut opts = Options::default();
+    opts.set_block_based_table_factory(&block_opts);
+    opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    opts.create_if_missing(true);
+    opts
+}
+
+/// Options for teleological vectors per-memory storage (52 bytes per vector).
+///
+/// # Configuration
+/// - No compression (52 bytes is too small to benefit from compression)
+/// - Bloom filter for fast lookups
+/// - 16-byte prefix extractor for UUID keys
+/// - Optimized for point lookups
+///
+/// # Key Format
+/// UUID (16 bytes) for memory_id.
+///
+/// # FAIL FAST Policy
+/// No fallback options - let RocksDB error on open if misconfigured.
+pub fn teleological_vectors_cf_options(cache: &Cache) -> Options {
+    let mut block_opts = BlockBasedOptions::default();
+    block_opts.set_block_cache(cache);
+    block_opts.set_bloom_filter(10.0, false);
+    block_opts.set_cache_index_and_filter_blocks(true);
+
+    let mut opts = Options::default();
+    opts.set_block_based_table_factory(&block_opts);
+    opts.set_compression_type(rocksdb::DBCompressionType::None); // 52 bytes, compression not worth it
+    opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(16)); // UUID prefix
+    opts.optimize_for_point_lookup(64); // 64MB hint
+    opts.create_if_missing(true);
+    opts
+}
+
 /// Options for quantized embedder storage (~1-2KB per embedding).
 ///
 /// Configuration:
@@ -240,13 +353,15 @@ pub fn quantized_embedder_cf_options(cache: &Cache) -> Options {
     opts
 }
 
-/// Get all 4 teleological column family descriptors.
+/// Get all 7 teleological column family descriptors.
+///
+/// Returns 7 descriptors: 4 original + 3 new (TASK-TELEO-006).
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 4 `ColumnFamilyDescriptor`s for teleological storage.
+/// Vector of 7 `ColumnFamilyDescriptor`s for teleological storage.
 ///
 /// # Example
 /// ```ignore
@@ -255,7 +370,7 @@ pub fn quantized_embedder_cf_options(cache: &Cache) -> Options {
 ///
 /// let cache = Cache::new_lru_cache(256 * 1024 * 1024); // 256MB
 /// let descriptors = get_teleological_cf_descriptors(&cache);
-/// assert_eq!(descriptors.len(), 4);
+/// assert_eq!(descriptors.len(), 7);
 /// ```
 pub fn get_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     vec![
@@ -263,6 +378,10 @@ pub fn get_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescrip
         ColumnFamilyDescriptor::new(CF_PURPOSE_VECTORS, purpose_vector_cf_options(cache)),
         ColumnFamilyDescriptor::new(CF_E13_SPLADE_INVERTED, e13_splade_inverted_cf_options(cache)),
         ColumnFamilyDescriptor::new(CF_E1_MATRYOSHKA_128, e1_matryoshka_128_cf_options(cache)),
+        // TASK-TELEO-006: New teleological vector CFs
+        ColumnFamilyDescriptor::new(CF_SYNERGY_MATRIX, synergy_matrix_cf_options(cache)),
+        ColumnFamilyDescriptor::new(CF_TELEOLOGICAL_PROFILES, teleological_profiles_cf_options(cache)),
+        ColumnFamilyDescriptor::new(CF_TELEOLOGICAL_VECTORS, teleological_vectors_cf_options(cache)),
     ]
 }
 
@@ -295,14 +414,14 @@ pub fn get_quantized_embedder_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyD
 
 /// Get ALL teleological + quantized embedder column family descriptors.
 ///
-/// Returns 17 descriptors total: 4 teleological + 13 quantized embedder.
+/// Returns 20 descriptors total: 7 teleological + 13 quantized embedder.
 /// Use this when opening a database that needs both fingerprint and per-embedder storage.
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 17 `ColumnFamilyDescriptor`s.
+/// Vector of 20 `ColumnFamilyDescriptor`s.
 ///
 /// # Example
 /// ```ignore
@@ -311,7 +430,7 @@ pub fn get_quantized_embedder_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyD
 ///
 /// let cache = Cache::new_lru_cache(256 * 1024 * 1024); // 256MB
 /// let descriptors = get_all_teleological_cf_descriptors(&cache);
-/// assert_eq!(descriptors.len(), 17); // 4 teleological + 13 embedder
+/// assert_eq!(descriptors.len(), 20); // 7 teleological + 13 embedder
 /// ```
 pub fn get_all_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     let mut descriptors = get_teleological_cf_descriptors(cache);

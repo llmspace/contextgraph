@@ -127,6 +127,53 @@ impl Handlers {
             tool_names::OMNI_INFER => {
                 self.call_omni_infer(id, arguments).await
             }
+            // TASK-NORTHSTAR-001: North Star goal management tools
+            tool_names::SET_NORTH_STAR => self.call_set_north_star(id, arguments).await,
+            tool_names::GET_NORTH_STAR => self.call_get_north_star(id, arguments).await,
+            tool_names::UPDATE_NORTH_STAR => self.call_update_north_star(id, arguments).await,
+            tool_names::DELETE_NORTH_STAR => self.call_delete_north_star(id, arguments).await,
+            tool_names::INIT_NORTH_STAR_FROM_DOCUMENTS => {
+                self.call_init_north_star_from_documents(id, arguments).await
+            }
+            tool_names::GET_GOAL_HIERARCHY => self.call_get_goal_hierarchy(id, arguments).await,
+            // TELEO-H1 to TELEO-H5: Teleological tools
+            tool_names::SEARCH_TELEOLOGICAL => {
+                self.call_search_teleological(id, arguments).await
+            }
+            tool_names::COMPUTE_TELEOLOGICAL_VECTOR => {
+                self.call_compute_teleological_vector(id, arguments).await
+            }
+            tool_names::FUSE_EMBEDDINGS => {
+                self.call_fuse_embeddings(id, arguments).await
+            }
+            tool_names::UPDATE_SYNERGY_MATRIX => {
+                self.call_update_synergy_matrix(id, arguments).await
+            }
+            tool_names::MANAGE_TELEOLOGICAL_PROFILE => {
+                self.call_manage_teleological_profile(id, arguments).await
+            }
+            // TASK-AUTONOMOUS-MCP: Autonomous North Star tools
+            tool_names::AUTO_BOOTSTRAP_NORTH_STAR => {
+                self.call_auto_bootstrap_north_star(id, arguments).await
+            }
+            tool_names::GET_ALIGNMENT_DRIFT => {
+                self.call_get_alignment_drift(id, arguments).await
+            }
+            tool_names::TRIGGER_DRIFT_CORRECTION => {
+                self.call_trigger_drift_correction(id, arguments).await
+            }
+            tool_names::GET_PRUNING_CANDIDATES => {
+                self.call_get_pruning_candidates(id, arguments).await
+            }
+            tool_names::TRIGGER_CONSOLIDATION => {
+                self.call_trigger_consolidation(id, arguments).await
+            }
+            tool_names::DISCOVER_SUB_GOALS => {
+                self.call_discover_sub_goals(id, arguments).await
+            }
+            tool_names::GET_AUTONOMOUS_STATUS => {
+                self.call_get_autonomous_status(id, arguments).await
+            }
             _ => JsonRpcResponse::error(
                 id,
                 error_codes::TOOL_NOT_FOUND,
@@ -1370,6 +1417,26 @@ impl Handlers {
 
         let was_selected = winner == Some(memory_id);
 
+        // GAP-1 FIX: Wire workspace events to neuromodulation
+        // When a memory enters workspace (was_selected), increase dopamine
+        let dopamine_triggered = if was_selected {
+            if let Some(neuromod) = &self.neuromod_manager {
+                let mut manager = neuromod.write();
+                manager.on_workspace_entry();
+                let new_dopamine = manager.get_hopfield_beta();
+                debug!(
+                    memory_id = %memory_id,
+                    dopamine = new_dopamine,
+                    "Workspace entry triggered dopamine increase"
+                );
+                Some(new_dopamine)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         self.tool_result_with_pulse(
             id,
             json!({
@@ -1377,7 +1444,8 @@ impl Handlers {
                 "memory_id": memory_id.to_string(),
                 "new_r": r,
                 "was_selected": was_selected,
-                "is_broadcasting": ws.is_broadcasting()
+                "is_broadcasting": ws.is_broadcasting(),
+                "dopamine_triggered": dopamine_triggered
             }),
         )
     }
@@ -1460,4 +1528,7 @@ impl Handlers {
             }),
         )
     }
+
+    // ========== NORTH STAR TOOLS ==========
+    // Real implementations are in handlers/north_star.rs (TASK-NORTHSTAR-001)
 }

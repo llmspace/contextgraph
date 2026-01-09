@@ -19,8 +19,11 @@
 //! - `atc`: Adaptive Threshold Calibration handlers (TASK-ATC-001)
 //! - `steering`: Steering subsystem handlers (TASK-STEERING-001)
 //! - `causal`: Causal inference handlers (TASK-CAUSAL-001)
+//! - `teleological`: Teleological search, fusion, and profile handlers (TELEO-H1 to TELEO-H5)
+//! - `autonomous`: NORTH autonomous system handlers (TASK-AUTONOMOUS-MCP)
 
 mod atc;
+mod autonomous;
 mod causal;
 mod core;
 mod dream;
@@ -28,10 +31,12 @@ mod johari;
 mod lifecycle;
 mod memory;
 mod neuromod;
+mod north_star;
 mod purpose;
 mod search;
 mod steering;
 mod system;
+mod teleological;
 mod tools;
 mod utl;
 pub mod gwt_traits;
@@ -47,12 +52,16 @@ pub use self::core::Handlers;
 pub use self::core::MetaUtlTracker;
 
 // Re-export GWT traits for external use (TASK-GWT-001)
+// Note: These are public API re-exports - unused within this crate but available to consumers
+#[allow(unused_imports)]
 pub use self::gwt_traits::{
     GwtSystemProvider, KuramotoProvider, MetaCognitiveProvider,
     SelfEgoProvider, WorkspaceProvider, NUM_OSCILLATORS,
 };
 
 // Re-export GWT provider implementations for wiring (TASK-GWT-001)
+// Note: These are public API re-exports - unused within this crate but available to consumers
+#[allow(unused_imports)]
 pub use self::gwt_providers::{
     GwtSystemProviderImpl, KuramotoProviderImpl, MetaCognitiveProviderImpl,
     SelfEgoProviderImpl, WorkspaceProviderImpl,

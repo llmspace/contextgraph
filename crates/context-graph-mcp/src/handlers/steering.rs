@@ -14,7 +14,7 @@
 use serde_json::json;
 use tracing::{debug, error};
 
-use context_graph_core::steering::{SteeringFeedback, SteeringSystem};
+use context_graph_core::steering::SteeringSystem;
 
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
 

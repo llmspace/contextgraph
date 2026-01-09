@@ -20,13 +20,13 @@
 
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use tracing::{debug, error, warn};
+use tracing::{debug, error};
 
 use context_graph_core::purpose::PurposeVectorComputer;
 use context_graph_core::traits::TeleologicalSearchOptions;
 use context_graph_core::types::{CognitivePulse, SuggestedAction};
 use context_graph_core::types::fingerprint::{
-    JohariFingerprint, PurposeVector, TeleologicalFingerprint,
+    JohariFingerprint, TeleologicalFingerprint,
     NUM_EMBEDDERS,
 };
 

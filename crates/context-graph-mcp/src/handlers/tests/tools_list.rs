@@ -5,7 +5,7 @@ use crate::protocol::JsonRpcId;
 use super::{create_test_handlers, make_request};
 
 #[tokio::test]
-async fn test_tools_list_returns_all_23_tools() {
+async fn test_tools_list_returns_all_34_tools() {
     let handlers = create_test_handlers();
     let request = make_request("tools/list", Some(JsonRpcId::Number(1)), None);
 
@@ -24,7 +24,7 @@ async fn test_tools_list_returns_all_23_tools() {
         .as_array()
         .expect("tools must be an array");
 
-    // Verify exactly 23 tools returned:
+    // Verify exactly 34 tools returned:
     // Original 6: inject_context, store_memory, get_memetic_status, get_graph_manifest, search_graph, utl_status
     // GWT 6: get_consciousness_state, get_kuramoto_sync, get_workspace_status, get_ego_state, trigger_workspace_broadcast, adjust_coupling
     // ATC 3 (TASK-ATC-001): get_threshold_status, get_calibration_metrics, trigger_recalibration
@@ -32,10 +32,12 @@ async fn test_tools_list_returns_all_23_tools() {
     // Neuromod 2 (TASK-NEUROMOD-MCP): get_neuromodulation_state, adjust_neuromodulator
     // Steering 1 (TASK-STEERING-001): get_steering_feedback
     // Causal 1 (TASK-CAUSAL-001): omni_infer
+    // North Star 6 (TASK-NORTHSTAR-001): set_north_star, get_north_star, update_north_star, delete_north_star, init_north_star_from_documents, get_goal_hierarchy
+    // Teleological 5 (TELEO-007 to TELEO-011): search_teleological, compute_teleological_vector, fuse_embeddings, update_synergy_matrix, manage_teleological_profile
     assert_eq!(
         tools.len(),
-        23,
-        "Must return exactly 23 tools, got {}",
+        34,
+        "Must return exactly 34 tools, got {}",
         tools.len()
     );
 }

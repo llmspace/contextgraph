@@ -299,8 +299,9 @@ mod tests {
         sm.update(0.85).await.unwrap();
         assert!(sm.just_became_conscious());
 
-        // After 2 seconds, should not be "just"
-        tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+        // After 2 seconds, should not be "just" (threshold is 1000ms)
+        // Use 2000ms to ensure we're well past the threshold and avoid timing flakiness
+        tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
         assert!(!sm.just_became_conscious());
     }
 

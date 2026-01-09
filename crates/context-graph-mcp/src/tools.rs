@@ -545,6 +545,670 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                 "required": ["source"]
             }),
         ),
+
+        // ========== NORTH STAR TOOLS (TASK-NORTHSTAR-001) ==========
+
+        // set_north_star - Set the initial North Star goal
+        ToolDefinition::new(
+            "set_north_star",
+            "Set the North Star goal that defines the system's purpose. Required before storing memories. \
+             Generates a 1024D embedding from the description. Only one North Star allowed.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "Human-readable description of the North Star goal (e.g., 'Build a bio-nervous knowledge graph with computational consciousness')"
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Keywords for SPLADE matching (optional)"
+                    },
+                    "embedding": {
+                        "type": "array",
+                        "items": { "type": "number" },
+                        "description": "Optional 1024D embedding vector. If not provided, generated from description."
+                    }
+                },
+                "required": ["description"]
+            }),
+        ),
+
+        // get_north_star - Retrieve current North Star
+        ToolDefinition::new(
+            "get_north_star",
+            "Get the current North Star goal configuration, including description, embedding, and alignment stats. \
+             Returns exists=false if no North Star is configured.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "include_embedding": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include the full 1024D embedding in response"
+                    },
+                    "include_stats": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Include alignment statistics"
+                    }
+                },
+                "required": []
+            }),
+        ),
+
+        // update_north_star - Update existing North Star
+        ToolDefinition::new(
+            "update_north_star",
+            "Update the existing North Star goal. Can update description, keywords, or embedding. \
+             Optionally recomputes alignment for all existing memories. Fails if no North Star exists.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "New description (optional)"
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "New keywords (optional)"
+                    },
+                    "embedding": {
+                        "type": "array",
+                        "items": { "type": "number" },
+                        "description": "New 1024D embedding (optional, regenerated from description if description changes)"
+                    },
+                    "recompute_alignments": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Recompute theta_to_north_star for all memories (expensive)"
+                    }
+                },
+                "required": []
+            }),
+        ),
+
+        // delete_north_star - Remove North Star (with safeguards)
+        ToolDefinition::new(
+            "delete_north_star",
+            "Delete the North Star goal. WARNING: This will break memory storage until a new North Star is set. \
+             Requires confirmation. Optionally deletes all child goals.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "confirm": {
+                        "type": "boolean",
+                        "description": "Must be true to confirm deletion"
+                    },
+                    "cascade": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Also delete all child goals (Strategic, Tactical, Immediate)"
+                    }
+                },
+                "required": ["confirm"]
+            }),
+        ),
+
+        // init_north_star_from_documents - Initialize from document chunks
+        ToolDefinition::new(
+            "init_north_star_from_documents",
+            "Initialize North Star by chunking documents, embedding all chunks, computing centroid, \
+             and setting that as the North Star embedding. Ideal for bootstrapping from project documentation.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "documents": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "content": { "type": "string" },
+                                "weight": { "type": "number", "default": 1.0 }
+                            },
+                            "required": ["content"]
+                        },
+                        "description": "Array of document contents to process"
+                    },
+                    "chunk_size": {
+                        "type": "integer",
+                        "default": 200,
+                        "minimum": 50,
+                        "maximum": 1000,
+                        "description": "Character size for chunks"
+                    },
+                    "chunk_overlap": {
+                        "type": "integer",
+                        "default": 50,
+                        "minimum": 0,
+                        "maximum": 200,
+                        "description": "Overlap between chunks"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Human-readable description for the North Star"
+                    },
+                    "store_chunks_as_memories": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Also store all chunks as memories after setting North Star"
+                    }
+                },
+                "required": ["documents", "description"]
+            }),
+        ),
+
+        // get_goal_hierarchy - Get full goal tree
+        ToolDefinition::new(
+            "get_goal_hierarchy",
+            "Get the complete goal hierarchy including North Star, Strategic, Tactical, and Immediate goals. \
+             Returns the full tree structure with alignment information.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "level": {
+                        "type": "string",
+                        "enum": ["all", "NorthStar", "Strategic", "Tactical", "Immediate"],
+                        "default": "all",
+                        "description": "Filter by goal level"
+                    },
+                    "include_embeddings": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include embeddings in response (large)"
+                    }
+                },
+                "required": []
+            }),
+        ),
+
+        // ========== TELEOLOGICAL TOOLS (13-EMBEDDER FUSION) ==========
+
+        // search_teleological - Cross-correlation search across all 13 embedders
+        ToolDefinition::new(
+            "search_teleological",
+            "Perform teleological matrix search across all 13 embedder dimensions. \
+             Computes cross-correlation similarity at multiple levels: full matrix (78 pairs), \
+             purpose vector (13D), group alignments (6D), and single embedder patterns.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "query_content": {
+                        "type": "string",
+                        "description": "Content to search for (will be embedded)"
+                    },
+                    "query_vector_id": {
+                        "type": "string",
+                        "description": "Alternative: ID of existing teleological vector to use as query"
+                    },
+                    "strategy": {
+                        "type": "string",
+                        "enum": ["cosine", "euclidean", "synergy_weighted", "group_hierarchical", "cross_correlation_dominant", "tucker_compressed", "adaptive"],
+                        "default": "adaptive",
+                        "description": "Search strategy for comparing teleological vectors"
+                    },
+                    "scope": {
+                        "type": "string",
+                        "enum": ["full", "purpose_vector_only", "cross_correlations_only", "group_alignments_only"],
+                        "default": "full",
+                        "description": "Which components to compare"
+                    },
+                    "specific_groups": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": ["factual", "temporal", "causal", "relational", "qualitative", "implementation"]
+                        },
+                        "description": "Compare only specific embedding groups"
+                    },
+                    "specific_embedder": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 12,
+                        "description": "Compare single embedder pattern (0=Semantic, 5=Code, 12=Sparse, etc.)"
+                    },
+                    "weight_purpose": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.4,
+                        "description": "Weight for purpose vector similarity"
+                    },
+                    "weight_correlations": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.35,
+                        "description": "Weight for cross-correlation similarity"
+                    },
+                    "weight_groups": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.15,
+                        "description": "Weight for group alignments similarity"
+                    },
+                    "min_similarity": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.3,
+                        "description": "Minimum similarity threshold for results"
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000,
+                        "default": 20,
+                        "description": "Maximum number of results to return"
+                    },
+                    "include_breakdown": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Include per-component similarity breakdown in results"
+                    }
+                },
+                "required": []
+            }),
+        ),
+
+        // compute_teleological_vector - Compute full 13-embedder teleological vector
+        ToolDefinition::new(
+            "compute_teleological_vector",
+            "Compute a complete teleological vector from content using all 13 embedders. \
+             Returns purpose vector (13D), cross-correlations (78D), group alignments (6D), \
+             and optional Tucker core decomposition.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "Content to compute teleological vector for"
+                    },
+                    "profile_id": {
+                        "type": "string",
+                        "description": "Optional profile ID for task-specific weighting"
+                    },
+                    "compute_tucker": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Compute Tucker decomposition for compressed representation"
+                    },
+                    "tucker_ranks": {
+                        "type": "array",
+                        "items": { "type": "integer" },
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "default": [4, 4, 128],
+                        "description": "Tucker decomposition ranks [r1, r2, r3]"
+                    },
+                    "include_per_embedder": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include raw per-embedder outputs (large)"
+                    }
+                },
+                "required": ["content"]
+            }),
+        ),
+
+        // fuse_embeddings - Fuse multiple embeddings using synergy matrix
+        ToolDefinition::new(
+            "fuse_embeddings",
+            "Fuse embedding outputs using the synergy matrix and optional profile weights. \
+             Supports multiple fusion methods: linear, attention-weighted, gated, hierarchical.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "memory_id": {
+                        "type": "string",
+                        "description": "ID of memory to fuse embeddings for"
+                    },
+                    "fusion_method": {
+                        "type": "string",
+                        "enum": ["linear", "attention", "gated", "hierarchical", "tucker"],
+                        "default": "hierarchical",
+                        "description": "Fusion method to use"
+                    },
+                    "profile_id": {
+                        "type": "string",
+                        "description": "Profile ID for task-specific fusion weights"
+                    },
+                    "custom_weights": {
+                        "type": "array",
+                        "items": { "type": "number" },
+                        "minItems": 13,
+                        "maxItems": 13,
+                        "description": "Custom per-embedder weights [E1..E13]"
+                    },
+                    "apply_synergy": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Apply synergy matrix weighting to cross-correlations"
+                    },
+                    "store_result": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Store fused teleological vector in database"
+                    }
+                },
+                "required": ["memory_id"]
+            }),
+        ),
+
+        // update_synergy_matrix - Adaptively update synergy matrix from feedback
+        ToolDefinition::new(
+            "update_synergy_matrix",
+            "Update the synergy matrix based on feedback from retrieval success/failure. \
+             Implements online learning to adapt cross-embedding relationships.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "query_vector_id": {
+                        "type": "string",
+                        "description": "ID of query teleological vector"
+                    },
+                    "result_vector_id": {
+                        "type": "string",
+                        "description": "ID of retrieved result vector"
+                    },
+                    "feedback": {
+                        "type": "string",
+                        "enum": ["relevant", "not_relevant", "partially_relevant"],
+                        "description": "User feedback on retrieval quality"
+                    },
+                    "relevance_score": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "Fine-grained relevance score [0.0, 1.0]"
+                    },
+                    "learning_rate": {
+                        "type": "number",
+                        "minimum": 0.001,
+                        "maximum": 0.5,
+                        "default": 0.01,
+                        "description": "Learning rate for synergy update"
+                    },
+                    "update_scope": {
+                        "type": "string",
+                        "enum": ["all_pairs", "high_synergy_only", "contributing_pairs"],
+                        "default": "contributing_pairs",
+                        "description": "Which synergy pairs to update"
+                    }
+                },
+                "required": ["query_vector_id", "result_vector_id", "feedback"]
+            }),
+        ),
+
+        // manage_teleological_profile - CRUD for task-specific profiles
+        ToolDefinition::new(
+            "manage_teleological_profile",
+            "Manage teleological profiles for task-specific embedding fusion. \
+             Profiles define per-embedder weights, fusion strategy, and group priorities.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["create", "read", "update", "delete", "list"],
+                        "description": "CRUD action to perform"
+                    },
+                    "profile_id": {
+                        "type": "string",
+                        "description": "Profile ID (required for read/update/delete)"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Human-readable profile name"
+                    },
+                    "task_type": {
+                        "type": "string",
+                        "enum": ["code_implementation", "research", "creative", "analysis", "debugging", "documentation", "custom"],
+                        "description": "Predefined task type for default weights"
+                    },
+                    "embedder_weights": {
+                        "type": "array",
+                        "items": { "type": "number" },
+                        "minItems": 13,
+                        "maxItems": 13,
+                        "description": "Per-embedder weights [E1..E13]"
+                    },
+                    "group_priorities": {
+                        "type": "object",
+                        "properties": {
+                            "factual": { "type": "number" },
+                            "temporal": { "type": "number" },
+                            "causal": { "type": "number" },
+                            "relational": { "type": "number" },
+                            "qualitative": { "type": "number" },
+                            "implementation": { "type": "number" }
+                        },
+                        "description": "Priority weights for each embedding group"
+                    },
+                    "fusion_strategy": {
+                        "type": "string",
+                        "enum": ["linear", "attention", "gated", "hierarchical"],
+                        "default": "hierarchical",
+                        "description": "Default fusion strategy for this profile"
+                    }
+                },
+                "required": ["action"]
+            }),
+        ),
+
+        // ========== AUTONOMOUS TOOLS (TASK-AUTONOMOUS-MCP) ==========
+
+        // auto_bootstrap_north_star - Initialize autonomous services from existing North Star
+        ToolDefinition::new(
+            "auto_bootstrap_north_star",
+            "Bootstrap the autonomous North Star system from an existing North Star goal. \
+             Initializes drift detection, pruning, consolidation, and sub-goal discovery services. \
+             Requires a North Star goal to be configured first via set_north_star.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "confidence_threshold": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.7,
+                        "description": "Minimum confidence threshold for bootstrapping"
+                    },
+                    "max_candidates": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "default": 10,
+                        "description": "Maximum number of candidates to evaluate during bootstrap"
+                    }
+                },
+                "required": []
+            }),
+        ),
+
+        // get_alignment_drift - Get drift state and history
+        ToolDefinition::new(
+            "get_alignment_drift",
+            "Get the current alignment drift state including severity, trend, and recommendations. \
+             Drift measures how far the system has deviated from the North Star goal alignment. \
+             High drift indicates memories are becoming misaligned with the primary purpose.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "timeframe": {
+                        "type": "string",
+                        "enum": ["1h", "24h", "7d", "30d"],
+                        "default": "24h",
+                        "description": "Timeframe to analyze for drift"
+                    },
+                    "include_history": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include full drift history in response"
+                    }
+                },
+                "required": []
+            }),
+        ),
+
+        // trigger_drift_correction - Manually trigger drift correction
+        ToolDefinition::new(
+            "trigger_drift_correction",
+            "Manually trigger a drift correction cycle. Applies correction strategies based on \
+             current drift severity: threshold adjustment, weight rebalancing, goal reinforcement, \
+             or emergency intervention for severe drift.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "force": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Force correction even if drift severity is low"
+                    },
+                    "target_alignment": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "Target alignment to achieve (optional, uses adaptive if not set)"
+                    }
+                },
+                "required": []
+            }),
+        ),
+
+        // get_pruning_candidates - Get memories eligible for pruning
+        ToolDefinition::new(
+            "get_pruning_candidates",
+            "Identify memories that are candidates for pruning based on staleness, low alignment, \
+             redundancy, or orphaned status. Returns a ranked list with reasons and recommendations. \
+             Use this for routine memory hygiene and to identify unused/outdated content.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000,
+                        "default": 20,
+                        "description": "Maximum number of candidates to return"
+                    },
+                    "min_staleness_days": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "default": 30,
+                        "description": "Minimum age in days for staleness consideration"
+                    },
+                    "min_alignment": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.4,
+                        "description": "Memories below this alignment are candidates for low-alignment pruning"
+                    }
+                },
+                "required": []
+            }),
+        ),
+
+        // trigger_consolidation - Trigger memory consolidation
+        ToolDefinition::new(
+            "trigger_consolidation",
+            "Trigger memory consolidation to merge similar memories and reduce redundancy. \
+             Uses similarity-based, temporal, or semantic strategies to identify merge candidates. \
+             Helps optimize memory storage and improve retrieval efficiency.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "max_memories": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000,
+                        "default": 100,
+                        "description": "Maximum memories to process in one batch"
+                    },
+                    "strategy": {
+                        "type": "string",
+                        "enum": ["similarity", "temporal", "semantic"],
+                        "default": "similarity",
+                        "description": "Consolidation strategy to use"
+                    },
+                    "min_similarity": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.85,
+                        "description": "Minimum similarity threshold for consolidation candidates"
+                    }
+                },
+                "required": []
+            }),
+        ),
+
+        // discover_sub_goals - Discover potential sub-goals
+        ToolDefinition::new(
+            "discover_sub_goals",
+            "Discover potential sub-goals from memory clusters. Analyzes stored memories to find \
+             emergent themes and patterns that could become strategic or tactical goals. \
+             Helps evolve the goal hierarchy based on actual content.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "min_confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.6,
+                        "description": "Minimum confidence for a discovered sub-goal"
+                    },
+                    "max_goals": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 20,
+                        "default": 5,
+                        "description": "Maximum number of sub-goals to discover"
+                    },
+                    "parent_goal_id": {
+                        "type": "string",
+                        "description": "Parent goal ID to discover sub-goals for (defaults to North Star)"
+                    }
+                },
+                "required": []
+            }),
+        ),
+
+        // get_autonomous_status - Get comprehensive autonomous system status
+        ToolDefinition::new(
+            "get_autonomous_status",
+            "Get comprehensive status of the autonomous North Star system including all services: \
+             drift detection, correction, pruning, consolidation, and sub-goal discovery. \
+             Returns health scores, recommendations, and optional detailed metrics.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "include_metrics": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include detailed per-service metrics"
+                    },
+                    "include_history": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include recent operation history"
+                    },
+                    "history_count": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "default": 10,
+                        "description": "Number of history entries to include"
+                    }
+                },
+                "required": []
+            }),
+        ),
     ]
 }
 
@@ -605,6 +1269,51 @@ pub mod tool_names {
 
     /// TASK-CAUSAL-001: Perform omni-directional causal inference
     pub const OMNI_INFER: &str = "omni_infer";
+
+    // ========== NORTH STAR TOOLS (TASK-NORTHSTAR-001) ==========
+
+    /// TASK-NORTHSTAR-001: Set the initial North Star goal
+    pub const SET_NORTH_STAR: &str = "set_north_star";
+    /// TASK-NORTHSTAR-001: Get current North Star configuration
+    pub const GET_NORTH_STAR: &str = "get_north_star";
+    /// TASK-NORTHSTAR-001: Update existing North Star
+    pub const UPDATE_NORTH_STAR: &str = "update_north_star";
+    /// TASK-NORTHSTAR-001: Delete North Star (requires confirmation)
+    pub const DELETE_NORTH_STAR: &str = "delete_north_star";
+    /// TASK-NORTHSTAR-001: Initialize North Star from document chunks with centroid
+    pub const INIT_NORTH_STAR_FROM_DOCUMENTS: &str = "init_north_star_from_documents";
+    /// TASK-NORTHSTAR-001: Get full goal hierarchy tree
+    pub const GET_GOAL_HIERARCHY: &str = "get_goal_hierarchy";
+
+    // ========== TELEOLOGICAL TOOLS (TELEO-007 through TELEO-011) ==========
+
+    /// TELEO-007: Cross-correlation search across all 13 embedders with configurable strategy/scope
+    pub const SEARCH_TELEOLOGICAL: &str = "search_teleological";
+    /// TELEO-008: Compute full 13-embedder teleological vector with optional Tucker compression
+    pub const COMPUTE_TELEOLOGICAL_VECTOR: &str = "compute_teleological_vector";
+    /// TELEO-009: Fuse embeddings using synergy matrix and task-specific profiles
+    pub const FUSE_EMBEDDINGS: &str = "fuse_embeddings";
+    /// TELEO-010: Adaptively update synergy matrix from retrieval feedback
+    pub const UPDATE_SYNERGY_MATRIX: &str = "update_synergy_matrix";
+    /// TELEO-011: CRUD operations for task-specific teleological profiles
+    pub const MANAGE_TELEOLOGICAL_PROFILE: &str = "manage_teleological_profile";
+
+    // ========== AUTONOMOUS TOOLS (TASK-AUTONOMOUS-MCP) ==========
+
+    /// TASK-AUTONOMOUS-MCP: Bootstrap autonomous system from existing North Star
+    pub const AUTO_BOOTSTRAP_NORTH_STAR: &str = "auto_bootstrap_north_star";
+    /// TASK-AUTONOMOUS-MCP: Get current drift state and history
+    pub const GET_ALIGNMENT_DRIFT: &str = "get_alignment_drift";
+    /// TASK-AUTONOMOUS-MCP: Manually trigger drift correction
+    pub const TRIGGER_DRIFT_CORRECTION: &str = "trigger_drift_correction";
+    /// TASK-AUTONOMOUS-MCP: Get memories that are candidates for pruning
+    pub const GET_PRUNING_CANDIDATES: &str = "get_pruning_candidates";
+    /// TASK-AUTONOMOUS-MCP: Trigger memory consolidation
+    pub const TRIGGER_CONSOLIDATION: &str = "trigger_consolidation";
+    /// TASK-AUTONOMOUS-MCP: Discover potential sub-goals from memory clusters
+    pub const DISCOVER_SUB_GOALS: &str = "discover_sub_goals";
+    /// TASK-AUTONOMOUS-MCP: Get comprehensive autonomous system status
+    pub const GET_AUTONOMOUS_STATUS: &str = "get_autonomous_status";
 }
 
 #[cfg(test)]
@@ -614,8 +1323,8 @@ mod tests {
     #[test]
     fn test_get_tool_definitions() {
         let tools = get_tool_definitions();
-        // 6 original + 6 GWT tools + 3 ATC tools + 4 Dream tools + 2 Neuromod tools + 1 Steering + 1 Causal = 23 total
-        assert_eq!(tools.len(), 23);
+        // 6 original + 6 GWT tools + 3 ATC tools + 4 Dream tools + 2 Neuromod tools + 1 Steering + 1 Causal + 6 North Star + 5 Teleological + 7 Autonomous = 41 total
+        assert_eq!(tools.len(), 41);
 
         let tool_names: Vec<_> = tools.iter().map(|t| t.name.as_str()).collect();
         // Original 6 tools
@@ -648,6 +1357,27 @@ mod tests {
         assert!(tool_names.contains(&"get_steering_feedback"));
         // Causal tools (TASK-CAUSAL-001)
         assert!(tool_names.contains(&"omni_infer"));
+        // North Star tools (TASK-NORTHSTAR-001)
+        assert!(tool_names.contains(&"set_north_star"));
+        assert!(tool_names.contains(&"get_north_star"));
+        assert!(tool_names.contains(&"update_north_star"));
+        assert!(tool_names.contains(&"delete_north_star"));
+        assert!(tool_names.contains(&"init_north_star_from_documents"));
+        assert!(tool_names.contains(&"get_goal_hierarchy"));
+        // Teleological tools (TELEO-007 through TELEO-011)
+        assert!(tool_names.contains(&"search_teleological"));
+        assert!(tool_names.contains(&"compute_teleological_vector"));
+        assert!(tool_names.contains(&"fuse_embeddings"));
+        assert!(tool_names.contains(&"update_synergy_matrix"));
+        assert!(tool_names.contains(&"manage_teleological_profile"));
+        // Autonomous tools (TASK-AUTONOMOUS-MCP)
+        assert!(tool_names.contains(&"auto_bootstrap_north_star"));
+        assert!(tool_names.contains(&"get_alignment_drift"));
+        assert!(tool_names.contains(&"trigger_drift_correction"));
+        assert!(tool_names.contains(&"get_pruning_candidates"));
+        assert!(tool_names.contains(&"trigger_consolidation"));
+        assert!(tool_names.contains(&"discover_sub_goals"));
+        assert!(tool_names.contains(&"get_autonomous_status"));
     }
 
     #[test]

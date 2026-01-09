@@ -28,6 +28,7 @@
 
 pub mod alignment;
 pub mod atc;
+pub mod autonomous;
 pub mod causal;
 pub mod config;
 pub mod dream;
@@ -44,6 +45,7 @@ pub mod retrieval;
 pub mod similarity;
 pub mod steering;
 pub mod stubs;
+pub mod teleological;
 pub mod traits;
 pub mod types;
 
@@ -62,3 +64,10 @@ pub use monitoring::{
 // Production code MUST provide real SystemMonitor and LayerStatusProvider implementations
 #[cfg(test)]
 pub use monitoring::{StubLayerStatusProvider, StubSystemMonitor};
+
+// Teleological module re-exports (cross-embedding synergy and fusion)
+pub use teleological::{
+    DomainAlignments, DomainType, GroupAlignments, GroupType, MultiResolutionHierarchy,
+    ProfileId, ProfileMetrics, SynergyMatrix, TaskType, TeleologicalProfile, TeleologicalVector,
+    TuckerCore,
+};

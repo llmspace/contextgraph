@@ -249,18 +249,19 @@ pub fn get_column_family_descriptors(block_cache: &Cache) -> Vec<ColumnFamilyDes
     ]
 }
 
-/// Get ALL column family descriptors: base (12) + teleological (4) + quantized embedder (13).
+/// Get ALL column family descriptors: base (12) + teleological (20) + autonomous (7).
 ///
-/// Returns 29 total column families for a fully configured Context Graph database.
+/// Returns 39 total column families for a fully configured Context Graph database.
 ///
 /// # Arguments
 /// * `block_cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 29 `ColumnFamilyDescriptor`s:
+/// Vector of 39 `ColumnFamilyDescriptor`s:
 /// - 12 base CFs (nodes, edges, embeddings, etc.)
-/// - 4 teleological CFs (fingerprints, purpose_vectors, etc.)
+/// - 7 teleological CFs (fingerprints, purpose_vectors, synergy_matrix, etc.)
 /// - 13 quantized embedder CFs (emb_0 through emb_12)
+/// - 7 autonomous CFs (autonomous_config, drift_history, etc.)
 ///
 /// # Example
 /// ```ignore
@@ -269,19 +270,21 @@ pub fn get_column_family_descriptors(block_cache: &Cache) -> Vec<ColumnFamilyDes
 ///
 /// let cache = Cache::new_lru_cache(256 * 1024 * 1024); // 256MB
 /// let descriptors = get_all_column_family_descriptors(&cache);
-/// assert_eq!(descriptors.len(), 29);
+/// assert_eq!(descriptors.len(), 39);
 /// ```
 pub fn get_all_column_family_descriptors(block_cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
+    use crate::autonomous::get_autonomous_cf_descriptors;
     use crate::teleological::get_all_teleological_cf_descriptors;
 
     let mut descriptors = get_column_family_descriptors(block_cache);
     descriptors.extend(get_all_teleological_cf_descriptors(block_cache));
+    descriptors.extend(get_autonomous_cf_descriptors(block_cache));
     descriptors
 }
 
 /// Total number of column families in a fully configured Context Graph database.
-/// Base (12) + Teleological (4) + Quantized Embedder (13) = 29
-pub const TOTAL_COLUMN_FAMILIES: usize = 29;
+/// Base (12) + Teleological (7) + Quantized Embedder (13) + Autonomous (7) = 39
+pub const TOTAL_COLUMN_FAMILIES: usize = 39;
 
 #[cfg(test)]
 mod tests {
@@ -589,15 +592,15 @@ mod tests {
 
     #[test]
     fn test_total_column_families_constant() {
-        // Verify the constant is correct: 12 base + 4 teleological + 13 quantized = 29
+        // Verify the constant is correct: 12 base + 7 teleological + 13 quantized + 7 autonomous = 39
         assert_eq!(
-            TOTAL_COLUMN_FAMILIES, 29,
-            "Total column families should be 29 (12 base + 4 teleological + 13 quantized)"
+            TOTAL_COLUMN_FAMILIES, 39,
+            "Total column families should be 39 (12 base + 7 teleological + 13 quantized + 7 autonomous)"
         );
     }
 
     #[test]
-    fn test_get_all_column_family_descriptors_returns_29() {
+    fn test_get_all_column_family_descriptors_returns_39() {
         let cache = Cache::new_lru_cache(256 * 1024 * 1024);
         let descriptors = get_all_column_family_descriptors(&cache);
 
@@ -649,10 +652,30 @@ mod tests {
         let descriptors = get_all_column_family_descriptors(&cache);
         let names: Vec<_> = descriptors.iter().map(|d| d.name()).collect();
 
-        // Verify all 4 teleological CFs are present
+        // Verify all 7 teleological CFs are present (4 original + 3 TASK-TELEO-006)
         assert!(names.contains(&"fingerprints"), "Missing CF: fingerprints");
         assert!(names.contains(&"purpose_vectors"), "Missing CF: purpose_vectors");
         assert!(names.contains(&"e13_splade_inverted"), "Missing CF: e13_splade_inverted");
         assert!(names.contains(&"e1_matryoshka_128"), "Missing CF: e1_matryoshka_128");
+        // TASK-TELEO-006: New teleological vector CFs
+        assert!(names.contains(&"synergy_matrix"), "Missing CF: synergy_matrix");
+        assert!(names.contains(&"teleological_profiles"), "Missing CF: teleological_profiles");
+        assert!(names.contains(&"teleological_vectors"), "Missing CF: teleological_vectors");
+    }
+
+    #[test]
+    fn test_all_cf_descriptors_includes_autonomous_cfs() {
+        let cache = Cache::new_lru_cache(256 * 1024 * 1024);
+        let descriptors = get_all_column_family_descriptors(&cache);
+        let names: Vec<_> = descriptors.iter().map(|d| d.name()).collect();
+
+        // Verify all 7 autonomous CFs are present
+        assert!(names.contains(&"autonomous_config"), "Missing CF: autonomous_config");
+        assert!(names.contains(&"adaptive_threshold_state"), "Missing CF: adaptive_threshold_state");
+        assert!(names.contains(&"drift_history"), "Missing CF: drift_history");
+        assert!(names.contains(&"goal_activity_metrics"), "Missing CF: goal_activity_metrics");
+        assert!(names.contains(&"autonomous_lineage"), "Missing CF: autonomous_lineage");
+        assert!(names.contains(&"consolidation_history"), "Missing CF: consolidation_history");
+        assert!(names.contains(&"memory_curation"), "Missing CF: memory_curation");
     }
 }

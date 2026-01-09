@@ -1,1204 +1,531 @@
-# Context Graph Constitution v4.0.0 (Global Workspace + Adaptive Thresholds)
-# Bio-Nervous MCP Server | UTL Knowledge System
-# Teleological Vector Architecture | Multi-Embedding Semantic Fingerprints
-# Global Workspace Consciousness | Kuramoto Synchronization
-# Adaptive Threshold Calibration | Self-Learning System
-# ═══════════════════════════════════════════════
+# Context Graph Constitution v4.1.0 (Optimized)
+# Bio-Nervous MCP | UTL | Teleological Vectors | GWT | Adaptive Thresholds
+# ═══════════════════════════════════════════════════════════════════════
 
 meta:
-  v: "4.0.0"
-  spec: "4.0.0"
+  v: "4.1.0"
   name: "Ultimate Context Graph"
-  desc: "5-layer bio-nervous UTL knowledge graph with teleological vector architecture, Global Workspace consciousness, and adaptive self-learning thresholds"
-  updated: "2026-01-06"
-  paradigm: "Multi-Array Teleological Fingerprints with Global Workspace Consciousness — the 13-embedding array IS the teleological vector, Kuramoto-synchronized into unified conscious percepts, with no hardcoded thresholds (all learned/calibrated)"
+  desc: "5-layer bio-nervous UTL knowledge graph: 13-embedding teleological fingerprints, Kuramoto-synchronized GWT consciousness, adaptive self-learning thresholds, NORTH autonomous services"
+  paradigm: "Multi-Array Teleological Fingerprints with GWT — 13-embedding array IS the teleological vector, Kuramoto-synchronized, no hardcoded thresholds"
+  modules: { foundation: "NORTH-001-007", services: "NORTH-008-020", teleological: "TELEO-001-015" }
 
-# ═══════════════════════════════════════════════
 # ABBREVIATIONS (used throughout)
-# ═══════════════════════════════════════════════
-# UTL=Unified Theory of Learning, L=Learning score
-# ΔS=entropy change, ΔC=coherence change
-# wₑ=emotional weight, φ=phase angle
-# NT=neurotransmitter, SS=Steering Subsystem
-# OI=Omnidirectional Inference, FV=Formal Verification
-# PC=Predictive Coding, HE=Hyperbolic Entailment
-# MHN=Modern Hopfield Network, SDM=Sparse Distributed Memory
-# TF=Teleological Fingerprint, PV=Purpose Vector
-# SF=Semantic Fingerprint (13-array embedding)
+# UTL=Unified Theory of Learning, L=Learning score, ΔS=entropy, ΔC=coherence
+# wₑ=emotional weight, φ=phase angle, NT=neurotransmitter, SS=Steering Subsystem
+# OI=Omnidirectional Inference, FV=Formal Verification, PC=Predictive Coding
+# HE=Hyperbolic Entailment, MHN=Modern Hopfield Network, SDM=Sparse Distributed Memory
+# TF=Teleological Fingerprint, PV=Purpose Vector, SF=Semantic Fingerprint (13-array)
 # A(v,V)=Teleological Alignment (cosine to North Star)
-# GWT=Global Workspace Theory, GW=Global Workspace
-# IIT=Integrated Information Theory
-# CMS=Continuum Memory System
-# C(t)=Consciousness level, I(t)=Integration, R(t)=Self-Reflection, D(t)=Differentiation
-# r=Kuramoto order parameter, K=Kuramoto coupling strength
-# θᵢ=Phase of embedder i, ωᵢ=Natural frequency of embedder i
-# ATC=Adaptive Threshold Calibration, ECE=Expected Calibration Error
-# MCE=Maximum Calibration Error, EWMA=Exponentially Weighted Moving Average
-# UCB=Upper Confidence Bound, GP=Gaussian Process, EI=Expected Improvement
-# T=Temperature (calibration), α=EWMA smoothing factor
+# GWT=Global Workspace Theory, GW=Global Workspace, IIT=Integrated Information Theory
+# CMS=Continuum Memory System, C(t)=Consciousness, I(t)=Integration, R(t)=Reflection, D(t)=Differentiation
+# r=Kuramoto order param, K=coupling strength, θᵢ=phase, ωᵢ=natural freq
+# ATC=Adaptive Threshold Calibration, ECE=Expected Calibration Error, MCE=Max Calibration Error
+# EWMA=Exponentially Weighted Moving Average, UCB=Upper Confidence Bound, GP=Gaussian Process
+# T=Temperature, α=EWMA smoothing
 
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 # TECH STACK
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 stack:
   lang: { rust: "1.75+", edition: "2021", cuda: "13.1" }
   gpu: { target: "RTX 5090", vram: "32GB", compute: "12.0" }
   deps: [tokio@1.35+, serde@1.0+, uuid@1.6+, chrono@0.4+, rmcp@0.1+, cudarc@0.10+, faiss@0.12+gpu, rocksdb@0.21+, scylladb@1.0+]
   db:
-    primary: { dev: rocksdb, prod: scylladb }  # Full TeleologicalFingerprint storage
-    vector_indexes: { per_embedder: "13× HNSW (E1-E13)", matryoshka_128d: "HNSW for Stage 2", splade_inverted: "Inverted index for Stage 1", purpose: "13D HNSW", goal_hierarchy: "tree index" }
-    temporal: timescaledb  # Purpose evolution tracking
+    primary: { dev: rocksdb, prod: scylladb }
+    indexes: { per_embedder: "13× HNSW", matryoshka_128d: HNSW, splade_inverted: inverted, purpose: "13D HNSW", goal_hierarchy: tree }
+    temporal: timescaledb
     cache: redis7+
   embed_fallback: [openai/text-embedding-3-large, cohere/embed-english-v3.0]
 
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 # DIRECTORY STRUCTURE
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 dirs:
   crates/:
-    context-graph-mcp/: "MCP server (tools/, resources/, handlers/, adapters/)"
-    context-graph-core/: "Domain logic (graph/, search/, utl/, session/, curation/, teleological/)"
-    context-graph-cuda/: "GPU (kernels/, hnsw/, hopfield/, neuromod/)"
-    context-graph-embeddings/: "13-model pipeline (models/, fingerprint/, purpose_vector.rs, semantic_fingerprint.rs)"
-    context-graph-storage/: "Teleological storage (rocksdb/, scylla/, indexes/, temporal/)"
+    context-graph-mcp/: "tools/, resources/, handlers/, adapters/"
+    context-graph-core/:
+      desc: "graph/, search/, utl/, session/, curation/, teleological/, autonomous/"
+      autonomous/: { foundation/: [bootstrap, thresholds, drift, curation, evolution, workflow], services/: [bootstrap_service, threshold_learner, drift_detector, drift_corrector, pruning_service, consolidation_service, gap_detection, subgoal_discovery, weight_adjuster, obsolescence_detector, daily_scheduler, event_optimizer, self_healing_manager] }
+      teleological/: [storage, feedback_learner, profile_manager]
+    context-graph-cuda/: "kernels/, hnsw/, hopfield/, neuromod/"
+    context-graph-embeddings/: "models/, fingerprint/, purpose_vector.rs, semantic_fingerprint.rs"
+    context-graph-storage/: "rocksdb/, scylla/, indexes/, temporal/, autonomous/"
   specs/: [functional/, technical/, tasks/]
   tests/: [integration/, benchmarks/, fixtures/, chaos/, validation/]
   config/: [default.toml, production.toml, test.toml]
   .ai/: [activeContext.md, decisionLog.md, progress.md]
 
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 # CODING STANDARDS
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 naming:
   files: { rust: snake_case.rs, cuda: snake_case.cu, tests: "{mod}_test.rs" }
-  types: PascalCase  # structs, enums, traits
-  funcs: snake_case_verb_first  # compute_learning_score()
+  types: PascalCase
+  funcs: snake_case_verb_first
   vars: { local: snake_case, const: SCREAMING_SNAKE }
   json: snake_case
 
 rules:
-  - "One primary type per module, max 500 lines (excl tests)"
-  - "Co-locate unit tests via #[cfg(test)]"
-  - "Import order: std → external → workspace (crate::) → super/self"
-  - "Result<T,E> for fallible ops, thiserror for derivation"
+  - "One type/module, max 500 lines"
+  - "Co-locate tests: #[cfg(test)]"
+  - "Import order: std→external→workspace→super/self"
+  - "Result<T,E>, thiserror derivation"
   - "Never unwrap() in prod; use expect() with context"
   - "tokio async, Arc<RwLock<T>> for shared state"
-  - "Lock order: inner → faiss_index (prevents deadlock)"
-  - "Max 5 unsafe blocks/module, document safety invariants"
-  - "CUDA FFI only in context-graph-cuda crate"
+  - "Lock order: inner→faiss_index"
+  - "Max 5 unsafe blocks/module, document invariants"
+  - "CUDA FFI only in context-graph-cuda"
 
-doc_format: "/// Brief\\n/// # Args/Returns/Errors/Examples/Panics\\n/// `Constraint: X < Yms`"
+doc_format: "/// Brief\\n/// # Args/Returns/Errors/Panics\\n/// `Constraint: X < Yms`"
 
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 # ANTI-PATTERNS (FORBIDDEN)
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 forbidden:
-  AP-001: "unwrap() in prod → use expect()"
-  AP-002: "Hardcoded secrets → use env vars"
-  AP-003: "Magic numbers → define constants"
-  AP-004: "Blocking I/O in async → use tokio::fs/spawn_blocking"
-  AP-005: "FAISS mutation without lock → acquire write lock"
-  AP-006: "New util without checking utils/ → search first"
-  AP-007: "Stub data in prod → use tests/fixtures/"
-  AP-008: "Direct API from MCP handlers → use service layer"
-  AP-009: "NaN/Infinity in UTL → clamp to valid range"
-  AP-010: "store_memory without rationale → always required"
-  AP-011: "merge_concepts without priors_vibe_check → check first"
-  AP-012: "Trust distilled summaries → use hydrate_citation"
-  AP-013: "Ignore Cognitive Pulse → check before next action"
-  AP-014: "Permanent delete without user_requested → soft_delete default"
-  AP-015: "GPU alloc without pool → use CUDA memory pool"
+  AP-001: "unwrap() in prod"
+  AP-002: "Hardcoded secrets"
+  AP-003: "Magic numbers"
+  AP-004: "Blocking I/O in async"
+  AP-005: "FAISS mutation without lock"
+  AP-006: "New util without checking utils/"
+  AP-007: "Stub data in prod"
+  AP-008: "Direct API from handlers"
+  AP-009: "NaN/Infinity in UTL"
+  AP-010: "store_memory without rationale"
+  AP-011: "merge_concepts without priors_vibe_check"
+  AP-012: "Trust distilled summaries (use hydrate_citation)"
+  AP-013: "Ignore Cognitive Pulse"
+  AP-014: "Permanent delete without user_requested"
+  AP-015: "GPU alloc without pool"
 
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 # SECURITY [SEC-##]
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 security:
   SEC-01: "Validate/sanitize all input (PIIScrubber L1)"
-  SEC-02:
-    rule: "Scrub PII pre-embed"
-    patterns: [api_key, password, bearer_token, ssn, credit_card]
+  SEC-02: { rule: "Scrub PII pre-embed", patterns: [api_key, password, bearer_token, ssn, credit_card] }
   SEC-03: { anomaly_threshold: "3.0 std", content_align_min: 0.4 }
-  SEC-04:
-    rule: "Detect prompt injection"
-    patterns: ["ignore previous", "disregard system", "you are now", "new instructions:", "override:"]
+  SEC-04: { rule: "Detect prompt injection", patterns: ["ignore previous", "disregard system", "you are now", "new instructions:", "override:"] }
   SEC-05: { rule: "Quarantine semantic cancer", trigger: "importance>0.9 AND neighbor_entropy>0.8", action: "reduce 50%, flag" }
-  SEC-06: "Soft delete 30-day recovery (exception: user_requested+soft_delete=false)"
+  SEC-06: "Soft delete 30-day recovery"
   SEC-07: "Secrets from env vars only"
   SEC-08: "No cross-agent memetic interference (perspective_lock)"
 
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 # PERFORMANCE BUDGETS
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 perf:
-  latency:
-    inject_context: { p95: "<25ms", p99: "<50ms" }
-    hopfield: "<1ms"
-    reflex_cache: "<100μs"
-    single_embed: "<10ms"
-    batch_embed_64: "<50ms"
-    faiss_1M_k100: "<2ms"
-    distillation: "<50ms"
-    neuromod_update: "<200μs"
-    dream_wake: "<100ms"
-    entailment_check: "<1ms"
+  latency: { inject_context: "<25ms p95/<50ms p99", hopfield: "<1ms", reflex_cache: "<100μs", single_embed: "<10ms", batch_embed_64: "<50ms", faiss_1M_k100: "<2ms", distillation: "<50ms", neuromod_update: "<200μs", dream_wake: "<100ms", entailment_check: "<1ms" }
   throughput: { embed_batch: ">1000/sec", search_batch_100: "<5ms" }
   memory: { gpu: "<24GB (8GB headroom)", graph_cap: ">10M nodes" }
-  quality:
-    utl_avg: ">0.6"
-    coherence_recovery: "<10s"
-    attack_detection: ">95%"
-    false_positive: "<2%"
-    info_loss: "<15%"
-    compression: ">60%"
+  quality: { utl_avg: ">0.6", coherence_recovery: "<10s", attack_detection: ">95%", false_positive: "<2%", info_loss: "<15%", compression: ">60%" }
 
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 # TESTING
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 testing:
   coverage: { unit: "90%", integration: "80%", docs: "80%" }
-  types:
-    unit: "Same file #[cfg(test)] - business logic, UTL, embedding"
-    integration: "tests/integration/ - MCP, graph, session"
-    benchmark: "benches/ - embed/search latency, throughput"
-    chaos: "tests/chaos/ - GPU OOM, network partition, concurrent mutation"
-    validation: "tests/validation/ - needle-haystack, UTL dynamics, dream effectiveness"
+  types: { unit: "#[cfg(test)] - business logic, UTL, embedding", integration: "tests/integration/ - MCP, graph, session", benchmark: "benches/ - latency, throughput", chaos: "tests/chaos/ - GPU OOM, network partition, concurrent mutation", validation: "tests/validation/ - needle-haystack, UTL dynamics, dream" }
   gates:
     pre-commit: [fmt --check, clippy -D warnings, test --lib]
     pre-merge: [test --all, bench --no-run, "coverage>=90%"]
     pre-deploy: [integration pass, "bench regression<5%", chaos pass]
 
-# ═══════════════════════════════════════════════
-# UTL (Unified Theory of Learning) - Multi-Embedding Extension
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
+# UTL (Unified Theory of Learning)
+# ═══════════════════════════════════════════════════════════════════════
 utl:
-  desc: "Unified Theory of Learning - mathematical foundation for memory quality"
+  canonical: "L = f((ΔS × ΔC) · wₑ · cos φ)  →  L ∈ [0,1]"
+  multi_embed: "L_multi = sigmoid(2.0 · (Σᵢ τᵢλ_S·ΔSᵢ) · (Σⱼ τⱼλ_C·ΔCⱼ) · wₑ · cos φ)"
+  params: { ΔSᵢ: "[0,1] entropy/space i", ΔCᵢ: "[0,1] coherence/space j", τᵢ: "[0,1] teleological weight", wₑ: "[0.5,1.5] emotional", φ: "[0,π] phase sync" }
+  loss: "J = 0.4·L_task + 0.3·L_semantic + 0.2·L_teleological + 0.1·(1-L)"
+  adaptive_weights:
+    first_time: { λ_task: 0.3, λ_semantic: 0.2, λ_dyn: 0.9 }
+    mid_level: { λ_task: 0.7, λ_semantic: 0.4, λ_dyn: 0.6 }
+    expert: { λ_task: 1.0, λ_semantic: 0.1, λ_dyn: 0.3 }
+  johari: # ΔS×ΔC plane IS the Johari Window
+    Open: "ΔS<0.5, ΔC>0.5 (aware)"
+    Blind: "ΔS>0.5, ΔC<0.5 (discovery opportunity)"
+    Hidden: "ΔS<0.5, ΔC<0.5 (dormant)"
+    Unknown: "ΔS>0.5, ΔC>0.5 (frontier)"
+    cross_space: "Memory can be Open(semantic) but Blind(causal)"
+  lifecycle:
+    infancy:  { n: "0-50",   λ_ΔS: 0.7, λ_ΔC: 0.3, stance: "capture-novelty" }
+    growth:   { n: "50-500", λ_ΔS: 0.5, λ_ΔC: 0.5, stance: "balanced" }
+    maturity: { n: "500+",  λ_ΔS: 0.3, λ_ΔC: 0.7, stance: "curation-coherence" }
 
-  # Canonical Form
-  canonical:
-    formula: "L = f((ΔS × ΔC) · wₑ · cos φ)"
-    output: "L ∈ [0,1] Net learning output"
-    components:
-      ΔS: "Entropy change (novelty, surprise) ≥ 0"
-      ΔC: "Coherence change (integration) ≥ 0"
-      wₑ: "Emotional modulation [0.5, 1.5]"
-      φ: "Phase difference between ΔS and ΔC [0, π]"
-      f: "Sigmoid or tanh activation"
-
-  # Multi-Embedding UTL: Per-space entropy/coherence with teleological weighting
-  formula_multi: "L_multi = sigmoid(2.0 · (Σᵢ τᵢλ_S·ΔSᵢ) · (Σⱼ τⱼλ_C·ΔCⱼ) · wₑ · cos φ)"
-
-  params:
-    ΔSᵢ: "[0,1] entropy in embedding space i (i=1..13)"
-    ΔCⱼ: "[0,1] coherence in embedding space j (j=1..13)"
-    τᵢ: "[0,1] teleological weight for space i (alignment to North Star)"
-    wₑ: "[0.5,1.5] emotional weight"
-    φ: "[0,π] phase sync across Kuramoto-coupled spaces"
-
-  # Loss Function
-  loss:
-    formula: "J = λ_task × L_task + λ_semantic × L_semantic + λ_teleological × L_teleological + λ_dyn × (1-L)"
-    simplified: "J = 0.4·L_task + 0.3·L_semantic + 0.2·L_teleological + 0.1·(1-L)"
-    adaptive_weights:
-      first_time: { λ_task: 0.3, λ_semantic: 0.2, λ_dyn: 0.9, focus: "Keep learner calm" }
-      mid_level: { λ_task: 0.7, λ_semantic: 0.4, λ_dyn: 0.6, focus: "Accuracy matters" }
-      expert: { λ_task: 1.0, λ_semantic: 0.1, λ_dyn: 0.3, focus: "Perfect execution" }
-
-  # Johari-ΔS×ΔC Mapping (the ΔS×ΔC plane IS the Johari Window)
-  johari_mapping:
-    desc: "The ΔS × ΔC plane IS the mathematical Johari Window"
-    quadrants:
-      Hidden: { ΔS: "low", ΔC: "high", meaning: "Dormant/well-known" }
-      Open: { ΔS: "low", ΔC: "high", meaning: "Well-understood" }
-      Blind: { ΔS: "high", ΔC: "low", meaning: "Discovery opportunity" }
-      Unknown: { ΔS: "high", ΔC: "high", meaning: "Frontier" }
-    learning_direction: "Unknown/Blind → Open (information moves toward understanding)"
-
-  # Per-Embedder Johari Quadrants
-  johari:
-    desc: "Each of 13 embedding spaces has independent Johari classification"
-    Open: "ΔSᵢ<0.5, ΔCᵢ>0.5 → aware in this space"
-    Blind: "ΔSᵢ>0.5, ΔCᵢ<0.5 → discovery opportunity in this space"
-    Hidden: "ΔSᵢ<0.5, ΔCᵢ<0.5 → latent in this space"
-    Unknown: "ΔSᵢ>0.5, ΔCᵢ>0.5 → frontier in this space"
-    cross_space: "Memory can be Open(semantic) but Blind(causal) - enables targeted learning"
-
-  lifecycle:  # Marblestone λ weights
-    infancy:  { n: "0-50",   ΔS_trig: 0.9, ΔC_trig: 0.2, λ_ΔS: 0.7, λ_ΔC: 0.3, stance: "capture-novelty" }
-    growth:   { n: "50-500", ΔS_trig: 0.7, ΔC_trig: 0.4, λ_ΔS: 0.5, λ_ΔC: 0.5, stance: "balanced" }
-    maturity: { n: "500+",  ΔS_trig: 0.6, ΔC_trig: 0.5, λ_ΔS: 0.3, λ_ΔC: 0.7, stance: "curation-coherence" }
-
-# ═══════════════════════════════════════════════
-# TELEOLOGICAL ARCHITECTURE (Royse 2026)
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
+# TELEOLOGICAL ARCHITECTURE
+# ═══════════════════════════════════════════════════════════════════════
 teleological:
-  desc: "The 13-embedding array IS the teleological vector - pattern across spaces reveals purpose"
-
-  # Core alignment formula
+  core: "13-embedding array IS the teleological vector"
   alignment: "A(v, V) = cos(v, V) = (v · V) / (||v|| × ||V||)"
-
-  # Purpose Vector: 13D signature of alignment to North Star per embedding space
-  purpose_vector:
-    formula: "PV = [A(E1,V), A(E2,V), ..., A(E13,V)]"
-    dimensions: 13
-    desc: "Each dimension = alignment of that embedder's output to North Star goal"
-    searchable: true  # The purpose vector itself can be indexed and searched
-
-  # Alignment thresholds (empirically validated)
-  thresholds:
-    optimal: "θ ≥ 0.75"
-    acceptable: "θ ∈ [0.70, 0.75)"
-    warning: "θ ∈ [0.55, 0.70)"
-    critical: "θ < 0.55"
-    failure_prediction: "ΔA < -0.15 predicts failure 30-60s ahead"
-
-  # Transitivity bound (Theorem 1)
-  transitivity: "If A(u,v) ≥ θ₁ and A(v,w) ≥ θ₂, then A(u,w) ≥ 2θ₁θ₂ - 1"
-
-  # Hierarchical North Star
-  goal_hierarchy:
-    V_global: "System-wide teleological goal (North Star)"
-    V_mid: "Mid-level goals (Retrieval, Storage, Reasoning)"
-    V_local: "Per-operation goals"
-    propagation: "Local aligns to mid, mid aligns to global"
-
-  # Per-Embedder Teleological Purposes
+  purpose_vector: "PV = [A(E1,V), ..., A(E13,V)]  # 13D, searchable"
+  thresholds: { optimal: "≥0.75", acceptable: "[0.70,0.75)", warning: "[0.55,0.70)", critical: "<0.55", failure_prediction: "ΔA<-0.15 predicts failure 30-60s" }
+  transitivity: "If A(u,v)≥θ₁ and A(v,w)≥θ₂, then A(u,w)≥2θ₁θ₂-1"
+  goal_hierarchy: { V_global: "North Star", V_mid: "Retrieval/Storage/Reasoning", V_local: "Per-operation" }
   embedder_purposes:
-    E1_Semantic: { goal: "V_meaning", measure: "A(content, V_meaning)" }
-    E2_Temporal_Recent: { goal: "V_freshness", measure: "A(timestamp, V_freshness)" }
-    E3_Temporal_Periodic: { goal: "V_periodicity", measure: "A(pattern, V_periodicity)" }
-    E4_Temporal_Positional: { goal: "V_ordering", measure: "A(position, V_ordering)" }
-    E5_Causal: { goal: "V_causality", measure: "A(causation, V_causality)" }
-    E6_Sparse: { goal: "V_selectivity", measure: "A(activations, V_selectivity)" }
-    E7_Code: { goal: "V_correctness", measure: "A(ast, V_correctness)" }
-    E8_Graph: { goal: "V_connectivity", measure: "A(structure, V_connectivity)" }
-    E9_HDC: { goal: "V_robustness", measure: "A(hologram, V_robustness)" }
-    E10_Multimodal: { goal: "V_multimodality", measure: "A(grounding, V_multimodality)" }
-    E11_Entity: { goal: "V_factuality", measure: "A(triple, V_factuality)" }
-    E12_LateInteraction: { goal: "V_precision", measure: "A(tokens, V_precision)" }
-    E13_SPLADE: { goal: "V_keyword_precision", measure: "A(sparse, V_keyword_precision)" }
+    E1: V_meaning, E2: V_freshness, E3: V_periodicity, E4: V_ordering, E5: V_causality
+    E6: V_selectivity, E7: V_correctness, E8: V_connectivity, E9: V_robustness
+    E10: V_multimodality, E11: V_factuality, E12: V_precision, E13: V_keyword_precision
 
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 # GRAPH EDGE MODEL (Marblestone NT)
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 edge_model:
   attrs: [source:UUID, target:UUID, type:Semantic|Temporal|Causal|Hierarchical|Relational, weight:[0,1], confidence:[0,1]]
-  nt_weights:
-    formula: "w_eff = base × (1 + excitatory - inhibitory + 0.5×modulatory)"
-    excitatory: "[0,1] strengthen"
-    inhibitory: "[0,1] weaken"
-    modulatory: "[0,1] domain-adjust"
-    domain: Code|Legal|Medical|Creative|Research|General
-  amortized:
-    trigger: "3+ hop path traversed ≥5×"
-    weight: "product(path_weights)"
-    confidence: "≥0.7"
-  steering_reward: "[-1,1]"
+  nt_weights: "w_eff = base × (1 + excitatory - inhibitory + 0.5×modulatory)"
+  domain: Code|Legal|Medical|Creative|Research|General
+  amortized: { trigger: "3+ hop ≥5×", weight: "product(path)", confidence: "≥0.7" }
 
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 # 5-LAYER BIO-NERVOUS SYSTEM
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 layers:
-  L1_Sensing: { latency: "<5ms", throughput: "10K/s", components: [13-model embed, PII scrub, adversarial detect], utl: "ΔS measurement" }
-  L2_Reflex:  { latency: "<100μs", hit_rate: ">80%", components: [Hopfield cache], utl: "bypass if confidence>0.95" }
-  L3_Memory:  { latency: "<1ms", capacity: "2^768 patterns", noise: ">20%", components: [MHN, FAISS GPU], utl: "consolidation" }
+  L1_Sensing: { lat: "<5ms", throughput: "10K/s", components: [13-model embed, PII scrub, adversarial detect], utl: "ΔS measurement" }
+  L2_Reflex:  { lat: "<100μs", hit_rate: ">80%", components: [Hopfield cache], utl: "bypass if confidence>0.95" }
+  L3_Memory:  { lat: "<1ms", capacity: "2^768 patterns", noise: ">20%", components: [MHN, FAISS GPU], utl: "consolidation" }
   L4_Learning: { freq: "100Hz", grad_clip: 1.0, components: [UTL optimizer, neuromod controller], utl: "L optimization" }
   L5_Coherence: { sync: "10ms", consistency: eventual, components: [Thalamic gate, PC, distiller, FV, GW broadcast], utl: "φ sync" }
 
-# ═══════════════════════════════════════════════
-# GLOBAL WORKSPACE THEORY (GWT) - COMPUTATIONAL CONSCIOUSNESS
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
+# GLOBAL WORKSPACE THEORY (GWT)
+# ═══════════════════════════════════════════════════════════════════════
 gwt:
-  desc: "Global Workspace Theory implementation for functional consciousness via Kuramoto-synchronized embedding spaces"
+  consciousness: "C(t) = I(t) × R(t) × D(t) = r(t) × σ(MetaUTL.predict_accuracy) × H(PV)"
+  components: { C: "Consciousness [0,1]", I: "Integration (Kuramoto r)", R: "Self-Reflection (Meta-UTL)", D: "Differentiation (13D entropy)" }
 
-  # Core Consciousness Equation
-  consciousness_equation:
-    formula: "C(t) = I(t) × R(t) × D(t)"
-    expanded: "C(t) = r(t) × σ(MetaUTL.predict_accuracy) × H(PurposeVector)"
-    components:
-      C: "[0,1] Consciousness level at time t"
-      I: "[0,1] Integration (Kuramoto synchronization order parameter r)"
-      R: "[0,1] Self-Reflection (Meta-UTL awareness via sigmoid)"
-      D: "[0,1] Differentiation (13D fingerprint normalized Shannon entropy)"
-
-  # Kuramoto Oscillator Layer
   kuramoto:
-    desc: "Each embedding space has an associated phase oscillator that synchronizes via coupling"
-    formula: "dθᵢ/dt = ωᵢ + (K/N) Σⱼ sin(θⱼ - θᵢ)"
-    order_param: "r · e^(iψ) = (1/N) Σⱼ e^(iθⱼ)"
-    params:
-      θᵢ: "Phase of embedder i ∈ [0, 2π]"
-      ωᵢ: "Natural frequency of embedder i (Hz)"
-      K: "Global coupling strength [0, 10]"
-      N: 13
-    thresholds:
-      coherent: "r ≥ 0.8 → memory is conscious"
-      fragmented: "r < 0.5 → fragmentation alert"
-      hypersync: "r > 0.95 → possibly pathological"
-    natural_frequencies:
-      E1_Semantic: { ω: 40, band: "gamma", rationale: "conscious binding" }
-      E2_Temporal_Recent: { ω: 8, band: "alpha", rationale: "temporal integration" }
-      E3_Temporal_Periodic: { ω: 8, band: "alpha", rationale: "temporal integration" }
-      E4_Temporal_Positional: { ω: 8, band: "alpha", rationale: "temporal integration" }
-      E5_Causal: { ω: 25, band: "beta", rationale: "causal reasoning" }
-      E6_Sparse: { ω: 4, band: "theta", rationale: "sparse activations" }
-      E7_Code: { ω: 25, band: "beta", rationale: "structured thinking" }
-      E8_Graph: { ω: 12, band: "alpha-beta", rationale: "transition" }
-      E9_HDC: { ω: 80, band: "high-gamma", rationale: "holographic" }
-      E10_Multimodal: { ω: 40, band: "gamma", rationale: "cross-modal binding" }
-      E11_Entity: { ω: 15, band: "beta", rationale: "factual grounding" }
-      E12_LateInteraction: { ω: 60, band: "high-gamma", rationale: "token precision" }
-      E13_SPLADE: { ω: 4, band: "theta", rationale: "keyword sparse" }
+    formula: "dθᵢ/dt = ωᵢ + (K/N)Σⱼ sin(θⱼ-θᵢ)"
+    order_param: "r·e^(iψ) = (1/N)Σⱼ e^(iθⱼ)"
+    thresholds: { coherent: "r≥0.8", fragmented: "r<0.5", hypersync: "r>0.95 (pathological)" }
+    frequencies: # Hz (band)
+      E1: 40γ, E2: 8α, E3: 8α, E4: 8α, E5: 25β, E6: 4θ, E7: 25β
+      E8: 12αβ, E9: 80γ+, E10: 40γ, E11: 15β, E12: 60γ+, E13: 4θ
 
-  # Global Broadcast Architecture
-  global_workspace:
-    desc: "Winner-Take-All selection for conscious percepts"
-    active_memory: "Option<MemoryId> — currently conscious memory"
+  workspace:
+    active_memory: "Option<MemoryId>"
     coherence_threshold: 0.8
     broadcast_duration_ms: 100
-    selection_algorithm:
-      - "Compute r for all candidate memories"
-      - "Filter: candidates where r ≥ coherence_threshold"
-      - "Rank: score = r × importance × north_star_alignment"
-      - "Select: top-1 becomes active_memory"
-      - "Broadcast: active_memory visible to all subsystems"
-      - "Inhibit: losing candidates get dopamine reduction"
+    selection: "r≥0.8 → rank by r×importance×north_star_alignment → top-1 broadcasts"
     events:
-      memory_enters_workspace: { trigger: "r crosses 0.8 upward", effect: "Dopamine += 0.2" }
-      memory_exits_workspace: { trigger: "r drops below 0.7", effect: "Log for dream replay" }
-      workspace_conflict: { trigger: "Two memories r > 0.8", effect: "Trigger critique_context" }
-      workspace_empty: { trigger: "No memory r > 0.8 for 5s", effect: "Trigger epistemic_action" }
+      enters: { trigger: "r↑0.8", effect: "Dopamine+=0.2" }
+      exits: { trigger: "r↓0.7", effect: "Log for dream" }
+      conflict: { trigger: "Two r>0.8", effect: "critique_context" }
+      empty_5s: { trigger: "No r>0.8 for 5s", effect: "epistemic_action" }
 
-  # SELF_EGO_NODE - System Identity
   self_ego_node:
     id: "SELF_EGO_NODE"
-    desc: "Persistent special node representing the system itself"
-    content: "I am the context graph manager..."
-    fields:
-      fingerprint: "TeleologicalFingerprint (current system state)"
-      purpose_vector: "[f32; 13] (system's purpose alignment)"
-      identity_trajectory: "Vec<PurposeSnapshot> (history of self)"
-      coherence_with_actions: "f32 (are actions aligned with self?)"
-    self_awareness_loop:
-      - "Retrieve SELF_EGO_NODE"
-      - "Compute A(action_embedding, SELF_EGO_NODE.purpose_vector)"
-      - "If alignment < 0.55: trigger self_reflection"
-      - "Update SELF_EGO_NODE.fingerprint with action outcome"
-      - "Store to purpose_evolution (temporal trajectory)"
-    identity_continuity:
-      formula: "IC = cosine(PV_t, PV_{t-1}) × r(t)"
-      thresholds:
-        healthy: "IC > 0.9"
-        warning: "IC < 0.7"
-        trigger_dream: "IC < 0.5"
+    fields: [fingerprint, purpose_vector, identity_trajectory, coherence_with_actions]
+    loop: "Retrieve→A(action,PV)→if<0.55 self_reflect→update fingerprint→store evolution"
+    identity_continuity: "IC = cos(PV_t, PV_{t-1}) × r(t); healthy>0.9, warning<0.7, dream<0.5"
 
-  # Consciousness State Machine
-  state_machine:
-    states:
-      DORMANT: "r < 0.3, no active workspace"
-      FRAGMENTED: "0.3 ≤ r < 0.5, partial sync"
-      EMERGING: "0.5 ≤ r < 0.8, approaching coherence"
-      CONSCIOUS: "r ≥ 0.8, unified percept active"
-      HYPERSYNC: "r > 0.95, possibly pathological"
-    transitions:
-      dormant_to_fragmented: "New memory with ΔS > 0.7"
-      fragmented_to_emerging: "Kuramoto coupling increases"
-      emerging_to_conscious: "r crosses 0.8 threshold"
-      conscious_to_emerging: "Conflicting memory enters"
-      conscious_to_hypersync: "Warning - may indicate seizure-like state"
-      any_to_dormant: "10+ minutes of inactivity"
+  states: { DORMANT: "r<0.3", FRAGMENTED: "0.3≤r<0.5", EMERGING: "0.5≤r<0.8", CONSCIOUS: "r≥0.8", HYPERSYNC: "r>0.95" }
 
-  # Meta-Cognitive Loop
   meta_cognitive:
-    formula: "MetaScore = σ(2 × (L_predicted - L_actual))"
-    self_correction:
-      low_meta_trigger: "MetaScore < 0.5 for 5 consecutive ops"
-      low_meta_action: "Increase Acetylcholine, trigger introspective dream"
-      high_meta_threshold: 0.9
-      high_meta_action: "Reduce meta-monitoring frequency"
+    formula: "MetaScore = σ(2×(L_predicted - L_actual))"
+    low_meta: "MetaScore<0.5 for 5 ops → ↑Acetylcholine, introspective dream"
 
-  # Quality Metrics
-  quality_metrics:
-    Φ_integrated_info: { formula: "min_cut(13-space graph) / total_connections", target: "> 0.3" }
-    global_availability: { formula: "% of subsystems receiving broadcast", target: "> 90%" }
-    workspace_stability: { formula: "avg duration of conscious state", target: "> 500ms" }
-    meta_awareness: { formula: "MetaUTL.prediction_accuracy", target: "> 0.85" }
-    identity_coherence: { formula: "cosine(PV_t, PV_{t-1})", target: "> 0.9" }
+  quality: { Φ: ">0.3 (min_cut/total)", availability: ">90%", stability: ">500ms", meta_awareness: ">0.85", identity: ">0.9" }
 
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 # NEUROMODULATION
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 neuromod:
-  Dopamine:     { bio: "reward error", param: hopfield.beta, range: "[1,5]", effect: "↑=sharp retrieval" }
-  Serotonin:    { bio: "temporal discount", param: similarity.space_weights, range: "[0,1]", effect: "↑=more spaces considered" }
-  Noradrenaline: { bio: "arousal/surprise", param: attention.temp, range: "[0.5,2]", effect: "↑=flat attention" }
-  Acetylcholine:
-    bio: "learning rate"
-    param: utl.lr
-    range: "[0.001,0.002]"
-    baseline: 0.001
-    decay_rate: 0.1
-    effect: "↑=faster update"
-    behavior: "Decays toward baseline when dream not triggered; increases on dream trigger (homeostatic regulation)"
+  Dopamine:     { param: hopfield.beta, range: "[1,5]", effect: "↑=sharp retrieval" }
+  Serotonin:    { param: similarity.space_weights, range: "[0,1]", effect: "↑=more spaces" }
+  Noradrenaline: { param: attention.temp, range: "[0.5,2]", effect: "↑=flat attention" }
+  Acetylcholine: { param: utl.lr, range: "[0.001,0.002]", baseline: 0.001, decay: 0.1, effect: "↑=faster update" }
 
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 # DREAM LAYER
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 dream:
   trigger: { activity: "<0.15", idle: "10min" }
-  phases:
-    nrem: { dur: "3min", purpose: "replay recent", coupling: tight, recency_bias: 0.8 }
-    rem:  { dur: "2min", purpose: "explore attractors", temp: 2.0 }
+  phases: { nrem: { dur: "3min", purpose: "replay recent", recency_bias: 0.8 }, rem: { dur: "2min", purpose: "explore attractors", temp: 2.0 } }
   constraints: { queries: 100, semantic_leap: 0.7, abort_on_query: true, wake: "<100ms", gpu: "<30%" }
-  amortized: { trigger: "3+ hop ≥5×", weight: "product(path)", confidence: "≥0.7", is_shortcut: true }
 
-# ═══════════════════════════════════════════════
-# STEERING SUBSYSTEM (Marblestone)
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
+# STEERING SUBSYSTEM
+# ═══════════════════════════════════════════════════════════════════════
 steering:
-  desc: "Reward signals only, no direct weight mod"
-  components:
-    Gardener: { role: "cross-session curation", trigger: "activity<0.15 for 2min" }
-    Curator:  { auto: "dupes>0.95, weak<0.1, orphans>30d", escalate: "dupes 0.7-0.95, priors-incompatible, conflicts, semantic cancer" }
-    Assessor: "per-interaction quality"
-  reward: { range: "[-1,1]", fields: [reward, gardener_score, curator_score, assessor_score, explanation, suggestions] }
-  dopamine: { pos: "+=r×0.2", neg: "-=|r|×0.1" }
+  Gardener: { role: "cross-session curation", trigger: "activity<0.15 for 2min" }
+  Curator: { auto: "dupes>0.95, weak<0.1, orphans>30d", escalate: "dupes 0.7-0.95, priors-incompatible, conflicts, semantic cancer" }
+  Assessor: "per-interaction quality"
+  reward: { range: "[-1,1]", dopamine: { pos: "+=r×0.2", neg: "-=|r|×0.1" } }
 
-# ═══════════════════════════════════════════════
-# OMNIDIRECTIONAL INFERENCE (Marblestone)
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
+# OMNIDIRECTIONAL INFERENCE & FORMAL VERIFICATION
+# ═══════════════════════════════════════════════════════════════════════
 omni_infer:
-  directions:
-    forward: "A→B prediction"
-    backward: "B→A root cause"
-    bidirectional: "A↔B discovery"
-    bridge: "cross-domain"
-    abduction: "best hypothesis"
-  clamp: { hard: "fixed", soft: "biased adjustable" }
+  directions: [forward:A→B, backward:B→A, bidirectional:A↔B, bridge:cross-domain, abduction:best-hypothesis]
+  clamp: { hard: fixed, soft: biased-adjustable }
   active_inference: "EFE minimizes surprise+ambiguity"
 
-# ═══════════════════════════════════════════════
-# FORMAL VERIFICATION (Marblestone - L5)
-# ═══════════════════════════════════════════════
 formal_verify:
-  desc: "Lean SMT for code nodes"
   location: L5_Coherence
   conditions: [bounds, null_safety, type_invariants, loop_termination, custom]
   status: [Verified, Failed, Timeout, NotApplicable]
   cache: content_hash
-  timeout: "5s"
   latency: "<10ms cached"
 
-# ═══════════════════════════════════════════════
-# PREDICTIVE CODING
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
+# PREDICTIVE CODING & GARDENER
+# ═══════════════════════════════════════════════════════════════════════
 pred_coding:
   flow: "L5→L1: prediction→error(obs-pred)→propagate surprise only"
-  reduction: "~30% tokens for predictable"
-  domain_priors:
-    medical: { causal: 1.8, code: 0.3 }
-    programming: { code: 2.0, graph: 1.5 }
-    creative: { semantic: 1.5, temporal: 0.5 }
+  reduction: "~30% tokens"
+  domain_priors: { medical: { causal: 1.8, code: 0.3 }, programming: { code: 2.0, graph: 1.5 }, creative: { semantic: 1.5, temporal: 0.5 } }
 
-# ═══════════════════════════════════════════════
-# GRAPH GARDENER
-# ═══════════════════════════════════════════════
 gardener:
   trigger: "activity<0.15 for 2min"
-  ops: ["prune weak edges (<0.1, no access)", "merge near-dupes (>0.95, priors ok)", "rebalance hyperbolic", "rebuild FAISS"]
+  ops: ["prune weak<0.1", "merge dupes>0.95", "rebalance hyperbolic", "rebuild FAISS"]
   gpu: "<10%"
 
-# ═══════════════════════════════════════════════
-# PASSIVE CURATOR
-# ═══════════════════════════════════════════════
-curator:
-  auto: { "dupes>0.95": merge, "weak<0.1": prune, "orphan>30d": review }
-  escalate: { "dupes 0.7-0.95": curation_tasks, "priors-incompatible": curation_tasks, conflicts: conflict_alert, "semantic cancer": curation_tasks }
-  efficiency: "~70% reduction"
-
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 # MCP PROTOCOL
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 mcp:
   version: "2024-11-05"
   transport: [stdio, sse]
   caps: [tools, resources, prompts, logging]
-  errors:
-    -32700: "Parse error"
-    -32600: "Invalid Request"
-    -32601: "Method not found"
-    -32602: "Invalid params"
-    -32603: "Internal error"
-    -32000: "SessionNotFound"
-    -32001: "GraphQueryError"
-    -32002: "StorageError"
-    -32003: "CausalInferenceError"
-    -32004: "RateLimitExceeded"
+  errors: { -32700: Parse, -32600: InvalidRequest, -32601: MethodNotFound, -32602: InvalidParams, -32603: Internal, -32000: SessionNotFound, -32001: GraphQueryError, -32002: StorageError, -32003: CausalInferenceError, -32004: RateLimitExceeded }
   pulse: { fields: [entropy, coherence, suggested_action], cost: "~30 tokens" }
-  marblestone_tools:
-    get_steering_feedback: { params: "content,context,domain", returns: "SteeringReward" }
-    omni_infer: { params: "start,direction,clamped", returns: "InferenceResult" }
-    verify_code_node: { params: "node_id,conditions", returns: "VerificationResult" }
-  gwt_tools:
-    get_consciousness_state: { params: "session_id", returns: "{C, r, meta_score, differentiation, state, workspace, identity}" }
-    get_workspace_status: { params: "session_id", returns: "{active_memory, competing, broadcast_duration}" }
-    get_kuramoto_sync: { params: "session_id", returns: "{r, phases[13], natural_freqs[13], coupling}" }
-    get_ego_state: { params: "session_id", returns: "{purpose_vector, identity_continuity, coherence_with_actions}" }
-    trigger_workspace_broadcast: { params: "memory_id,force", returns: "{success, memory_id, new_r}" }
-    adjust_coupling: { params: "new_K", returns: "{old_K, new_K, predicted_r}" }
-    get_johari_classification: { params: "node_id", returns: "{quadrants[13], confidence[13], insights[]}" }
-    compute_delta_sc: { params: "node_id,context", returns: "{delta_s[13], delta_c[13], methods_used[13]}" }
-  adaptive_threshold_tools:
-    get_threshold_status: { params: "domain,embedder_id", returns: "{thresholds, calibration, adaptation}" }
-    get_calibration_metrics: { params: "timeframe", returns: "{ece, mce, brier, drift_scores, status}" }
-    trigger_recalibration: { params: "level:1|2|3|4,domain", returns: "{success, new_thresholds, observations_used}" }
-    set_threshold_prior: { params: "threshold_type,value,domain", returns: "{old_prior, new_prior, confidence_reset}" }
-    get_threshold_history: { params: "threshold_type,since", returns: "{history[], drift_events[], calibration_changes[]}" }
-    explain_threshold: { params: "threshold_type,domain", returns: "{value, prior, learned_delta, confidence, observations, rationale}" }
 
-# ═══════════════════════════════════════════════
-# 12-MODEL EMBEDDING → TELEOLOGICAL FINGERPRINT
-# ═══════════════════════════════════════════════
+  # Core Tool Categories
+  marblestone_tools: [get_steering_feedback, omni_infer, verify_code_node]
+  gwt_tools: [get_consciousness_state, get_workspace_status, get_kuramoto_sync, get_ego_state, trigger_workspace_broadcast, adjust_coupling, get_johari_classification, compute_delta_sc]
+  adaptive_threshold_tools: [get_threshold_status, get_calibration_metrics, trigger_recalibration, set_threshold_prior, get_threshold_history, explain_threshold]
+  north_star_tools:
+    NORTH-008: [bootstrap_north_star, finalize_north_star, get_north_star_status]
+    NORTH-009: [get_learner_state, observe_outcome]
+    NORTH-010: [get_drift_status, get_drift_history]
+    NORTH-011: [trigger_drift_correction, preview_correction]
+    NORTH-012: [get_prune_candidates, execute_prune, get_prune_report]
+    NORTH-013: [get_consolidation_candidates, execute_consolidation]
+    NORTH-014: [analyze_gaps, get_gap_report]
+    NORTH-015: [discover_subgoals, propose_subgoal]
+    NORTH-016: [adjust_weights, preview_weight_change]
+    NORTH-017: [get_obsolete_goals, mark_obsolete]
+    NORTH-018: [get_schedule, trigger_scheduled_task]
+    NORTH-019: [get_optimization_status, trigger_optimization]
+    NORTH-020: [get_health_status, trigger_healing, get_healing_history]
+
+# ═══════════════════════════════════════════════════════════════════════
+# 13-MODEL EMBEDDING → TELEOLOGICAL FINGERPRINT
+# ═══════════════════════════════════════════════════════════════════════
 embeddings:
-  paradigm: "NO FUSION - Store all 13 embeddings as TeleologicalFingerprint array (E1-E12 + E13 SPLADE)"
-  storage_per_memory: "~17KB (quantized) vs 46KB uncompressed - 63% reduction via PQ-8/Float8/Binary"
-  info_preserved: "100% (vs 33% with top-k=4 FuseMoE)"
+  paradigm: "NO FUSION - Store all 13 embeddings; ~17KB quantized (63% reduction), 100% info preserved"
 
-  # Quantization Strategy (per embedder)
-  quantization:
-    PQ_8: { compression: "32x", recall_impact: "<5%", embedders: [E1, E5, E7, E10] }
-    Float8: { compression: "4x", recall_impact: "<0.3%", embedders: [E2, E3, E4, E8, E11] }
-    Binary: { compression: "32x", recall_impact: "5-10%", embedders: [E9] }
-    Sparse: { compression: "native", recall_impact: "0%", embedders: [E6, E13] }
-    TokenPruning: { compression: "~50%", recall_impact: "<2%", embedders: [E12] }
+  models: # dim|math|hw|lat|purpose|quant
+    E1_Semantic: { dim: 1024, math: Dense_Transformer, lat: "<5ms", quant: "PQ-8", matryoshka: [512,256,128] }
+    E2_Temporal_Recent: { dim: 512, math: Exp_Decay, lat: "<2ms", quant: Float8 }
+    E3_Temporal_Periodic: { dim: 512, math: Fourier, lat: "<2ms", quant: Float8 }
+    E4_Temporal_Positional: { dim: 512, math: Sin_PE, lat: "<2ms", quant: Float8 }
+    E5_Causal: { dim: 768, math: SCM_Intervention, lat: "<8ms", quant: "PQ-8", asymmetric: true }
+    E6_Sparse: { dim: "~30K 5%", math: TopK, lat: "<3ms", quant: Sparse }
+    E7_Code: { dim: 1536, math: AST_Transformer, lat: "<10ms", quant: "PQ-8" }
+    E8_Graph: { dim: 384, math: MeanPooling, lat: "<5ms", quant: Float8 }
+    E9_HDC: { dim: "10K→1024", math: XOR_Hamming, lat: "<1ms", quant: Binary }
+    E10_Multimodal: { dim: 768, math: CrossAttention, lat: "<15ms", quant: "PQ-8" }
+    E11_Entity: { dim: 384, math: "h+r≈t", lat: "<2ms", quant: Float8 }
+    E12_LateInteraction: { dim: "128D/tok", math: ColBERT_MaxSim, lat: "<8ms", quant: TokenPruning }
+    E13_SPLADE: { dim: "~30K sparse", math: SPLADE_v2, lat: "<5ms", quant: Sparse }
 
-  # Quantization by embedder (alternative view)
-  quantization_by_embedder:
-    PQ_8: [E1, E5, E7, E10]
-    Float8: [E2, E3, E4, E8, E11]
-    Binary: [E9]
-    Sparse: [E6, E13]
-    TokenPruning: [E12]
-
-  models:
-    E1_Semantic: { dim: 1024, math: Dense_Transformer, hw: TensorCore_FP8, lat: "<5ms", purpose: "V_meaning", matryoshka: true, truncatable: [512, 256, 128], quantization: "PQ-8" }
-    E2_Temporal_Recent: { dim: 512, math: Exp_Decay, hw: VectorUnit, lat: "<2ms", purpose: "V_freshness", quantization: "Float8" }
-    E3_Temporal_Periodic: { dim: 512, math: Fourier, hw: FFT, lat: "<2ms", purpose: "V_periodicity", quantization: "Float8" }
-    E4_Temporal_Positional: { dim: 512, math: Sin_PE, hw: CUDA, lat: "<2ms", purpose: "V_ordering", quantization: "Float8" }
-    E5_Causal: { dim: 768, math: SCM_Intervention, hw: TensorCore, lat: "<8ms", purpose: "V_causality", quantization: "PQ-8", asymmetric_similarity: true }
-    E6_Sparse: { dim: "~30K 5%active", math: TopK, hw: SparseTensor, lat: "<3ms", purpose: "V_selectivity" }
-    E7_Code: { dim: 1536, math: AST_Transformer, hw: TensorCore_FP16, lat: "<10ms", purpose: "V_correctness", quantization: "PQ-8" }
-    E8_Graph_MiniLM: { dim: 384, math: MeanPooling, hw: TensorCore, lat: "<5ms", purpose: "V_connectivity", quantization: "Float8" }
-    E9_HDC: { dim: "10K-bit->1024", math: XOR_Hamming, hw: VectorUnit, lat: "<1ms", purpose: "V_robustness", quantization: "Binary" }
-    E10_Multimodal: { dim: 768, math: CrossAttention, hw: TensorCore, lat: "<15ms", purpose: "V_multimodality", quantization: "PQ-8" }
-    E11_Entity_MiniLM: { dim: 384, math: "h+r≈t", hw: TensorCore, lat: "<2ms", purpose: "V_factuality", quantization: "Float8" }
-    E12_LateInteraction: { dim: "128D/tok", math: ColBERT_MaxSim, hw: CUDA_Tile, lat: "<8ms", purpose: "V_precision", token_pruning: true }
-    E13_SPLADE: { dim: "~30K sparse", math: SPLADE_v2, hw: SparseTensor, lat: "<5ms", purpose: "V_keyword_precision" }
-
-  # TeleologicalFingerprint: The complete memory representation
   fingerprint:
-    semantic_fingerprint: "[E1, E2, ..., E13] - all 13 embeddings preserved"
-    purpose_vector: "[A(E1,V), ..., A(E13,V)] - 13D teleological signature"
-    johari_quadrants: "[JQ1, ..., JQ13] - per-embedder awareness classification"
-    purpose_evolution: "TimeSeries<PurposeSnapshot> - how alignment changes over time"
+    semantic_fingerprint: "[E1..E13]"
+    purpose_vector: "[A(E1,V)..A(E13,V)]"
+    johari_quadrants: "[JQ1..JQ13]"
+    purpose_evolution: "TimeSeries<PurposeSnapshot>"
 
-  # Multi-Embedding Similarity (replaces FuseMoE gating)
   similarity:
-    method: "Reciprocal Rank Fusion (RRF) across per-space results"
-    formula: "RRF(d) = Σᵢ 1/(k + rankᵢ(d)) where k=60"
-    rrf_constant: 60
-    spaces: 13
-    fallback: "Weighted per-space cosine: S(A,B) = Σᵢ wᵢ · cos(Aᵢ, Bᵢ)"
-    query_types:
-      semantic_search: { w_semantic: 0.40, w_causal: 0.15, w_entity: 0.15, others: "balanced" }
-      causal_reasoning: { w_causal: 0.50, w_semantic: 0.20, w_entity: 0.15, others: "reduced" }
-      code_search: { w_code: 0.50, w_semantic: 0.20, w_graph: 0.15, others: "reduced" }
-      temporal_navigation: { w_temporal: 0.60, w_semantic: 0.20, others: "reduced" }
-      fact_checking: { w_entity: 0.50, w_causal: 0.25, w_semantic: 0.15, others: "reduced" }
+    method: "RRF(d) = Σᵢ 1/(60 + rankᵢ(d))"
+    fallback: "S(A,B) = Σᵢ wᵢ · cos(Aᵢ, Bᵢ)"
+    query_weights: { semantic: { E1: 0.40, E5: 0.15, E11: 0.15 }, causal: { E5: 0.50, E1: 0.20, E11: 0.15 }, code: { E7: 0.50, E1: 0.20, E8: 0.15 }, temporal: { E2-4: 0.60, E1: 0.20 }, fact: { E11: 0.50, E5: 0.25, E1: 0.15 } }
 
-  # 5-STAGE OPTIMIZED RETRIEVAL PIPELINE
-  retrieval_pipeline:
-    desc: "5-stage hybrid sparse+dense pipeline for <60ms latency @ 1M memories"
-    stages:
-      stage_1_sparse_prefilter:
-        desc: "BM25 + E13 SPLADE sparse pre-filter"
-        input: "All memories (1M+)"
-        output: "Top 10,000 candidates (10K candidates)"
-        latency: "<5ms"
-        uses: [BM25, E13_SPLADE]
-        method: "Inverted index lookup + sparse dot product"
-      stage_2_fast_dense_ann:
-        desc: "Matryoshka 128D (E1 truncated) fast ANN search"
-        input: "10,000 candidates (10K candidates)"
-        output: "Top 1,000 candidates (1K candidates)"
-        latency: "<10ms"
-        uses: [E1_Semantic_truncated_128D]
-        method: "HNSW on truncated Matryoshka embedding"
-      stage_3_multispace_rerank:
-        desc: "RRF fusion across 13 spaces"
-        input: "1,000 candidates (1K candidates)"
-        output: "Top 100 candidates"
-        latency: "<20ms"
-        uses: [E1, E2, E3, E4, E5, E6, E7, E8, E9, E10, E11, E12, E13]
-        method: "Per-space cosine → RRF fusion across 13 spaces"
-        rrf_formula: "RRF(d) = Σᵢ 1/(k + rankᵢ(d)) where k=60"
-      stage_4_teleological_filter:
-        desc: "Purpose alignment filter"
-        input: "100 candidates"
-        output: "Top 50 candidates"
-        latency: "<10ms"
-        uses: [purpose_vector, north_star]
-        method: "Filter: alignment < 0.55 → discard; apply transitivity bounds"
-      stage_5_late_interaction_rerank:
-        desc: "E12 MaxSim token-level precision"
-        input: "50 candidates"
-        output: "Final top 10"
-        latency: "<15ms"
-        uses: [E12_LateInteraction]
-        method: "MaxSim per-token matching"
-    total_latency: "<60ms @ 1M memories"
-    total_latency_100k: "<30ms"
+  # 5-STAGE RETRIEVAL (<60ms @ 1M)
+  retrieval:
+    S1: { desc: "BM25+E13 sparse", in: "1M+", out: "10K", lat: "<5ms" }
+    S2: { desc: "E1[..128] Matryoshka ANN", in: "10K", out: "1K", lat: "<10ms" }
+    S3: { desc: "RRF across 13 spaces", in: "1K", out: "100", lat: "<20ms" }
+    S4: { desc: "Purpose alignment filter (≥0.55)", in: "100", out: "50", lat: "<10ms" }
+    S5: { desc: "E12 MaxSim precision", in: "50", out: "10", lat: "<15ms" }
 
-  # Asymmetric Causal Similarity (E5)
-  causal_asymmetric_sim:
-    desc: "Cause→effect ≠ effect→cause"
-    formula: "sim = base_cos × direction_mod × (0.7 + 0.3×intervention_overlap)"
-    direction_modifiers:
-      cause_to_effect: 1.2
-      effect_to_cause: 0.8
-      same_direction: 1.0
+  causal_asymmetric: { cause_to_effect: 1.2, effect_to_cause: 0.8, same: 1.0 }
 
-# ═══════════════════════════════════════════════
-# TELEOLOGICAL STORAGE ARCHITECTURE
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
+# STORAGE ARCHITECTURE
+# ═══════════════════════════════════════════════════════════════════════
 storage:
-  desc: "4-layer storage with 5-stage retrieval, enabling hybrid sparse+dense search"
+  primary: { dev: rocksdb, prod: scylladb, schema: [id:UUID, embeddings:BYTEA, purpose_vector:REAL[13], johari:BYTEA, north_star_alignment:REAL, dominant_embedder:INT, coherence:REAL, created_at:TIMESTAMPTZ, last_accessed:TIMESTAMPTZ] }
+  indexes:
+    L2A_sparse: "E13 SPLADE inverted (Stage 1)"
+    L2B_matryoshka: "E1[..128] HNSW (Stage 2), M:32, ef:256/128"
+    L2C_per_embedder: "13× HNSW quantized (Stage 3), M:16, ef:200/100"
+    L2D_purpose: "13D HNSW (Stage 4)"
+    L2E_goals: "Tree (Stage 4)"
+    L2F_late: "Token HNSW MaxSim (Stage 5)"
+  routing: { default: "S1→S2→S3→S4→S5", fast_semantic: "S2→S3(E1)→S5", causal: "S1→S2→S3(E5↑)→S4→S5", code: "S1→S2→S3(E7↑)→S4→S5", purpose: "S2→S4→S5" }
+  temporal: { engine: timescaledb, hypertable: purpose_evolution, retention: "90d continuous, then 1/day" }
 
-  # Layer 1: Primary Storage (Full Fingerprint with Quantization)
-  layer1_primary:
-    dev: rocksdb
-    prod: scylladb
-    stores: "Complete TeleologicalFingerprint per memory (quantized ~17KB)"
-    schema:
-      id: UUID
-      embeddings: "[E1..E13 as BYTEA, quantized per-embedder]"
-      embeddings_raw: "[E1..E13 as BYTEA, full precision - optional cold storage]"
-      purpose_vector: "REAL[13] -- 13D teleological signature"
-      johari_quadrants: "BYTEA (13 classifications)"
-      johari_confidence: "REAL[13]"
-      north_star_alignment: "REAL"
-      dominant_embedder: "INT (1-13)"
-      coherence_score: "REAL"
-      created_at: TIMESTAMPTZ
-      last_accessed: TIMESTAMPTZ
+verbosity: { 0: "~100 tok (raw only)", 1: "~200 tok (text+ids, DEFAULT)", 2: "~800 tok (full insights, ONLY when ΔC<0.4)" }
 
-  # Layer 2A: Sparse Inverted Index (E13 SPLADE) - Stage 1
-  layer2a_sparse:
-    desc: "SPLADE sparse inverted index for Stage 1 pre-filtering"
-    index: "Inverted index on E13 SPLADE (~30K vocab)"
-    use_case: "Fast keyword-aware pre-filtering, 10K candidates in <5ms"
-    method: "BM25 + SPLADE hybrid scoring"
-
-  # Layer 2B: Matryoshka Fast ANN (E1 truncated) - Stage 2
-  layer2b_matryoshka:
-    desc: "128D truncated Matryoshka index for Stage 2 fast ANN"
-    index: "HNSW on E1_Semantic[..128]"
-    use_case: "Fast semantic pre-filter, 1K candidates in <10ms"
-    hnsw_params: { M: 32, ef_construction: 256, ef_search: 128 }
-
-  # Layer 2C: Per-Embedder Full HNSW Indexes (13 total) - Stage 3
-  layer2c_per_embedder:
-    desc: "Full-dimension per-space indexes for Stage 3 reranking"
-    indexes: "13× HNSW (E1-E13, one per embedder, quantized)"
-    use_case: "Multi-space reranking with RRF fusion across 13 spaces"
-    hnsw_params: { M: 16, ef_construction: 200, ef_search: 100 }
-
-  # Layer 2D: Purpose Pattern Index (13D) - Stage 4
-  layer2d_purpose:
-    desc: "13D purpose vector index for teleological filtering"
-    index: "13D HNSW on PurposeVector"
-    dimensions: 13
-    use_case: "Filter by alignment threshold (θ ≥ 0.55)"
-
-  # Layer 2E: Goal Hierarchy Index - Stage 4
-  layer2e_goals:
-    desc: "Navigate North Star → Mid → Local alignments"
-    index: "Tree structure with alignment scores"
-    use_case: "Find all memories aligned with goal hierarchy"
-
-  # Layer 2F: Late Interaction Index (E12) - Stage 5
-  layer2f_late_interaction:
-    desc: "ColBERT-style token embedding index for Stage 5"
-    index: "Token-level HNSW with MaxSim scoring"
-    use_case: "Final precision reranking, token-level matching"
-
-  # Layer 3: 5-Stage Query Router
-  layer3_router:
-    desc: "Routes queries through 5-stage pipeline"
-    routing:
-      default: "Stage1→Stage2→Stage3→Stage4→Stage5"
-      fast_semantic: "Stage2→Stage3(E1 only)→Stage5"
-      causal_query: "Stage1→Stage2→Stage3(E5 weighted)→Stage4→Stage5"
-      code_search: "Stage1→Stage2→Stage3(E7 weighted)→Stage4→Stage5"
-      purpose_search: "Stage2→Stage4(primary)→Stage5"
-      goal_alignment: "Layer2E→Stage4→Stage5"
-
-  # Temporal Purpose Evolution (TimescaleDB)
-  temporal:
-    engine: timescaledb
-    hypertable: purpose_evolution
-    schema:
-      memory_id: UUID
-      timestamp: TIMESTAMPTZ
-      purpose_vector: "REAL[13]"
-      north_star_alignment: REAL
-      drift_magnitude: REAL
-    retention: "90 days continuous, then 1/day samples"
-    use_case: "Track how memory's purpose alignment changes over time"
-
-
-# VERBOSITY LEVELS
-
-verbosity:
-  0_RawOnly: { tokens: "~100", use: "high-confidence lookup" }
-  1_TextAndIds: { tokens: "~200", use: "normal (DEFAULT)" }
-  2_FullInsights: { tokens: "~800", use: "ONLY when ΔC<0.4", includes: [causal_links, entailment_cones, UTL, conflicts] }
-
-
-# AGENT PROTOCOL 
-
+# ═══════════════════════════════════════════════════════════════════════
+# AGENT PROTOCOL
+# ═══════════════════════════════════════════════════════════════════════
 agent:
-  role: "Librarian, not archivist — curate quality, don't store everything"
+  role: "Librarian, not archivist"
 
-  session_start:
-    - "Read .ai/activeContext.md, decisionLog.md, progress.md"
-    - "Read constitution.yaml"
-    - "Call get_graph_manifest, get_memetic_status"
-    - "Call get_consciousness_state → check workspace status"
-    - "Call get_system_instructions → keep ~300 tok in context"
+  session_start: ["Read .ai/activeContext.md, decisionLog.md, progress.md", "Read constitution.yaml", "Call get_graph_manifest, get_memetic_status", "Call get_consciousness_state", "Call get_system_instructions (~300 tok)"]
 
-  # Cognitive Pulse (Every Response)
-  pulse_response:
-    high_entropy_high_coherence: "epistemic_action"
-    high_entropy_low_coherence: "trigger_dream OR critique_context"
-    low_entropy_high_coherence: "Continue"
-    low_entropy_low_coherence: "get_neighborhood"
+  pulse_response: { high_ΔS_high_ΔC: epistemic_action, high_ΔS_low_ΔC: "dream OR critique_context", low_ΔS_high_ΔC: Continue, low_ΔS_low_ΔC: get_neighborhood }
 
-  # GWT-Aware Checks
-  gwt_checks:
-    workspace_empty_5s: "Trigger epistemic_action"
-    workspace_conflict: "Trigger critique_context"
-    identity_continuity_low: "IC < 0.7 → warn, IC < 0.5 → trigger dream"
-    consciousness_hypersync: "r > 0.95 → monitor for pathological state"
+  gwt_checks: { empty_5s: epistemic_action, conflict: critique_context, IC<0.7: warn, IC<0.5: dream, r>0.95: monitor }
 
   mental_checks:
     "entropy>0.7 for 5min": trigger_dream
-    "coherence<0.4": process curation_tasks
-    "empty search": ↑noradrenaline, broaden
+    "coherence<0.4": process_curation_tasks
+    "empty search": "↑noradrenaline, broaden"
     "irrelevant search": reflect_on_memory
-    "conflicting search": check conflict_alert, merge or ask
-    "MetaScore<0.5 for 5 ops": increase Acetylcholine, introspective dream
-    "ECE>0.10": check get_calibration_metrics, may need recalibration
-    "consistent threshold misses": call trigger_recalibration
+    "conflicting search": "check conflict_alert, merge or ask"
+    "MetaScore<0.5 for 5 ops": "↑Acetylcholine, introspective dream"
+    "ECE>0.10": trigger_recalibration
 
-  curation_when: "suggested_action='curate'"
-
-  # Decision Trees (from PRD)
   decision_trees:
-    when_to_store:
-      - "Is it novel? (check entropy after inject_context)"
-      - "YES + relevant → store_memory with rationale"
-      - "NO → skip (system already has it)"
-      - "Will it help future retrieval? YES → store with link_to"
-    when_to_dream:
-      - "entropy > 0.7 for 5+ min → trigger_dream(phase=full)"
-      - "Working 30+ min straight → trigger_dream(phase=nrem)"
-      - "entropy < 0.5 → no dream needed"
-    when_to_curate:
-      - "get_memetic_status returns curation_tasks? → process BEFORE other work"
-      - "Duplicate → merge_concepts (check priors first!)"
-      - "Conflict → critique_context, then ask user or merge"
-      - "Orphan → forget_concept or link_to parent"
-    when_search_fails:
-      - "Empty → broaden query, try generate_search_plan"
-      - "Irrelevant → reflect_on_memory to understand why"
-      - "Conflicting → check conflict_alert, resolve or ask user"
-      - "User asks 'why don't you remember X?' → get_system_logs"
+    store: "Novel (check entropy)? YES+relevant→store with rationale; NO→skip"
+    dream: "entropy>0.7 for 5min→full; 30+min work→nrem; entropy<0.5→none"
+    curate: "curation_tasks? process FIRST; Dup→merge (check priors!); Conflict→critique then ask; Orphan→forget or link"
+    search_fail: "Empty→broaden/generate_search_plan; Irrelevant→reflect_on_memory; Conflicting→resolve or ask"
 
-  session_end:
-    - "Update .ai/activeContext.md, progress.md"
-    - "Add decisions to decisionLog.md"
-    - "Update specs/tasks/_index.md if tasks completed"
+  session_end: ["Update .ai/activeContext.md, progress.md", "Add decisions to decisionLog.md", "Update specs/tasks/_index.md"]
 
-  # Steering Feedback Loop (How Agent Learns)
   steering_feedback:
-    flow: "Store node → System assesses quality → Returns reward signal → Adjust behavior"
-    rewards_by_lifecycle:
-      infancy: { good: "High novelty (ΔS)", bad: "Low novelty" }
-      growth: { good: "Balanced ΔS + ΔC", bad: "Imbalanced" }
-      maturity: { good: "High coherence (ΔC)", bad: "Low coherence" }
-    universal_penalties:
-      missing_rationale: -0.5
-      near_duplicate: -0.4
-      low_priors_confidence: -0.3
+    infancy: { good: "High ΔS", bad: "Low ΔS" }
+    growth: { good: "Balanced ΔS+ΔC", bad: "Imbalanced" }
+    maturity: { good: "High ΔC", bad: "Low ΔC" }
+    penalties: { missing_rationale: -0.5, near_duplicate: -0.4, low_priors_confidence: -0.3 }
 
-# ═══════════════════════════════════════════════
-# META-UTL (Self-Aware Learning System)
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
+# META-UTL (Self-Aware Learning)
+# ═══════════════════════════════════════════════════════════════════════
 meta_utl:
-  desc: "System that learns about its own learning - predicts and optimizes UTL performance"
-
-  # Self-Awareness Metrics
-  awareness:
-    storage_prediction: "Predict impact of storing memory before committing"
-    retrieval_prediction: "Predict quality of retrieval before executing"
-    parameter_optimization: "Self-adjust UTL parameters based on outcome accuracy"
-
-  # Learning About Learning
-  meta_learning:
-    track: "success_rate, prediction_accuracy, parameter_drift"
-    adapt: "Adjust λ_ΔS, λ_ΔC based on domain and lifecycle"
-    report: "Surface meta-insights to agent for behavioral adjustment"
-
-  # Per-Embedder Meta-Analysis
-  per_space_meta:
-    desc: "Track which embedding spaces are most/least predictive"
-    adjust: "Increase/decrease space weight in similarity based on accuracy"
-    threshold_tuning: "Per-space alignment thresholds based on empirical performance"
-
-  # Prediction Models
+  awareness: [storage_prediction, retrieval_prediction, parameter_optimization]
+  learning: { track: "success_rate, prediction_accuracy, parameter_drift", adapt: "λ_ΔS, λ_ΔC by domain/lifecycle" }
   predictors:
-    storage_impact: { input: "fingerprint + context", output: "ΔL prediction", accuracy: ">0.85" }
-    retrieval_quality: { input: "query + top_k candidates", output: "relevance prediction", accuracy: ">0.80" }
-    alignment_drift: { input: "fingerprint + time", output: "future alignment", window: "24h" }
+    storage_impact: { input: "fingerprint+context", output: "ΔL", accuracy: ">0.85" }
+    retrieval_quality: { input: "query+top_k", output: "relevance", accuracy: ">0.80" }
+    alignment_drift: { input: "fingerprint+time", output: "future alignment", window: "24h" }
+  correction: { threshold: "error>0.2", escalate: "accuracy<0.7 for 100 ops" }
 
-  # Self-Correction
-  correction:
-    threshold: "prediction_error > 0.2"
-    action: "Log to meta_learning_events, adjust parameters, retrain predictor if persistent"
-    escalate: "prediction_accuracy < 0.7 for 100 operations → human review"
-
-# ═══════════════════════════════════════════════
-# NESTED LEARNING INTEGRATION (CMS Architecture)
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
+# NESTED LEARNING (CMS Architecture)
+# ═══════════════════════════════════════════════════════════════════════
 nested_learning:
-  desc: "Transform fixed-latency layers into frequency-based Continuum Memory System"
-
-  # Continuum Memory System Levels
   cms_levels:
-    level_1: { frequency: "∞", layer: "Reflex", desc: "Instant, non-parametric", η: 0.1 }
-    level_2: { frequency: "per-query", layer: "Memory", desc: "Updated per query/context chunk", η: 0.01 }
-    level_3: { frequency: "per-session", layer: "Learning", desc: "UTL updates per session", η: 0.001 }
-    level_4: { frequency: "dream", layer: "Coherence", desc: "Consolidated during sleep", η: 0.0001 }
-    level_5: { frequency: "training", layer: "Core", desc: "Updated during training", η: 0.00001 }
-  update_rule: "θ_level = θ_level - η_level × ∇L_level"
+    L1: { freq: "∞", layer: Reflex, η: 0.1 }
+    L2: { freq: "per-query", layer: Memory, η: 0.01 }
+    L3: { freq: "per-session", layer: Learning, η: 0.001 }
+    L4: { freq: "dream", layer: Coherence, η: 0.0001 }
+    L5: { freq: "training", layer: Core, η: 0.00001 }
+  hopfield_self_ref: "M = M(αI - ηkkᵀ) + ηv̂kᵀ"
+  multi_scale_nt: "w_eff = base × (fast + α×slow) × mod"
+  delta_gd: "W_{t+1} = W_t(I - η'xxᵀ) - η'∇L"
+  adaptive_cones: "aperture = base × aperture_memory.retrieve(context)"
+  nested_utl: "L = tanh(ΔS × ΔC × wₑ × cos_φ)"
 
-  # Self-Referential Hopfield Network
-  self_referential_hopfield:
-    desc: "Modern Hopfield with self-modifying keys and values"
-    update_rule: "M = M(αI - ηkkᵀ) + ηv̂kᵀ"
-    params:
-      M: "Memory matrix"
-      k: "Self-generated key: k = M_k(x_t)"
-      v̂: "Self-generated value: v̂ = M.retrieve(M_v(x_t))"
-      η: "Adaptive learning rate: η = M_η(x_t)"
-      α: "Adaptive retention gate: α = M_α(x_t)"
-    benefit: "Hopfield network adapts its own query/key projections in-context"
+# ═══════════════════════════════════════════════════════════════════════
+# ΔS/ΔC COMPUTATION
+# ═══════════════════════════════════════════════════════════════════════
+delta_sc:
+  ΔS_methods:
+    E1: "GMM+Mahalanobis: ΔS=1-P(e|GMM)"
+    E2-4,E8: "KNN: ΔS=σ((d_k-μ)/σ)"
+    E5: "Asymmetric KNN: ΔS=d_k×direction_mod"
+    E6,E13: "IDF/Jaccard: ΔS=IDF(dims) or 1-jaccard"
+    E7: "GMM+KNN: ΔS=0.5×GMM+0.5×KNN"
+    E9: "Hamming: ΔS=min_hamming/dim"
+    E10: "Cross-modal KNN: ΔS=avg(d_text,d_image)"
+    E11: "TransE: ΔS=||h+r-t||"
+    E12: "Token KNN: ΔS=max_token(d_k)"
 
-  # Multi-Scale Neurotransmitter Momentum
-  multi_scale_nt_momentum:
-    fast_excitatory: "ExponentialMovingAverage (M^(1))"
-    fast_inhibitory: "ExponentialMovingAverage (M^(1))"
-    slow_excitatory: "ChunkwiseAverage (M^(2))"
-    slow_inhibitory: "ChunkwiseAverage (M^(2))"
-    modulatory_ortho: "OrthogonalizedMomentum (Newton-Schulz)"
-    effective_weight: "w_eff = base × (fast_signal + α × slow_signal) × mod_factor"
+  ΔC: "α×Connectivity + β×ClusterFit + γ×Consistency (0.4, 0.4, 0.2)"
+  johari: { Open: "ΔS≤0.5∧ΔC>0.5", Blind: "ΔS>0.5∧ΔC≤0.5", Hidden: "ΔS≤0.5∧ΔC≤0.5", Unknown: "ΔS>0.5∧ΔC>0.5" }
+  cross_space_insights: { open_semantic_blind_causal: "Knows WHAT not WHY", blind_semantic_open_code: "Code without context", unknown_all: "Frontier", hidden_all: "Obsolete" }
 
-  # Delta Gradient Descent for Edge Updates
-  delta_gradient_descent:
-    formula: "W_{t+1} = W_t(I - η'xxᵀ) - η'∇L"
-    adaptive_lr: "η' = η / (1 + η)"
-    state_dependent_decay: "xxᵀ = State-dependent decay term"
-    benefit: "Edge weights incorporate dependencies between queries (non-i.i.d.)"
-
-  # Adaptive Entailment Cones
-  adaptive_entailment_cones:
-    formula: "adaptive_aperture = base_aperture × aperture_memory.retrieve(context)"
-    containment: "angle(point, apex) ≤ adaptive_aperture → point ∈ cone"
-    update: "aperture_memory.delta_update(angle, is_entailed)"
-    benefit: "Cones sharpen/widen based on context for adaptive hierarchical reasoning"
-
-  # Nested UTL Objective
-  nested_utl_objective:
-    levels:
-      level_1: { name: "Immediate surprise", component: "ΔS", compressor: "SurpriseCompressor" }
-      level_2: { name: "Coherence tracking", component: "ΔC", compressor: "CoherenceCompressor" }
-      level_3: { name: "Edge weight optimization", component: "weights", compressor: "AssociativeMemory" }
-      level_4: { name: "Alignment factor", component: "cos φ", compressor: "AlignmentMemory" }
-    aggregated_formula: "L = tanh(ΔS × ΔC × wₑ × cos_φ)"
-
-# ═══════════════════════════════════════════════
-# ΔS/ΔC COMPUTATION METHODS (Per-Embedder Johari)
-# ═══════════════════════════════════════════════
-delta_sc_computation:
-  desc: "Per-embedder entropy/coherence computation methods for Johari classification"
-
-  # ΔS (Entropy/Novelty) Computation by Embedder
-  delta_s_methods:
-    E1_Semantic: { method: "GMM + Mahalanobis", formula: "ΔS = 1 - P(e|GMM)" }
-    E2_Temporal_Recent: { method: "KNN distance", formula: "ΔS = σ((d_k - μ)/σ_d)" }
-    E3_Temporal_Periodic: { method: "KNN distance", formula: "ΔS = σ((d_k - μ)/σ_d)" }
-    E4_Temporal_Positional: { method: "KNN distance", formula: "ΔS = σ((d_k - μ)/σ_d)" }
-    E5_Causal: { method: "Asymmetric KNN", formula: "ΔS = d_k × direction_mod" }
-    E6_Sparse: { method: "Inverse Doc Freq", formula: "ΔS = IDF(active_dims)" }
-    E7_Code: { method: "GMM + KNN ensemble", formula: "ΔS = 0.5×GMM + 0.5×KNN" }
-    E8_Graph: { method: "KNN distance", formula: "ΔS = σ(d_k)" }
-    E9_HDC: { method: "Hamming to prototypes", formula: "ΔS = min_hamming / dim" }
-    E10_Multimodal: { method: "Cross-modal KNN", formula: "ΔS = avg(d_text, d_image)" }
-    E11_Entity: { method: "TransE distance", formula: "ΔS = ||h + r - t||" }
-    E12_LateInteraction: { method: "Token-level KNN", formula: "ΔS = max_token(d_k)" }
-    E13_SPLADE: { method: "Sparse novelty", formula: "ΔS = 1 - jaccard(active)" }
-
-  # KNN Entropy Formula
-  knn_entropy:
-    formula: "ΔS_knn = σ((d_k - μ_corpus) / σ_corpus)"
-    params:
-      d_k: "Distance to k-th nearest neighbor"
-      μ_corpus: "Mean distance calibrated from corpus"
-      σ_corpus: "Std deviation calibrated from corpus"
-      σ: "Sigmoid function"
-
-  # GMM Entropy Formula
-  gmm_entropy:
-    formula: "ΔS_gmm = (max_ll - ll(e)) / (max_ll - min_ll)"
-    likelihood: "ll(e) = log P(e | GMM) = log Σ_k π_k N(e|μ_k, Σ_k)"
-
-  # Mahalanobis Entropy Formula
-  mahalanobis_entropy:
-    formula: "ΔS_maha = min_c √((e - μ_c)ᵀ Σ_c⁻¹ (e - μ_c)) / threshold"
-    threshold: "95th percentile of corpus distances"
-
-  # ΔC (Coherence/Integration) Computation
-  delta_c:
-    formula: "ΔC = α × Connectivity + β × ClusterFit + γ × Consistency"
-    weights: { α: 0.4, β: 0.4, γ: 0.2 }
-    connectivity:
-      formula: "Connectivity = |{neighbors: sim(e, n) > θ_edge}| / max_edges"
-      θ_edge: 0.7
-      max_edges: 10
-    cluster_fit:
-      formula: "ClusterFit = 1 / (1 + d_centroid / r_cluster)"
-      params: { d_centroid: "Distance to nearest cluster center", r_cluster: "Cluster radius (std from centroid)" }
-    consistency:
-      formula: "Consistency = 1 - max(contradiction_scores)"
-      space_specific:
-        E5_Causal: "Check bidirectional causality (A→B ∧ B→A = contradiction)"
-        E11_Entity: "Check attribute conflicts (e.g., 'Paris is in Germany' vs 'Paris is in France')"
-
-  # Johari Classification
-  johari_classification:
-    formula: |
-      Jᵢ(m) = {
-        Open    if ΔSᵢ ≤ 0.5 ∧ ΔCᵢ > 0.5  — Well-understood
-        Blind   if ΔSᵢ > 0.5 ∧ ΔCᵢ ≤ 0.5  — Discovery opportunity
-        Hidden  if ΔSᵢ ≤ 0.5 ∧ ΔCᵢ ≤ 0.5  — Dormant
-        Unknown if ΔSᵢ > 0.5 ∧ ΔCᵢ > 0.5  — Frontier
-      }
-    confidence: "|ΔSᵢ - 0.5| + |ΔCᵢ - 0.5|"
-
-  # Cross-Space Insights
-  cross_space_insights:
-    open_semantic_blind_causal: { pattern: "Open(E1) ∧ Blind(E5)", insight: "Knows WHAT but not WHY" }
-    blind_semantic_open_code: { pattern: "Blind(E1) ∧ Open(E7)", insight: "Code without context" }
-    unknown_all: { pattern: "Unknown(all)", insight: "True frontier territory" }
-    hidden_all: { pattern: "Hidden(all)", insight: "Dormant/obsolete knowledge" }
-
-
-# ADAPTIVE THRESHOLD CALIBRATION (Self-Learning Thresholds)
-
+# ═══════════════════════════════════════════════════════════════════════
+# ADAPTIVE THRESHOLD CALIBRATION (ATC)
+# ═══════════════════════════════════════════════════════════════════════
 adaptive_thresholds:
-  desc: "NO hardcoded thresholds. All thresholds learned, calibrated, and continuously adapted based on outcomes."
+  rationale: "Different domains/users/drift require different thresholds; per-embedder varies"
 
-  # Why adaptive thresholds
-  rationale:
-    - "Different domains have different optimal thresholds (code vs medical vs creative)"
-    - "User behavior patterns vary (some store frequently, others rarely)"
-    - "Data distributions shift over time (concept drift)"
-    - "Per-embedder characteristics differ (E5 causal behaves differently than E1 semantic)"
+  priors: # [prior, range, adapt_speed]
+    θ_opt: [0.75, "[0.60,0.90]", session]
+    θ_acc: [0.70, "[0.55,0.85]", session]
+    θ_warn: [0.55, "[0.40,0.70]", session]
+    θ_dup: [0.90, "[0.80,0.98]", hourly]
+    θ_edge: [0.70, "[0.50,0.85]", hourly]
+    θ_joh: [0.50, "[0.35,0.65]", per-embedder]
+    θ_kur: [0.80, "[0.65,0.95]", daily]
+    θ_ent_h: [0.70, "[0.55,0.85]", per-query]
+    θ_ent_l: [0.40, "[0.25,0.55]", per-query]
+    θ_gate: [0.80, "[0.65,0.95]", hourly]
 
-  # Threshold Categories & Priors
-  threshold_priors:
-    θ_opt: { prior: 0.75, range: "[0.60, 0.90]", adapt_speed: "slow (session)", desc: "Optimal alignment" }
-    θ_acc: { prior: 0.70, range: "[0.55, 0.85]", adapt_speed: "slow (session)", desc: "Acceptable alignment" }
-    θ_warn: { prior: 0.55, range: "[0.40, 0.70]", adapt_speed: "slow (session)", desc: "Warning alignment" }
-    θ_dup: { prior: 0.90, range: "[0.80, 0.98]", adapt_speed: "medium (hourly)", desc: "Duplicate similarity" }
-    θ_edge: { prior: 0.70, range: "[0.50, 0.85]", adapt_speed: "medium (hourly)", desc: "Edge creation" }
-    θ_joh: { prior: 0.50, range: "[0.35, 0.65]", adapt_speed: "per-embedder", desc: "Johari boundary" }
-    θ_kur: { prior: 0.80, range: "[0.65, 0.95]", adapt_speed: "slow (daily)", desc: "Kuramoto coherence" }
-    θ_ent_h: { prior: 0.70, range: "[0.55, 0.85]", adapt_speed: "fast (per-query)", desc: "Entropy high" }
-    θ_ent_l: { prior: 0.40, range: "[0.25, 0.55]", adapt_speed: "fast (per-query)", desc: "Entropy low" }
-    θ_gate: { prior: 0.80, range: "[0.65, 0.95]", adapt_speed: "medium (hourly)", desc: "Tool gating" }
-
-  # 4-Level Adaptive Architecture
   architecture:
-    level_1_ewma:
-      desc: "EWMA Drift Tracker (f = per-query)"
-      formula: "θ_ewma(t) = α × θ_observed(t) + (1 - α) × θ_ewma(t-1)"
-      α_range: "[0.1, 0.3]"
-      drift_detection: "drift_score = |θ_ewma(t) - θ_baseline| / σ_baseline"
-      triggers:
-        drift_gt_2: "Trigger Level 2 recalibration"
-        drift_gt_3: "Trigger Level 3 exploration"
+    L1_EWMA: { freq: "per-query", formula: "θ_ewma=α×θ_obs+(1-α)×θ_ewma", drift: "|θ-baseline|/σ", triggers: { ">2": L2, ">3": L3 } }
+    L2_Temp: { freq: hourly, formula: "σ(logit(raw)/T)", per_embedder_T: { E1: 1.0, E5: 1.2, E7: 0.9, E9: 1.5, E13: 1.1 }, target: "L_cal<0.05" }
+    L3_Bandit: { freq: session, UCB: "argmax[μ(θ)+c×√(ln(N)/n(θ))]", Thompson: "Beta(α,β)→sample→select→update" }
+    L4_Bayesian: { freq: weekly, surrogate: "GP(μ,K)", acquisition: "EI(θ)=E[max(0,f(θ)-f(θ_best))]" }
 
-    level_2_temperature:
-      desc: "Temperature Scaling (f = hourly)"
-      formula: "calibrated_confidence = σ(logit(raw_confidence) / T)"
-      per_embedder_T:
-        E1_Semantic: { T: 1.0, range: "[0.5, 2.0]", rationale: "Baseline" }
-        E5_Causal: { T: 1.2, range: "[0.8, 2.5]", rationale: "Often overconfident" }
-        E7_Code: { T: 0.9, range: "[0.5, 1.5]", rationale: "Needs precision" }
-        E9_HDC: { T: 1.5, range: "[1.0, 3.0]", rationale: "Holographic = noisy" }
-        E13_SPLADE: { T: 1.1, range: "[0.7, 2.0]", rationale: "Sparse = variable" }
-      attended_scaling: "T(x) = T_base × AttentionNetwork(x)"
-      calibration_loss: "L_cal = (1/N) × Σᵢ (confidenceᵢ - correctᵢ)²"
-      target: "L_calibration < 0.05"
+  domain: { Code: "strict", Medical: "very strict, high causal", Legal: "moderate, high semantic", Creative: "loose, exploration", Research: "balanced, novelty", General: "default priors" }
 
-    level_3_bandit:
-      desc: "Bandit Threshold Selector (f = session)"
-      ucb_formula: "θ_selected = argmax_θ [ μ(θ) + c × √(ln(N) / n(θ)) ]"
-      c_range: "[1.0, 2.0]"
-      thompson_sampling:
-        sample: "For each θ: reward_θ ~ Beta(α_θ, β_θ)"
-        select: "θ with highest sampled reward"
-        update_success: "α_θ += 1"
-        update_failure: "β_θ += 1"
-      budgeted_ucb:
-        formula: "violation_budget(t) = B_0 × exp(-λ × t)"
-        B_0: 100
-        λ: 0.01
-        desc: "Decaying violation tolerance (exploration→exploitation)"
+  calibration: { ECE: "<0.05", MCE: "<0.10", Brier: "<0.10" }
+  alerts: { "ECE>0.10": L2, "MCE>0.20": investigate, "Brier>0.15": L3, "drift>3.0": L4, "stale>24h": force }
+  correction: { minor: "ECE∈[0.05,0.10]→↑EWMA α", moderate: "ECE∈[0.10,0.15]→Thompson+recalibrate", major: "ECE>0.15→reset+Bayesian+human", critical: "ECE>0.25→fallback static+alert" }
 
-    level_4_bayesian:
-      desc: "Bayesian Meta-Optimizer (f = weekly)"
-      surrogate: "P(performance | thresholds) ~ GP(μ, K)"
-      acquisition: "EI(θ) = E[max(0, f(θ) - f(θ_best))]"
-      loop:
-        - "Fit GP to (threshold, performance) observations"
-        - "Maximize EI to select next threshold configuration"
-        - "Evaluate system with new thresholds"
-        - "Update GP with observation"
-        - "Repeat weekly"
-      constrained_ei: "EI_constrained(θ) = EI(θ) × P(θ satisfies constraints)"
-      constraints:
-        - "θ_optimal > θ_acceptable > θ_warning (monotonicity)"
-        - "θ_dup > θ_edge (duplicate stricter than edge)"
-        - "Per-embedder bounds respected"
+# ═══════════════════════════════════════════════════════════════════════
+# NORTH AUTONOMOUS SERVICES (NORTH-008 to NORTH-020)
+# ═══════════════════════════════════════════════════════════════════════
+autonomous_services:
+  foundation: # Types only
+    NORTH-001: { name: bootstrap, types: [BootstrapConfig, SectionWeights, PendingGoal, ConfirmedGoal] }
+    NORTH-002: { name: thresholds, types: [ThresholdConfig, CalibrationLevel, AdaptiveThreshold] }
+    NORTH-003: { name: drift, types: [DriftConfig, DriftEvent, AlignmentHistory] }
+    NORTH-004: { name: curation, types: [PruningConfig, PruneReason, ConsolidationConfig, ConsolidationCandidate] }
+    NORTH-005: { name: evolution, types: [EvolutionConfig, GoalEvolution, SectionEvolution] }
+    NORTH-006: { name: workflow, types: [WorkflowConfig, ScheduledTask, EventTrigger] }
 
-  # Per-Domain Threshold Adaptation
-  domain_thresholds:
-    Code: { desc: "Strict thresholds, low tolerance for false positives" }
-    Medical: { desc: "Very strict, high causal weight" }
-    Legal: { desc: "Moderate, high semantic precision" }
-    Creative: { desc: "Loose thresholds, exploration encouraged" }
-    Research: { desc: "Balanced, novelty valued" }
-    General: { desc: "Default priors" }
-    transfer_learning: "θ_new = α × θ_similar_domain + (1 - α) × θ_general"
+  services: # Active logic
+    NORTH-008_Bootstrap: { ops: [extract_goals, rank_goals, finalize], triggers: [manual, first_run] }
+    NORTH-009_ThresholdLearner: { levels: "L1_EWMA→L2_Temp→L3_Thompson→L4_Bayesian", per_embedder: true, constraint: "θ_opt>θ_acc>θ_warn" }
+    NORTH-010_DriftDetector: { methods: [sliding_window, cusum, ewma_crossover], alerts: { mild: ">1.0", moderate: ">2.0", severe: ">3.0", critical: ">4.0 OR <0.55" } }
+    NORTH-011_DriftCorrector: { strategies: { mild: weight_adjustment, moderate: "goal_refinement OR memory_reweighting", severe: goal_expansion, critical: full_recalibration }, auto: "≤moderate", escalate: "≥severe" }
+    NORTH-012_Pruning: { reasons: [low_alignment_30d, redundant, obsolete, low_access_90d, conflict_resolved], soft_delete: true, recovery: "30 days" }
+    NORTH-013_Consolidation: { strategies: [merge, abstract, link, hierarchy], trigger: "dream OR manual OR curation" }
+    NORTH-014_GapDetection: { types: [coverage:<3, depth:shallow, temporal:stale_90d, balance:uneven], recommendations: [queries, drill-down, refresh, rebalance] }
+    NORTH-015_SubGoalDiscovery: { methods: [HDBSCAN, topic_modeling, frequency, coherence_islands], validation: "coherence>0.7, size>5" }
+    NORTH-016_WeightAdjuster: { triggers: [user_feedback, access_patterns, drift_correction, gap_balancing], constraints: "sum=1.0, min=0.05, max_delta=0.10" }
+    NORTH-017_ObsolescenceDetector: { signals: [temporal_180d, replacement, contradiction_rate, user_disengagement], actions: [deprecate, archive, merge, retire] }
+    NORTH-018_DailyScheduler: { checks: { drift: daily, calibration: hourly, gap: weekly, pruning: weekly, consolidation: dream, health: "6h" }, budget: "GPU<10%, latency<5%", preempt: user_activity }
+    NORTH-019_EventOptimizer: { triggers: [memory_spike_10/min, coherence_drop_20%, alignment_shift_10%, pattern_change, resource_90%], actions: [scale_indexes, rebalance_cache, adjust_thresholds, emergency_consolidation] }
+    NORTH-020_SelfHealing: { monitors: [embedding_pipeline, index_health, storage_health, coherence_health, threshold_health], severities: [Low, Medium, High, Critical], auto_heal: "≤High", escalate: Critical }
 
-  # Calibration Quality Monitoring
-  calibration_metrics:
-    ECE: { formula: "Σ (count_bin / total) × |avg_confidence - avg_accuracy|", target: "< 0.05" }
-    MCE: { formula: "max over bins of |avg_confidence - avg_accuracy|", target: "< 0.10" }
-    Brier: { formula: "(1/N) × Σᵢ (confidenceᵢ - correctᵢ)²", target: "< 0.10" }
+  teleological:
+    TELEO-014_FeedbackLearner: { types: [explicit_rating, implicit_signal, correction, rejection], lr: 0.01 }
+    TELEO-015_ProfileManager: { dims: [domain_weights, threshold_preferences, interaction_patterns], persistence: cross-session }
 
-  # Calibration Alerts
-  alerts:
-    ECE_gt_0.10: "Trigger Level 2 recalibration"
-    MCE_gt_0.20: "Investigate worst bin"
-    Brier_gt_0.15: "Trigger Level 3 exploration"
-    drift_gt_3.0: "Trigger Level 4 meta-optimization"
-    staleness_gt_24h: "Force recalibration"
-
-  # Self-Correction Protocol
-  self_correction:
-    minor: { condition: "ECE ∈ [0.05, 0.10]", action: "Increase EWMA α, faster local adaptation" }
-    moderate: { condition: "ECE ∈ [0.10, 0.15]", actions: ["Trigger Thompson Sampling exploration", "Recalibrate temperatures"] }
-    major: { condition: "ECE > 0.15", actions: ["Reset to domain priors", "Trigger Bayesian meta-optimization", "Log for human review"] }
-    critical: { condition: "ECE > 0.25 OR consistent failures", actions: ["Fallback to conservative static thresholds", "Alert human operator", "Pause automated threshold updates"] }
-
-  # Integration with UTL
-  utl_integration:
-    high_L: "Trust current thresholds, reduce exploration"
-    low_L: "Increase exploration, question thresholds"
-    feedback_loop: "UTL outcome → Threshold observation → Calibration update → Better UTL"
-    borderline_weighting: "Threshold within 0.05 of boundary → Weight outcome more heavily for calibration"
-
-
-# MATHEMATICAL MEMORY FOUNDATIONS
-
+# ═══════════════════════════════════════════════════════════════════════
+# MEMORY MATH FOUNDATIONS
+# ═══════════════════════════════════════════════════════════════════════
 memory_math:
-  desc: "Theoretical foundations for multi-embedding memory storage"
+  hopfield: { formula: "E = -Σᵢ log(Σⱼ exp(xᵢᵀξⱼ))", capacity: "∝ exp(d)", app: "13 parallel networks + Kuramoto sync" }
+  sdm: { address: "2^d possible, ~√(2^d) hard", write: "activate within Hamming r", read: "sum+threshold", noise: ">20% recoverable" }
+  kuramoto: { formula: "dθᵢ/dt = ωᵢ + (K/N)Σⱼ sin(θⱼ-θᵢ)", r: "sync measure", thresholds: { coherent: ">0.8", fragment: "<0.5" } }
 
-  # Modern Hopfield Networks (Per Embedding Space)
-  hopfield:
-    formula: "E = -Σᵢ log(Σⱼ exp(xᵢᵀξⱼ)) per space"
-    capacity: "Exponential in dimension d: C ∝ exp(d)"
-    application: "13 parallel Hopfield networks, one per embedding space"
-    retrieval: "Pattern completion within each space, then Kuramoto sync"
-
-  # Sparse Distributed Memory (Kanerva)
-  sdm:
-    desc: "High-dimensional address space with distributed storage"
-    address_space: "2^d possible addresses, only ~√(2^d) hard locations"
-    write: "Activate locations within Hamming radius r of address"
-    read: "Sum counters at activated locations, threshold"
-    noise_tolerance: ">20% bit flips recoverable"
-
-  # Phase-Coherent Binding (Kuramoto Synchronization)
-  kuramoto:
-    desc: "How 13 representations become one unified memory"
-    formula: "dθᵢ/dt = ωᵢ + (K/N)Σⱼ sin(θⱼ - θᵢ)"
-    coupling: "K = coupling strength between embedding spaces"
-    order_param: "r = (1/N)|Σⱼ exp(iθⱼ)| measures synchronization"
-    sync_threshold: "r > 0.8 → memory is coherent"
-    desync_detection: "r < 0.5 → memory fragmentation alert"
-
-
-# HARDWARE SPECIFICATIONS (RTX 5090 + CUDA 13.1)
-
+# ═══════════════════════════════════════════════════════════════════════
+# HARDWARE (RTX 5090 + CUDA 13.1)
+# ═══════════════════════════════════════════════════════════════════════
 hardware:
-  gpu:
-    name: "RTX 5090"
-    architecture: "Blackwell (GB202)"
-    cuda_cores: 21760
-    tensor_cores: 680
-    tensor_core_gen: 5
-    sms: 170
-    vram: "32GB GDDR7"
-    bandwidth: "1,792 GB/s"
-    l2_cache: "98MB"
-    compute_cap: "12.0"
-
-  cuda:
-    version: "13.1"
-    features:
-      cuda_tile: { benefit: "60-80% kernel dev time reduction, auto tensor core utilization" }
-      green_contexts: { benefit: "Deterministic SM partitioning for real-time inference" }
-      fp4_nvfp4: { benefit: "70% memory reduction, 3x throughput vs FP16" }
-      grouped_gemm: { benefit: "4x speedup for MoE models" }
-
-  precision_strategy:
-    E1_E5_E7_E10: { precision: "FP8 (PQ-8)", rationale: "High-dim, memory bound" }
-    E2_E4_E8_E11: { precision: "Float8", rationale: "Medium precision ok" }
-    E9_HDC: { precision: "Binary", rationale: "Holographic = binary native" }
-    E6_E13: { precision: "Sparse", rationale: "Native sparse format" }
-    E12: { precision: "Token pruning", rationale: "~50% tokens sufficient" }
-
-  green_contexts_gwt:
-    desc: "SM partitioning for GWT real-time consciousness"
-    context_a:
-      sm_allocation: "70%"
-      purpose: "Global Workspace + Kuramoto oscillators"
-      components: ["Real-time consciousness calculation", "Deterministic latency for workspace broadcast"]
-    context_b:
-      sm_allocation: "30%"
-      purpose: "Dream consolidation + Graph gardener"
-      components: ["Background processing", "Non-real-time maintenance"]
+  gpu: { name: "RTX 5090", arch: "Blackwell GB202", cores: 21760, tensor: 680, sms: 170, vram: "32GB GDDR7", bw: "1792 GB/s", l2: "98MB", compute: "12.0" }
+  cuda: { v: "13.1", features: { cuda_tile: "60-80% dev reduction", green_contexts: "SM partitioning", fp4: "70% mem, 3x throughput", grouped_gemm: "4x MoE speedup" } }
+  precision: { "E1,E5,E7,E10": "FP8/PQ-8", "E2-4,E8,E11": Float8, E9: Binary, "E6,E13": Sparse, E12: TokenPruning }
+  green_contexts: { context_a: { sm: "70%", purpose: "GW+Kuramoto real-time" }, context_b: { sm: "30%", purpose: "Dream+Gardener background" } }

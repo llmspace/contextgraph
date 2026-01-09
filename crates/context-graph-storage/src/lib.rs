@@ -9,20 +9,24 @@
 //! - `memex`: Storage trait abstraction (Memex = "memory index")
 //! - `rocksdb_backend`: RocksDB implementation
 //! - `column_families`: Column family definitions per Johari quadrant (12 CFs)
-//! - `teleological`: TeleologicalFingerprint storage extensions (4 CFs)
+//! - `teleological`: TeleologicalFingerprint storage extensions (20 CFs)
 //! - `serialization`: Bincode serialization utilities
 //! - `indexes`: Secondary index operations (tags, temporal, sources)
 //!
-//! # Column Families (16 total)
+//! # Column Families (39 total)
 //!
 //! Base (12): nodes, edges, embeddings, metadata, johari_*, temporal, tags, sources, system
-//! Teleological (4): fingerprints, purpose_vectors, e13_splade_inverted, e1_matryoshka_128
+//! Teleological (20): fingerprints, purpose_vectors, e13_splade_inverted, e1_matryoshka_128,
+//!                    synergy_matrix, teleological_profiles, teleological_vectors, emb_0..emb_12
+//! Autonomous (7): autonomous_config, adaptive_threshold_state, drift_history, goal_activity_metrics,
+//!                 autonomous_lineage, consolidation_history, memory_curation
 //!
 //! # Constitution Reference
 //! - db.dev: sqlite (ghost phase), db.prod: postgres16+
 //! - db.vector: faiss_gpu (separate from RocksDB node storage)
 //! - SEC-06: Soft delete 30-day recovery
 
+pub mod autonomous;
 pub mod column_families;
 pub mod indexes;
 pub mod memex;
@@ -62,13 +66,20 @@ pub use serialization::{
 pub use teleological::{
     // Column family names and functions
     CF_E1_MATRYOSHKA_128, CF_E13_SPLADE_INVERTED, CF_FINGERPRINTS, CF_PURPOSE_VECTORS,
-    TELEOLOGICAL_CFS, get_teleological_cf_descriptors,
+    TELEOLOGICAL_CFS, TELEOLOGICAL_CF_COUNT, get_teleological_cf_descriptors,
     e1_matryoshka_128_cf_options, e13_splade_inverted_cf_options,
     fingerprint_cf_options, purpose_vector_cf_options,
+    // TASK-TELEO-006: New teleological vector column families
+    CF_SYNERGY_MATRIX, CF_TELEOLOGICAL_PROFILES, CF_TELEOLOGICAL_VECTORS,
+    synergy_matrix_cf_options, teleological_profiles_cf_options, teleological_vectors_cf_options,
     // Key format functions
     e13_splade_inverted_key, e1_matryoshka_128_key, fingerprint_key,
     parse_e13_splade_key, parse_fingerprint_key, purpose_vector_key,
     parse_purpose_vector_key, parse_e1_matryoshka_key,
+    // TASK-TELEO-006: New key format functions
+    SYNERGY_MATRIX_KEY,
+    teleological_profile_key, parse_teleological_profile_key,
+    teleological_vector_key, parse_teleological_vector_key,
     // Serialization functions
     serialize_teleological_fingerprint, deserialize_teleological_fingerprint,
     serialize_purpose_vector, deserialize_purpose_vector,
@@ -92,4 +103,27 @@ pub use teleological::{
     // RocksDB teleological store (TASK: test-remediation)
     RocksDbTeleologicalStore, TeleologicalStoreConfig, TeleologicalStoreError,
     TeleologicalStoreResult,
+};
+
+// Re-export autonomous storage types (TASK-NORTH-007)
+pub use autonomous::{
+    // Column family names
+    CF_AUTONOMOUS_CONFIG, CF_ADAPTIVE_THRESHOLD_STATE, CF_DRIFT_HISTORY,
+    CF_GOAL_ACTIVITY_METRICS, CF_AUTONOMOUS_LINEAGE, CF_CONSOLIDATION_HISTORY,
+    CF_MEMORY_CURATION, AUTONOMOUS_CFS, AUTONOMOUS_CF_COUNT,
+    // CF option builders
+    autonomous_config_cf_options, adaptive_threshold_state_cf_options,
+    drift_history_cf_options, goal_activity_metrics_cf_options,
+    autonomous_lineage_cf_options, consolidation_history_cf_options,
+    memory_curation_cf_options,
+    // Descriptor getter
+    get_autonomous_cf_descriptors,
+    // Singleton key constants
+    AUTONOMOUS_CONFIG_KEY, ADAPTIVE_THRESHOLD_STATE_KEY,
+    // Key format functions
+    drift_history_key, drift_history_timestamp_prefix, parse_drift_history_key,
+    goal_activity_metrics_key, parse_goal_activity_metrics_key,
+    autonomous_lineage_key, autonomous_lineage_timestamp_prefix, parse_autonomous_lineage_key,
+    consolidation_history_key, consolidation_history_timestamp_prefix, parse_consolidation_history_key,
+    memory_curation_key, parse_memory_curation_key,
 };
