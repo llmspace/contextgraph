@@ -79,9 +79,126 @@ use context_graph_embeddings::{GpuConfig, ProductionMultiArrayProvider};
 #[cfg(feature = "cuda")]
 use std::path::PathBuf;
 
+// TASK-WARM-LOAD: Warm model cache for GPU embedding tests
+// Prevents OOM by loading models ONCE and sharing across all tests
+#[cfg(feature = "cuda")]
+use tokio::sync::OnceCell;
+
+/// Global warm-loaded model cache.
+///
+/// RTX 5090 32GB VRAM - models should be warm-loaded ONCE and shared.
+/// This prevents CUDA OOM when tests run in parallel, each trying to load
+/// all 13 embedding models (~20GB total) from scratch.
+///
+/// FAIL FAST: If initial load fails, all tests using real embeddings will fail.
+#[cfg(feature = "cuda")]
+static WARM_MODEL_CACHE: OnceCell<Arc<dyn MultiArrayEmbeddingProvider>> = OnceCell::const_new();
+
+/// Get or initialize the warm-loaded embedding provider.
+///
+/// This function ensures models are loaded exactly ONCE into GPU VRAM and
+/// shared across all tests. The Arc allows multiple tests to hold references
+/// to the same provider instance.
+///
+/// # RTX 5090 32GB Configuration
+///
+/// With 32GB VRAM, all 13 embedding models fit comfortably:
+/// - Semantic (384D) + Temporal (3x) + Causal + Code + Graph + HDC + Multimodal
+/// - Entity + LateInteraction + SPLADE + Sparse
+/// - Total ~18-20GB loaded, leaving headroom for activations
+///
+/// # Returns
+///
+/// `Arc<dyn MultiArrayEmbeddingProvider>` - Cloned reference to the cached provider
+///
+/// # Panics
+///
+/// Panics if:
+/// - CUDA GPU not available
+/// - Models directory missing or incomplete
+/// - GPU OOM (should NOT happen with 32GB VRAM)
+#[cfg(feature = "cuda")]
+async fn get_warm_loaded_provider() -> Arc<dyn MultiArrayEmbeddingProvider> {
+    WARM_MODEL_CACHE
+        .get_or_init(|| async {
+            let models_dir = resolve_test_models_path();
+            tracing::info!(
+                "WARM LOAD: Initializing global embedding provider from {:?}",
+                models_dir
+            );
+            tracing::info!("WARM LOAD: This loads 13 models ONCE, shared across all tests");
+
+            let provider = ProductionMultiArrayProvider::new(models_dir.clone(), GpuConfig::default())
+                .await
+                .expect(&format!(
+                    "WARM LOAD FAILED: Could not create ProductionMultiArrayProvider. \
+                     Ensure models exist at {:?} and RTX 5090 GPU is available with CUDA.",
+                    models_dir
+                ));
+
+            tracing::info!("WARM LOAD: All 13 embedding models loaded into VRAM successfully");
+            Arc::new(provider) as Arc<dyn MultiArrayEmbeddingProvider>
+        })
+        .await
+        .clone()
+}
+
 use crate::adapters::UtlProcessorAdapter;
 use crate::handlers::Handlers;
 use crate::protocol::{JsonRpcId, JsonRpcRequest};
+
+// ============================================================================
+// MCP Response Parsing Helpers
+// ============================================================================
+
+/// Extract parsed data from MCP tool response.
+///
+/// MCP tool responses wrap data in: `{ "content": [{ "type": "text", "text": "{...json...}" }] }`
+/// This helper extracts and parses the inner JSON from the text field.
+///
+/// # Arguments
+///
+/// * `result` - The `result` field from JsonRpcResponse
+///
+/// # Returns
+///
+/// Parsed JSON value from content[0].text
+///
+/// # Panics
+///
+/// Panics if:
+/// - result doesn't have `content` array
+/// - content[0] doesn't have `text` field
+/// - text field isn't valid JSON
+pub(crate) fn extract_mcp_tool_data(result: &serde_json::Value) -> serde_json::Value {
+    // Check if this is an error response (MCP format)
+    if let Some(is_error) = result.get("isError").and_then(|v| v.as_bool()) {
+        if is_error {
+            let error_text = result
+                .get("content")
+                .and_then(|v| v.as_array())
+                .and_then(|arr| arr.first())
+                .and_then(|c| c.get("text"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("Unknown error");
+            panic!("MCP tool returned error: {}", error_text);
+        }
+    }
+
+    // Check if result has MCP content wrapper format: { "content": [{ "text": "..." }] }
+    if let Some(content) = result.get("content").and_then(|v| v.as_array()) {
+        // MCP wrapped format - extract from content[0].text
+        let text = content[0]
+            .get("text")
+            .and_then(|v| v.as_str())
+            .expect("content[0] must have text field");
+        serde_json::from_str(text).expect("text field must be valid JSON")
+    } else {
+        // Direct result format - data is already unwrapped
+        // This happens when handler returns data directly via JsonRpcResponse::success
+        result.clone()
+    }
+}
 
 /// Create test handlers with real stub implementations (no mocks).
 ///
@@ -468,18 +585,10 @@ pub(crate) async fn create_test_handlers_with_real_embeddings() -> (Handlers, Te
     // Use real UTL processor adapter for live computation
     let utl_processor: Arc<dyn UtlProcessor> = Arc::new(UtlProcessorAdapter::with_defaults());
 
-    // TASK-P3-01: Use REAL ProductionMultiArrayProvider (GPU-accelerated, 13 embedders)
-    // This requires CUDA GPU and models in ./models directory
-    let models_dir = resolve_test_models_path();
-    let multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider> = Arc::new(
-        ProductionMultiArrayProvider::new(models_dir.clone(), GpuConfig::default())
-            .await
-            .expect(&format!(
-                "Failed to create ProductionMultiArrayProvider. \
-                 Ensure models exist at {:?} and CUDA GPU is available.",
-                models_dir
-            ))
-    );
+    // TASK-WARM-LOAD: Use WARM-LOADED embedding provider from global cache
+    // RTX 5090 32GB - models loaded ONCE, shared across all tests
+    // This prevents CUDA OOM when tests run in parallel
+    let multi_array_provider = get_warm_loaded_provider().await;
 
     let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
         Arc::new(DefaultAlignmentCalculator::new());
@@ -531,17 +640,9 @@ pub(crate) async fn create_test_handlers_with_real_embeddings_store_access() -> 
     // Use real UTL processor adapter
     let utl_processor: Arc<dyn UtlProcessor> = Arc::new(UtlProcessorAdapter::with_defaults());
 
-    // REAL ProductionMultiArrayProvider for FSV
-    let models_dir = resolve_test_models_path();
-    let multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider> = Arc::new(
-        ProductionMultiArrayProvider::new(models_dir.clone(), GpuConfig::default())
-            .await
-            .expect(&format!(
-                "Failed to create ProductionMultiArrayProvider for FSV. \
-                 Ensure models at {:?} and CUDA GPU available.",
-                models_dir
-            ))
-    );
+    // TASK-WARM-LOAD: Use WARM-LOADED embedding provider from global cache
+    // RTX 5090 32GB - models loaded ONCE, shared across all tests
+    let multi_array_provider = get_warm_loaded_provider().await;
 
     let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
         Arc::new(DefaultAlignmentCalculator::new());
@@ -597,4 +698,193 @@ pub(crate) fn make_request(
         method: method.to_string(),
         params,
     }
+}
+
+// ============================================================================
+// TASK-GWT-WARM: Warm-Started GWT Test Helpers (Non-Zero Values)
+// ============================================================================
+
+use parking_lot::RwLock as ParkingRwLock;
+use tokio::sync::RwLock as TokioRwLock;
+
+use context_graph_core::johari::{DynDefaultJohariManager, JohariTransitionManager};
+use context_graph_core::monitoring::{StubLayerStatusProvider, StubSystemMonitor};
+use context_graph_core::{LayerStatusProvider, SystemMonitor};
+
+use crate::handlers::core::MetaUtlTracker;
+use crate::handlers::gwt_providers::{
+    GwtSystemProviderImpl, KuramotoProviderImpl, MetaCognitiveProviderImpl,
+    SelfEgoProviderImpl, WorkspaceProviderImpl,
+};
+use crate::handlers::gwt_traits::{
+    GwtSystemProvider, KuramotoProvider, MetaCognitiveProvider,
+    SelfEgoProvider, WorkspaceProvider,
+};
+
+/// Create test handlers with WARM GWT state (synchronized Kuramoto, non-zero purpose vector).
+///
+/// This helper creates handlers with GWT components in a "warm" state:
+/// - Kuramoto network SYNCHRONIZED (r ≈ 1.0, state = CONSCIOUS)
+/// - Purpose vector with non-zero values (aligned to North Star)
+/// - All other GWT components at default/initial state
+///
+/// # Use Case
+///
+/// Use this helper when testing GWT tools that should return meaningful non-zero values.
+/// For example, `get_kuramoto_sync` should return r ≈ 1.0 instead of r ≈ 0.0.
+///
+/// # Returns
+///
+/// `Handlers` - Handlers instance with warm GWT state
+///
+/// # Example
+///
+/// ```ignore
+/// #[tokio::test]
+/// async fn test_gwt_returns_non_zero_values() {
+///     let handlers = create_test_handlers_with_warm_gwt();
+///
+///     // Kuramoto should return high r value
+///     let response = handlers.dispatch(kuramoto_request).await;
+///     let r = response.result["r"].as_f64().unwrap();
+///     assert!(r > 0.9, "Kuramoto r should be ≈ 1 for synchronized network");
+/// }
+/// ```
+pub(crate) fn create_test_handlers_with_warm_gwt() -> Handlers {
+    let store = Arc::new(InMemoryTeleologicalStore::new());
+    let teleological_store: Arc<dyn TeleologicalMemoryStore> = store.clone();
+    let utl_processor: Arc<dyn UtlProcessor> = Arc::new(StubUtlProcessor::new());
+    let multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider> =
+        Arc::new(StubMultiArrayProvider::new());
+    let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
+        Arc::new(DefaultAlignmentCalculator::new());
+    let goal_hierarchy = Arc::new(ParkingRwLock::new(create_test_hierarchy()));
+    let johari_manager: Arc<dyn JohariTransitionManager> =
+        Arc::new(DynDefaultJohariManager::new(store));
+    let meta_utl_tracker = Arc::new(ParkingRwLock::new(MetaUtlTracker::new()));
+    let system_monitor: Arc<dyn SystemMonitor> = Arc::new(StubSystemMonitor);
+    let layer_status_provider: Arc<dyn LayerStatusProvider> =
+        Arc::new(StubLayerStatusProvider);
+
+    // WARM STATE: Create synchronized Kuramoto network (r ≈ 1.0)
+    let kuramoto_network: Arc<ParkingRwLock<dyn KuramotoProvider>> =
+        Arc::new(ParkingRwLock::new(KuramotoProviderImpl::synchronized()));
+
+    let gwt_system: Arc<dyn GwtSystemProvider> =
+        Arc::new(GwtSystemProviderImpl::new());
+    let workspace_provider: Arc<TokioRwLock<dyn WorkspaceProvider>> =
+        Arc::new(TokioRwLock::new(WorkspaceProviderImpl::new()));
+    let meta_cognitive: Arc<TokioRwLock<dyn MetaCognitiveProvider>> =
+        Arc::new(TokioRwLock::new(MetaCognitiveProviderImpl::new()));
+
+    // WARM STATE: Create purpose vector with non-zero values (aligned to North Star)
+    // Using values based on embedder natural frequencies for realistic distribution
+    let warm_purpose_vector: [f32; 13] = [
+        0.85, // E1: Semantic - high alignment
+        0.72, // E2: Temporal (recent)
+        0.68, // E3: Temporal (medium)
+        0.65, // E4: Temporal (long)
+        0.78, // E5: Causal
+        0.55, // E6: Sparse (SPLADE)
+        0.82, // E7: Code
+        0.71, // E8: Graph
+        0.63, // E9: HDC
+        0.59, // E10: Multimodal
+        0.76, // E11: Entity
+        0.69, // E12: Late-interaction
+        0.52, // E13: SPLADE auxiliary
+    ];
+    let self_ego: Arc<TokioRwLock<dyn SelfEgoProvider>> =
+        Arc::new(TokioRwLock::new(SelfEgoProviderImpl::with_purpose_vector(warm_purpose_vector)));
+
+    Handlers::with_gwt(
+        teleological_store,
+        utl_processor,
+        multi_array_provider,
+        alignment_calculator,
+        goal_hierarchy,
+        johari_manager,
+        meta_utl_tracker,
+        system_monitor,
+        layer_status_provider,
+        kuramoto_network,
+        gwt_system,
+        workspace_provider,
+        meta_cognitive,
+        self_ego,
+    )
+}
+
+/// Create test handlers with WARM GWT state and RocksDB storage.
+///
+/// Same as `create_test_handlers_with_warm_gwt()` but uses real RocksDB storage
+/// for integration testing with persistent data.
+///
+/// # Returns
+///
+/// `(Handlers, TempDir)` - Handlers with warm GWT and TempDir owning the database
+pub(crate) async fn create_test_handlers_with_warm_gwt_rocksdb() -> (Handlers, TempDir) {
+    let tempdir = TempDir::new().expect("Failed to create temp directory");
+    let db_path = tempdir.path().join("test_warm_gwt_rocksdb");
+
+    let rocksdb_store = RocksDbTeleologicalStore::open(&db_path)
+        .expect("Failed to open RocksDbTeleologicalStore");
+    rocksdb_store
+        .initialize_hnsw()
+        .await
+        .expect("Failed to initialize HNSW indexes");
+
+    // Create in-memory store for Johari manager (separate from RocksDB)
+    let johari_store = Arc::new(InMemoryTeleologicalStore::new());
+
+    let teleological_store: Arc<dyn TeleologicalMemoryStore> = Arc::new(rocksdb_store);
+    let utl_processor: Arc<dyn UtlProcessor> = Arc::new(UtlProcessorAdapter::with_defaults());
+    let multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider> =
+        Arc::new(StubMultiArrayProvider::new());
+    let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
+        Arc::new(DefaultAlignmentCalculator::new());
+    let goal_hierarchy = Arc::new(ParkingRwLock::new(create_test_hierarchy()));
+    let johari_manager: Arc<dyn JohariTransitionManager> =
+        Arc::new(DynDefaultJohariManager::new(johari_store));
+    let meta_utl_tracker = Arc::new(ParkingRwLock::new(MetaUtlTracker::new()));
+    let system_monitor: Arc<dyn SystemMonitor> = Arc::new(StubSystemMonitor);
+    let layer_status_provider: Arc<dyn LayerStatusProvider> =
+        Arc::new(StubLayerStatusProvider);
+
+    // WARM STATE: Synchronized Kuramoto network
+    let kuramoto_network: Arc<ParkingRwLock<dyn KuramotoProvider>> =
+        Arc::new(ParkingRwLock::new(KuramotoProviderImpl::synchronized()));
+
+    let gwt_system: Arc<dyn GwtSystemProvider> =
+        Arc::new(GwtSystemProviderImpl::new());
+    let workspace_provider: Arc<TokioRwLock<dyn WorkspaceProvider>> =
+        Arc::new(TokioRwLock::new(WorkspaceProviderImpl::new()));
+    let meta_cognitive: Arc<TokioRwLock<dyn MetaCognitiveProvider>> =
+        Arc::new(TokioRwLock::new(MetaCognitiveProviderImpl::new()));
+
+    // WARM STATE: Non-zero purpose vector
+    let warm_purpose_vector: [f32; 13] = [
+        0.85, 0.72, 0.68, 0.65, 0.78, 0.55, 0.82, 0.71, 0.63, 0.59, 0.76, 0.69, 0.52,
+    ];
+    let self_ego: Arc<TokioRwLock<dyn SelfEgoProvider>> =
+        Arc::new(TokioRwLock::new(SelfEgoProviderImpl::with_purpose_vector(warm_purpose_vector)));
+
+    let handlers = Handlers::with_gwt(
+        teleological_store,
+        utl_processor,
+        multi_array_provider,
+        alignment_calculator,
+        goal_hierarchy,
+        johari_manager,
+        meta_utl_tracker,
+        system_monitor,
+        layer_status_provider,
+        kuramoto_network,
+        gwt_system,
+        workspace_provider,
+        meta_cognitive,
+        self_ego,
+    );
+
+    (handlers, tempdir)
 }

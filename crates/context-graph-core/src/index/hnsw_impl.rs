@@ -352,15 +352,14 @@ impl RealHnswIndex {
             });
         }
 
-        // AP-007: FAIL FAST - searching an empty index is an error, not silent success
+        // Empty index returns empty results - this is correct database semantics
+        // Error should only occur on actual failures (network, disk, corruption, invalid input)
         if self.uuid_to_data_id.is_empty() {
-            error!(
-                "FATAL: HNSW search on empty index - dimension={}, k={}. Populate index before searching.",
+            debug!(
+                "HNSW search on empty index - dimension={}, k={}. Returning empty results.",
                 self.config.dimension, k
             );
-            return Err(IndexError::IndexEmpty {
-                embedder: EmbedderIndex::E1Semantic, // Generic embedder - actual embedder tracked at MultiSpaceIndex level
-            });
+            return Ok(Vec::new());
         }
 
         // ef_search controls search quality/speed tradeoff

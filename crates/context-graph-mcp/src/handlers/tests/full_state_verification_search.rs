@@ -190,7 +190,7 @@ async fn test_full_state_verification_store_search_delete_cycle() {
 
     // Verify our fingerprint was found
     let found_in_search = results.iter().any(|r| {
-        r.get("id").and_then(|v| v.as_str()) == Some(fingerprint_id_str)
+        r.get("fingerprintId").and_then(|v| v.as_str()) == Some(fingerprint_id_str)
     });
     assert!(found_in_search, "Stored fingerprint must appear in search results");
     println!("   ✓ VERIFIED: Stored fingerprint found in search results\n");
@@ -202,7 +202,7 @@ async fn test_full_state_verification_store_search_delete_cycle() {
 
     // Get the search result for our fingerprint
     let search_fp = results.iter()
-        .find(|r| r.get("id").and_then(|v| v.as_str()) == Some(fingerprint_id_str))
+        .find(|r| r.get("fingerprintId").and_then(|v| v.as_str()) == Some(fingerprint_id_str))
         .expect("Must find our fingerprint in results");
 
     let search_similarity = search_fp.get("aggregate_similarity").and_then(|v| v.as_f64()).unwrap_or(0.0);

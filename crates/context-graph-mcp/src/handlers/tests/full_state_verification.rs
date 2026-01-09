@@ -30,7 +30,7 @@ use crate::handlers::Handlers;
 use crate::protocol::{JsonRpcId, JsonRpcRequest};
 
 // Import shared test helpers for RocksDB integration tests
-use super::{create_test_handlers_with_rocksdb_store_access, create_test_hierarchy};
+use super::{create_test_handlers_with_rocksdb_store_access, create_test_hierarchy, extract_mcp_tool_data};
 
 /// Create test handlers AND return direct access to the store for verification.
 ///
@@ -1097,8 +1097,9 @@ mod real_embedding_fsv_tests {
         assert!(response.error.is_none(), "Store must succeed");
 
         let result = response.result.expect("Must have result");
-        let fingerprint_id = result.get("fingerprint_id")
-            .or_else(|| result.get("fingerprintId"))
+        let data = extract_mcp_tool_data(&result);
+        let fingerprint_id = data.get("fingerprint_id")
+            .or_else(|| data.get("fingerprintId"))
             .and_then(|v| v.as_str())
             .expect("Must have fingerprint ID");
 
@@ -1113,16 +1114,21 @@ mod real_embedding_fsv_tests {
         assert!(response.error.is_none(), "Retrieve must succeed");
 
         let result = response.result.expect("Must have result");
+        let data = extract_mcp_tool_data(&result);
 
-        // Verify retrieved ID matches
-        let retrieved_id = result.get("fingerprintId")
+        // Verify retrieved ID matches (response has fingerprint.id, not fingerprintId)
+        let retrieved_id = data.get("fingerprint")
+            .and_then(|fp| fp.get("id"))
             .and_then(|v| v.as_str())
-            .expect("Must have fingerprintId");
+            .expect("Must have fingerprint.id");
         assert_eq!(retrieved_id, fingerprint_id, "Retrieved ID must match stored ID");
         println!("[FSV] Retrieved fingerprint ID matches ✓");
 
-        // Verify content hash exists (proves data persisted)
-        if let Some(hash) = result.get("content_hash").and_then(|v| v.as_str()) {
+        // Verify content hash exists (proves data persisted) - it's in fingerprint.contentHashHex
+        if let Some(hash) = data.get("fingerprint")
+            .and_then(|fp| fp.get("contentHashHex"))
+            .and_then(|v| v.as_str())
+        {
             println!("[FSV] Content hash: {}... ✓", &hash[..16.min(hash.len())]);
         }
 

@@ -386,7 +386,7 @@ async fn test_fsv_complete_memory_lifecycle() {
 
     // Verify our fingerprint was found
     let found_in_search = results.iter().any(|r| {
-        r.get("id").and_then(|v| v.as_str()) == Some(fingerprint_id_str)
+        r.get("fingerprintId").and_then(|v| v.as_str()) == Some(fingerprint_id_str)
     });
     assert!(found_in_search, "Stored fingerprint MUST appear in search results");
     println!("   ✓ VERIFIED: Fingerprint found in search results\n");
@@ -1231,7 +1231,7 @@ async fn test_fsv_cross_handler_integration() {
     let search_result = search_response.result.unwrap();
     let results = search_result["results"].as_array().unwrap();
     let found = results.iter().any(|r| {
-        r.get("id").and_then(|v| v.as_str()) == Some(&fingerprint_id)
+        r.get("fingerprintId").and_then(|v| v.as_str()) == Some(&fingerprint_id)
     });
     assert!(found, "Stored fingerprint MUST be found in search");
     println!("   - Found fingerprint in search: {}", found);
@@ -1555,7 +1555,7 @@ async fn test_edge_case_goal_not_found() {
 #[cfg(feature = "cuda")]
 mod real_embedding_integration_tests {
     use super::*;
-    use crate::handlers::tests::create_test_handlers_with_real_embeddings;
+    use crate::handlers::tests::{create_test_handlers_with_real_embeddings, extract_mcp_tool_data};
     use std::time::Instant;
 
     /// FSV: Complete memory lifecycle with REAL GPU embeddings.
@@ -1584,19 +1584,21 @@ mod real_embedding_integration_tests {
 
         assert!(store_response.error.is_none(), "Store should succeed with real embeddings");
         let store_result = store_response.result.expect("Should have result");
-        let fingerprint_id = store_result.get("fingerprint_id")
+        let store_data = extract_mcp_tool_data(&store_result);
+        let fingerprint_id = store_data.get("fingerprintId")
+            .or_else(|| store_data.get("fingerprint_id"))
             .and_then(|v| v.as_str())
             .expect("Should have fingerprint_id");
         println!("✓ Stored fingerprint: {}", fingerprint_id);
 
         // Verify store result has embedding count (13 embeddings)
-        if let Some(emb_count) = store_result.get("embedding_count").and_then(|v| v.as_u64()) {
+        if let Some(emb_count) = store_data.get("embedderCount").and_then(|v| v.as_u64()) {
             assert_eq!(emb_count, 13, "Should have 13 embeddings");
             println!("✓ Fingerprint has {} embeddings", emb_count);
         }
 
         // Verify purpose vector is returned and has 13 dimensions
-        if let Some(pv) = store_result.get("purpose_vector").and_then(|v| v.as_array()) {
+        if let Some(pv) = store_data.get("purpose_vector").and_then(|v| v.as_array()) {
             assert_eq!(pv.len(), 13, "Purpose vector should be 13D");
             println!("✓ Purpose vector has {} dimensions", pv.len());
 
@@ -1619,10 +1621,12 @@ mod real_embedding_integration_tests {
         let retrieve_response = handlers.dispatch(retrieve_request).await;
         assert!(retrieve_response.error.is_none(), "Retrieve should succeed");
         let retrieve_result = retrieve_response.result.expect("Should have result");
+        let retrieve_data = extract_mcp_tool_data(&retrieve_result);
 
-        let retrieved_id = retrieve_result.get("fingerprintId")
+        let retrieved_id = retrieve_data.get("fingerprint")
+            .and_then(|fp| fp.get("id"))
             .and_then(|v| v.as_str())
-            .expect("Should have fingerprintId");
+            .expect("Should have fingerprint.id");
         assert_eq!(retrieved_id, fingerprint_id, "Retrieved ID should match stored ID");
         println!("✓ Retrieved fingerprint matches stored");
 
@@ -1777,12 +1781,14 @@ mod real_embedding_integration_tests {
         assert!(response.error.is_none(), "Store should succeed");
 
         let result = response.result.expect("Should have result");
-        let _fingerprint_id = result.get("fingerprint_id")
+        let data = extract_mcp_tool_data(&result);
+        let _fingerprint_id = data.get("fingerprintId")
+            .or_else(|| data.get("fingerprint_id"))
             .and_then(|v| v.as_str())
             .expect("Should have fingerprint_id");
 
         // Verify purpose vector from store response
-        if let Some(pv) = result.get("purpose_vector").and_then(|v| v.as_array()) {
+        if let Some(pv) = data.get("purpose_vector").and_then(|v| v.as_array()) {
             assert_eq!(pv.len(), 13, "Purpose vector must be 13D");
 
             println!("Purpose vector dimensions:");
@@ -1852,18 +1858,20 @@ mod real_embedding_integration_tests {
         assert!(response.error.is_none(), "Store should succeed");
 
         let result = response.result.expect("Should have result");
-        let _fingerprint_id = result.get("fingerprint_id")
+        let data = extract_mcp_tool_data(&result);
+        let _fingerprint_id = data.get("fingerprintId")
+            .or_else(|| data.get("fingerprint_id"))
             .and_then(|v| v.as_str())
             .expect("Should have fingerprint_id");
 
         // Verify embedding count from store response
-        if let Some(emb_count) = result.get("embedding_count").and_then(|v| v.as_u64()) {
+        if let Some(emb_count) = data.get("embedderCount").and_then(|v| v.as_u64()) {
             assert_eq!(emb_count, 13, "Must have exactly 13 embeddings");
             println!("✓ Store returned {} embeddings", emb_count);
         }
 
         println!("\nVerifying all 13 embedding spaces via single-space search:");
-        let space_names = [
+        let _space_names = [
             "E1:Semantic", "E2:TempCyclic", "E3:TempDecay", "E4:TempCtx",
             "E5:Causal", "E6:Sparse(SPLADE)", "E7:Code", "E8:Graph", "E9:HDC",
             "E10:Multimodal", "E11:Entity", "E12:LateInteract(ColBERT)", "E13:Sparse2"

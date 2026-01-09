@@ -54,8 +54,8 @@ pub enum IndexError {
 
     /// Index is empty - no vectors have been added.
     ///
-    /// AP-007: FAIL FAST - searching an empty index is an error, not silent success.
-    /// Populate the index before searching, or check `count() > 0` first.
+    /// NOTE: Searching an empty index now returns empty results (correct database semantics).
+    /// This error type is retained for legacy compatibility but should not be returned by search.
     #[error("INDEX ERROR: Index for {embedder:?} is empty - populate before searching")]
     IndexEmpty {
         /// The empty embedder index

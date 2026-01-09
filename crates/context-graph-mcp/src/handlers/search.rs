@@ -298,7 +298,7 @@ impl Handlers {
                     .iter()
                     .map(|r| {
                         let mut result = json!({
-                            "id": r.fingerprint.id.to_string(),
+                            "fingerprintId": r.fingerprint.id.to_string(),
                             "aggregate_similarity": r.similarity,
                         });
 
@@ -560,7 +560,7 @@ impl Handlers {
                     .iter()
                     .map(|r| {
                         json!({
-                            "id": r.fingerprint.id.to_string(),
+                            "fingerprintId": r.fingerprint.id.to_string(),
                             "similarity": r.embedder_scores[space_index],
                             "aggregate_similarity": r.similarity,
                             "space_score": r.embedder_scores[space_index]
@@ -725,7 +725,7 @@ impl Handlers {
                     .iter()
                     .map(|r| {
                         json!({
-                            "id": r.fingerprint.id.to_string(),
+                            "fingerprintId": r.fingerprint.id.to_string(),
                             "purpose_alignment": r.purpose_alignment,
                             "theta_to_north_star": r.fingerprint.theta_to_north_star,
                             "purpose_vector": r.fingerprint.purpose_vector.alignments.to_vec(),

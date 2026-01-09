@@ -664,7 +664,7 @@ async fn test_search_by_purpose_result_structure() {
     if let Some(results) = results {
         if !results.is_empty() {
             let first = &results[0];
-            assert!(first.get("id").is_some(), "Result should have id");
+            assert!(first.get("fingerprintId").is_some(), "Result should have fingerprintId");
             assert!(
                 first.get("purpose_alignment").is_some(),
                 "Result should have purpose_alignment"
@@ -1189,7 +1189,7 @@ async fn test_rocksdb_integration_search_multi() {
     // Verify per-embedder scores in first result
     if !results.is_empty() {
         let first = &results[0];
-        assert!(first.get("id").is_some(), "Result must have id");
+        assert!(first.get("fingerprintId").is_some(), "Result must have fingerprintId");
         assert!(first.get("aggregate_similarity").is_some(), "Result must have aggregate_similarity");
         assert!(first.get("per_embedder_scores").is_some(), "Result must have per_embedder_scores");
         assert!(first.get("top_contributing_spaces").is_some(), "Result must have top_contributing_spaces");
@@ -1498,7 +1498,7 @@ async fn test_rocksdb_integration_search_error_handling() {
 #[cfg(feature = "cuda")]
 mod real_embedding_tests {
     use super::*;
-    use crate::handlers::tests::create_test_handlers_with_real_embeddings;
+    use crate::handlers::tests::{create_test_handlers_with_real_embeddings, extract_mcp_tool_data};
     use std::time::Instant;
 
     /// FSV: Verify search/multi with REAL GPU embeddings returns semantically relevant results.
@@ -1533,7 +1533,11 @@ mod real_embedding_tests {
             assert!(response.error.is_none(), "Store {} should succeed", i);
 
             if let Some(result) = response.result {
-                if let Some(id) = result.get("fingerprint_id").and_then(|v| v.as_str()) {
+                let data = extract_mcp_tool_data(&result);
+                if let Some(id) = data.get("fingerprintId")
+                    .or_else(|| data.get("fingerprint_id"))
+                    .and_then(|v| v.as_str())
+                {
                     stored_ids.push(id.to_string());
                 }
             }
