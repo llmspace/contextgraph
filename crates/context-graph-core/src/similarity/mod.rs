@@ -51,6 +51,7 @@ mod explanation;
 mod multi_utl;
 mod result;
 mod sparse;
+mod token_level;
 
 #[cfg(test)]
 mod tests;
@@ -74,4 +75,9 @@ pub use result::CrossSpaceSimilarity;
 pub use sparse::{
     bm25_score, jaccard_similarity, sparse_cosine_similarity, sparse_dot_product, sparse_l2_norm,
     Bm25Config, SparseSimilarityError,
+};
+
+// Token-level similarity functions for E12 (ColBERT MaxSim) embeddings
+pub use token_level::{
+    approximate_max_sim, max_sim, symmetric_max_sim, token_alignments, TokenAlignment,
 };

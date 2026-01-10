@@ -1,10 +1,10 @@
 # TASK-LOGIC-003: Token-Level Similarity
 
 ```xml
-<task_spec id="TASK-LOGIC-003" version="1.0">
+<task_spec id="TASK-LOGIC-003" version="2.1">
 <metadata>
   <title>Implement Token-Level Similarity Functions (ColBERT MaxSim)</title>
-  <status>todo</status>
+  <status>done</status>
   <layer>logic</layer>
   <sequence>13</sequence>
   <implements>
@@ -12,294 +12,191 @@
   </implements>
   <depends_on>
     <task_ref>TASK-CORE-003</task_ref>
+    <task_ref>TASK-LOGIC-001</task_ref>
   </depends_on>
   <estimated_complexity>medium</estimated_complexity>
-  <estimated_days>1.5</estimated_days>
+  <completed_date>2026-01-09</completed_date>
+  <verification>137 similarity tests pass including 12 token_level tests</verification>
 </metadata>
 
 <context>
 Late interaction embeddings (E12) use ColBERT-style token-level representations.
 Each token has its own 128D embedding, and similarity is computed via MaxSim:
 for each query token, find the maximum similarity to any document token.
+
+From constitution.yaml:
+- E12_LateInteraction: dim=128D/token, math=ColBERT_MaxSim
+- Stage 5 retrieval: <15ms for 50→10 candidates using MaxSim
+- Formula: score = (1/|Q|) × Σᵢ max_j cos(q_i, d_j)
 </context>
 
 <objective>
-Implement MaxSim and symmetric MaxSim functions for token-level embeddings,
-enabling precision matching for the late interaction embedder.
+Implement MaxSim and symmetric MaxSim functions for token-level embeddings in
+context-graph-core, enabling precision matching for Stage 5 of the 5-stage retrieval pipeline.
 </objective>
 
-<rationale>
-MaxSim provides:
-1. Token-level precision: Exact term matching preserved
-2. Contextual matching: Embeddings capture token context
-3. Efficiency: Can be approximated with inverted indices
-4. Interpretability: Know which tokens matched
+<source_of_truth>
+  <!-- VERIFIED against actual codebase on 2026-01-09 -->
+  <verified_files>
+    <file path="crates/context-graph-core/src/similarity/mod.rs" status="exists">
+      Similarity module - exports token_level submodule and all public functions
+    </file>
+    <file path="crates/context-graph-core/src/similarity/dense.rs" status="exists">
+      Contains cosine_similarity function (used internally by token_level)
+    </file>
+    <file path="crates/context-graph-core/src/similarity/token_level.rs" status="exists">
+      IMPLEMENTED: MaxSim, symmetric_max_sim, approximate_max_sim, token_alignments
+    </file>
+    <file path="crates/context-graph-core/src/types/fingerprint/mod.rs" status="exists">
+      Re-exports E12_TOKEN_DIM from semantic module
+    </file>
+    <file path="crates/context-graph-core/src/types/fingerprint/semantic/constants.rs" status="exists">
+      E12_TOKEN_DIM = 128 (canonical definition)
+    </file>
+  </verified_files>
 
-ColBERT's late interaction is crucial for precision-critical retrieval.
-</rationale>
+  <correct_import_path>
+    <!-- Use the public re-export, NOT the internal path -->
+    use crate::types::fingerprint::E12_TOKEN_DIM;
 
-<input_context_files>
-  <file purpose="token_embeddings">crates/context-graph-core/src/teleology/array.rs</file>
-  <file purpose="dense_similarity">crates/context-graph-core/src/teleology/similarity/dense.rs</file>
-</input_context_files>
+    <!-- NOT: use crate::types::fingerprint::semantic::constants::E12_TOKEN_DIM; -->
+    <!-- The semantic module is private; constants are re-exported through fingerprint/mod.rs -->
+  </correct_import_path>
 
-<prerequisites>
-  <check>TASK-CORE-003 complete (TokenEmbeddings type exists)</check>
-  <check>TASK-LOGIC-001 complete (dense cosine similarity exists)</check>
-</prerequisites>
+  <actual_data_type>
+    <!-- The E12 late-interaction field in SemanticFingerprint -->
+    pub e12_late_interaction: Vec&lt;Vec&lt;f32&gt;&gt;  <!-- [num_tokens][128] -->
 
-<scope>
-  <in_scope>
-    <item>Implement max_sim function</item>
-    <item>Implement symmetric_max_sim function</item>
-    <item>Implement approximate_max_sim with early termination</item>
-    <item>Add token alignment analysis</item>
-    <item>Add unit tests</item>
-  </in_scope>
-  <out_of_scope>
-    <item>Dense similarity (TASK-LOGIC-001)</item>
-    <item>Sparse similarity (TASK-LOGIC-002)</item>
-    <item>Index for approximate search</item>
-  </out_of_scope>
-</scope>
+    <!-- Each inner Vec is a 128D embedding for one token -->
+  </actual_data_type>
 
-<definition_of_done>
-  <signatures>
-    <signature file="crates/context-graph-core/src/teleology/similarity/token_level.rs">
-      use crate::teleology::array::TokenEmbeddings;
+  <dimension_constant>
+    E12_TOKEN_DIM: usize = 128  <!-- Publicly exported via types::fingerprint -->
+  </dimension_constant>
+</source_of_truth>
 
-      /// Calculate MaxSim score: sum of max similarities per query token.
-      /// For each query token, finds the maximum cosine similarity to any doc token.
-      pub fn max_sim(query: &TokenEmbeddings, document: &TokenEmbeddings) -> f32;
-
-      /// Calculate symmetric MaxSim: average of both directions.
-      pub fn symmetric_max_sim(a: &TokenEmbeddings, b: &TokenEmbeddings) -> f32;
-
-      /// Calculate MaxSim with early termination for approximate matching.
-      pub fn approximate_max_sim(
-          query: &TokenEmbeddings,
-          document: &TokenEmbeddings,
-          min_score_threshold: f32,
-      ) -> f32;
-
-      /// Result of token alignment analysis.
-      #[derive(Debug, Clone)]
-      pub struct TokenAlignment {
-          pub query_token_idx: usize,
-          pub doc_token_idx: usize,
-          pub similarity: f32,
-      }
-
-      /// Get detailed token alignments for interpretability.
-      pub fn token_alignments(
-          query: &TokenEmbeddings,
-          document: &TokenEmbeddings,
-      ) -> Vec<TokenAlignment>;
-    </signature>
-  </signatures>
-
-  <constraints>
-    <constraint>MaxSim score normalized to [0, 1] range</constraint>
-    <constraint>Handles empty token sequences (return 0.0)</constraint>
-    <constraint>Token embeddings must have same dimensionality</constraint>
-    <constraint>Approximate version within 5% of exact</constraint>
-  </constraints>
-
-  <verification>
-    <command>cargo test -p context-graph-core similarity::token_level</command>
-  </verification>
-</definition_of_done>
-
-<pseudo_code>
-// crates/context-graph-core/src/teleology/similarity/token_level.rs
-
-use crate::teleology::array::TokenEmbeddings;
-use crate::teleology::similarity::dense::cosine_similarity;
-
-/// Calculate MaxSim score between query and document token embeddings.
-/// Score = (1/|Q|) * sum over q in Q of max over d in D of cos(q, d)
-pub fn max_sim(query: &TokenEmbeddings, document: &TokenEmbeddings) -> f32 {
-    if query.embeddings.is_empty() || document.embeddings.is_empty() {
-        return 0.0;
-    }
-
-    let mut total_max_sim = 0.0f32;
-
-    for q_token in &query.embeddings {
-        let mut max_sim_for_token = f32::NEG_INFINITY;
-
-        for d_token in &document.embeddings {
-            if let Ok(sim) = cosine_similarity(q_token, d_token) {
-                if sim > max_sim_for_token {
-                    max_sim_for_token = sim;
-                }
-            }
-        }
-
-        if max_sim_for_token > f32::NEG_INFINITY {
-            total_max_sim += max_sim_for_token;
-        }
-    }
-
-    // Normalize by query length
-    total_max_sim / query.embeddings.len() as f32
-}
-
-/// Symmetric MaxSim: average of MaxSim(A, B) and MaxSim(B, A).
-/// Useful when neither is clearly the "query".
-pub fn symmetric_max_sim(a: &TokenEmbeddings, b: &TokenEmbeddings) -> f32 {
-    let ab = max_sim(a, b);
-    let ba = max_sim(b, a);
-    (ab + ba) / 2.0
-}
-
-/// Approximate MaxSim with early termination.
-/// Stops processing a query token once threshold is exceeded.
-pub fn approximate_max_sim(
-    query: &TokenEmbeddings,
-    document: &TokenEmbeddings,
-    min_score_threshold: f32,
-) -> f32 {
-    if query.embeddings.is_empty() || document.embeddings.is_empty() {
-        return 0.0;
-    }
-
-    let mut total = 0.0f32;
-
-    for q_token in &query.embeddings {
-        let mut max_sim = f32::NEG_INFINITY;
-
-        for d_token in &document.embeddings {
-            if let Ok(sim) = cosine_similarity(q_token, d_token) {
-                if sim > max_sim {
-                    max_sim = sim;
-                    // Early termination if we've exceeded threshold
-                    if max_sim >= min_score_threshold {
-                        break;
-                    }
-                }
-            }
-        }
-
-        if max_sim > f32::NEG_INFINITY {
-            total += max_sim;
-        }
-    }
-
-    total / query.embeddings.len() as f32
-}
-
-#[derive(Debug, Clone)]
-pub struct TokenAlignment {
-    pub query_token_idx: usize,
-    pub doc_token_idx: usize,
-    pub similarity: f32,
-}
-
-/// Get detailed token alignments for interpretability.
-pub fn token_alignments(
-    query: &TokenEmbeddings,
-    document: &TokenEmbeddings,
-) -> Vec<TokenAlignment> {
-    let mut alignments = Vec::with_capacity(query.embeddings.len());
-
-    for (q_idx, q_token) in query.embeddings.iter().enumerate() {
-        let mut best_d_idx = 0;
-        let mut best_sim = f32::NEG_INFINITY;
-
-        for (d_idx, d_token) in document.embeddings.iter().enumerate() {
-            if let Ok(sim) = cosine_similarity(q_token, d_token) {
-                if sim > best_sim {
-                    best_sim = sim;
-                    best_d_idx = d_idx;
-                }
-            }
-        }
-
-        alignments.push(TokenAlignment {
-            query_token_idx: q_idx,
-            doc_token_idx: best_d_idx,
-            similarity: best_sim,
-        });
-    }
-
-    alignments
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn create_token_embeddings(tokens: Vec<Vec<f32>>) -> TokenEmbeddings {
-        let dims = tokens.first().map(|t| t.len()).unwrap_or(0);
-        TokenEmbeddings {
-            embeddings: tokens,
-            token_count: 0,  // Will be set
-            dims_per_token: dims,
-        }
-    }
-
-    #[test]
-    fn test_maxsim_identical() {
-        let tokens = vec![
-            vec![1.0, 0.0, 0.0],
-            vec![0.0, 1.0, 0.0],
-        ];
-        let te = create_token_embeddings(tokens);
-        let sim = max_sim(&te, &te);
-        assert!((sim - 1.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_maxsim_orthogonal() {
-        let q = create_token_embeddings(vec![vec![1.0, 0.0]]);
-        let d = create_token_embeddings(vec![vec![0.0, 1.0]]);
-        let sim = max_sim(&q, &d);
-        assert!(sim.abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_symmetric() {
-        let a = create_token_embeddings(vec![
-            vec![1.0, 0.0],
-            vec![0.5, 0.5],
-        ]);
-        let b = create_token_embeddings(vec![
-            vec![0.0, 1.0],
-            vec![0.7, 0.3],
-        ]);
-
-        let sym = symmetric_max_sim(&a, &b);
-        let ab = max_sim(&a, &b);
-        let ba = max_sim(&b, &a);
-
-        assert!((sym - (ab + ba) / 2.0).abs() < 1e-6);
-    }
-}
-</pseudo_code>
-
-<files_to_create>
-  <file path="crates/context-graph-core/src/teleology/similarity/token_level.rs">
-    Token-level (ColBERT) similarity functions
+<implementation_status>
+  <!-- COMPLETED: All functions implemented and tested -->
+  <file path="crates/context-graph-core/src/similarity/token_level.rs">
+    - max_sim: ✅ Implemented with dimension validation
+    - symmetric_max_sim: ✅ Implemented as (ab + ba) / 2
+    - approximate_max_sim: ✅ Implemented with early termination
+    - token_alignments: ✅ Implemented with TokenAlignment struct
+    - 12 unit tests: ✅ All passing
   </file>
-</files_to_create>
 
-<files_to_modify>
-  <file path="crates/context-graph-core/src/teleology/similarity/mod.rs">
-    Add: pub mod token_level;
-  </file>
-</files_to_modify>
+  <module_integration>
+    mod.rs already contains:
+    - mod token_level;
+    - pub use token_level::{approximate_max_sim, max_sim, symmetric_max_sim, token_alignments, TokenAlignment};
+  </module_integration>
+</implementation_status>
 
-<validation_criteria>
-  <criterion>MaxSim of identical sequences is 1.0</criterion>
-  <criterion>Symmetric MaxSim is average of both directions</criterion>
-  <criterion>Token alignments correctly identify best matches</criterion>
-  <criterion>Approximate version within 5% of exact</criterion>
-  <criterion>Empty sequences return 0.0</criterion>
-</validation_criteria>
+<verification_results>
+  <command>cargo test -p context-graph-core similarity::token_level</command>
+  <result>12 passed; 0 failed</result>
 
-<test_commands>
-  <command>cargo test -p context-graph-core similarity::token_level -- --nocapture</command>
-</test_commands>
+  <command>cargo test -p context-graph-core similarity::</command>
+  <result>137 passed; 0 failed</result>
+
+  <command>cargo build -p context-graph-core</command>
+  <result>Succeeded</result>
+</verification_results>
+
+<api_reference>
+  <!-- Actual function signatures as implemented -->
+  <function name="max_sim">
+    pub fn max_sim(query: &amp;[Vec&lt;f32&gt;], document: &amp;[Vec&lt;f32&gt;]) -&gt; f32
+
+    Returns: MaxSim score in [0.0, 1.0] range
+    Panics: If any token dimension != 128
+    Empty: Returns 0.0 for empty sequences
+  </function>
+
+  <function name="symmetric_max_sim">
+    pub fn symmetric_max_sim(a: &amp;[Vec&lt;f32&gt;], b: &amp;[Vec&lt;f32&gt;]) -&gt; f32
+
+    Returns: (max_sim(a,b) + max_sim(b,a)) / 2
+  </function>
+
+  <function name="approximate_max_sim">
+    pub fn approximate_max_sim(
+        query: &amp;[Vec&lt;f32&gt;],
+        document: &amp;[Vec&lt;f32&gt;],
+        min_score_threshold: f32,
+    ) -&gt; f32
+
+    Returns: Approximate score with early termination
+    Constraint: Within 5% of exact for threshold ≥ 0.8
+  </function>
+
+  <function name="token_alignments">
+    pub fn token_alignments(
+        query: &amp;[Vec&lt;f32&gt;],
+        document: &amp;[Vec&lt;f32&gt;],
+    ) -&gt; Vec&lt;TokenAlignment&gt;
+
+    Returns: One alignment per query token (best-matching doc token)
+  </function>
+
+  <struct name="TokenAlignment">
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct TokenAlignment {
+        pub query_token_idx: usize,
+        pub doc_token_idx: usize,
+        pub similarity: f32,
+    }
+  </struct>
+</api_reference>
+
+<constraints>
+  <constraint status="verified">MaxSim score normalized to [0.0, 1.0] range</constraint>
+  <constraint status="verified">Empty token sequences return 0.0 (no panic)</constraint>
+  <constraint status="verified">Token embeddings MUST have dimension = E12_TOKEN_DIM (128)</constraint>
+  <constraint status="verified">Dimension mismatch MUST panic with descriptive error (fail fast)</constraint>
+  <constraint status="verified">Approximate version within 5% of exact for threshold ≥ 0.8</constraint>
+  <constraint status="verified">All functions are #[inline] for performance</constraint>
+</constraints>
+
+<edge_cases_verified>
+  <case id="1" status="passed">
+    <description>Empty query sequence</description>
+    <input>query = [], document = [[1.0; 128]]</input>
+    <output>0.0</output>
+    <behavior>Return 0.0, no panic</behavior>
+  </case>
+  <case id="2" status="passed">
+    <description>Wrong token dimension</description>
+    <input>query = [[1.0; 64]], document = [[1.0; 128]]</input>
+    <output>panic!("Query token 0 has dimension 64, expected 128")</output>
+    <behavior>Fail fast with descriptive panic</behavior>
+  </case>
+  <case id="3" status="passed">
+    <description>Single token perfect match</description>
+    <input>query = [[1.0, 0.0, ..., 0.0]], document = [[1.0, 0.0, ..., 0.0]]</input>
+    <output>1.0</output>
+    <behavior>Return exactly 1.0 for identical normalized vectors</behavior>
+  </case>
+</edge_cases_verified>
+
+<notes>
+  <note type="critical">
+    IMPORT PATH CORRECTION: The task originally specified wrong import paths.
+
+    WRONG (task v2.0):
+      use crate::types::fingerprint::semantic::constants::E12_TOKEN_DIM;
+
+    CORRECT (actual implementation):
+      use crate::types::fingerprint::E12_TOKEN_DIM;
+
+    The semantic module is private. Constants are re-exported through fingerprint/mod.rs.
+  </note>
+
+  <note type="info">
+    There is already a maxsim_score implementation in context-graph-embeddings crate
+    (late_interaction/scoring.rs), but this task implemented MaxSim in context-graph-core
+    for use with SemanticFingerprint data directly.
+  </note>
+</notes>
 </task_spec>
 ```
