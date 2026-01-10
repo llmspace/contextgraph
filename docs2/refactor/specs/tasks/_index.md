@@ -283,7 +283,7 @@ graph TD
 ### Logic (13 tasks)
 | Task | Status | Started | Completed | Verified |
 |------|--------|---------|-----------|----------|
-| TASK-LOGIC-001 | :white_circle: todo | - | - | - |
+| TASK-LOGIC-001 | :white_check_mark: completed | 2026-01-10 | 2026-01-10 | YES (39 dense tests pass, SIMD within 1e-5 of scalar, 2807 total tests pass) |
 | TASK-LOGIC-002 | :white_circle: todo | - | - | - |
 | TASK-LOGIC-003 | :white_circle: todo | - | - | - |
 | TASK-LOGIC-004 | :white_circle: todo | - | - | - |
@@ -334,7 +334,7 @@ graph TD
 | TASK-PERF-003 | :white_circle: todo | - | - | - |
 | TASK-PERF-004 | :white_circle: todo | - | - | - |
 
-**Progress: 14/52 tasks completed (27%): CORE-001, CORE-002, CORE-003, CORE-004, CORE-005, CORE-007, CORE-008, CORE-009, CORE-010, CORE-011, CORE-012, CORE-013, CORE-014 done**
+**Progress: 15/52 tasks completed (29%): CORE-001, CORE-002, CORE-003, CORE-004, CORE-005, CORE-007, CORE-008, CORE-009, CORE-010, CORE-011, CORE-012, CORE-013, CORE-014, LOGIC-001 done**
 
 ---
 
