@@ -213,8 +213,8 @@ graph TD
 | 21 | TASK-LOGIC-007 | Matrix Strategy Search | LOGIC-004 | 2 | :white_check_mark: done |
 | 22 | TASK-LOGIC-008 | 5-Stage Pipeline | LOGIC-005-007, LOGIC-011-012 | 3 | :white_check_mark: done |
 | 23 | TASK-LOGIC-009 | Goal Discovery Pipeline | LOGIC-004 | 3 | :white_check_mark: done |
-| 24 | TASK-LOGIC-010 | Drift Detection | LOGIC-004 | 2 | :white_circle: todo |
-| 25 | TASK-LOGIC-011 | RRF Fusion Implementation | LOGIC-005-007 | 1.5 | :white_circle: todo |
+| 24 | TASK-LOGIC-010 | Drift Detection | LOGIC-004 | 2 | :white_check_mark: done |
+| 25 | TASK-LOGIC-011 | RRF Fusion Implementation | LOGIC-005-007 | 1.5 | :white_check_mark: done |
 | 26 | TASK-LOGIC-012 | Entry-Point Selection Heuristics | CORE-002 | 2 | :white_circle: todo |
 | 27 | TASK-LOGIC-013 | Search Result Caching | LOGIC-008 | 1.5 | :white_circle: todo |
 
@@ -292,8 +292,8 @@ graph TD
 | TASK-LOGIC-007 | :white_check_mark: completed | 2026-01-09 | 2026-01-09 | YES (30 tests pass, matrix.rs ~520 lines, git: current) |
 | TASK-LOGIC-008 | :white_check_mark: completed | 2026-01-09 | 2026-01-09 | YES (21 tests pass, pipeline.rs in context-graph-storage, git: 56ae42e) |
 | TASK-LOGIC-009 | :white_check_mark: completed | 2026-01-09 | 2026-01-09 | YES (10 tests pass, discovery.rs ~1177 lines, K-means clustering verified) |
-| TASK-LOGIC-010 | :white_circle: todo | - | - | - |
-| TASK-LOGIC-011 | :white_circle: todo | - | - | - |
+| TASK-LOGIC-010 | :white_check_mark: completed | 2026-01-09 | 2026-01-09 | YES (25 tests pass, drift.rs in autonomous module, git: 0b1a955) |
+| TASK-LOGIC-011 | :white_check_mark: completed | 2026-01-09 | 2026-01-09 | YES (12 aggregation tests pass, RRF in pipeline Stage 3, k=60 verified) |
 | TASK-LOGIC-012 | :white_circle: todo | - | - | - |
 | TASK-LOGIC-013 | :white_circle: todo | - | - | - |
 
@@ -334,7 +334,7 @@ graph TD
 | TASK-PERF-003 | :white_circle: todo | - | - | - |
 | TASK-PERF-004 | :white_circle: todo | - | - | - |
 
-**Progress: 23/52 tasks completed (44%): CORE-001, CORE-002, CORE-003, CORE-004, CORE-005, CORE-007, CORE-008, CORE-009, CORE-010, CORE-011, CORE-012, CORE-013, CORE-014, LOGIC-001, LOGIC-002, LOGIC-003, LOGIC-004, LOGIC-005, LOGIC-006, LOGIC-007, LOGIC-008, LOGIC-009 done**
+**Progress: 25/52 tasks completed (48%): CORE-001, CORE-002, CORE-003, CORE-004, CORE-005, CORE-007, CORE-008, CORE-009, CORE-010, CORE-011, CORE-012, CORE-013, CORE-014, LOGIC-001, LOGIC-002, LOGIC-003, LOGIC-004, LOGIC-005, LOGIC-006, LOGIC-007, LOGIC-008, LOGIC-009, LOGIC-010, LOGIC-011 done**
 
 ---
 
