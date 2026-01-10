@@ -782,6 +782,29 @@ impl Handlers {
             methods::MEMORY_SEARCH => self.handle_memory_search(request.id, request.params).await,
             methods::MEMORY_DELETE => self.handle_memory_delete(request.id, request.params).await,
 
+            // Memory injection and comparison operations (TASK-INTEG-001)
+            methods::MEMORY_INJECT => self.handle_memory_inject(request.id, request.params).await,
+            methods::MEMORY_INJECT_BATCH => {
+                self.handle_memory_inject_batch(request.id, request.params)
+                    .await
+            }
+            methods::MEMORY_SEARCH_MULTI_PERSPECTIVE => {
+                self.handle_memory_search_multi_perspective(request.id, request.params)
+                    .await
+            }
+            methods::MEMORY_COMPARE => {
+                self.handle_memory_compare(request.id, request.params)
+                    .await
+            }
+            methods::MEMORY_BATCH_COMPARE => {
+                self.handle_memory_batch_compare(request.id, request.params)
+                    .await
+            }
+            methods::MEMORY_SIMILARITY_MATRIX => {
+                self.handle_memory_similarity_matrix(request.id, request.params)
+                    .await
+            }
+
             // Search operations (TASK-S002)
             methods::SEARCH_MULTI => self.handle_search_multi(request.id, request.params).await,
             methods::SEARCH_SINGLE_SPACE => {

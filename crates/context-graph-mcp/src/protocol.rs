@@ -256,6 +256,20 @@ pub mod methods {
     pub const MEMORY_SEARCH: &str = "memory/search";
     pub const MEMORY_DELETE: &str = "memory/delete";
 
+    // Memory injection and comparison operations (TASK-INTEG-001)
+    /// Inject content with automatic 13-embedder fingerprint generation
+    pub const MEMORY_INJECT: &str = "memory/inject";
+    /// Batch injection with parallel embedding
+    pub const MEMORY_INJECT_BATCH: &str = "memory/inject_batch";
+    /// Multi-embedder perspective search with RRF fusion
+    pub const MEMORY_SEARCH_MULTI_PERSPECTIVE: &str = "memory/search_multi_perspective";
+    /// Single pair comparison using TeleologicalComparator
+    pub const MEMORY_COMPARE: &str = "memory/compare";
+    /// 1-to-N comparison using BatchComparator
+    pub const MEMORY_BATCH_COMPARE: &str = "memory/batch_compare";
+    /// N×N similarity matrix using BatchComparator::compare_all_pairs
+    pub const MEMORY_SIMILARITY_MATRIX: &str = "memory/similarity_matrix";
+
     // Search operations (TASK-S002)
     pub const SEARCH_MULTI: &str = "search/multi";
     pub const SEARCH_SINGLE_SPACE: &str = "search/single_space";

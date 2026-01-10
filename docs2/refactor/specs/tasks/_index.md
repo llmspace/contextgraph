@@ -217,7 +217,7 @@ graph TD
 
 | # | Task ID | Title | Depends On | Est. Days | Status |
 |---|---------|-------|------------|-----------|--------|
-| 28 | TASK-INTEG-001 | Memory MCP Handlers | CORE-010, LOGIC-004 | 2 | :white_circle: todo |
+| 28 | TASK-INTEG-001 | Memory MCP Handlers | CORE-010, LOGIC-004 | 2 | :white_check_mark: done |
 | 29 | TASK-INTEG-002 | Purpose/Goal MCP Handlers | LOGIC-009, LOGIC-010 | 2 | :white_circle: todo |
 | 30 | TASK-INTEG-003 | Consciousness MCP Handlers | LOGIC-004 | 2 | :white_circle: todo |
 | 31 | TASK-INTEG-004 | Hook Protocol & Core Handlers | CORE-003, LOGIC-006 | 2 | :white_circle: todo |
@@ -294,7 +294,7 @@ graph TD
 ### Integration (16 tasks)
 | Task | Status | Started | Completed | Verified |
 |------|--------|---------|-----------|----------|
-| TASK-INTEG-001 | :white_circle: todo | - | - | - |
+| TASK-INTEG-001 | :white_check_mark: completed | 2026-01-09 | 2026-01-09 | YES (39 tests pass, memory.rs 1787 lines, 6 new handlers) |
 | TASK-INTEG-002 | :white_circle: todo | - | - | - |
 | TASK-INTEG-003 | :white_circle: todo | - | - | - |
 | TASK-INTEG-004 | :white_circle: todo | - | - | - |
@@ -328,7 +328,7 @@ graph TD
 | TASK-PERF-003 | :white_circle: todo | - | - | - |
 | TASK-PERF-004 | :white_circle: todo | - | - | - |
 
-**Progress: 25/52 tasks completed (48%): CORE-001, CORE-002, CORE-003, CORE-004, CORE-005, CORE-007, CORE-008, CORE-009, CORE-010, CORE-011, CORE-012, CORE-013, CORE-014, LOGIC-001, LOGIC-002, LOGIC-003, LOGIC-004, LOGIC-005, LOGIC-006, LOGIC-007, LOGIC-008, LOGIC-009, LOGIC-010, LOGIC-011 done**
+**Progress: 26/52 tasks completed (50%): CORE-001, CORE-002, CORE-003, CORE-004, CORE-005, CORE-007, CORE-008, CORE-009, CORE-010, CORE-011, CORE-012, CORE-013, CORE-014, LOGIC-001, LOGIC-002, LOGIC-003, LOGIC-004, LOGIC-005, LOGIC-006, LOGIC-007, LOGIC-008, LOGIC-009, LOGIC-010, LOGIC-011, INTEG-001 done**
 
 ---
 

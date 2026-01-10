@@ -1434,6 +1434,571 @@ async fn test_rocksdb_integration_utl_computation() {
 }
 
 // =============================================================================
+// TASK-INTEG-001: Memory Injection and Comparison Tests
+// =============================================================================
+//
+// Tests for the new memory handlers:
+// - memory/inject: Single content injection with 13-embedder fingerprint
+// - memory/inject_batch: Batch injection with continueOnError option
+// - memory/search_multi_perspective: RRF-based multi-perspective search
+// - memory/compare: Single pair comparison using TeleologicalComparator
+// - memory/batch_compare: 1-to-N comparison using BatchComparator
+// - memory/similarity_matrix: N×N similarity matrix
+//
+// =============================================================================
+
+/// Test memory/inject creates TeleologicalFingerprint with atomic 13-embedder generation.
+#[tokio::test]
+async fn test_memory_inject_creates_fingerprint() {
+    let handlers = create_test_handlers();
+    let params = json!({
+        "content": "Test content for memory injection"
+    });
+    let request = make_request("memory/inject", Some(JsonRpcId::Number(1)), Some(params));
+
+    let response = handlers.dispatch(request).await;
+
+    assert!(response.error.is_none(), "memory/inject should succeed: {:?}", response.error);
+    let result = response.result.expect("Should have result");
+
+    // Verify fingerprintId is valid UUID
+    let fingerprint_id = result.get("fingerprintId")
+        .expect("Should return fingerprintId")
+        .as_str()
+        .expect("fingerprintId should be string");
+    uuid::Uuid::parse_str(fingerprint_id).expect("fingerprintId should be valid UUID");
+
+    // Verify 13 embeddings were generated
+    let embedder_count = result.get("embedderCount").and_then(|v| v.as_u64());
+    assert_eq!(embedder_count, Some(13), "Should generate exactly 13 embeddings");
+
+    // Verify latency metrics
+    assert!(result.get("embeddingLatencyMs").is_some(), "Should return embeddingLatencyMs");
+    assert!(result.get("storageLatencyMs").is_some(), "Should return storageLatencyMs");
+}
+
+/// Test memory/inject fails with missing content parameter (FAIL FAST).
+#[tokio::test]
+async fn test_memory_inject_missing_content_fails() {
+    let handlers = create_test_handlers();
+    let params = json!({});
+    let request = make_request("memory/inject", Some(JsonRpcId::Number(1)), Some(params));
+
+    let response = handlers.dispatch(request).await;
+
+    assert!(response.error.is_some(), "memory/inject should fail without content");
+    let error = response.error.unwrap();
+    assert_eq!(error.code, -32602, "Should return INVALID_PARAMS error code");
+}
+
+/// Test memory/inject fails with empty content (FAIL FAST).
+#[tokio::test]
+async fn test_memory_inject_empty_content_fails() {
+    let handlers = create_test_handlers();
+    let params = json!({
+        "content": ""
+    });
+    let request = make_request("memory/inject", Some(JsonRpcId::Number(1)), Some(params));
+
+    let response = handlers.dispatch(request).await;
+
+    assert!(response.error.is_some(), "memory/inject should fail with empty content");
+    let error = response.error.unwrap();
+    assert_eq!(error.code, -32602, "Should return INVALID_PARAMS error code");
+}
+
+/// Test memory/inject_batch creates multiple fingerprints atomically.
+#[tokio::test]
+async fn test_memory_inject_batch_creates_multiple_fingerprints() {
+    let handlers = create_test_handlers();
+    let params = json!({
+        "contents": [
+            "First batch content for injection",
+            "Second batch content for injection",
+            "Third batch content for injection"
+        ],
+        "continueOnError": false
+    });
+    let request = make_request("memory/inject_batch", Some(JsonRpcId::Number(1)), Some(params));
+
+    let response = handlers.dispatch(request).await;
+
+    assert!(response.error.is_none(), "memory/inject_batch should succeed: {:?}", response.error);
+    let result = response.result.expect("Should have result");
+
+    // Verify success count
+    let success_count = result.get("succeeded").and_then(|v| v.as_u64());
+    assert_eq!(success_count, Some(3), "Should have 3 successful injections");
+
+    // Verify failure count is 0
+    let failure_count = result.get("failed").and_then(|v| v.as_u64());
+    assert_eq!(failure_count, Some(0), "Should have 0 failures");
+
+    // Verify results array
+    let results = result.get("results").and_then(|v| v.as_array()).expect("Should have results array");
+    assert_eq!(results.len(), 3, "Should have 3 results");
+
+    // Verify each result has fingerprintId
+    for (i, r) in results.iter().enumerate() {
+        let fp_id = r.get("fingerprintId").and_then(|v| v.as_str());
+        assert!(fp_id.is_some(), "Result[{}] should have fingerprintId", i);
+        uuid::Uuid::parse_str(fp_id.unwrap()).expect("fingerprintId should be valid UUID");
+    }
+}
+
+/// Test memory/inject_batch with continueOnError=false (default) fails on first error.
+/// Note: Validation errors (empty content) always fail regardless of continueOnError.
+/// The continueOnError flag is for runtime errors during embedding/storage.
+#[tokio::test]
+async fn test_memory_inject_batch_with_empty_content_fails() {
+    let handlers = create_test_handlers();
+    let params = json!({
+        "contents": [
+            "Valid content for injection",
+            "",  // Empty - validation error
+            "Another valid content"
+        ],
+        "continueOnError": true  // Still fails because validation error
+    });
+    let request = make_request("memory/inject_batch", Some(JsonRpcId::Number(1)), Some(params));
+
+    let response = handlers.dispatch(request).await;
+
+    // Validation errors always fail, even with continueOnError
+    assert!(response.error.is_some(), "Empty content should always fail validation");
+    let error = response.error.unwrap();
+    assert_eq!(error.code, -32602, "Should return INVALID_PARAMS for empty content");
+}
+
+/// Test memory/inject_batch fails with empty contents array.
+#[tokio::test]
+async fn test_memory_inject_batch_empty_contents_fails() {
+    let handlers = create_test_handlers();
+    let params = json!({
+        "contents": []
+    });
+    let request = make_request("memory/inject_batch", Some(JsonRpcId::Number(1)), Some(params));
+
+    let response = handlers.dispatch(request).await;
+
+    assert!(response.error.is_some(), "memory/inject_batch should fail with empty contents");
+    let error = response.error.unwrap();
+    assert_eq!(error.code, -32602, "Should return INVALID_PARAMS error code");
+}
+
+/// Test memory/compare computes similarity between two fingerprints.
+#[tokio::test]
+async fn test_memory_compare_computes_similarity() {
+    let handlers = create_test_handlers();
+
+    // First, inject two fingerprints
+    let inject1_params = json!({ "content": "Machine learning enables pattern recognition" });
+    let inject1_request = make_request("memory/inject", Some(JsonRpcId::Number(1)), Some(inject1_params));
+    let inject1_response = handlers.dispatch(inject1_request).await;
+    assert!(inject1_response.error.is_none(), "First inject should succeed");
+    let fp_id_a = inject1_response.result.unwrap().get("fingerprintId").unwrap().as_str().unwrap().to_string();
+
+    let inject2_params = json!({ "content": "Deep learning uses neural networks for AI" });
+    let inject2_request = make_request("memory/inject", Some(JsonRpcId::Number(2)), Some(inject2_params));
+    let inject2_response = handlers.dispatch(inject2_request).await;
+    assert!(inject2_response.error.is_none(), "Second inject should succeed");
+    let fp_id_b = inject2_response.result.unwrap().get("fingerprintId").unwrap().as_str().unwrap().to_string();
+
+    // Now compare them (include perEmbedder to verify structure)
+    let compare_params = json!({
+        "memoryA": fp_id_a,
+        "memoryB": fp_id_b,
+        "includePerEmbedder": true
+    });
+    let compare_request = make_request("memory/compare", Some(JsonRpcId::Number(3)), Some(compare_params));
+
+    let response = handlers.dispatch(compare_request).await;
+
+    assert!(response.error.is_none(), "memory/compare should succeed: {:?}", response.error);
+    let result = response.result.expect("Should have result");
+
+    // Verify comparison structure
+    let overall_similarity = result.get("overallSimilarity").and_then(|v| v.as_f64());
+    assert!(overall_similarity.is_some(), "Should have overallSimilarity");
+    let sim = overall_similarity.unwrap();
+    assert!((0.0..=1.0).contains(&sim), "Similarity should be in [0, 1], got {}", sim);
+
+    // Verify per-embedder scores (array of {embedder, score} objects)
+    let per_embedder = result.get("perEmbedder").and_then(|v| v.as_array());
+    assert!(per_embedder.is_some(), "Should have perEmbedder scores");
+    let pe = per_embedder.unwrap();
+    assert_eq!(pe.len(), 13, "Should have 13 embedder scores");
+
+    // Verify dominant embedder
+    let dominant = result.get("dominantEmbedder").and_then(|v| v.as_str());
+    assert!(dominant.is_some(), "Should have dominantEmbedder");
+}
+
+/// Test memory/compare fails with missing fingerprint ID (FAIL FAST).
+#[tokio::test]
+async fn test_memory_compare_missing_id_fails() {
+    let handlers = create_test_handlers();
+    let params = json!({
+        "memoryA": "00000000-0000-0000-0000-000000000001"
+        // Missing memoryB
+    });
+    let request = make_request("memory/compare", Some(JsonRpcId::Number(1)), Some(params));
+
+    let response = handlers.dispatch(request).await;
+
+    assert!(response.error.is_some(), "memory/compare should fail without memoryB");
+    let error = response.error.unwrap();
+    assert_eq!(error.code, -32602, "Should return INVALID_PARAMS error code");
+}
+
+/// Test memory/compare fails with non-existent fingerprint (FAIL FAST).
+#[tokio::test]
+async fn test_memory_compare_not_found_fails() {
+    let handlers = create_test_handlers();
+    let params = json!({
+        "memoryA": "00000000-0000-0000-0000-000000000001",
+        "memoryB": "00000000-0000-0000-0000-000000000002"
+    });
+    let request = make_request("memory/compare", Some(JsonRpcId::Number(1)), Some(params));
+
+    let response = handlers.dispatch(request).await;
+
+    assert!(response.error.is_some(), "memory/compare should fail for non-existent fingerprints");
+    let error = response.error.unwrap();
+    assert_eq!(error.code, -32010, "Should return FINGERPRINT_NOT_FOUND error code");
+}
+
+/// Test memory/batch_compare compares reference to multiple targets.
+#[tokio::test]
+async fn test_memory_batch_compare_one_to_many() {
+    let handlers = create_test_handlers();
+
+    // Inject reference fingerprint
+    let inject_ref_params = json!({ "content": "Artificial intelligence transforms industries" });
+    let inject_ref_request = make_request("memory/inject", Some(JsonRpcId::Number(1)), Some(inject_ref_params));
+    let inject_ref_response = handlers.dispatch(inject_ref_request).await;
+    assert!(inject_ref_response.error.is_none());
+    let reference_id = inject_ref_response.result.unwrap().get("fingerprintId").unwrap().as_str().unwrap().to_string();
+
+    // Inject target fingerprints
+    let mut target_ids = Vec::new();
+    for i in 0..3 {
+        let inject_params = json!({ "content": format!("Target content number {} about technology", i) });
+        let inject_request = make_request("memory/inject", Some(JsonRpcId::Number((i + 2) as i64)), Some(inject_params));
+        let inject_response = handlers.dispatch(inject_request).await;
+        assert!(inject_response.error.is_none());
+        let fp_id = inject_response.result.unwrap().get("fingerprintId").unwrap().as_str().unwrap().to_string();
+        target_ids.push(fp_id);
+    }
+
+    // Batch compare
+    let compare_params = json!({
+        "reference": reference_id,
+        "targets": target_ids
+    });
+    let compare_request = make_request("memory/batch_compare", Some(JsonRpcId::Number(10)), Some(compare_params));
+
+    let response = handlers.dispatch(compare_request).await;
+
+    assert!(response.error.is_none(), "memory/batch_compare should succeed: {:?}", response.error);
+    let result = response.result.expect("Should have result");
+
+    // Verify results array
+    let comparisons = result.get("comparisons").and_then(|v| v.as_array()).expect("Should have comparisons array");
+    assert_eq!(comparisons.len(), 3, "Should have 3 comparison results");
+
+    // Verify each comparison has required fields
+    for (i, cmp) in comparisons.iter().enumerate() {
+        assert!(cmp.get("target").is_some(), "Comparison[{}] should have target", i);
+        assert!(cmp.get("similarity").is_some(), "Comparison[{}] should have similarity", i);
+        assert!(cmp.get("rank").is_some(), "Comparison[{}] should have rank", i);
+    }
+
+    // Verify comparisonLatencyMs
+    assert!(result.get("comparisonLatencyMs").is_some(), "Should have comparisonLatencyMs");
+}
+
+/// Test memory/batch_compare fails with empty target list (FAIL FAST).
+#[tokio::test]
+async fn test_memory_batch_compare_empty_targets_fails() {
+    let handlers = create_test_handlers();
+    let params = json!({
+        "reference": "00000000-0000-0000-0000-000000000001",
+        "targets": []
+    });
+    let request = make_request("memory/batch_compare", Some(JsonRpcId::Number(1)), Some(params));
+
+    let response = handlers.dispatch(request).await;
+
+    assert!(response.error.is_some(), "memory/batch_compare should fail with empty targets");
+    let error = response.error.unwrap();
+    assert_eq!(error.code, -32602, "Should return INVALID_PARAMS error code");
+}
+
+/// Test memory/similarity_matrix computes N×N pairwise similarities.
+#[tokio::test]
+async fn test_memory_similarity_matrix() {
+    let handlers = create_test_handlers();
+
+    // Inject multiple fingerprints
+    let mut fp_ids = Vec::new();
+    for i in 0..4 {
+        let inject_params = json!({ "content": format!("Matrix content {} for similarity computation", i) });
+        let inject_request = make_request("memory/inject", Some(JsonRpcId::Number((i + 1) as i64)), Some(inject_params));
+        let inject_response = handlers.dispatch(inject_request).await;
+        assert!(inject_response.error.is_none(), "Inject[{}] should succeed", i);
+        let fp_id = inject_response.result.unwrap().get("fingerprintId").unwrap().as_str().unwrap().to_string();
+        fp_ids.push(fp_id);
+    }
+
+    // Compute similarity matrix
+    let matrix_params = json!({
+        "memoryIds": fp_ids
+    });
+    let matrix_request = make_request("memory/similarity_matrix", Some(JsonRpcId::Number(10)), Some(matrix_params));
+
+    let response = handlers.dispatch(matrix_request).await;
+
+    assert!(response.error.is_none(), "memory/similarity_matrix should succeed: {:?}", response.error);
+    let result = response.result.expect("Should have result");
+
+    // Verify matrix dimensions
+    let matrix = result.get("matrix").and_then(|v| v.as_array()).expect("Should have matrix array");
+    assert_eq!(matrix.len(), 4, "Matrix should have 4 rows for 4 fingerprints");
+
+    for (i, row) in matrix.iter().enumerate() {
+        let row_arr = row.as_array().expect("Row should be array");
+        assert_eq!(row_arr.len(), 4, "Row[{}] should have 4 columns", i);
+
+        // Diagonal should be ~1.0 (self-similarity)
+        let diag_val = row_arr[i].as_f64().unwrap_or(0.0);
+        assert!(
+            diag_val >= 0.99,
+            "Diagonal[{},{}] should be ~1.0 (self-similarity), got {}",
+            i, i, diag_val
+        );
+
+        // All values should be in [0, 1]
+        for (j, val) in row_arr.iter().enumerate() {
+            let v = val.as_f64().unwrap_or(-1.0);
+            assert!(
+                (0.0..=1.0).contains(&v),
+                "Matrix[{},{}] should be in [0, 1], got {}",
+                i, j, v
+            );
+        }
+    }
+
+    // Verify matrix is symmetric
+    for i in 0..4 {
+        for j in 0..4 {
+            let val_ij = matrix[i].as_array().unwrap()[j].as_f64().unwrap();
+            let val_ji = matrix[j].as_array().unwrap()[i].as_f64().unwrap();
+            assert!(
+                (val_ij - val_ji).abs() < 1e-6,
+                "Matrix should be symmetric: [{},{}]={} vs [{},{}]={}",
+                i, j, val_ij, j, i, val_ji
+            );
+        }
+    }
+
+    // Verify memoryIds mapping
+    let ids = result.get("memoryIds").and_then(|v| v.as_array()).expect("Should have memoryIds");
+    assert_eq!(ids.len(), 4, "Should have 4 memory IDs");
+}
+
+/// Test memory/similarity_matrix fails with fewer than 2 fingerprints (FAIL FAST).
+#[tokio::test]
+async fn test_memory_similarity_matrix_too_few_fails() {
+    let handlers = create_test_handlers();
+    let params = json!({
+        "memoryIds": ["00000000-0000-0000-0000-000000000001"]
+    });
+    let request = make_request("memory/similarity_matrix", Some(JsonRpcId::Number(1)), Some(params));
+
+    let response = handlers.dispatch(request).await;
+
+    assert!(response.error.is_some(), "memory/similarity_matrix should fail with fewer than 2 IDs");
+    let error = response.error.unwrap();
+    assert_eq!(error.code, -32602, "Should return INVALID_PARAMS error code");
+}
+
+/// Test memory/search_multi_perspective returns RRF-fused results.
+#[tokio::test]
+async fn test_memory_search_multi_perspective() {
+    let handlers = create_test_handlers();
+
+    // First inject some content
+    let contents = [
+        "Machine learning algorithms for pattern recognition",
+        "Neural network architectures for deep learning",
+        "Data science and statistical analysis methods",
+    ];
+    for (i, content) in contents.iter().enumerate() {
+        let inject_params = json!({ "content": content });
+        let inject_request = make_request("memory/inject", Some(JsonRpcId::Number((i + 1) as i64)), Some(inject_params));
+        let inject_response = handlers.dispatch(inject_request).await;
+        assert!(inject_response.error.is_none(), "Inject[{}] should succeed", i);
+    }
+
+    // Multi-perspective search (indices: 0=Semantic, 4=Causal, 6=Code)
+    let search_params = json!({
+        "query": "AI and machine learning techniques",
+        "topK": 10,
+        "minSimilarity": 0.1,
+        "perspectives": [0, 4, 6]
+    });
+    let search_request = make_request("memory/search_multi_perspective", Some(JsonRpcId::Number(10)), Some(search_params));
+
+    let response = handlers.dispatch(search_request).await;
+
+    assert!(response.error.is_none(), "memory/search_multi_perspective should succeed: {:?}", response.error);
+    let result = response.result.expect("Should have result");
+
+    // Verify RRF results
+    let results = result.get("results").and_then(|v| v.as_array()).expect("Should have results array");
+    assert!(!results.is_empty(), "Should have at least one result");
+
+    // Verify each result has required fields
+    for (i, r) in results.iter().enumerate() {
+        assert!(r.get("memoryId").is_some(), "Result[{}] should have memoryId", i);
+        assert!(r.get("rrfScore").is_some(), "Result[{}] should have rrfScore", i);
+        assert!(r.get("perspectiveScores").is_some(), "Result[{}] should have perspectiveScores", i);
+    }
+
+    // Verify perspectives used
+    let perspectives = result.get("perspectives").and_then(|v| v.as_array());
+    assert!(perspectives.is_some(), "Should have perspectives");
+}
+
+/// Test memory/search_multi_perspective with all perspectives (omit perspectives = all).
+#[tokio::test]
+async fn test_memory_search_multi_perspective_all_embedders() {
+    let handlers = create_test_handlers();
+
+    // Inject content
+    let inject_params = json!({ "content": "Multi-perspective test content" });
+    let inject_request = make_request("memory/inject", Some(JsonRpcId::Number(1)), Some(inject_params));
+    handlers.dispatch(inject_request).await;
+
+    // Search with all perspectives (omit perspectives = defaults to all 13 embedders)
+    let search_params = json!({
+        "query": "test content",
+        "topK": 5,
+        "minSimilarity": 0.1
+        // perspectives omitted = all 13 embedders
+    });
+    let search_request = make_request("memory/search_multi_perspective", Some(JsonRpcId::Number(2)), Some(search_params));
+
+    let response = handlers.dispatch(search_request).await;
+
+    assert!(response.error.is_none(), "memory/search_multi_perspective with all perspectives should succeed");
+    let result = response.result.expect("Should have result");
+
+    // Verify all 13 perspectives were used
+    let perspectives = result.get("perspectives").and_then(|v| v.as_array());
+    if let Some(p) = perspectives {
+        assert_eq!(p.len(), 13, "Should use all 13 perspectives when perspectives omitted");
+    }
+}
+
+/// Test memory/search_multi_perspective fails with missing query (FAIL FAST).
+#[tokio::test]
+async fn test_memory_search_multi_perspective_missing_query_fails() {
+    let handlers = create_test_handlers();
+    let params = json!({
+        "topK": 5,
+        "perspectives": [0]  // Semantic perspective
+    });
+    let request = make_request("memory/search_multi_perspective", Some(JsonRpcId::Number(1)), Some(params));
+
+    let response = handlers.dispatch(request).await;
+
+    assert!(response.error.is_some(), "memory/search_multi_perspective should fail without query");
+    let error = response.error.unwrap();
+    assert_eq!(error.code, -32602, "Should return INVALID_PARAMS error code");
+}
+
+// =============================================================================
+// TASK-INTEG-001: RocksDB Integration Tests for New Handlers
+// =============================================================================
+
+/// Integration test: Full injection and comparison cycle with REAL RocksDB.
+#[tokio::test]
+async fn test_rocksdb_integration_inject_compare_cycle() {
+    let (handlers, _tempdir) = create_test_handlers_with_rocksdb().await;
+
+    // Inject two fingerprints
+    let inject1_params = json!({ "content": "RocksDB integration test: first fingerprint for comparison" });
+    let inject1_request = make_request("memory/inject", Some(JsonRpcId::Number(1)), Some(inject1_params));
+    let inject1_response = handlers.dispatch(inject1_request).await;
+    assert!(inject1_response.error.is_none(), "First inject should succeed: {:?}", inject1_response.error);
+    let fp_id_a = inject1_response.result.unwrap().get("fingerprintId").unwrap().as_str().unwrap().to_string();
+
+    let inject2_params = json!({ "content": "RocksDB integration test: second fingerprint for comparison" });
+    let inject2_request = make_request("memory/inject", Some(JsonRpcId::Number(2)), Some(inject2_params));
+    let inject2_response = handlers.dispatch(inject2_request).await;
+    assert!(inject2_response.error.is_none(), "Second inject should succeed: {:?}", inject2_response.error);
+    let fp_id_b = inject2_response.result.unwrap().get("fingerprintId").unwrap().as_str().unwrap().to_string();
+
+    // Compare them
+    let compare_params = json!({
+        "memoryA": fp_id_a,
+        "memoryB": fp_id_b
+    });
+    let compare_request = make_request("memory/compare", Some(JsonRpcId::Number(3)), Some(compare_params));
+    let compare_response = handlers.dispatch(compare_request).await;
+
+    assert!(compare_response.error.is_none(), "Comparison should succeed with RocksDB: {:?}", compare_response.error);
+    let result = compare_response.result.expect("Should have result");
+
+    // Verify comparison result
+    let overall = result.get("overallSimilarity").and_then(|v| v.as_f64());
+    assert!(overall.is_some(), "Should have overallSimilarity");
+    let sim = overall.unwrap();
+    assert!((0.0..=1.0).contains(&sim), "Similarity should be in [0, 1], got {}", sim);
+
+    // Similar content should have high similarity
+    assert!(sim > 0.5, "Similar RocksDB content should have similarity > 0.5, got {}", sim);
+}
+
+/// Integration test: Similarity matrix with REAL RocksDB.
+#[tokio::test]
+async fn test_rocksdb_integration_similarity_matrix() {
+    let (handlers, _tempdir) = create_test_handlers_with_rocksdb().await;
+
+    // Inject fingerprints
+    let mut fp_ids = Vec::new();
+    for i in 0..3 {
+        let inject_params = json!({ "content": format!("RocksDB matrix test content number {}", i) });
+        let inject_request = make_request("memory/inject", Some(JsonRpcId::Number((i + 1) as i64)), Some(inject_params));
+        let inject_response = handlers.dispatch(inject_request).await;
+        assert!(inject_response.error.is_none(), "Inject[{}] should succeed: {:?}", i, inject_response.error);
+        let fp_id = inject_response.result.unwrap().get("fingerprintId").unwrap().as_str().unwrap().to_string();
+        fp_ids.push(fp_id);
+    }
+
+    // Compute similarity matrix
+    let matrix_params = json!({
+        "memoryIds": fp_ids
+    });
+    let matrix_request = make_request("memory/similarity_matrix", Some(JsonRpcId::Number(10)), Some(matrix_params));
+    let matrix_response = handlers.dispatch(matrix_request).await;
+
+    assert!(matrix_response.error.is_none(), "Similarity matrix should succeed with RocksDB: {:?}", matrix_response.error);
+    let result = matrix_response.result.expect("Should have result");
+
+    let matrix = result.get("matrix").and_then(|v| v.as_array()).expect("Should have matrix");
+    assert_eq!(matrix.len(), 3, "Should have 3x3 matrix");
+
+    // Verify diagonal is ~1.0
+    for i in 0..3 {
+        let diag = matrix[i].as_array().unwrap()[i].as_f64().unwrap();
+        assert!(diag >= 0.99, "Diagonal[{},{}] should be ~1.0, got {}", i, i, diag);
+    }
+}
+
+// =============================================================================
 // TASK-P3-02: Real GPU Embedding Tests (Feature-gated: cuda)
 // =============================================================================
 //

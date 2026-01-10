@@ -25,8 +25,8 @@ use tracing::{debug, error, info, warn};
 
 use context_graph_core::autonomous::drift::DriftState;
 use context_graph_core::autonomous::{
-    BootstrapService, ConsolidationService, DiscoveryConfig, DriftCorrector, DriftDetector,
-    DriftSeverity, PruningService, SubGoalDiscovery,
+    BootstrapService, ConsolidationService, DriftCorrector, DriftDetector, DriftSeverity,
+    PruningService, ServiceDiscoveryConfig, SubGoalDiscovery,
 };
 
 use crate::protocol::{error_codes, JsonRpcId, JsonRpcResponse};
@@ -787,7 +787,7 @@ impl Handlers {
         };
 
         // Create discovery service with config
-        let config = DiscoveryConfig {
+        let config = ServiceDiscoveryConfig {
             min_cluster_size: 3,
             min_coherence: params.min_confidence,
             emergence_threshold: params.min_confidence,
