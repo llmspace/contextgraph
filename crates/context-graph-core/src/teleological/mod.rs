@@ -89,6 +89,9 @@ pub mod matrix_search;
 // Comparison validation errors (TASK-CORE-004)
 pub mod comparison_error;
 
+// TeleologicalComparator for fingerprint comparison (TASK-LOGIC-004)
+pub mod comparator;
+
 // Teleological services (TELEO-007 through TELEO-015)
 pub mod services;
 
@@ -109,3 +112,6 @@ pub use resolution::{DomainAlignments, DomainType, MultiResolutionHierarchy, Res
 pub use synergy_matrix::{SynergyMatrix, CROSS_CORRELATION_COUNT, SYNERGY_DIM};
 pub use types::{ProfileId, TuckerCore, EMBEDDING_DIM, NUM_EMBEDDERS};
 pub use vector::TeleologicalVector;
+
+// TASK-LOGIC-004: Teleological Comparator exports
+pub use comparator::{BatchComparator, ComparisonResult, TeleologicalComparator};

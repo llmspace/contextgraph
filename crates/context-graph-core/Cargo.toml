@@ -27,6 +27,9 @@ regex = "1.10"
 # Real HNSW implementation - NO FALLBACKS
 hnsw_rs = "0.3"
 
+# Parallel batch comparisons (TASK-LOGIC-004: BatchComparator)
+rayon = "1.10"
+
 [features]
 default = []
 # Enable test utilities (stubs, zeroed() methods) for downstream crate tests
