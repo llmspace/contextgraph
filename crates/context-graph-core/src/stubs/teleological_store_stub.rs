@@ -94,6 +94,10 @@ pub struct InMemoryTeleologicalStore {
     /// Soft-deleted IDs (still in data but marked deleted)
     deleted: DashMap<Uuid, ()>,
 
+    /// Content storage: UUID -> original content text
+    /// TASK-CONTENT-004: Added for content storage support in tests
+    content: DashMap<Uuid, String>,
+
     /// Running size estimate in bytes
     size_bytes: AtomicUsize,
 }
@@ -110,6 +114,7 @@ impl InMemoryTeleologicalStore {
         Self {
             data: DashMap::new(),
             deleted: DashMap::new(),
+            content: DashMap::new(),
             size_bytes: AtomicUsize::new(0),
         }
     }
@@ -128,6 +133,7 @@ impl InMemoryTeleologicalStore {
         Self {
             data: DashMap::with_capacity(capacity),
             deleted: DashMap::new(),
+            content: DashMap::with_capacity(capacity),
             size_bytes: AtomicUsize::new(0),
         }
     }
@@ -343,7 +349,10 @@ impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
                 self.size_bytes.fetch_sub(size, Ordering::Relaxed);
             }
             self.deleted.remove(&id);
-            debug!("Hard-deleted fingerprint {}", id);
+            // TASK-CONTENT-004: Cascade delete to content (EC-CONTENT-05)
+            // Content orphans are not allowed - delete content when fingerprint is hard-deleted
+            self.content.remove(&id);
+            debug!("Hard-deleted fingerprint {} (content also removed)", id);
         }
 
         Ok(true)
@@ -743,6 +752,68 @@ impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
         debug!("list_all_johari returned {} results", results.len());
         Ok(results)
     }
+
+    // ==================== Content Storage (TASK-CONTENT-004) ====================
+
+    /// Store content text for a fingerprint.
+    ///
+    /// # Arguments
+    /// * `id` - The fingerprint UUID
+    /// * `content` - The content text to store
+    ///
+    /// # Returns
+    /// * `Ok(())` - Content stored successfully
+    async fn store_content(&self, id: Uuid, content: &str) -> CoreResult<()> {
+        self.content.insert(id, content.to_string());
+        debug!(
+            fingerprint_id = %id,
+            content_size = content.len(),
+            "Content stored"
+        );
+        Ok(())
+    }
+
+    /// Retrieve content text for a fingerprint.
+    ///
+    /// # Arguments
+    /// * `id` - The fingerprint UUID
+    ///
+    /// # Returns
+    /// * `Ok(Some(content))` - Content found
+    /// * `Ok(None)` - Content not found (fingerprint may exist but content was never stored)
+    async fn get_content(&self, id: Uuid) -> CoreResult<Option<String>> {
+        Ok(self.content.get(&id).map(|r| r.clone()))
+    }
+
+    /// Retrieve content text for multiple fingerprints.
+    ///
+    /// # Arguments
+    /// * `ids` - The fingerprint UUIDs
+    ///
+    /// # Returns
+    /// * `Ok(Vec<Option<String>>)` - Content for each ID (None if not found)
+    async fn get_content_batch(&self, ids: &[Uuid]) -> CoreResult<Vec<Option<String>>> {
+        Ok(ids
+            .iter()
+            .map(|id| self.content.get(id).map(|r| r.clone()))
+            .collect())
+    }
+
+    /// Delete content text for a fingerprint.
+    ///
+    /// # Arguments
+    /// * `id` - The fingerprint UUID
+    ///
+    /// # Returns
+    /// * `Ok(true)` - Content was deleted
+    /// * `Ok(false)` - Content was not found
+    async fn delete_content(&self, id: Uuid) -> CoreResult<bool> {
+        let removed = self.content.remove(&id).is_some();
+        if removed {
+            debug!(fingerprint_id = %id, "Content deleted");
+        }
+        Ok(removed)
+    }
 }
 
 #[cfg(test)]
@@ -1056,5 +1127,129 @@ mod tests {
         assert!(sim2.abs() < 1e-6);
 
         println!("[VERIFIED] test_cosine_similarity: Cosine similarity computed correctly");
+    }
+
+    // ==================== Content Storage Tests (TASK-CONTENT-006) ====================
+
+    /// TC-CONTENT-04: InMemoryTeleologicalStore content round-trip
+    #[tokio::test]
+    async fn test_content_round_trip() {
+        let store = InMemoryTeleologicalStore::new();
+        let fp = create_test_fingerprint();
+        let id = fp.id;
+        let test_content = "Test content for round-trip verification";
+
+        // Store fingerprint
+        store.store(fp).await.unwrap();
+
+        // Store content
+        let store_result = store.store_content(id, test_content).await;
+        assert!(store_result.is_ok(), "store_content should succeed");
+
+        // Get content back
+        let retrieved = store.get_content(id).await.unwrap();
+        assert!(retrieved.is_some(), "get_content should return Some");
+        assert_eq!(
+            retrieved.unwrap(),
+            test_content,
+            "Content should match exactly"
+        );
+
+        // Delete content
+        let deleted = store.delete_content(id).await.unwrap();
+        assert!(deleted, "delete_content should return true");
+
+        // Verify content is gone
+        let after_delete = store.get_content(id).await.unwrap();
+        assert!(after_delete.is_none(), "get_content should return None after delete");
+
+        println!("[VERIFIED] TC-CONTENT-04: Content round-trip works correctly");
+    }
+
+    /// TC-CONTENT-06: InMemoryTeleologicalStore hard delete cascades to content
+    #[tokio::test]
+    async fn test_hard_delete_cascades_to_content() {
+        let store = InMemoryTeleologicalStore::new();
+        let fp = create_test_fingerprint();
+        let id = fp.id;
+        let test_content = "Content that should be deleted with fingerprint";
+
+        // Store fingerprint and content
+        store.store(fp).await.unwrap();
+        store.store_content(id, test_content).await.unwrap();
+
+        // Verify content exists
+        let content_before = store.get_content(id).await.unwrap();
+        assert!(content_before.is_some(), "Content should exist before delete");
+
+        // Hard delete the fingerprint
+        let deleted = store.delete(id, false).await.unwrap();
+        assert!(deleted, "Hard delete should succeed");
+
+        // Fingerprint should be gone
+        let fp_after = store.retrieve(id).await.unwrap();
+        assert!(fp_after.is_none(), "Fingerprint should be gone after hard delete");
+
+        // Content should ALSO be gone (cascade delete)
+        let content_after = store.get_content(id).await.unwrap();
+        assert!(
+            content_after.is_none(),
+            "Content should be gone after hard delete (EC-CONTENT-05)"
+        );
+
+        println!("[VERIFIED] TC-CONTENT-06: Hard delete cascades to content");
+    }
+
+    /// Test get_content_batch with mixed results
+    #[tokio::test]
+    async fn test_content_batch_mixed() {
+        let store = InMemoryTeleologicalStore::new();
+
+        // Create 3 fingerprints
+        let fp1 = create_test_fingerprint();
+        let fp2 = create_test_fingerprint();
+        let fp3 = create_test_fingerprint();
+
+        let id1 = fp1.id;
+        let id2 = fp2.id;
+        let id3 = fp3.id;
+
+        // Store all fingerprints
+        store.store(fp1).await.unwrap();
+        store.store(fp2).await.unwrap();
+        store.store(fp3).await.unwrap();
+
+        // Only store content for fp1 and fp3
+        store.store_content(id1, "Content for fp1").await.unwrap();
+        store.store_content(id3, "Content for fp3").await.unwrap();
+
+        // Batch retrieve
+        let batch = store.get_content_batch(&[id1, id2, id3]).await.unwrap();
+
+        assert_eq!(batch.len(), 3, "Batch should have 3 entries");
+        assert!(batch[0].is_some(), "fp1 should have content");
+        assert_eq!(batch[0].as_ref().unwrap(), "Content for fp1");
+        assert!(batch[1].is_none(), "fp2 should NOT have content");
+        assert!(batch[2].is_some(), "fp3 should have content");
+        assert_eq!(batch[2].as_ref().unwrap(), "Content for fp3");
+
+        println!("[VERIFIED] test_content_batch_mixed: Batch retrieval handles mixed content correctly");
+    }
+
+    /// Test content for nonexistent fingerprint
+    #[tokio::test]
+    async fn test_content_nonexistent_id() {
+        let store = InMemoryTeleologicalStore::new();
+        let random_id = Uuid::new_v4();
+
+        // Get content for non-existent ID
+        let result = store.get_content(random_id).await.unwrap();
+        assert!(result.is_none(), "Should return None for non-existent ID");
+
+        // Delete content for non-existent ID
+        let deleted = store.delete_content(random_id).await.unwrap();
+        assert!(!deleted, "Should return false for non-existent ID");
+
+        println!("[VERIFIED] test_content_nonexistent_id: Content operations handle missing IDs correctly");
     }
 }

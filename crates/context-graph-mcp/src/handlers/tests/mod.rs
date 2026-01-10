@@ -42,6 +42,7 @@
 mod causal;
 mod cognitive_pulse;
 mod consciousness_dispatch;
+mod content_storage_verification;
 mod exhaustive_mcp_tools;
 mod error_codes;
 mod full_state_verification;

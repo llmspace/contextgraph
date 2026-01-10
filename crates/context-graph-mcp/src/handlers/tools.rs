@@ -417,6 +417,29 @@ impl Handlers {
             return self.tool_error_with_pulse(id, &format!("Storage failed: {}", e));
         }
 
+        // TASK-CONTENT-001: Store content text alongside fingerprint
+        // Content storage failure is non-fatal - fingerprint is primary data
+        // Pattern matches store_memory implementation for API consistency
+        if let Err(e) = self
+            .teleological_store
+            .store_content(fingerprint_id, &content)
+            .await
+        {
+            warn!(
+                fingerprint_id = %fingerprint_id,
+                error = %e,
+                content_size = content.len(),
+                "inject_context: Failed to store content text (fingerprint saved successfully). \
+                 Content retrieval will return None for this fingerprint."
+            );
+        } else {
+            debug!(
+                fingerprint_id = %fingerprint_id,
+                content_size = content.len(),
+                "inject_context: Content text stored successfully"
+            );
+        }
+
         self.tool_result_with_pulse(
             id,
             json!({
@@ -915,6 +938,13 @@ impl Handlers {
         };
 
         let top_k = args.get("topK").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
+
+        // TASK-CONTENT-002: Parse includeContent parameter (default: false for backward compatibility)
+        let include_content = args
+            .get("includeContent")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
         let options = TeleologicalSearchOptions::quick(top_k);
 
         // Generate query embedding
@@ -932,16 +962,47 @@ impl Handlers {
             .await
         {
             Ok(results) => {
+                // TASK-CONTENT-003: Hydrate content if requested
+                // Batch retrieve content for all results to minimize I/O
+                let contents: Vec<Option<String>> = if include_content && !results.is_empty() {
+                    let ids: Vec<uuid::Uuid> =
+                        results.iter().map(|r| r.fingerprint.id).collect();
+                    match self.teleological_store.get_content_batch(&ids).await {
+                        Ok(c) => c,
+                        Err(e) => {
+                            warn!(
+                                error = %e,
+                                result_count = results.len(),
+                                "search_graph: Content hydration failed. Results will not include content."
+                            );
+                            // Return None for all - graceful degradation
+                            vec![None; ids.len()]
+                        }
+                    }
+                } else {
+                    // Not requested or no results - empty vec
+                    vec![]
+                };
+
                 let results_json: Vec<_> = results
                     .iter()
-                    .map(|r| {
-                        json!({
+                    .enumerate()
+                    .map(|(i, r)| {
+                        let mut entry = json!({
                             "fingerprintId": r.fingerprint.id.to_string(),
                             "similarity": r.similarity,
                             "purposeAlignment": r.purpose_alignment,
                             "dominantEmbedder": r.dominant_embedder(),
                             "thetaToNorthStar": r.fingerprint.theta_to_north_star
-                        })
+                        });
+                        // Only include content field when includeContent=true
+                        if include_content {
+                            entry["content"] = match contents.get(i).and_then(|c| c.as_ref()) {
+                                Some(c) => json!(c),
+                                None => serde_json::Value::Null,
+                            };
+                        }
+                        entry
                     })
                     .collect();
 
