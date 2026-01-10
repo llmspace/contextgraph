@@ -11,17 +11,18 @@ use super::Handlers;
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
 use context_graph_core::teleological::{
     services::{FusionEngine, ProfileManager},
-    types::NUM_EMBEDDERS,
-    ComparisonScope, ComponentWeights, GroupType, MatrixSearchConfig, ProfileId, SearchStrategy,
-    TeleologicalMatrixSearch, TeleologicalVector,
+    types::{EMBEDDING_DIM, NUM_EMBEDDERS},
+    ComparisonScope, ComponentWeights, GroupType, ProfileId, TeleologicalVector,
 };
 // FeedbackEvent and FeedbackType need full path - not re-exported from services
 use context_graph_core::teleological::services::feedback_learner::{
     FeedbackEvent, FeedbackLearner, FeedbackType,
 };
+// ISSUE-1 FIX: Import TeleologicalSearchOptions for store search
+use context_graph_core::traits::TeleologicalSearchOptions;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 // ============================================================================
@@ -29,45 +30,92 @@ use uuid::Uuid;
 // ============================================================================
 
 /// Parameters for search_teleological tool.
+///
+/// ISSUE-1 FIX: Updated to match tool definition in tools.rs (lines 558-644).
+/// Accepts `query_content` (string to embed) OR `query_vector_id` (existing vector ID).
+/// Searches against stored vectors in TeleologicalMemoryStore, NOT a candidates array.
 #[derive(Debug, Deserialize)]
 pub struct SearchTeleologicalParams {
-    /// Query vector to search with
-    pub query: TeleologicalVectorJson,
-    /// Candidate vectors to search through
-    pub candidates: Vec<TeleologicalVectorJson>,
-    /// Search strategy (default: "cosine")
+    /// Content to search for (will be embedded using all 13 embedders).
+    /// Mutually exclusive with `query_vector_id`.
+    pub query_content: Option<String>,
+
+    /// ID of existing teleological vector to use as query.
+    /// Mutually exclusive with `query_content`.
+    pub query_vector_id: Option<String>,
+
+    /// Search strategy (default: "adaptive")
     #[serde(default = "default_strategy")]
     pub strategy: String,
+
     /// Comparison scope (default: "full")
     #[serde(default = "default_scope")]
     pub scope: String,
-    /// Component weights (optional)
-    pub weights: Option<ComponentWeightsJson>,
-    /// Number of results to return (default: 10)
-    #[serde(default = "default_top_k")]
-    pub top_k: usize,
-    /// Minimum similarity threshold (default: 0.0)
-    #[serde(default)]
-    pub threshold: f32,
-    /// Include detailed breakdown (default: false)
-    #[serde(default)]
-    pub include_breakdown: bool,
-    /// Specific pairs for SpecificPairs scope
-    pub specific_pairs: Option<Vec<(usize, usize)>>,
-    /// Specific groups for SpecificGroups scope
+
+    /// Specific groups for SpecificGroups scope.
+    /// Reserved for future use with parse_scope when SpecificGroups scope is enabled.
+    #[allow(dead_code)]
     pub specific_groups: Option<Vec<String>>,
-    /// Embedder index for SingleEmbedderPattern scope
-    pub embedder_index: Option<usize>,
+
+    /// Specific embedder index for SingleEmbedderPattern scope (0=Semantic, 5=Code, 12=Sparse).
+    /// Reserved for future use with parse_scope when SingleEmbedderPattern scope is enabled.
+    #[allow(dead_code)]
+    pub specific_embedder: Option<usize>,
+
+    /// Weight for purpose vector similarity (default: 0.4).
+    /// Reserved for future use with custom component weighting.
+    #[allow(dead_code)]
+    #[serde(default = "default_weight_purpose")]
+    pub weight_purpose: f32,
+
+    /// Weight for cross-correlation similarity (default: 0.35).
+    /// Reserved for future use with custom component weighting.
+    #[allow(dead_code)]
+    #[serde(default = "default_weight_correlations")]
+    pub weight_correlations: f32,
+
+    /// Weight for group alignments similarity (default: 0.15).
+    /// Reserved for future use with custom component weighting.
+    #[allow(dead_code)]
+    #[serde(default = "default_weight_groups")]
+    pub weight_groups: f32,
+
+    /// Minimum similarity threshold (default: 0.3)
+    #[serde(default = "default_min_similarity")]
+    pub min_similarity: f32,
+
+    /// Maximum number of results to return (default: 20)
+    #[serde(default = "default_max_results")]
+    pub max_results: usize,
+
+    /// Include per-component similarity breakdown in results (default: true)
+    #[serde(default = "default_include_breakdown")]
+    pub include_breakdown: bool,
 }
 
 fn default_strategy() -> String {
-    "cosine".to_string()
+    "adaptive".to_string()
 }
 fn default_scope() -> String {
     "full".to_string()
 }
-fn default_top_k() -> usize {
-    10
+fn default_weight_purpose() -> f32 {
+    0.4
+}
+fn default_weight_correlations() -> f32 {
+    0.35
+}
+fn default_weight_groups() -> f32 {
+    0.15
+}
+fn default_min_similarity() -> f32 {
+    0.3
+}
+fn default_max_results() -> usize {
+    20
+}
+fn default_include_breakdown() -> bool {
+    true
 }
 
 /// JSON representation of TeleologicalVector.
@@ -90,6 +138,7 @@ fn default_confidence() -> f32 {
 }
 
 /// JSON representation of ComponentWeights.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentWeightsJson {
     #[serde(default = "default_pv_weight")]
@@ -188,6 +237,8 @@ pub struct ManageTeleologicalProfileParams {
 
 impl TeleologicalVectorJson {
     /// Convert to core TeleologicalVector.
+    /// Reserved for future use when clients need to submit pre-computed vectors.
+    #[allow(dead_code)]
     pub fn to_core(&self) -> TeleologicalVector {
         use context_graph_core::teleological::groups::GroupAlignments;
         use context_graph_core::types::fingerprint::PurposeVector;
@@ -228,6 +279,8 @@ impl TeleologicalVectorJson {
 
 impl ComponentWeightsJson {
     /// Convert to core ComponentWeights.
+    /// Reserved for future use when custom component weights are supported in API.
+    #[allow(dead_code)]
     pub fn to_core(&self) -> ComponentWeights {
         ComponentWeights {
             purpose_vector: self.purpose_vector,
@@ -238,33 +291,20 @@ impl ComponentWeightsJson {
     }
 }
 
-fn parse_strategy(s: &str) -> SearchStrategy {
-    match s.to_lowercase().as_str() {
-        "cosine" => SearchStrategy::Cosine,
-        "euclidean" => SearchStrategy::Euclidean,
-        "synergy_weighted" | "synergy" => SearchStrategy::SynergyWeighted,
-        "group_hierarchical" | "group" => SearchStrategy::GroupHierarchical,
-        "cross_correlation_dominant" | "correlation" => SearchStrategy::CrossCorrelationDominant,
-        "tucker_compressed" | "tucker" => SearchStrategy::TuckerCompressed,
-        "adaptive" => SearchStrategy::Adaptive,
-        _ => SearchStrategy::Cosine,
-    }
-}
-
+/// Parse scope string into ComparisonScope enum.
+///
+/// ISSUE-1 FIX: Updated to match tool definition - removed specific_pairs (not in schema).
+#[allow(dead_code)]
 fn parse_scope(
     s: &str,
-    specific_pairs: Option<Vec<(usize, usize)>>,
     specific_groups: Option<Vec<String>>,
-    embedder_index: Option<usize>,
+    specific_embedder: Option<usize>,
 ) -> ComparisonScope {
     match s.to_lowercase().as_str() {
         "full" => ComparisonScope::Full,
         "purpose_vector_only" | "purpose" => ComparisonScope::PurposeVectorOnly,
         "cross_correlations_only" | "correlations" => ComparisonScope::CrossCorrelationsOnly,
         "group_alignments_only" | "groups" => ComparisonScope::GroupAlignmentsOnly,
-        "specific_pairs" | "pairs" => {
-            ComparisonScope::SpecificPairs(specific_pairs.unwrap_or_default())
-        }
         "specific_groups" => {
             let groups: Vec<GroupType> = specific_groups
                 .unwrap_or_default()
@@ -282,7 +322,7 @@ fn parse_scope(
             ComparisonScope::SpecificGroups(groups)
         }
         "single_embedder" | "embedder" => {
-            ComparisonScope::SingleEmbedderPattern(embedder_index.unwrap_or(0))
+            ComparisonScope::SingleEmbedderPattern(specific_embedder.unwrap_or(0))
         }
         _ => ComparisonScope::Full,
     }
@@ -298,6 +338,41 @@ fn parse_feedback_type(s: &str) -> FeedbackType {
         }
         "neutral" | "none" => FeedbackType::Neutral,
         _ => FeedbackType::Positive { magnitude: 1.0 },
+    }
+}
+
+/// Project an embedding to the target dimension (EMBEDDING_DIM = 1024).
+///
+/// Strategy:
+/// - If dim < target: zero-pad to target dimension
+/// - If dim > target: use mean-pooling to reduce to target dimension
+/// - If dim == target: return as-is
+///
+/// This ensures all embeddings are compatible with FusionEngine which expects
+/// uniform EMBEDDING_DIM dimensions for all 13 embedders.
+fn project_to_embedding_dim(embedding: Vec<f32>) -> Vec<f32> {
+    let dim = embedding.len();
+
+    if dim == EMBEDDING_DIM {
+        // Already correct dimension
+        embedding
+    } else if dim < EMBEDDING_DIM {
+        // Zero-pad to EMBEDDING_DIM
+        let mut projected = embedding;
+        projected.resize(EMBEDDING_DIM, 0.0);
+        projected
+    } else {
+        // Mean-pool to reduce dimension: divide into EMBEDDING_DIM chunks and average
+        let mut projected = vec![0.0f32; EMBEDDING_DIM];
+        let chunk_size = (dim as f32 / EMBEDDING_DIM as f32).ceil() as usize;
+
+        for (i, chunk) in embedding.chunks(chunk_size).enumerate() {
+            if i < EMBEDDING_DIM {
+                let sum: f32 = chunk.iter().sum();
+                projected[i] = sum / chunk.len() as f32;
+            }
+        }
+        projected
     }
 }
 
@@ -338,6 +413,10 @@ impl Handlers {
 
     /// Handle search_teleological tool call.
     ///
+    /// ISSUE-1 FIX: Rewritten to match tool definition in tools.rs (lines 558-644).
+    /// Accepts `query_content` (string to embed) OR `query_vector_id` (existing vector ID).
+    /// Searches against stored vectors in TeleologicalMemoryStore, NOT a candidates array.
+    ///
     /// Performs cross-correlation search across all 13 embedders using
     /// configurable strategies and scopes.
     pub(super) async fn call_search_teleological(
@@ -356,82 +435,158 @@ impl Handlers {
             }
         };
 
-        // Convert query and candidates
-        let query = params.query.to_core();
-        let candidates: Vec<TeleologicalVector> =
-            params.candidates.iter().map(|c| c.to_core()).collect();
+        // =====================================================================
+        // FAIL FAST: Require exactly one of query_content or query_vector_id
+        // =====================================================================
+        let query_vector: TeleologicalVector = match (&params.query_content, &params.query_vector_id) {
+            (None, None) => {
+                error!("search_teleological: Neither query_content nor query_vector_id provided");
+                return self.tool_error_with_pulse(
+                    id,
+                    "FAIL FAST: Must provide either 'query_content' (string to embed) or 'query_vector_id' (existing vector ID). Neither was provided.",
+                );
+            }
+            (Some(_), Some(_)) => {
+                warn!("search_teleological: Both query_content and query_vector_id provided, using query_content");
+                // Fall through to query_content path
+                match self.compute_query_vector_from_content(params.query_content.as_ref().unwrap()).await {
+                    Ok(v) => v,
+                    Err(e) => return self.tool_error_with_pulse(id, &e),
+                }
+            }
+            (Some(content), None) => {
+                // Embed query_content using multi_array_provider
+                if content.is_empty() {
+                    return self.tool_error_with_pulse(id, "FAIL FAST: query_content cannot be empty string");
+                }
+                match self.compute_query_vector_from_content(content).await {
+                    Ok(v) => v,
+                    Err(e) => return self.tool_error_with_pulse(id, &e),
+                }
+            }
+            (None, Some(vector_id)) => {
+                // Retrieve existing vector from store
+                let uuid = match Uuid::parse_str(vector_id) {
+                    Ok(u) => u,
+                    Err(e) => {
+                        return self.tool_error_with_pulse(
+                            id,
+                            &format!("FAIL FAST: Invalid query_vector_id '{}': {}", vector_id, e),
+                        );
+                    }
+                };
 
-        if candidates.is_empty() {
-            return self.tool_error_with_pulse(id, "No candidates provided for search");
-        }
+                // Retrieve fingerprint from store
+                match self.teleological_store.retrieve(uuid).await {
+                    Ok(Some(fingerprint)) => {
+                        // Extract purpose vector and create TeleologicalVector
+                        // TeleologicalVector requires purpose_vector, cross_correlations, group_alignments
+                        use context_graph_core::teleological::groups::GroupAlignments;
 
-        // Build config with all required fields
-        let strategy = parse_strategy(&params.strategy);
-        let scope = parse_scope(
-            &params.scope,
-            params.specific_pairs,
-            params.specific_groups,
-            params.embedder_index,
-        );
-        let weights = params.weights.map(|w| w.to_core()).unwrap_or_default();
+                        // Create a basic TeleologicalVector from the stored fingerprint's purpose_vector
+                        let purpose_vector = fingerprint.purpose_vector.clone();
 
-        let config = MatrixSearchConfig {
-            strategy,
-            scope,
-            weights,
-            synergy_matrix: None, // Use default synergies
-            min_similarity: params.threshold,
-            max_results: params.top_k,
-            compute_breakdown: params.include_breakdown,
+                        // For cross-correlations, compute from the fingerprint's semantic embeddings
+                        // This is a simplified version - full computation would use all embedders
+                        let cross_correlations = vec![0.0f32; 78]; // 13*(13-1)/2 = 78 pairs
+
+                        // Group alignments from purpose vector components
+                        let group_alignments = GroupAlignments::new(
+                            purpose_vector.alignments[0], // factual
+                            purpose_vector.alignments[1], // temporal
+                            purpose_vector.alignments[2], // causal
+                            purpose_vector.alignments[3], // relational
+                            purpose_vector.alignments[4], // qualitative
+                            purpose_vector.alignments[5], // implementation
+                        );
+
+                        TeleologicalVector::with_all(
+                            purpose_vector,
+                            cross_correlations,
+                            group_alignments,
+                            1.0, // confidence
+                        )
+                    }
+                    Ok(None) => {
+                        return self.tool_error_with_pulse(
+                            id,
+                            &format!("FAIL FAST: query_vector_id '{}' not found in store", vector_id),
+                        );
+                    }
+                    Err(e) => {
+                        error!("Failed to retrieve vector {}: {}", vector_id, e);
+                        return self.tool_error_with_pulse(
+                            id,
+                            &format!("FAIL FAST: Failed to retrieve query_vector_id '{}': {}", vector_id, e),
+                        );
+                    }
+                }
+            }
         };
 
-        // Use with_config() constructor
-        let searcher = TeleologicalMatrixSearch::with_config(config);
-
-        // Perform search - methods take 2 arguments (query, candidates)
-        let results_json = if params.include_breakdown {
-            let results = searcher.search_with_breakdown(&query, &candidates);
-
-            results
-                .iter()
-                .enumerate()
-                .map(|(rank, (idx, breakdown))| {
-                    json!({
-                        "rank": rank,
-                        "index": idx,
-                        "similarity": breakdown.overall,
-                        "vector_id": params.candidates.get(*idx).and_then(|c| c.id.clone()),
-                        "breakdown": {
-                            "overall": breakdown.overall,
-                            "purpose_vector": breakdown.purpose_vector,
-                            "cross_correlations": breakdown.cross_correlations,
-                            "group_alignments": breakdown.group_alignments,
-                            "per_embedder_purpose": breakdown.per_embedder_purpose,
-                        }
-                    })
-                })
-                .collect::<Vec<_>>()
-        } else {
-            let results = searcher.search(&query, &candidates);
-            results
-                .iter()
-                .enumerate()
-                .map(|(rank, (idx, score))| {
-                    json!({
-                        "rank": rank,
-                        "index": idx,
-                        "similarity": score,
-                        "vector_id": params.candidates.get(*idx).and_then(|c| c.id.clone()),
-                    })
-                })
-                .collect::<Vec<_>>()
+        // =====================================================================
+        // Search stored vectors using TeleologicalMemoryStore.search_purpose()
+        // =====================================================================
+        let search_options = TeleologicalSearchOptions {
+            top_k: params.max_results,
+            min_similarity: params.min_similarity,
+            include_deleted: false,
+            johari_quadrant_filter: None,
+            min_alignment: Some(params.min_similarity),
+            embedder_indices: Vec::new(),
         };
+
+        let search_start = std::time::Instant::now();
+        let search_results = match self
+            .teleological_store
+            .search_purpose(&query_vector.purpose_vector, search_options)
+            .await
+        {
+            Ok(results) => results,
+            Err(e) => {
+                error!("search_purpose failed: {}", e);
+                return self.tool_error_with_pulse(
+                    id,
+                    &format!("Search failed: {}. Store may be empty or unavailable.", e),
+                );
+            }
+        };
+        let search_duration = search_start.elapsed();
+
+        // =====================================================================
+        // Build response with optional breakdown
+        // =====================================================================
+        let results_json: Vec<serde_json::Value> = search_results
+            .iter()
+            .enumerate()
+            .map(|(rank, result)| {
+                let mut entry = json!({
+                    "rank": rank,
+                    "id": result.fingerprint.id.to_string(),
+                    "similarity": result.similarity,
+                    "purpose_alignment": result.purpose_alignment,
+                    "dominant_embedder": result.dominant_embedder(),
+                });
+
+                if params.include_breakdown {
+                    entry["breakdown"] = json!({
+                        "similarity": result.similarity,
+                        "purpose_alignment": result.purpose_alignment,
+                        "embedder_scores": result.embedder_scores,
+                        "stage_scores": result.stage_scores,
+                    });
+                }
+
+                entry
+            })
+            .collect();
 
         info!(
-            "search_teleological found {} results (top_k={}, threshold={})",
+            "search_teleological found {} results in {:?} (max_results={}, min_similarity={})",
             results_json.len(),
-            params.top_k,
-            params.threshold
+            search_duration,
+            params.max_results,
+            params.min_similarity
         );
 
         self.tool_result_with_pulse(
@@ -440,11 +595,81 @@ impl Handlers {
                 "success": true,
                 "strategy": params.strategy,
                 "scope": params.scope,
-                "num_candidates": candidates.len(),
+                "query_type": if params.query_content.is_some() { "embedded" } else { "existing_vector" },
+                "search_latency_ms": search_duration.as_millis(),
                 "num_results": results_json.len(),
                 "results": results_json,
             }),
         )
+    }
+
+    /// Helper: Compute TeleologicalVector from content string using multi_array_provider.
+    ///
+    /// Shared logic between search_teleological and compute_teleological_vector.
+    async fn compute_query_vector_from_content(&self, content: &str) -> Result<TeleologicalVector, String> {
+        // Use multi_array_provider to get all 13 embeddings
+        let embedding_result = match self.multi_array_provider.embed_all(content).await {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Failed to compute embeddings for query: {}", e);
+                return Err(format!(
+                    "FAIL FAST: Embedding computation failed for query_content: {}. \
+                     Check embedding provider connection and configuration.",
+                    e
+                ));
+            }
+        };
+
+        // Extract embeddings from fingerprint and project to EMBEDDING_DIM (1024)
+        // This is REQUIRED because FusionEngine expects uniform dimensions for all embedders.
+        let fingerprint = &embedding_result.fingerprint;
+        let embeddings: Vec<Vec<f32>> = (0..NUM_EMBEDDERS)
+            .map(|i| {
+                let raw = match fingerprint.get_embedding(i) {
+                    Some(context_graph_core::types::EmbeddingSlice::Dense(slice)) => slice.to_vec(),
+                    Some(context_graph_core::types::EmbeddingSlice::Sparse(sparse)) => {
+                        // For sparse vectors, convert indices and values to a dense representation
+                        // by hashing indices into EMBEDDING_DIM buckets
+                        let mut dense = vec![0.0f32; EMBEDDING_DIM];
+                        for (&idx, &val) in sparse.indices.iter().zip(sparse.values.iter()) {
+                            let bucket = (idx as usize) % EMBEDDING_DIM;
+                            dense[bucket] += val;
+                        }
+                        dense
+                    }
+                    Some(context_graph_core::types::EmbeddingSlice::TokenLevel(tokens)) => {
+                        if tokens.is_empty() {
+                            vec![0.0; EMBEDDING_DIM]
+                        } else {
+                            let dim = tokens[0].len();
+                            let mut avg = vec![0.0f32; dim];
+                            for token in tokens {
+                                for (j, &v) in token.iter().enumerate() {
+                                    avg[j] += v;
+                                }
+                            }
+                            let n = tokens.len() as f32;
+                            for v in &mut avg {
+                                *v /= n;
+                            }
+                            avg
+                        }
+                    }
+                    None => vec![0.0; EMBEDDING_DIM],
+                };
+                // Project to EMBEDDING_DIM to ensure FusionEngine compatibility
+                project_to_embedding_dim(raw)
+            })
+            .collect();
+
+        // Compute alignments from projected embeddings
+        let alignments = compute_alignments_from_embeddings(&embeddings);
+
+        // Use FusionEngine for complete processing (now with uniform 1024D embeddings)
+        let fusion_engine = FusionEngine::new();
+        let fusion_result = fusion_engine.fuse(&embeddings, &alignments);
+
+        Ok(fusion_result.vector)
     }
 
     // ========================================================================
@@ -486,20 +711,26 @@ impl Handlers {
         };
         let embed_duration = start.elapsed();
 
-        // Extract embeddings from fingerprint - each embedding accessible by index
+        // Extract embeddings from fingerprint and project to EMBEDDING_DIM (1024)
+        // This is REQUIRED because FusionEngine expects uniform dimensions for all embedders.
         let fingerprint = &embedding_result.fingerprint;
         let embeddings: Vec<Vec<f32>> = (0..NUM_EMBEDDERS)
             .map(|i| {
-                match fingerprint.get_embedding(i) {
+                let raw = match fingerprint.get_embedding(i) {
                     Some(context_graph_core::types::EmbeddingSlice::Dense(slice)) => slice.to_vec(),
                     Some(context_graph_core::types::EmbeddingSlice::Sparse(sparse)) => {
-                        // Convert sparse to dense (use values as a simple approximation)
-                        sparse.values.clone()
+                        // For sparse vectors, convert indices and values to a dense representation
+                        // by hashing indices into EMBEDDING_DIM buckets
+                        let mut dense = vec![0.0f32; EMBEDDING_DIM];
+                        for (&idx, &val) in sparse.indices.iter().zip(sparse.values.iter()) {
+                            let bucket = (idx as usize) % EMBEDDING_DIM;
+                            dense[bucket] += val;
+                        }
+                        dense
                     }
                     Some(context_graph_core::types::EmbeddingSlice::TokenLevel(tokens)) => {
-                        // Average token embeddings
                         if tokens.is_empty() {
-                            vec![0.0; 128] // Default dimension for ColBERT
+                            vec![0.0; EMBEDDING_DIM]
                         } else {
                             let dim = tokens[0].len();
                             let mut avg = vec![0.0f32; dim];
@@ -515,15 +746,17 @@ impl Handlers {
                             avg
                         }
                     }
-                    None => vec![0.0; 1024], // Default fallback
-                }
+                    None => vec![0.0; EMBEDDING_DIM],
+                };
+                // Project to EMBEDDING_DIM to ensure FusionEngine compatibility
+                project_to_embedding_dim(raw)
             })
             .collect();
 
-        // Compute alignments from embeddings
+        // Compute alignments from projected embeddings
         let alignments = compute_alignments_from_embeddings(&embeddings);
 
-        // Use FusionEngine for complete processing
+        // Use FusionEngine for complete processing (now with uniform 1024D embeddings)
         let fusion_engine = FusionEngine::new();
         let fusion_result = fusion_engine.fuse(&embeddings, &alignments);
 

@@ -45,6 +45,147 @@ The SELF_EGO_NODE is a special TeleologicalArray that:
 4. Anchors goal hierarchies and meta-cognition
 5. Stores persistent identity across sessions
 
+## Claude Code Integration
+
+### SessionStart Hook Integration
+
+The SELF_EGO_NODE is initialized/loaded during SessionStart hook:
+
+**settings.json Configuration:**
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": ".claude/hooks/ego-init.sh \"$SESSION_ID\"",
+        "timeout": 5000
+      }
+    ]
+  }
+}
+```
+
+**Shell Script (.claude/hooks/ego-init.sh):**
+```bash
+#!/bin/bash
+SESSION_ID="$1"
+# Initialize or restore ego node for session
+npx claude-flow@v3alpha hooks session-start --session-id "$SESSION_ID" --init-ego
+```
+
+### GWT Consciousness Integration
+
+The SELF_EGO_NODE represents the core of agent consciousness in the GWT model:
+
+```rust
+/// Consciousness-aware ego context
+pub struct EgoConsciousnessContext {
+    /// Self-model from ego node
+    pub self_model: SelfModel,
+    /// Current consciousness state
+    pub consciousness_state: ConsciousnessState,
+    /// GWT integration score C(t) = I(t) × R(t) × D(t)
+    pub gwt_score: f32,
+    /// Self-awareness level (meta-cognition depth)
+    pub self_awareness: SelfAwareness,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum SelfAwareness {
+    /// No self-reflection
+    Unreflective,
+    /// Basic self-monitoring
+    Monitoring,
+    /// Active introspection
+    Introspective,
+    /// Deep self-understanding
+    Enlightened,
+}
+
+impl EgoConsciousnessContext {
+    /// Calculate self-awareness from meta-cognition
+    pub fn calculate_awareness(&self) -> SelfAwareness {
+        let meta = &self.self_model.meta;
+        let depth = meta.introspection.len() as f32 / 10.0;
+        let confidence = meta.confidence;
+        let awareness_score = (depth + confidence) / 2.0;
+
+        match awareness_score {
+            s if s < 0.3 => SelfAwareness::Unreflective,
+            s if s < 0.5 => SelfAwareness::Monitoring,
+            s if s < 0.8 => SelfAwareness::Introspective,
+            _ => SelfAwareness::Enlightened,
+        }
+    }
+}
+```
+
+### 13-Embedder Integration for Self-Model
+
+The ego node content is embedded across all 13 dimensions for rich self-representation:
+
+```rust
+impl EgoNodeManager {
+    /// Generate embeddings for self-model components
+    pub async fn embed_self_model(&self, embedder: &MultiEmbedder) -> StorageResult<EgoEmbeddings> {
+        let model = self.get_self_model().await?;
+
+        // E1: Semantic - identity and traits
+        let identity_text = format!("{} - {}", model.identity.name,
+            model.traits.expertise.join(", "));
+        let e1 = embedder.embed_semantic(&identity_text).await?;
+
+        // E7: Teleological - active goals
+        let goals_text = model.active_goals.iter()
+            .map(|g| g.description.clone())
+            .collect::<Vec<_>>()
+            .join("; ");
+        let e7 = embedder.embed_teleological(&goals_text).await?;
+
+        // E11: Emotional - meta-cognitive state
+        let meta_text = format!("confidence: {}, load: {}",
+            model.meta.confidence, model.meta.cognitive_load);
+        let e11 = embedder.embed_emotional(&meta_text).await?;
+
+        Ok(EgoEmbeddings { e1, e7, e11, /* ... other embeddings */ })
+    }
+}
+```
+
+### Memory Integration for Persistent Identity
+
+The ego node integrates with Claude Flow memory for cross-session persistence:
+
+```rust
+impl EgoNodeManager {
+    /// Persist ego state to memory system
+    pub async fn persist_to_memory(&self, memory: &MemoryCoordinator) -> StorageResult<()> {
+        let model = self.get_self_model().await?;
+
+        memory.store(
+            "ego",  // namespace
+            "self_model",
+            &serde_json::to_string(&model)?,
+            None,  // no TTL - permanent
+        ).await?;
+
+        Ok(())
+    }
+
+    /// Restore ego state from memory system
+    pub async fn restore_from_memory(&self, memory: &MemoryCoordinator) -> StorageResult<Option<SelfModel>> {
+        if let Some(value) = memory.retrieve("ego", "self_model").await? {
+            let model: SelfModel = serde_json::from_str(&value)?;
+            // Update cache
+            *self.cache.write().await = Some(model.clone());
+            return Ok(Some(model));
+        }
+        Ok(None)
+    }
+}
+```
+
 ## Scope
 
 ### In Scope
@@ -391,6 +532,11 @@ impl SessionStartHandler {
 - [ ] Goals can be added/removed from ego
 - [ ] Cognitive load updates persist
 - [ ] Cache invalidates on update
+- [ ] SessionStart hook initializes ego node
+- [ ] GWT consciousness score calculated from self-model
+- [ ] Self-awareness level derived from meta-cognition
+- [ ] Ego embeddings generated across 13 dimensions
+- [ ] Memory persistence works cross-session
 
 ## Files to Create
 
@@ -399,6 +545,7 @@ impl SessionStartHandler {
 | `crates/context-graph-core/src/teleology/ego.rs` | Ego types and constants |
 | `crates/context-graph-storage/src/teleological/ego_manager.rs` | Ego node management |
 | Update `crates/context-graph-storage/src/teleological/store.rs` | Ego integration |
+| `.claude/hooks/ego-init.sh` | Ego initialization hook |
 
 ## Risk Assessment
 

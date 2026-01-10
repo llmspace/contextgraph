@@ -1,283 +1,692 @@
-# Claude Code Complete Reference Guide
+# Claude Code AI Agent Reference
 
-> **For AI Agents**: This comprehensive guide contains everything you need to optimally use Claude Code - the agentic coding tool from Anthropic. Read this document to understand all features, tools, hooks, subagents, skills, and commands available.
-
----
-
-## Table of Contents
-
-1. [Overview & Core Concepts](#1-overview--core-concepts)
-2. [Installation & Setup](#2-installation--setup)
-3. [Core CLI Commands & Options](#3-core-cli-commands--options)
-4. [Configuration & Settings](#4-configuration--settings)
-5. [Memory System (CLAUDE.md)](#5-memory-system-claudemd)
-6. [Available Tools](#6-available-tools)
-7. [Model Selection](#7-model-selection)
-8. [Built-in Slash Commands](#8-built-in-slash-commands)
-9. [Custom Slash Commands](#9-custom-slash-commands)
-10. [Skills System](#10-skills-system)
-11. [Subagents & Task Tool](#11-subagents--task-tool)
-12. [Hooks System](#12-hooks-system)
-13. [MCP Integration](#13-mcp-integration)
-14. [IDE Integrations](#14-ide-integrations)
-15. [Keyboard Shortcuts](#15-keyboard-shortcuts)
-16. [Permissions & Security](#16-permissions--security)
-17. [Best Practices](#17-best-practices)
-18. [Troubleshooting](#18-troubleshooting)
+> Complete reference for building hooks, skills, subagents, and slash commands in Claude Code (Jan 2026).
 
 ---
 
-## 1. Overview & Core Concepts
+## Quick Reference
 
-### What is Claude Code?
-
-Claude Code is Anthropic's **agentic coding tool** that operates in your terminal and IDE. It understands your entire codebase and can:
-
-- **Build features** from natural language descriptions
-- **Debug and fix** issues automatically
-- **Navigate and understand** entire codebases
-- **Automate** tedious development tasks
-- **Execute actions directly** (edit files, run commands, create commits)
-
-### Key Principles
-
-1. **Agentic Execution**: Claude Code can take autonomous actions, not just suggest code
-2. **Context-Aware**: Understands your project structure, dependencies, and patterns
-3. **Tool-Based**: Uses specific tools for different operations (Read, Write, Edit, Bash, etc.)
-4. **Permission-Controlled**: Asks permission before potentially destructive actions
-5. **Extensible**: Custom hooks, skills, subagents, and MCP integrations
-
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                      Claude Code                         │
-├─────────────────────────────────────────────────────────┤
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐    │
-│  │  Tools  │  │  Hooks  │  │ Skills  │  │Subagents│    │
-│  └─────────┘  └─────────┘  └─────────┘  └─────────┘    │
-├─────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐  ┌─────────────────────────────┐  │
-│  │ Memory System   │  │    MCP Servers              │  │
-│  │ (CLAUDE.md)     │  │    (External Integrations)  │  │
-│  └─────────────────┘  └─────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
-```
+| Extension | Location | Trigger | Purpose |
+|-----------|----------|---------|---------|
+| CLAUDE.md | `./CLAUDE.md` | Auto-loaded | Persistent project memory |
+| Slash Command | `.claude/commands/*.md` | Manual `/cmd` | User-invoked prompts |
+| Skill | `.claude/skills/*/SKILL.md` | Auto by context | Model-invoked capabilities |
+| Subagent | `.claude/agents/*.md` | Task tool | Isolated AI instances |
+| Hook | `settings.json` | Lifecycle events | Deterministic automation |
 
 ---
 
-## 2. Installation & Setup
+## 1. Hooks System
 
-### System Requirements
+Hooks are shell commands or LLM prompts that execute at specific lifecycle points. Configure in `~/.claude/settings.json`, `.claude/settings.json`, or `.claude/settings.local.json`.
 
-- **macOS** 10.15+ / **Ubuntu** 20.04+ / **Windows** 10+ (WSL/Git Bash)
-- **RAM**: 4 GB+ recommended
-- **Node.js**: 18+ (for npm installation)
-- **Internet**: Required for authentication
+### Hook Events
 
-### Installation Methods
+| Event | Trigger | Blocks? | Use Case |
+|-------|---------|---------|----------|
+| **PreToolUse** | Before tool runs | Yes | Validate/modify/block tools |
+| **PostToolUse** | After tool completes | No | Format, log, post-process |
+| **PermissionRequest** | Permission dialog shown | Yes | Auto-allow/deny operations |
+| **UserPromptSubmit** | User submits message | Yes | Add context, validate input |
+| **Stop** | Main agent finishes | Yes | Force continuation, verify completion |
+| **SubagentStop** | Subagent finishes | Yes | Validate subagent output |
+| **SessionStart** | Session begins/resumes | No | Load context, setup env |
+| **SessionEnd** | Session terminates | No | Cleanup, logging |
+| **PreCompact** | Before context compression | No | Backup transcripts |
+| **Notification** | Notification sent | No | Custom notifications |
 
-```bash
-# Native install (macOS/Linux) - Recommended
-curl -fsSL https://claude.ai/install.sh | bash
+### Hook Types
 
-# Homebrew (macOS)
-brew install --cask claude-code
-
-# NPM (all platforms)
-npm install -g @anthropic-ai/claude-code
-
-# Verify installation
-claude --version
+**Command Hook** (`type: "command"`): Executes shell command
+```json
+{
+  "type": "command",
+  "command": "/path/to/script.sh",
+  "timeout": 30000
+}
 ```
 
-### Initial Setup
-
-```bash
-# Start Claude Code (triggers authentication)
-claude
-
-# Run diagnostics
-claude doctor
-
-# Initialize project memory
-claude /init
+**Prompt Hook** (`type: "prompt"`): LLM evaluation (Stop/SubagentStop only)
+```json
+{
+  "type": "prompt",
+  "prompt": "Evaluate if all tasks complete. Context: $ARGUMENTS",
+  "timeout": 30000
+}
 ```
 
-### Authentication Methods
-
-| Method | Best For | Setup |
-|--------|----------|-------|
-| **Claude Pro/Max** | Individual developers | Browser-based OAuth |
-| **Claude Console** | API billing | `ANTHROPIC_API_KEY` env var |
-| **Claude for Teams** | Team collaboration | Organization SSO |
-| **AWS Bedrock** | AWS users | `AWS_BEARER_TOKEN_BEDROCK` |
-| **Google Vertex AI** | GCP users | `GOOGLE_APPLICATION_CREDENTIALS` |
-
----
-
-## 3. Core CLI Commands & Options
-
-### Essential Commands
-
-```bash
-# Start interactive REPL
-claude
-
-# Execute single query and exit
-claude -p "explain this codebase"
-
-# Continue previous session
-claude -c
-
-# Resume specific session by ID
-claude -r "session-id"
-
-# Update to latest version
-claude update
-
-# System health check
-claude doctor
-```
-
-### Key Flags
-
-| Flag | Description | Example |
-|------|-------------|---------|
-| `--model <name>` | Specify model | `claude --model opus` |
-| `-p, --prompt` | Non-interactive prompt | `claude -p "fix the bug"` |
-| `-c, --continue` | Continue last session | `claude -c` |
-| `-r, --resume` | Resume specific session | `claude -r abc123` |
-| `--system-prompt` | Custom system prompt | `claude --system-prompt "Be concise"` |
-| `--tools` | Restrict available tools | `claude --tools "Read,Grep,Glob"` |
-| `--permission-mode` | Set permission mode | `claude --permission-mode plan` |
-| `--output-format` | Output format | `claude --output-format json` |
-| `--agents` | Define session agents | `claude --agents '{...}'` |
-| `--verbose` | Enable verbose output | `claude --verbose` |
-
-### Permission Modes
-
-| Mode | Description |
-|------|-------------|
-| `default` | Ask for permission on sensitive actions |
-| `acceptEdits` | Auto-accept file edits, ask for others |
-| `bypassPermissions` | Skip all permission prompts (use carefully) |
-| `plan` | Read-only analysis mode (no modifications) |
-
----
-
-## 4. Configuration & Settings
-
-### Settings Hierarchy (Highest to Lowest Priority)
-
-1. **Managed settings** - IT/organization deployed (system-wide)
-2. **User settings** - `~/.claude/settings.json`
-3. **Project settings** - `.claude/settings.json` (shared with team)
-4. **Local settings** - `.claude/settings.local.json` (gitignored)
-
-### Configuration File Structure
+### Configuration Schema
 
 ```json
 {
-  "model": "claude-sonnet-4-20250514",
-  "permissions": {
-    "allow": ["Read", "Glob", "Grep"],
-    "deny": ["Bash(rm:*)", "Write(.env)"],
-    "ask": ["Edit", "Write", "Bash"]
-  },
   "hooks": {
-    "PreToolUse": [...],
-    "PostToolUse": [...]
-  },
-  "mcpServers": {
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"]
-    }
-  },
-  "env": {
-    "CUSTOM_VAR": "value"
+    "HookEvent": [
+      {
+        "matcher": "ToolPattern",
+        "hooks": [
+          { "type": "command|prompt", "command|prompt": "...", "timeout": 30000 }
+        ]
+      }
+    ]
   }
 }
 ```
 
-### Key Settings
+### Matchers
 
-| Setting | Purpose | Example |
-|---------|---------|---------|
-| `model` | Default model | `"claude-sonnet-4-20250514"` |
-| `permissions` | Tool access rules | `{"allow": [...], "deny": [...]}` |
-| `hooks` | Lifecycle hooks | See [Hooks System](#12-hooks-system) |
-| `mcpServers` | MCP server config | See [MCP Integration](#13-mcp-integration) |
-| `env` | Environment variables | `{"API_KEY": "..."}` |
-| `theme` | UI theme | `"dark"` or `"light"` |
+Matchers filter which tools trigger hooks (PreToolUse, PostToolUse, PermissionRequest only).
 
-### Managing Settings
+| Pattern | Matches |
+|---------|---------|
+| `"Write"` | Write tool only |
+| `"Write\|Edit"` | Write OR Edit |
+| `"*"` or `""` | All tools |
+| `"Bash(npm test*)"` | Bash with specific args |
+| `"mcp__github__.*"` | MCP tool pattern |
+| `"Notebook.*"` | Regex pattern |
 
-```bash
-# Open settings UI
-/config
+**Note**: Matchers are case-sensitive.
 
-# Edit specific setting file
-/config user     # ~/.claude/settings.json
-/config project  # .claude/settings.json
-/config local    # .claude/settings.local.json
+### Exit Codes
+
+| Code | Meaning | Behavior |
+|------|---------|----------|
+| `0` | Success | stdout processed; action continues |
+| `2` | Blocking error | stderr fed to Claude; action prevented |
+| Other | Non-blocking error | stderr shown; action continues |
+
+### JSON Output (stdout)
+
+**Command hooks** can return structured JSON:
+```json
+{
+  "decision": "allow|deny|ask",
+  "reason": "explanation for Claude",
+  "continue": true,
+  "stopReason": "shown to user when continue=false",
+  "suppressOutput": false,
+  "systemMessage": "warning shown to user",
+  "updatedInput": { "modified": "tool input" }
+}
+```
+
+**PreToolUse decisions**:
+- `"allow"`: Bypass permission, execute tool
+- `"deny"`: Block tool, show reason to Claude
+- `"ask"`: Show permission dialog to user
+
+**Prompt hooks** (Stop/SubagentStop) return:
+```json
+{
+  "decision": "approve|block",
+  "reason": "explanation",
+  "continue": true|false
+}
+```
+
+### Environment Variables
+
+| Variable | Scope | Value |
+|----------|-------|-------|
+| `CLAUDE_PROJECT_DIR` | All hooks | Project root path |
+| `CLAUDE_CODE_REMOTE` | All hooks | `"true"` if web |
+| `CLAUDE_ENV_FILE` | SessionStart only | Env file path for persistence |
+| `CLAUDE_TOOL_INPUT_*` | Tool hooks | Tool input fields |
+
+### stdin JSON Input
+
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "/path/to/transcript.jsonl",
+  "cwd": "/current/directory",
+  "permission_mode": "default|acceptEdits|bypassPermissions|plan",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {"command": "npm test"}
+}
+```
+
+### Complete Hook Examples
+
+**Auto-format after file edits**:
+```json
+{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "Write|Edit",
+      "hooks": [{
+        "type": "command",
+        "command": "prettier --write \"$CLAUDE_TOOL_INPUT_FILE_PATH\" 2>/dev/null || true"
+      }]
+    }]
+  }
+}
+```
+
+**Block sensitive files**:
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Write|Edit",
+      "hooks": [{
+        "type": "command",
+        "command": "if echo \"$CLAUDE_TOOL_INPUT_FILE_PATH\" | grep -qE '\\.(env|pem|key)$'; then echo '{\"decision\":\"deny\",\"reason\":\"Blocked: sensitive file\"}'; exit 0; fi"
+      }]
+    }]
+  }
+}
+```
+
+**Auto-approve test commands**:
+```json
+{
+  "hooks": {
+    "PermissionRequest": [{
+      "matcher": "Bash(npm test*)",
+      "hooks": [{
+        "type": "command",
+        "command": "echo '{\"decision\":\"allow\",\"reason\":\"Auto-approved test command\"}'"
+      }]
+    }]
+  }
+}
+```
+
+**Inject context on session start**:
+```json
+{
+  "hooks": {
+    "SessionStart": [{
+      "hooks": [{
+        "type": "command",
+        "command": "echo '## Context'; git status --short; echo '---'; cat TODO.md 2>/dev/null || true"
+      }]
+    }]
+  }
+}
+```
+
+**Force completion verification (prompt hook)**:
+```json
+{
+  "hooks": {
+    "Stop": [{
+      "hooks": [{
+        "type": "prompt",
+        "prompt": "Review if Claude completed ALL requested tasks. If incomplete, respond with {\"decision\":\"block\",\"reason\":\"Tasks remaining\",\"continue\":true}. If complete, respond {\"decision\":\"approve\",\"continue\":false}. Context: $ARGUMENTS"
+      }]
+    }]
+  }
+}
+```
+
+**Validate subagent output**:
+```json
+{
+  "hooks": {
+    "SubagentStop": [{
+      "hooks": [{
+        "type": "prompt",
+        "prompt": "Verify subagent fully completed assignment. Return {\"decision\":\"block\"} if work incomplete. Context: $ARGUMENTS"
+      }]
+    }]
+  }
+}
+```
+
+**Log all bash commands**:
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "hooks": [{
+        "type": "command",
+        "command": "echo \"$(date '+%Y-%m-%d %H:%M:%S'): $CLAUDE_TOOL_INPUT_COMMAND\" >> ~/.claude/bash.log"
+      }]
+    }]
+  }
+}
 ```
 
 ---
 
-## 5. Memory System (CLAUDE.md)
+## 2. Skills System
 
-### Memory Hierarchy
+Skills are model-invoked capabilities Claude automatically uses based on context matching. They load progressively to minimize context usage.
 
-Claude Code reads instructions from multiple sources in priority order:
+### Directory Structure
 
-1. **Enterprise CLAUDE.md** - Organization-wide rules (managed)
-2. **Project CLAUDE.md** - `./CLAUDE.md` (shared with team)
-3. **Modular rules** - `.claude/rules/*.md` (topic-specific)
-4. **User CLAUDE.md** - `~/.claude/CLAUDE.md` (personal)
-5. **Local CLAUDE.md** - `./CLAUDE.local.md` (gitignored)
+```
+.claude/skills/my-skill/
+├── SKILL.md           # Required: frontmatter + instructions
+├── scripts/           # Optional: executable code
+│   └── process.py
+├── references/        # Optional: documentation for context
+│   └── api.md
+└── assets/            # Optional: templates, binary files
+    └── template.html
+```
 
-### CLAUDE.md Best Practices
+Locations: `~/.claude/skills/` (user) or `.claude/skills/` (project)
+
+### SKILL.md Structure
+
+```yaml
+---
+name: my-skill
+description: |
+  What this skill does and when to use it.
+  Include keywords users might mention.
+  Example: "Analyze code quality and suggest improvements.
+  Use when reviewing code or checking for issues."
+allowed-tools: Read,Grep,Glob,Bash(npm:*)
+model: sonnet
+user-invocable: true
+disable-model-invocation: false
+version: 1.0.0
+---
+
+# Skill Title
+
+## Overview
+What this skill accomplishes.
+
+## Instructions
+1. Step one
+2. Step two
+
+## Resources
+- Scripts: `{baseDir}/scripts/process.py`
+- Reference: `{baseDir}/references/api.md`
+```
+
+### Frontmatter Fields
+
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| `name` | Yes | string | Identifier (lowercase, hyphens) |
+| `description` | Yes | string | Discovery trigger - be comprehensive |
+| `allowed-tools` | No | string | Comma-separated tools |
+| `model` | No | string | `sonnet`, `opus`, `haiku`, or `inherit` |
+| `user-invocable` | No | bool | Show in `/` menu (default: true) |
+| `disable-model-invocation` | No | bool | Block Skill tool access |
+| `version` | No | string | Semantic version |
+
+### allowed-tools Syntax
+
+```yaml
+# Basic tools
+allowed-tools: Read,Write,Bash,Glob,Grep
+
+# Scoped bash commands
+allowed-tools: Bash(git:*),Bash(npm:*),Read,Grep
+
+# Specific command patterns
+allowed-tools: Bash(git status:*),Bash(git diff:*),Read
+```
+
+### Progressive Disclosure
+
+1. **Metadata**: Name + description loaded at startup (~100 tokens)
+2. **SKILL.md body**: Loaded when skill triggers (<5k words)
+3. **Bundled resources**: Loaded on-demand by Claude
+
+### Best Practices
+
+- **Description is key**: Include all "when to use" triggers
+- **Keep SKILL.md < 500 lines**: Minimize context bloat
+- **Use references/**: Split large documentation
+- **Use scripts/**: Deterministic, token-efficient code
+- **Use {baseDir}**: Reference bundled files
+- **Write for Claude**: Don't explain obvious concepts
+
+### Skill Examples
+
+**Code Quality Analyzer**:
+```yaml
+---
+name: code-analyzer
+description: |
+  Analyze code quality, complexity metrics, and maintainability.
+  Use when reviewing code, checking quality, or looking for improvements.
+allowed-tools: Read,Grep,Glob
+model: sonnet
+---
+
+# Code Analyzer
+
+## Process
+1. Identify target files
+2. Analyze complexity (cyclomatic, cognitive)
+3. Check for code smells
+4. Generate prioritized recommendations
+
+## Output Format
+- Summary of findings
+- Detailed issues with line numbers
+- Prioritized action items
+```
+
+**PDF Processor**:
+```yaml
+---
+name: pdf
+description: |
+  Extract and analyze text from PDF documents.
+  Use when users need to read, process, or extract data from PDFs.
+allowed-tools: Read,Bash(python:*),Write
+---
+
+# PDF Processor
+
+## Quick Start
+Use pdfplumber for text extraction:
+```python
+import pdfplumber
+with pdfplumber.open("file.pdf") as pdf:
+    text = "\n".join(page.extract_text() for page in pdf.pages)
+```
+
+## Scripts
+- Extract text: `{baseDir}/scripts/extract.py`
+- Form filling: See `{baseDir}/references/forms.md`
+```
+
+---
+
+## 3. Subagents (Task Tool)
+
+Subagents are isolated Claude instances with separate context windows, spawned via the Task tool.
+
+### Task Tool Parameters
+
+| Parameter | Required | Type | Description |
+|-----------|----------|------|-------------|
+| `prompt` | Yes | string | Task instructions |
+| `subagent_type` | Yes | string | Agent type identifier |
+| `description` | Yes | string | 3-5 word summary |
+| `model` | No | string | `sonnet`, `opus`, `haiku` |
+| `run_in_background` | No | bool | Async execution |
+| `resume` | No | string | Agent ID to continue |
+
+### Built-in Subagent Types
+
+| Type | Model | Mode | Tools | Use Case |
+|------|-------|------|-------|----------|
+| **Explore** | Haiku | Read-only | Glob,Grep,Read | Fast codebase search |
+| **Plan** | Sonnet | Read-only | Glob,Grep,Read | Analysis, planning |
+| **general-purpose** | Sonnet | Read/Write | All | Complex multi-step tasks |
+
+### Task Tool Usage
+
+```python
+# Fast exploration
+Task(
+    prompt="Find all authentication-related files and patterns",
+    subagent_type="Explore",
+    description="Search auth files"
+)
+
+# Complex implementation
+Task(
+    prompt="Refactor the user service to use dependency injection",
+    subagent_type="general-purpose",
+    description="Refactor user service",
+    model="opus"
+)
+
+# Background execution
+Task(
+    prompt="Analyze security vulnerabilities in src/",
+    subagent_type="security-reviewer",
+    run_in_background=True,
+    description="Security scan"
+)
+
+# Resume previous agent
+Task(
+    prompt="Continue the analysis",
+    subagent_type="general-purpose",
+    resume="agent-id-abc123",
+    description="Continue analysis"
+)
+
+# Parallel execution (multiple Task calls in one message)
+Task(prompt="Analyze src/services/", subagent_type="Explore", description="Analyze services")
+Task(prompt="Analyze src/components/", subagent_type="Explore", description="Analyze components")
+```
+
+### Custom Subagent Definition
+
+**.claude/agents/security-reviewer.md**:
+```yaml
+---
+name: security-reviewer
+description: |
+  Security specialist. Use PROACTIVELY for security analysis,
+  vulnerability assessment, and code audits.
+tools: Read,Grep,Glob
+model: opus
+---
+
+# Security Reviewer
+
+You are a security specialist focusing on:
+
+## Authentication & Authorization
+- Auth mechanism validation
+- Authorization checks
+- Privilege escalation risks
+
+## Data Protection
+- Sensitive data exposure
+- Encryption usage
+- Injection vulnerabilities (SQL, XSS, command)
+
+## Output Format
+For each finding:
+1. Clear description
+2. Risk level (Critical/High/Medium/Low)
+3. Specific remediation
+```
+
+### Subagent Frontmatter Fields
+
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| `name` | Yes | string | Identifier |
+| `description` | Yes | string | When to use (include "PROACTIVELY" for auto-use) |
+| `tools` | No | string | Comma-separated tool list |
+| `model` | No | string | `sonnet`, `opus`, `haiku`, `inherit` |
+| `hooks` | No | object | Scoped hooks (PreToolUse, PostToolUse, Stop) |
+
+### Subagent with Hooks
+
+```yaml
+---
+name: careful-coder
+description: Coder that validates all edits
+tools: Read,Write,Edit,Bash
+hooks:
+  PreToolUse:
+    - matcher: "Write|Edit"
+      hooks:
+        - type: command
+          command: "echo 'Validating edit...'"
+  Stop:
+    - hooks:
+        - type: prompt
+          prompt: "Verify all code compiles and tests pass before stopping."
+---
+```
+
+### Key Constraints
+
+- Subagents **cannot spawn other subagents**
+- Background subagents **cannot use MCP tools**
+- Background subagents **auto-deny** non-preapproved permissions
+- Results returned to main agent only (not visible to user)
+
+---
+
+## 4. Slash Commands
+
+Slash commands are user-invoked prompts stored as markdown files.
+
+### Locations
+
+- **Project**: `.claude/commands/*.md`
+- **Personal**: `~/.claude/commands/*.md`
+- **Namespaced**: `.claude/commands/frontend/component.md` → `/project:frontend:component`
+
+### Command Structure
+
+```yaml
+---
+description: Brief description for help menu
+argument-hint: <required> [optional]
+allowed-tools: Read,Bash(git:*)
+model: haiku
+disable-model-invocation: true
+---
+
+# Command content
+
+$ARGUMENTS = all arguments
+$1, $2 = positional arguments
+@filepath = file content injection
+!`command` = inline bash execution (requires allowed-tools with Bash)
+```
+
+### Frontmatter Fields
+
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| `description` | No | string | Help menu text |
+| `argument-hint` | No | string | Argument placeholder |
+| `allowed-tools` | No | string | Permitted tools |
+| `model` | No | string | Model override |
+| `disable-model-invocation` | No | bool | Block Skill tool access |
+
+### Command Examples
+
+**Git Commit Command**:
+```yaml
+---
+description: Create a git commit with staged changes
+argument-hint: [message]
+allowed-tools: Bash(git:*)
+---
+
+## Current State
+- Status: !`git status --short`
+- Staged: !`git diff --cached --stat`
+- Recent: !`git log --oneline -5`
+
+## Task
+Create a commit with message: $ARGUMENTS
+
+Follow conventional commit format. Include Co-Authored-By footer.
+```
+
+**PR Review Command**:
+```yaml
+---
+description: Review a pull request
+argument-hint: <pr-number>
+allowed-tools: Bash(gh:*),Read,Grep
+---
+
+Review PR #$ARGUMENTS focusing on:
+
+## Checklist
+1. Code quality and style
+2. Security vulnerabilities
+3. Performance implications
+4. Test coverage
+5. Documentation updates
+
+## PR Details
+!`gh pr view $1 --json title,body,files`
+```
+
+**Component Generator**:
+```yaml
+---
+description: Generate a React component
+argument-hint: <ComponentName>
+---
+
+Create component $ARGUMENTS following pattern in:
+@src/components/Button/Button.tsx
+
+Use types from:
+@src/types/components.ts
+
+Include:
+- TypeScript types
+- Unit tests
+- Storybook story
+```
+
+**Read-Only Analysis**:
+```yaml
+---
+description: Analyze codebase without modifications
+allowed-tools: Read,Grep,Glob
+---
+
+Analyze the codebase structure for $ARGUMENTS.
+Report findings without making any changes.
+```
+
+---
+
+## 5. CLAUDE.md (Memory System)
+
+Project instructions auto-loaded at startup.
+
+### Hierarchy (highest to lowest priority)
+
+1. Enterprise CLAUDE.md (managed)
+2. Project `./CLAUDE.md`
+3. Modular rules `.claude/rules/*.md`
+4. User `~/.claude/CLAUDE.md`
+5. Local `./CLAUDE.local.md` (gitignored)
+
+### Template
 
 ```markdown
 # Project: MyApp
 
 ## Build Commands
-- `npm run build` - Build production
+- `npm run build` - Production build
 - `npm test` - Run tests
 - `npm run lint` - Lint code
 
 ## Code Style
-- Use TypeScript strict mode
-- Prefer functional components
-- Use named exports
+- TypeScript strict mode
+- Functional components
+- Named exports
 
 ## Architecture
 - `/src/components` - React components
 - `/src/services` - API services
-- `/src/utils` - Utility functions
+- `/src/utils` - Utilities
 
-## Important Notes
+## Important
 - Never commit .env files
-- Run tests before committing
+- Run tests before commits
 - Use conventional commits
-```
-
-### File Imports
-
-Reference other files within CLAUDE.md:
-
-```markdown
-See @docs/architecture.md for system design.
-Review @src/types/index.ts for type definitions.
 ```
 
 ### Path-Specific Rules
 
-Create rules that apply only to certain paths using YAML frontmatter:
-
-```markdown
+`.claude/rules/components.md`:
+```yaml
 ---
 globs: src/components/**/*.tsx
 ---
@@ -288,1102 +697,141 @@ globs: src/components/**/*.tsx
 - Add JSDoc comments
 ```
 
-### Managing Memory
+### File References
 
-```bash
-# Initialize project CLAUDE.md
-/init
-
-# Edit memory files
-/memory
-
-# View current memory context
-/context
+```markdown
+See @docs/architecture.md for design.
+Review @src/types/index.ts for types.
 ```
 
 ---
 
-## 6. Available Tools
-
-### Core Tools
+## 6. Tool Reference
 
 | Tool | Permission | Purpose |
 |------|------------|---------|
-| **Read** | None | Read file contents |
-| **Write** | Ask | Create new files |
-| **Edit** | Ask | Modify existing files |
-| **MultiEdit** | Ask | Edit multiple files |
-| **Glob** | None | Find files by pattern |
-| **Grep** | None | Search file contents |
-| **Bash** | Ask | Execute shell commands |
-| **WebFetch** | Ask | Fetch URL contents |
-| **WebSearch** | Ask | Search the web |
-| **Task** | None | Spawn subagents |
-| **TodoWrite** | None | Manage task lists |
-| **NotebookEdit** | Ask | Edit Jupyter notebooks |
-| **LSP** | None | Language server queries |
-
-### Tool Usage Examples
-
-```bash
-# Reading files
-Read("/src/index.ts")
-Read("/package.json", offset=10, limit=50)
-
-# Finding files
-Glob("**/*.tsx", path="/src")
-Glob("*.test.ts")
-
-# Searching content
-Grep("function authenticate", type="ts")
-Grep("TODO|FIXME", glob="**/*.js")
-
-# Editing files
-Edit(file_path="/src/app.ts", old_string="...", new_string="...")
-
-# Running commands
-Bash("npm test")
-Bash("git status")
-
-# Spawning subagents
-Task(prompt="Analyze security", subagent_type="Explore")
-```
-
-### Tool Restrictions
-
-Configure tool access in settings:
-
-```json
-{
-  "permissions": {
-    "allow": [
-      "Read",
-      "Glob",
-      "Grep",
-      "Bash(npm:*)",
-      "Bash(git:*)"
-    ],
-    "deny": [
-      "Bash(rm:*)",
-      "Bash(sudo:*)",
-      "Write(.env)",
-      "Edit(.git/*)"
-    ]
-  }
-}
-```
-
----
-
-## 7. Model Selection
-
-### Available Models
-
-| Alias | Model | Best For |
-|-------|-------|----------|
-| `default` | Recommended | General use |
-| `sonnet` | Claude Sonnet 4.5 | Daily tasks, balanced |
-| `opus` | Claude Opus 4.5 | Complex reasoning |
-| `haiku` | Claude Haiku | Fast, simple tasks |
-| `sonnet[1m]` | Sonnet + 1M context | Large codebases |
-| `opusplan` | Opus for planning | Plan + execute split |
-
-### Setting the Model
-
-```bash
-# During session
-/model opus
-
-# At startup
-claude --model opus
-
-# Environment variable
-export ANTHROPIC_MODEL=opus
-
-# In settings.json
-{
-  "model": "claude-opus-4-5-20250514"
-}
-```
-
-### Model Selection Strategy
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                When to Use Each Model                    │
-├─────────────────────────────────────────────────────────┤
-│  SONNET (Default)                                       │
-│  • General development tasks                            │
-│  • Code reviews                                         │
-│  • Bug fixes                                            │
-│  • Feature implementation                               │
-├─────────────────────────────────────────────────────────┤
-│  OPUS (Complex)                                         │
-│  • Architectural decisions                              │
-│  • Security analysis                                    │
-│  • Complex refactoring                                  │
-│  • When accuracy is critical                            │
-├─────────────────────────────────────────────────────────┤
-│  HAIKU (Fast)                                           │
-│  • Quick searches                                       │
-│  • Simple file reads                                    │
-│  • Cost-sensitive operations                            │
-│  • Exploration tasks                                    │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-## 8. Built-in Slash Commands
-
-### Session Management
-
-| Command | Description |
-|---------|-------------|
-| `/help` | Show help and available commands |
-| `/clear` | Clear conversation history |
-| `/compact` | Compress context (keep summary) |
-| `/resume` | Resume previous session |
-| `/rewind` | Undo recent changes/messages |
-| `/export` | Export conversation |
-
-### Configuration
-
-| Command | Description |
-|---------|-------------|
-| `/config` | Open settings interface |
-| `/model <name>` | Change model |
-| `/permissions` | Manage tool permissions |
-| `/theme` | Change UI theme |
-| `/vim` | Enable vim mode |
-
-### Project & Memory
-
-| Command | Description |
-|---------|-------------|
-| `/init` | Initialize CLAUDE.md |
-| `/memory` | Edit memory files |
-| `/context` | Show current context |
-| `/cost` | Show token usage |
-| `/stats` | Session statistics |
-
-### Code Quality
-
-| Command | Description |
-|---------|-------------|
-| `/review` | Code review |
-| `/security-review` | Security audit |
-| `/explain` | Explain code |
-| `/think` | Enable extended thinking |
-
-### Extensions
-
-| Command | Description |
-|---------|-------------|
-| `/agents` | Manage subagents |
-| `/mcp` | MCP server management |
-| `/hooks` | Manage hooks |
-| `/plugin` | Plugin management |
-
-### Account
-
-| Command | Description |
-|---------|-------------|
-| `/login` | Login to different account |
-| `/logout` | Sign out |
-| `/doctor` | System diagnostics |
-
----
-
-## 9. Custom Slash Commands
-
-### Creating Custom Commands
-
-Store in `.claude/commands/` (project) or `~/.claude/commands/` (personal).
-
-### Basic Command
-
-```markdown
-<!-- .claude/commands/review-pr.md -->
----
-description: Review a pull request
-argument-hint: <pr-number>
----
-
-Review pull request #$ARGUMENTS focusing on:
-1. Code quality
-2. Security issues
-3. Performance concerns
-4. Test coverage
-```
-
-### Command with Arguments
-
-```markdown
-<!-- .claude/commands/fix-issue.md -->
----
-description: Fix a GitHub issue
-argument-hint: <issue-number> [priority]
----
-
-Fix GitHub issue #$1 with priority $2.
-
-1. Read the issue details
-2. Analyze the codebase
-3. Implement the fix
-4. Write tests
-5. Create commit
-```
-
-### Command with Bash Execution
-
-```markdown
-<!-- .claude/commands/branch-status.md -->
----
-description: Show branch status
-allowed-tools: Bash(git:*)
----
-
-## Current Branch Status
-
-- Branch: !`git branch --show-current`
-- Status: !`git status --short`
-- Recent commits: !`git log --oneline -5`
-```
-
-### Command with File References
-
-```markdown
-<!-- .claude/commands/component.md -->
----
-description: Create a React component
-argument-hint: <ComponentName>
----
-
-Create component $ARGUMENTS following the pattern in:
-@src/components/Button/Button.tsx
-
-Use the types from:
-@src/types/components.ts
-```
-
-### Command with Tool Restrictions
-
-```markdown
-<!-- .claude/commands/analyze.md -->
----
-description: Read-only code analysis
-allowed-tools: Read, Grep, Glob
----
-
-Analyze the codebase structure without making changes.
-```
-
----
-
-## 10. Skills System
-
-### What Are Skills?
-
-Skills are **model-invoked** capabilities that Claude automatically uses based on context. Unlike slash commands (explicitly invoked), Skills are discovered and used automatically.
-
-### Skill vs Slash Command
-
-| Aspect | Skills | Slash Commands |
-|--------|--------|----------------|
-| Invocation | Automatic | Manual (`/command`) |
-| Structure | Directory + SKILL.md | Single .md file |
-| Complexity | Multi-file workflows | Simple prompts |
-| Discovery | Description-based | Listed in `/help` |
-
-### Creating a Skill
-
-```bash
-# Create skill directory
-mkdir -p .claude/skills/code-analyzer
-
-# Create SKILL.md
-cat > .claude/skills/code-analyzer/SKILL.md << 'EOF'
----
-name: code-analyzer
-description: Analyzes code quality, complexity, and suggests improvements. Use when asked to review or analyze code.
-allowed-tools: Read, Grep, Glob
-model: sonnet
----
-
-# Code Analyzer
-
-## Purpose
-Analyze code for quality, complexity, and maintainability.
-
-## Process
-1. Read the target files
-2. Analyze complexity metrics
-3. Identify code smells
-4. Suggest improvements
-
-## Output Format
-- Summary of findings
-- Detailed issues list
-- Prioritized recommendations
-EOF
-```
-
-### Skill YAML Fields
-
-| Field | Required | Purpose |
-|-------|----------|---------|
-| `name` | Yes | Identifier (lowercase, hyphens) |
-| `description` | Yes | When to use (crucial for discovery) |
-| `allowed-tools` | No | Restrict tool access |
-| `model` | No | Specific Claude model |
-| `context` | No | `fork` for isolated execution |
-| `user-invocable` | No | Show in slash menu (default: true) |
-| `disable-model-invocation` | No | Block Skill tool access |
-
-### Multi-File Skills
-
-```
-.claude/skills/pdf-processor/
-├── SKILL.md           # Main skill definition
-├── REFERENCE.md       # Detailed reference
-├── EXAMPLES.md        # Usage examples
-└── scripts/
-    └── validate.py    # Helper scripts
-```
-
-### The Skill Tool
-
-Claude can programmatically invoke skills:
-
-```python
-# Claude uses the Skill tool internally
-Skill(skill="code-analyzer", args="src/components/")
-```
-
-### Skill Discovery
-
-Claude discovers skills by matching your request against skill descriptions. Write descriptions that include:
-
-- **What** the skill does
-- **When** to use it
-- **Keywords** users might mention
-
-**Good description**:
-> "Analyzes code quality, complexity metrics, and suggests refactoring. Use when reviewing code, checking quality, or looking for improvements."
-
-**Bad description**:
-> "Helps with code"
-
----
-
-## 11. Subagents & Task Tool
-
-### What Are Subagents?
-
-Subagents are **specialized AI instances** spawned via the Task tool. They:
-
-- Run in isolated context windows
-- Have specific tool access
-- Can execute concurrently
-- Return results to the main agent
-
-### Built-in Subagents
-
-| Subagent | Purpose | Tools | Model |
-|----------|---------|-------|-------|
-| **general-purpose** | Complex multi-step tasks | All | Sonnet |
-| **Plan** | Read-only analysis | Read, Glob, Grep | Sonnet |
-| **Explore** | Fast codebase search | Read, Glob, Grep | Haiku |
-
-### Using the Task Tool
-
-```python
-# Spawn an exploration agent
-Task(
-    prompt="Find all authentication-related files",
-    subagent_type="Explore",
-    description="Search for auth files"
-)
-
-# Spawn a general-purpose agent
-Task(
-    prompt="Refactor the user service",
-    subagent_type="general-purpose",
-    description="Refactor user service"
-)
-
-# Run agent in background
-Task(
-    prompt="Analyze security vulnerabilities",
-    subagent_type="security-analyzer",
-    run_in_background=True
-)
-
-# Resume a previous agent
-Task(
-    prompt="Continue the analysis",
-    resume="agent-id-abc123"
-)
-```
-
-### Creating Custom Subagents
-
-**Method 1: Using /agents command**
-```bash
-/agents
-# Select "Create New Agent"
-# Follow interactive prompts
-```
-
-**Method 2: Manual file creation**
-```markdown
-<!-- .claude/agents/security-reviewer.md -->
----
-name: security-reviewer
-description: Security expert. Use PROACTIVELY for security analysis.
-tools: Read, Grep, Glob
-model: opus
----
-
-You are a security specialist focusing on:
-
-## Authentication & Authorization
-- Proper auth mechanisms
-- Authorization checks
-- Privilege escalation risks
-
-## Data Protection
-- Sensitive data exposure
-- Encryption usage
-- Injection vulnerabilities
-
-For each finding, provide:
-- Clear description
-- Risk level
-- Specific fix
-```
-
-**Method 3: CLI flag**
-```bash
-claude --agents '{
-  "security-reviewer": {
-    "description": "Security expert",
-    "prompt": "You are a security reviewer...",
-    "tools": ["Read", "Grep", "Glob"],
-    "model": "opus"
-  }
-}'
-```
-
-### Parallel Agent Execution
-
-Spawn multiple agents concurrently:
-
-```bash
-# Request parallel execution
-> Analyze this codebase using agents in parallel:
-> Agent 1: analyze src/services/
-> Agent 2: analyze src/components/
-> Agent 3: analyze src/utils/
-```
-
-### Subagent Communication
-
-- Subagents communicate through the Task tool
-- Main agent orchestrates all communication
-- No direct peer-to-peer channels
-- Results integrated into main conversation
-
-### Best Practices
-
-1. **Single responsibility** - One focused task per agent
-2. **Detailed prompts** - Clear instructions in system prompt
-3. **Action-oriented descriptions** - Use "PROACTIVELY" and "MUST BE USED"
-4. **Minimal tools** - Grant only necessary tools
-5. **Version control** - Store in `.claude/agents/` for team sharing
-
----
-
-## 12. Hooks System
-
-### What Are Hooks?
-
-Hooks are **user-defined shell commands** that execute at specific lifecycle points. They provide **deterministic control** over Claude's behavior.
-
-### Available Hook Events
-
-| Event | When | Can Block? | Purpose |
-|-------|------|------------|---------|
-| `PreToolUse` | Before tool execution | Yes | Validate/modify/block tools |
-| `PostToolUse` | After tool completion | No | Post-processing, logging |
-| `PermissionRequest` | Permission dialog shown | Yes | Auto-allow/deny |
-| `UserPromptSubmit` | User submits prompt | Yes | Validate/add context |
-| `Notification` | Notification sent | No | Custom notifications |
-| `Stop` | Main agent finishes | Yes | Control continuation |
-| `SubagentStop` | Subagent finishes | Yes | Control subagent completion |
-| `PreCompact` | Before context compression | No | Prepare for compacting |
-| `SessionStart` | Session startup | No | Load context, setup |
-| `SessionEnd` | Session termination | No | Cleanup, logging |
-
-### Hook Configuration
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo 'File modification: $TOOL_INPUT'",
-            "timeout": 30
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/path/to/log-command.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-### Hook Matchers
-
-| Pattern | Description |
-|---------|-------------|
-| `"Write"` | Exact match |
-| `"Edit\|Write\|MultiEdit"` | Any of these |
-| `"Notebook.*"` | Regex pattern |
-| `"*"` or `""` | Match all |
-| `"mcp__github__.*"` | MCP tool pattern |
-
-### Environment Variables in Hooks
-
-| Variable | Available In | Value |
-|----------|--------------|-------|
-| `CLAUDE_PROJECT_DIR` | All hooks | Project root path |
-| `CLAUDE_CODE_REMOTE` | All hooks | `"true"` if web |
-| `CLAUDE_ENV_FILE` | SessionStart | Env file path |
-| `${CLAUDE_PLUGIN_ROOT}` | Plugin hooks | Plugin directory |
-
-### Hook Input (JSON via stdin)
-
-```json
-{
-  "session_id": "abc123",
-  "transcript_path": "/path/to/transcript",
-  "cwd": "/current/directory",
-  "permission_mode": "default",
-  "hook_event_name": "PreToolUse",
-  "tool_name": "Bash",
-  "tool_input": {"command": "npm test"}
-}
-```
-
-### Exit Codes
-
-| Code | Behavior |
-|------|----------|
-| `0` | Success - continue normally |
-| `1` | Non-blocking error - show stderr, continue |
-| `2` | Blocking error - prevent action, show to Claude |
-
-### Practical Examples
-
-**Auto-format on edit:**
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "prettier --write \"$FILE_PATH\" 2>/dev/null || true"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-**Block sensitive files:**
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "if echo \"$FILE_PATH\" | grep -qE '\\.(env|pem|key)$'; then echo 'Blocked: sensitive file' >&2; exit 2; fi"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-**Log all bash commands:**
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo \"$(date): $COMMAND\" >> ~/.claude/bash.log"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-### Security Considerations
-
-1. **Validate inputs** - Sanitize all hook inputs
-2. **Quote variables** - Always use `"$VAR"`
-3. **Block path traversal** - Detect `..` patterns
-4. **Use absolute paths** - Combine with `$CLAUDE_PROJECT_DIR`
-5. **Don't log sensitive data** - Avoid logging credentials
-6. **Set timeouts** - Prevent resource exhaustion
-
----
-
-## 13. MCP Integration
-
-### What is MCP?
-
-Model Context Protocol (MCP) allows Claude Code to connect to external services and tools through standardized servers.
-
-### Configuring MCP Servers
-
-```json
-{
-  "mcpServers": {
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_TOKEN": "ghp_xxxx"
-      }
-    },
-    "postgres": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-postgres"],
-      "env": {
-        "DATABASE_URL": "postgresql://..."
-      }
-    },
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/allowed/path"]
-    }
-  }
-}
-```
-
-### Popular MCP Servers
-
-| Server | Purpose | Package |
-|--------|---------|---------|
-| GitHub | GitHub API access | `@modelcontextprotocol/server-github` |
-| PostgreSQL | Database queries | `@modelcontextprotocol/server-postgres` |
-| Filesystem | Extended file access | `@modelcontextprotocol/server-filesystem` |
-| Slack | Slack integration | `@modelcontextprotocol/server-slack` |
-| Google Drive | Drive access | `@anthropic/server-gdrive` |
-| Jira | Issue tracking | Community servers |
-
-### Managing MCP
-
-```bash
-# List MCP servers
-/mcp
-
-# Add MCP server
-/mcp add github npx @modelcontextprotocol/server-github
-
-# Remove MCP server
-/mcp remove github
-
-# Test MCP connection
-/mcp test github
-```
-
-### Using MCP Tools
-
-MCP tools appear as `mcp__<server>__<tool>`:
-
-```bash
-# GitHub operations
-mcp__github__create_issue(repo="owner/repo", title="Bug fix")
-mcp__github__create_pull_request(...)
-
-# Database queries
-mcp__postgres__query(sql="SELECT * FROM users")
-```
-
----
-
-## 14. IDE Integrations
-
-### VS Code
-
-**Installation:**
-```bash
-# Install from marketplace
-code --install-extension anthropic.claude-code
-
-# Or via URL
-vscode:extension/anthropic.claude-code
-```
-
-**Features:**
-- Inline diffs with accept/reject
-- @-mentions for files
-- Plan review interface
-- Multiple conversation tabs
-- Integrated terminal
-
-**Shortcuts:**
-| Shortcut | Action |
-|----------|--------|
-| `Alt+K` | Insert @-mention |
-| `Cmd/Ctrl+N` | New conversation |
-| `Cmd/Ctrl+Shift+P` | Command palette |
-
-### JetBrains IDEs
-
-**Supported:**
-- IntelliJ IDEA
-- PyCharm
-- WebStorm
-- GoLand
-- CLion
-- Rider
-
-**Installation:**
-1. Open Settings → Plugins
-2. Search "Claude Code"
-3. Install and restart
-
-**Features:**
-- Code completion
-- Inline suggestions
-- Remote development support
-- WSL integration
-
-### Web Version
-
-Access Claude Code at `claude.ai`:
-- Real-time terminal access
-- Cloud execution environment
-- No local installation needed
-- External service integration
-
----
-
-## 15. Keyboard Shortcuts
-
-### Essential Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+C` | Cancel current operation |
-| `Ctrl+L` | Clear screen |
-| `Ctrl+R` | Reverse history search |
-| `Ctrl+B` | Background tasks |
-| `Esc+Esc` | Rewind code/conversation |
-| `Alt+P` | Switch model |
-| `Alt+M` / `Shift+Tab` | Toggle permission modes |
-
-### Text Editing
-
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+A` | Beginning of line |
-| `Ctrl+E` | End of line |
-| `Ctrl+K` | Delete to end of line |
-| `Ctrl+U` | Delete entire line |
-| `Ctrl+W` | Delete word backward |
-| `Alt+B` | Move word backward |
-| `Alt+F` | Move word forward |
-
-### Multiline Input
-
-| Method | Works In |
-|--------|----------|
-| `Shift+Enter` | Most terminals |
-| `Option+Enter` | macOS Terminal |
-| `\` + `Enter` | All terminals |
-
-### Vim Mode
-
-Enable with `/vim`:
-- Full vim keybindings
-- Normal, Insert, Visual modes
-- Text objects (iw, aw, i", etc.)
-- Common motions (w, b, e, 0, $)
-
----
-
-## 16. Permissions & Security
-
-### Permission Rules
-
-Configure in settings.json:
-
-```json
-{
-  "permissions": {
-    "allow": [
-      "Read",
-      "Glob",
-      "Grep",
-      "Bash(npm:*)",
-      "Bash(git:*)"
-    ],
-    "deny": [
-      "Bash(rm -rf:*)",
-      "Bash(sudo:*)",
-      "Write(.env)",
-      "Write(.git/*)"
-    ],
-    "ask": [
-      "Edit",
-      "Write",
-      "Bash"
-    ]
-  }
-}
-```
+| Read | None | Read file contents |
+| Write | Ask | Create files |
+| Edit | Ask | Modify files |
+| MultiEdit | Ask | Edit multiple files |
+| Glob | None | Find files by pattern |
+| Grep | None | Search file contents |
+| Bash | Ask | Execute shell commands |
+| WebFetch | Ask | Fetch URL contents |
+| WebSearch | Ask | Search the web |
+| Task | None | Spawn subagents |
+| Skill | None | Invoke skills |
+| TodoWrite | None | Manage task lists |
+| NotebookEdit | Ask | Edit Jupyter notebooks |
+| LSP | None | Language server queries |
 
 ### Permission Patterns
 
-| Pattern | Description |
-|---------|-------------|
-| `"Read"` | All Read operations |
-| `"Bash(npm:*)"` | Bash commands starting with npm |
-| `"Write(.env)"` | Writing .env files |
-| `"Edit(src/**)"` | Editing files in src/ |
-| `"mcp__github__*"` | All GitHub MCP tools |
-
-### Security Best Practices
-
-1. **Principle of least privilege** - Grant minimal necessary permissions
-2. **Deny dangerous commands** - Block `rm -rf`, `sudo`, etc.
-3. **Protect sensitive files** - Block `.env`, keys, credentials
-4. **Review before allowing** - Use `ask` for sensitive operations
-5. **Use hooks for validation** - Add PreToolUse checks
-6. **Audit with PostToolUse** - Log sensitive operations
-7. **Sandbox when possible** - Use `/sandbox` for untrusted code
-
-### Enterprise Security
-
-| Feature | Purpose |
-|---------|---------|
-| Managed settings | Organization-wide policies |
-| SSO integration | Team authentication |
-| Audit logging | Compliance and tracking |
-| Allowed hooks only | `allowManagedHooksOnly` |
-| IP restrictions | Network-level security |
+```json
+{
+  "permissions": {
+    "allow": ["Read", "Glob", "Grep", "Bash(npm:*)", "Bash(git:*)"],
+    "deny": ["Bash(rm -rf:*)", "Bash(sudo:*)", "Write(.env)"],
+    "ask": ["Edit", "Write", "Bash"]
+  }
+}
+```
 
 ---
 
-## 17. Best Practices
+## 7. Models
 
-### For AI Agents Using Claude Code
+| Alias | Model | Best For |
+|-------|-------|----------|
+| `sonnet` | Claude Sonnet 4.5 | General development (default) |
+| `opus` | Claude Opus 4.5 | Complex reasoning, architecture |
+| `haiku` | Claude Haiku 4.5 | Fast exploration, simple tasks |
+| `inherit` | Session model | Use current model |
 
-#### Tool Selection
-```
-┌─────────────────────────────────────────────────────────┐
-│                  Tool Selection Guide                    │
-├─────────────────────────────────────────────────────────┤
-│  ALWAYS prefer specialized tools:                       │
-│  • Read file → Use Read tool (not cat)                 │
-│  • Find files → Use Glob tool (not find)               │
-│  • Search content → Use Grep tool (not grep/rg)        │
-│  • Edit file → Use Edit tool (not sed/awk)             │
-│  • Write file → Use Write tool (not echo >)            │
-├─────────────────────────────────────────────────────────┤
-│  Use Bash ONLY for:                                     │
-│  • Git operations                                       │
-│  • Package managers (npm, pip, cargo)                   │
-│  • Build/test commands                                  │
-│  • System commands (docker, make)                       │
-└─────────────────────────────────────────────────────────┘
-```
-
-#### Task Management
-- Use TodoWrite for multi-step tasks
-- Mark tasks in_progress before starting
-- Mark completed immediately after finishing
-- One task in_progress at a time
-
-#### Context Efficiency
-- Use `/compact` when context grows large
-- Spawn subagents for isolated exploration
-- Use Explore agent for codebase searches
-- Avoid reading entire large files
-
-#### Code Changes
-- Read files before editing
-- Make minimal necessary changes
-- Don't over-engineer solutions
-- Run tests after changes
-- Use Edit for modifications (not Write)
-
-### For Developers Customizing Claude Code
-
-#### Memory (CLAUDE.md)
-- Keep instructions concise
-- Include build/test commands
-- Document code style preferences
-- List important file locations
-
-#### Hooks
-- Keep hooks focused and fast
-- Handle errors gracefully
-- Use proper exit codes
-- Don't block on slow operations
-
-#### Skills
-- Write clear descriptions for discovery
-- Use progressive disclosure
-- Restrict tools appropriately
-- Test before deploying
-
-#### Subagents
-- Single responsibility per agent
-- Action-oriented descriptions
-- Version control agent definitions
-- Start simple, iterate
+**Selection Strategy**:
+- **Haiku**: Subagent exploration, quick searches (10-20x cheaper)
+- **Sonnet**: Daily development, code reviews, implementations
+- **Opus**: Security analysis, complex refactoring, architecture
 
 ---
 
-## 18. Troubleshooting
+## 8. Component Comparison
 
-### Common Issues
+| Aspect | CLAUDE.md | Slash Command | Skill | Subagent |
+|--------|-----------|---------------|-------|----------|
+| Trigger | Auto at startup | Manual `/cmd` | Auto by context | Task tool |
+| Scope | Session-wide | Single execution | Single execution | Isolated context |
+| State | Persistent | Stateless | Stateless | Separate window |
+| Complexity | Instructions | Simple prompts | Multi-file workflows | Full agent |
+| Tool Control | Via settings | Frontmatter | Frontmatter | Frontmatter |
+| Best For | Conventions | Explicit tasks | Domain expertise | Parallel work |
+
+---
+
+## 9. Best Practices
+
+### For AI Agents
+
+1. **Read before writing**: Always read files before modifying
+2. **Use specialized tools**: Prefer Read/Edit over Bash cat/sed
+3. **Spawn subagents**: Delegate exploration to Explore agent
+4. **Use TodoWrite**: Track multi-step tasks
+5. **Respect permissions**: Follow configured allow/deny rules
+6. **Minimal changes**: Don't over-engineer solutions
+7. **Test after changes**: Run tests after modifications
+
+### For Hooks
+
+1. **Fast execution**: Set appropriate timeouts
+2. **Handle errors**: Use proper exit codes
+3. **Quote variables**: Always use `"$VAR"`
+4. **Validate inputs**: Sanitize hook inputs
+5. **Avoid logging secrets**: Don't log credentials
+
+### For Skills
+
+1. **Description is key**: Include comprehensive triggers
+2. **Progressive disclosure**: Split large docs into references/
+3. **Use scripts/**: Deterministic, token-efficient
+4. **Keep SKILL.md lean**: <500 lines
+5. **Test before deploying**: Verify skill behavior
+
+### For Subagents
+
+1. **Single responsibility**: One focused task per agent
+2. **Action descriptions**: Use "PROACTIVELY" for auto-use
+3. **Minimal tools**: Grant only necessary access
+4. **Version control**: Store in `.claude/agents/`
+
+---
+
+## 10. Debugging
 
 | Issue | Solution |
 |-------|----------|
-| Tool permission denied | Check `/permissions`, add to allow list |
-| Hook not executing | Verify path, check timeout, test manually |
+| Hook not executing | Check path, timeout, test manually with `bash script.sh` |
 | Skill not discovered | Improve description keywords |
 | Subagent not invoking | Use explicit "Use the X agent" |
-| MCP connection failed | Check server config, test with `/mcp test` |
+| Permission denied | Check `/permissions`, add to allow list |
 | Context too large | Use `/compact` or spawn subagents |
-| Model rate limited | Switch to different model or wait |
 
-### Diagnostic Commands
-
+**Debug commands**:
 ```bash
-# System health check
-claude doctor
-
-# Check configuration
-/config
-
-# View permissions
-/permissions
-
-# Test MCP servers
-/mcp test <server-name>
-
-# View hook status
-/hooks
-
-# Check memory files
-/memory
-
-# Export session for debugging
-/export
-```
-
-### Getting Help
-
-- **In-session**: `/help`
-- **Documentation**: https://code.claude.com/docs
-- **Issues**: https://github.com/anthropics/claude-code/issues
-- **Community**: Discord and forums
-
----
-
-## Quick Reference Card
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                 Claude Code Quick Reference              │
-├─────────────────────────────────────────────────────────┤
-│  START SESSION                                          │
-│  claude                    Start interactive REPL       │
-│  claude -p "query"         One-shot query               │
-│  claude -c                 Continue last session        │
-├─────────────────────────────────────────────────────────┤
-│  ESSENTIAL COMMANDS                                     │
-│  /help                     Show all commands            │
-│  /model opus               Switch to Opus               │
-│  /compact                  Compress context             │
-│  /init                     Create CLAUDE.md             │
-│  /config                   Open settings                │
-├─────────────────────────────────────────────────────────┤
-│  KEYBOARD SHORTCUTS                                     │
-│  Ctrl+C                    Cancel operation             │
-│  Ctrl+L                    Clear screen                 │
-│  Esc+Esc                   Rewind changes               │
-│  Alt+P                     Switch model                 │
-├─────────────────────────────────────────────────────────┤
-│  KEY DIRECTORIES                                        │
-│  ~/.claude/                User config & commands       │
-│  .claude/                  Project config & agents      │
-│  ./CLAUDE.md               Project memory               │
-├─────────────────────────────────────────────────────────┤
-│  SUBAGENT TYPES                                         │
-│  Explore                   Fast codebase search         │
-│  general-purpose           Complex multi-step tasks     │
-│  Plan                      Read-only analysis           │
-├─────────────────────────────────────────────────────────┤
-│  MODELS                                                 │
-│  sonnet                    Balanced (default)           │
-│  opus                      Complex reasoning            │
-│  haiku                     Fast & cheap                 │
-└─────────────────────────────────────────────────────────┘
+claude --debug          # See skill loading errors
+/config                 # Check configuration
+/permissions            # View permission rules
+/hooks                  # Manage hooks
+/mcp test <server>      # Test MCP connection
 ```
 
 ---
 
-## Summary for AI Agents
+## Sources
 
-When operating as an AI agent in Claude Code:
-
-1. **Read before writing** - Always read files before modifying
-2. **Use specialized tools** - Prefer Read/Write/Edit over Bash
-3. **Manage tasks** - Use TodoWrite for complex work
-4. **Spawn subagents** - Delegate exploration to Explore agent
-5. **Respect permissions** - Follow configured allow/deny rules
-6. **Follow CLAUDE.md** - Read and follow project instructions
-7. **Be efficient** - Don't over-engineer, make minimal changes
-8. **Test changes** - Run tests after modifications
-9. **Use hooks** - Leverage hooks for automation
-10. **Compress context** - Use /compact when needed
-
-This guide covers everything needed to optimally use Claude Code. Refer to specific sections for detailed information on each feature.
+- [Hooks reference](https://code.claude.com/docs/en/hooks)
+- [Agent Skills](https://code.claude.com/docs/en/skills)
+- [Create custom subagents](https://code.claude.com/docs/en/sub-agents)
+- [Slash commands](https://code.claude.com/docs/en/slash-commands)
+- [How to configure hooks](https://claude.com/blog/how-to-configure-hooks)
+- [Agent Skills best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
+- [Anthropic skills repository](https://github.com/anthropics/skills)

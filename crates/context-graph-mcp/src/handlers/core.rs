@@ -659,6 +659,66 @@ impl Handlers {
         }
     }
 
+    /// Create new handlers with ALL subsystems wired (GWT + ATC + Dream + Neuromod).
+    ///
+    /// TASK-EXHAUSTIVE-MCP: This is the ONLY constructor that enables ALL 35 MCP tools.
+    /// Use for:
+    /// - Exhaustive MCP tool testing
+    /// - Full system integration tests
+    /// - Production deployment where all features are required
+    ///
+    /// # Arguments
+    /// All GWT providers (same as with_gwt) plus:
+    /// * `atc` - Adaptive Threshold Calibration for get_threshold_status, get_calibration_metrics, trigger_recalibration
+    /// * `dream_controller` - Dream consolidation controller for trigger_dream, get_dream_status, abort_dream
+    /// * `dream_scheduler` - Dream scheduling logic
+    /// * `amortized_learner` - Amortized shortcut learner for get_amortized_shortcuts
+    /// * `neuromod_manager` - Neuromodulation manager for get_neuromodulation_state, adjust_neuromodulator
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_gwt_and_subsystems(
+        teleological_store: Arc<dyn TeleologicalMemoryStore>,
+        utl_processor: Arc<dyn UtlProcessor>,
+        multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
+        alignment_calculator: Arc<dyn GoalAlignmentCalculator>,
+        goal_hierarchy: Arc<RwLock<GoalHierarchy>>,
+        johari_manager: Arc<dyn JohariTransitionManager>,
+        meta_utl_tracker: Arc<RwLock<MetaUtlTracker>>,
+        system_monitor: Arc<dyn SystemMonitor>,
+        layer_status_provider: Arc<dyn LayerStatusProvider>,
+        kuramoto_network: Arc<RwLock<dyn KuramotoProvider>>,
+        gwt_system: Arc<dyn GwtSystemProvider>,
+        workspace_provider: Arc<tokio::sync::RwLock<dyn WorkspaceProvider>>,
+        meta_cognitive: Arc<tokio::sync::RwLock<dyn MetaCognitiveProvider>>,
+        self_ego: Arc<tokio::sync::RwLock<dyn SelfEgoProvider>>,
+        atc: Arc<RwLock<context_graph_core::atc::AdaptiveThresholdCalibration>>,
+        dream_controller: Arc<RwLock<context_graph_core::dream::DreamController>>,
+        dream_scheduler: Arc<RwLock<context_graph_core::dream::DreamScheduler>>,
+        amortized_learner: Arc<RwLock<context_graph_core::dream::AmortizedLearner>>,
+        neuromod_manager: Arc<RwLock<context_graph_core::neuromod::NeuromodulationManager>>,
+    ) -> Self {
+        Self {
+            teleological_store,
+            utl_processor,
+            multi_array_provider,
+            alignment_calculator,
+            goal_hierarchy,
+            johari_manager,
+            meta_utl_tracker,
+            system_monitor,
+            layer_status_provider,
+            kuramoto_network: Some(kuramoto_network),
+            gwt_system: Some(gwt_system),
+            workspace_provider: Some(workspace_provider),
+            meta_cognitive: Some(meta_cognitive),
+            self_ego: Some(self_ego),
+            atc: Some(atc),
+            dream_controller: Some(dream_controller),
+            dream_scheduler: Some(dream_scheduler),
+            amortized_learner: Some(amortized_learner),
+            neuromod_manager: Some(neuromod_manager),
+        }
+    }
+
     /// Create new handlers with default GWT provider implementations.
     ///
     /// TASK-GWT-001: Convenience constructor that uses the real GWT provider

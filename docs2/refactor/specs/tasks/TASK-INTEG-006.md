@@ -3,29 +3,31 @@
 ```xml
 <task_spec>
   <task_id>TASK-INTEG-006</task_id>
-  <title>File Operation Hooks (PreFileRead, PostFileRead)</title>
+  <title>File Operation Hooks (PreToolUse/PostToolUse for Read)</title>
   <status>pending</status>
 
   <objective>
-    Implement PreFileRead and PostFileRead hook handlers that provide context
-    preloading and automatic content embedding when files are accessed during
-    Claude Code sessions.
+    Implement PreToolUse and PostToolUse hook handlers for Claude Code's Read tool that
+    provide consciousness-aware context preloading and automatic content embedding using
+    the full 13-embedder teleological array when files are accessed during sessions.
   </objective>
 
   <rationale>
+    Claude Code's hook system uses PreToolUse/PostToolUse events for ALL tools including Read.
     File read hooks enable:
-    1. PreFileRead: Preload related context before file access
-    2. PostFileRead: Automatically embed file content as teleological arrays
-    3. Context augmentation: Inject relevant memories alongside file content
-    4. Access tracking: Build understanding of file access patterns
+    1. PreToolUse (Read): Preload related context before file access with consciousness-aware prioritization
+    2. PostToolUse (Read): Automatically embed file content as 13-dimensional teleological arrays
+    3. Context augmentation: Inject relevant memories alongside file content based on consciousness level
+    4. Access tracking: Build understanding of file access patterns for predictive preloading
 
-    These hooks transform passive file reads into active context building.
+    These hooks transform passive file reads into active context building with GWT integration.
   </rationale>
 
   <dependencies>
     <dependency type="required">TASK-INTEG-004</dependency>    <!-- Hook protocol -->
     <dependency type="required">TASK-CORE-003</dependency>     <!-- TeleologicalArray type -->
     <dependency type="required">TASK-LOGIC-001</dependency>    <!-- Search engine -->
+    <dependency type="required">TASK-LOGIC-010</dependency>    <!-- Teleological drift detection -->
   </dependencies>
 
   <input_context_files>
@@ -33,30 +35,288 @@
     <file purpose="search_engine">crates/context-graph-storage/src/teleological/search/engine.rs</file>
     <file purpose="embedder_pipeline">crates/context-graph-core/src/teleology/embedder.rs</file>
     <file purpose="store">crates/context-graph-storage/src/teleological/store.rs</file>
+    <file purpose="consciousness">crates/context-graph-mcp/src/methods/consciousness.rs</file>
   </input_context_files>
 
   <output_artifacts>
     <artifact type="source">crates/context-graph-mcp/src/hooks/file_read.rs</artifact>
-    <artifact type="config">.claude/hooks/pre_file_read.sh</artifact>
-    <artifact type="config">.claude/hooks/post_file_read.sh</artifact>
+    <artifact type="config">.claude/hooks/pre_tool_use_read.sh</artifact>
+    <artifact type="config">.claude/hooks/post_tool_use_read.sh</artifact>
+    <artifact type="config">.claude/settings.local.json</artifact>
     <artifact type="test">crates/context-graph-mcp/tests/file_read_hooks_test.rs</artifact>
   </output_artifacts>
 
+  <claude_code_settings>
+    <description>
+      Claude Code settings.json configuration for PreToolUse/PostToolUse hooks.
+      These hooks intercept the Read tool to enable context preloading and embedding.
+    </description>
+    <configuration>
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [".claude/hooks/pre_tool_use_read.sh"],
+        "timeout": 3000
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [".claude/hooks/post_tool_use_read.sh"],
+        "timeout": 3000
+      }
+    ]
+  }
+}
+```
+    </configuration>
+    <notes>
+      - timeout: 3000ms per Constitution requirement for tool hooks
+      - matcher: "Read" matches Claude Code's Read tool exactly
+      - hooks: Array of shell scripts to execute (can chain multiple)
+    </notes>
+  </claude_code_settings>
+
   <definition_of_done>
-    <criterion id="1">PreFileRead handler searches for related context before reads</criterion>
-    <criterion id="2">PostFileRead handler embeds file content as teleological array</criterion>
-    <criterion id="3">Context injection provides relevant memories to augment file content</criterion>
+    <criterion id="1">PreToolUse handler searches for related context before reads with consciousness-aware prioritization</criterion>
+    <criterion id="2">PostToolUse handler embeds file content as 13-dimensional teleological array</criterion>
+    <criterion id="3">Context injection provides relevant memories scaled by consciousness level (C(t))</criterion>
     <criterion id="4">File access patterns tracked for future preloading optimization</criterion>
     <criterion id="5">Configurable file extensions and size limits</criterion>
-    <criterion id="6">Hook latency under 50ms for pre-read operations</criterion>
+    <criterion id="6">Hook latency within 3000ms Constitution budget (target: 50ms for pre-read, 2500ms for post-read)</criterion>
     <criterion id="7">Deduplication prevents re-embedding unchanged files</criterion>
-    <criterion id="8">Shell scripts work with Claude Code's file read workflow</criterion>
+    <criterion id="8">Shell scripts parse Claude Code's PreToolUse/PostToolUse JSON format correctly</criterion>
+    <criterion id="9">All 13 embedders (E1-E13) used for content embedding</criterion>
+    <criterion id="10">GWT consciousness integration determines preload priority and context depth</criterion>
   </definition_of_done>
 
-  <estimated_complexity>Medium</estimated_complexity>
+  <estimated_complexity>Medium-High</estimated_complexity>
 
   <pseudo_code>
-    <section name="PreFileReadHandler">
+    <section name="TeleologicalEmbedders">
+```rust
+// Full 13-Embedder Teleological Array Reference
+// crates/context-graph-core/src/teleology/embedder.rs
+
+/// All 13 embedders in the teleological array
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EmbedderType {
+    E1_Semantic,       // Semantic meaning and concepts
+    E2_Temporal,       // Time-based patterns and sequences
+    E3_Causal,         // Cause-effect relationships
+    E4_Counterfactual, // What-if scenarios and alternatives
+    E5_Moral,          // Ethical implications and values
+    E6_Aesthetic,      // Code quality, elegance, style
+    E7_Teleological,   // Purpose and goal alignment
+    E8_Contextual,     // Environmental and situational context
+    E9_Structural,     // Architecture and organization
+    E10_Behavioral,    // Runtime behavior and patterns
+    E11_Emotional,     // Developer intent and sentiment
+    E12_Code,          // AST-based code semantics
+    E13_SPLADE,        // Sparse lexical representations
+}
+
+impl EmbedderType {
+    /// All embedder types in order
+    pub const ALL: [EmbedderType; 13] = [
+        Self::E1_Semantic,
+        Self::E2_Temporal,
+        Self::E3_Causal,
+        Self::E4_Counterfactual,
+        Self::E5_Moral,
+        Self::E6_Aesthetic,
+        Self::E7_Teleological,
+        Self::E8_Contextual,
+        Self::E9_Structural,
+        Self::E10_Behavioral,
+        Self::E11_Emotional,
+        Self::E12_Code,
+        Self::E13_SPLADE,
+    ];
+
+    /// Embedders optimized for code file reads
+    pub const CODE_FOCUSED: [EmbedderType; 7] = [
+        Self::E1_Semantic,
+        Self::E6_Aesthetic,
+        Self::E7_Teleological,
+        Self::E9_Structural,
+        Self::E10_Behavioral,
+        Self::E12_Code,
+        Self::E13_SPLADE,
+    ];
+
+    /// Embedders optimized for documentation
+    pub const DOC_FOCUSED: [EmbedderType; 5] = [
+        Self::E1_Semantic,
+        Self::E7_Teleological,
+        Self::E8_Contextual,
+        Self::E11_Emotional,
+        Self::E13_SPLADE,
+    ];
+}
+```
+    </section>
+
+    <section name="ConsciousnessIntegration">
+```rust
+// GWT Consciousness-Aware File Reading
+// crates/context-graph-mcp/src/hooks/file_read.rs
+
+use crate::methods::consciousness::{ConsciousnessState, GWTMetrics};
+
+/// Consciousness context for file reading decisions
+/// Based on GWT (Global Workspace Theory) integration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadConsciousnessContext {
+    /// I(t) - Integration score: how well this read integrates with workspace
+    pub integration_score: f32,
+    /// R(t) - Reflection depth: understanding depth required
+    pub reflection_depth: f32,
+    /// D(t) - Differentiation index: uniqueness of content
+    pub differentiation_index: f32,
+    /// C(t) = I(t) × R(t) × D(t) - Overall consciousness level
+    pub consciousness_level: f32,
+    /// Derived preload priority based on consciousness
+    pub preload_priority: PreloadPriority,
+}
+
+/// Preload priority levels derived from consciousness score
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PreloadPriority {
+    /// C < 0.3: Passive embedding, minimal context
+    Background,
+    /// 0.3 <= C < 0.6: Standard context retrieval
+    Standard,
+    /// 0.6 <= C < 0.8: Enhanced context with related files
+    Enhanced,
+    /// C >= 0.8: Full context activation, maximum depth
+    Critical,
+}
+
+impl PreloadPriority {
+    pub fn from_consciousness_level(c: f32) -> Self {
+        match c {
+            c if c < 0.3 => Self::Background,
+            c if c < 0.6 => Self::Standard,
+            c if c < 0.8 => Self::Enhanced,
+            _ => Self::Critical,
+        }
+    }
+
+    /// Number of related memories to fetch based on priority
+    pub fn context_limit(&self) -> usize {
+        match self {
+            Self::Background => 2,
+            Self::Standard => 5,
+            Self::Enhanced => 10,
+            Self::Critical => 20,
+        }
+    }
+
+    /// Whether to include file history
+    pub fn include_history(&self) -> bool {
+        matches!(self, Self::Enhanced | Self::Critical)
+    }
+
+    /// Whether to include related goals
+    pub fn include_goals(&self) -> bool {
+        matches!(self, Self::Standard | Self::Enhanced | Self::Critical)
+    }
+
+    /// Whether to generate suggestions
+    pub fn include_suggestions(&self) -> bool {
+        matches!(self, Self::Enhanced | Self::Critical)
+    }
+
+    /// Whether to preload related files
+    pub fn preload_related_files(&self) -> bool {
+        matches!(self, Self::Critical)
+    }
+}
+
+impl ReadConsciousnessContext {
+    /// Calculate consciousness context for a file read
+    pub fn calculate(
+        file_path: &str,
+        workspace_state: &ConsciousnessState,
+        gwt_metrics: &GWTMetrics,
+    ) -> Self {
+        // I(t): Integration with current workspace focus
+        let integration_score = Self::calculate_integration(file_path, workspace_state);
+
+        // R(t): Required reflection depth based on file complexity
+        let reflection_depth = Self::calculate_reflection_depth(file_path);
+
+        // D(t): How unique/different this file is from recent reads
+        let differentiation_index = Self::calculate_differentiation(file_path, gwt_metrics);
+
+        // C(t) = I(t) × R(t) × D(t)
+        let consciousness_level = integration_score * reflection_depth * differentiation_index;
+        let preload_priority = PreloadPriority::from_consciousness_level(consciousness_level);
+
+        Self {
+            integration_score,
+            reflection_depth,
+            differentiation_index,
+            consciousness_level,
+            preload_priority,
+        }
+    }
+
+    fn calculate_integration(file_path: &str, state: &ConsciousnessState) -> f32 {
+        // Check alignment with current broadcast focus
+        if let Some(focus) = &state.current_focus {
+            if file_path.contains(&focus.topic) {
+                return 0.9;
+            }
+        }
+
+        // Check if file is in active working set
+        if state.working_memory.contains_file(file_path) {
+            return 0.7;
+        }
+
+        // Default moderate integration
+        0.5
+    }
+
+    fn calculate_reflection_depth(file_path: &str) -> f32 {
+        let extension = std::path::Path::new(file_path)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("");
+
+        // Core code files require deeper reflection
+        match extension {
+            "rs" | "ts" | "tsx" => 0.9,
+            "py" | "go" | "java" => 0.85,
+            "js" | "jsx" => 0.8,
+            "json" | "yaml" | "toml" => 0.6,
+            "md" | "txt" => 0.5,
+            _ => 0.4,
+        }
+    }
+
+    fn calculate_differentiation(file_path: &str, metrics: &GWTMetrics) -> f32 {
+        // Higher differentiation if file hasn't been accessed recently
+        if let Some(last_access) = metrics.last_file_access(file_path) {
+            let age = Utc::now() - last_access;
+            if age.num_hours() < 1 {
+                return 0.3; // Recently accessed, low differentiation
+            } else if age.num_hours() < 24 {
+                return 0.6;
+            }
+        }
+        0.9 // New or old file, high differentiation
+    }
+}
+```
+    </section>
+
+    <section name="PreToolUseHandler">
 ```rust
 // crates/context-graph-mcp/src/hooks/file_read.rs
 
@@ -65,35 +325,39 @@ use context_graph_storage::teleological::{TeleologicalStore, SearchEngine, Searc
 use std::sync::Arc;
 use tokio::time::{timeout, Duration};
 
-/// Pre-file-read hook handler for context preloading
-pub struct PreFileReadHandler {
+/// Pre-tool-use hook handler for Read tool - context preloading
+pub struct PreToolUseReadHandler {
     /// Teleological store for searching
     store: Arc<TeleologicalStore>,
     /// Search engine for finding related content
     search_engine: Arc<SearchEngine>,
     /// File access tracker
     access_tracker: Arc<FileAccessTracker>,
+    /// Consciousness state for priority decisions
+    consciousness_state: Arc<RwLock<ConsciousnessState>>,
+    /// GWT metrics for differentiation
+    gwt_metrics: Arc<RwLock<GWTMetrics>>,
     /// Configuration
-    config: PreFileReadConfig,
+    config: PreToolUseReadConfig,
 }
 
 #[derive(Debug, Clone)]
-pub struct PreFileReadConfig {
-    /// Maximum time to spend on preloading (ms)
+pub struct PreToolUseReadConfig {
+    /// Maximum time to spend on preloading (ms) - must fit within 3000ms Constitution budget
     pub max_preload_latency_ms: u64,
-    /// Number of related memories to fetch
-    pub context_limit: usize,
+    /// Base number of related memories (scaled by consciousness)
+    pub base_context_limit: usize,
     /// Minimum similarity score for context injection
     pub min_context_similarity: f32,
     /// File extensions to process
     pub process_extensions: HashSet<String>,
-    /// Entry points to use for search
+    /// Entry points to use for search (all 13 embedders available)
     pub search_entry_points: Vec<EmbedderType>,
-    /// Whether to include file history
+    /// Whether to include file history (overridden by consciousness)
     pub include_history: bool,
 }
 
-impl Default for PreFileReadConfig {
+impl Default for PreToolUseReadConfig {
     fn default() -> Self {
         let mut extensions = HashSet::new();
         extensions.extend([
@@ -102,42 +366,57 @@ impl Default for PreFileReadConfig {
         ].iter().map(|s| s.to_string()));
 
         Self {
+            // Within 3000ms Constitution budget, target 50ms for responsiveness
             max_preload_latency_ms: 50,
-            context_limit: 5,
+            base_context_limit: 5,
             min_context_similarity: 0.6,
             process_extensions: extensions,
             search_entry_points: vec![
-                EmbedderType::Semantic,
-                EmbedderType::Code,
-                EmbedderType::Entity,
+                EmbedderType::E1_Semantic,
+                EmbedderType::E7_Teleological,
+                EmbedderType::E12_Code,
+                EmbedderType::E13_SPLADE,
             ],
             include_history: true,
         }
     }
 }
 
-/// Payload for file read hooks
+/// Claude Code's PreToolUse payload for Read tool
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FileReadPayload {
-    /// Path to file being read
-    pub file_path: String,
-    /// Requested line range (if partial read)
-    pub line_range: Option<(usize, usize)>,
-    /// Tool initiating the read
-    pub source_tool: String,
+pub struct ClaudeCodePreToolUsePayload {
+    /// Tool name - will be "Read"
+    pub tool_name: String,
+    /// Tool input parameters
+    pub tool_input: ReadToolInput,
 }
 
-/// Context to inject alongside file content
+/// Read tool input from Claude Code
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadToolInput {
+    /// Path to file being read
+    pub file_path: String,
+    /// Optional line limit
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+    /// Optional line offset
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offset: Option<usize>,
+}
+
+/// Context to inject alongside file content (scaled by consciousness)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InjectedContext {
-    /// Related memories
+    /// Related memories (count based on consciousness level)
     pub related_memories: Vec<RelatedMemory>,
-    /// File history entries
+    /// File history entries (if consciousness >= Standard)
     pub file_history: Vec<FileHistoryEntry>,
-    /// Active goals related to this file
+    /// Active goals related to this file (if consciousness >= Standard)
     pub related_goals: Vec<RelatedGoal>,
-    /// Suggestions based on context
+    /// Suggestions based on context (if consciousness >= Enhanced)
     pub suggestions: Vec<ContextSuggestion>,
+    /// Consciousness context that determined injection depth
+    pub consciousness: ReadConsciousnessContext,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,6 +425,7 @@ pub struct RelatedMemory {
     pub content_preview: String,
     pub similarity_score: f32,
     pub memory_type: MemoryType,
+    /// Which of the 13 embedders found this match
     pub entry_points_used: Vec<EmbedderType>,
 }
 
@@ -178,49 +458,72 @@ pub enum SuggestionType {
     ConsiderPattern,
     CheckAlignment,
     RecentChange,
+    ConsciousnessAlert,
 }
 
-impl PreFileReadHandler {
+impl PreToolUseReadHandler {
     pub fn new(
         store: Arc<TeleologicalStore>,
         search_engine: Arc<SearchEngine>,
         access_tracker: Arc<FileAccessTracker>,
-        config: PreFileReadConfig,
+        consciousness_state: Arc<RwLock<ConsciousnessState>>,
+        gwt_metrics: Arc<RwLock<GWTMetrics>>,
+        config: PreToolUseReadConfig,
     ) -> Self {
         Self {
             store,
             search_engine,
             access_tracker,
+            consciousness_state,
+            gwt_metrics,
             config,
         }
     }
 
-    /// Handle PreFileRead event
-    pub async fn handle(&self, payload: FileReadPayload) -> Result<HookResponse, HookError> {
+    /// Handle PreToolUse event for Read tool
+    pub async fn handle(&self, payload: ClaudeCodePreToolUsePayload) -> Result<HookResponse, HookError> {
         let start = Instant::now();
 
+        // Validate this is a Read tool call
+        if payload.tool_name != "Read" {
+            return Ok(HookResponse::skip("Not a Read tool call"));
+        }
+
+        let file_path = &payload.tool_input.file_path;
+
         // 1. Check if we should process this file
-        if !self.should_process(&payload.file_path) {
+        if !self.should_process(file_path) {
             return Ok(HookResponse::skip("File type not configured for preprocessing"));
         }
 
-        // 2. Record access (async, don't wait)
+        // 2. Calculate consciousness context
+        let consciousness_state = self.consciousness_state.read().await;
+        let gwt_metrics = self.gwt_metrics.read().await;
+        let consciousness_ctx = ReadConsciousnessContext::calculate(
+            file_path,
+            &consciousness_state,
+            &gwt_metrics,
+        );
+        drop(consciousness_state);
+        drop(gwt_metrics);
+
+        // 3. Record access (async, don't wait)
         let tracker = self.access_tracker.clone();
-        let file_path = payload.file_path.clone();
+        let file_path_clone = file_path.clone();
         tokio::spawn(async move {
-            let _ = tracker.record_access(&file_path).await;
+            let _ = tracker.record_access(&file_path_clone).await;
         });
 
-        // 3. Search for related context with timeout
+        // 4. Search for related context with timeout, scaled by consciousness
         let context = timeout(
             Duration::from_millis(self.config.max_preload_latency_ms),
-            self.fetch_related_context(&payload),
+            self.fetch_related_context(file_path, &consciousness_ctx),
         )
         .await
-        .unwrap_or_else(|_| Ok(InjectedContext::empty()))
-        .unwrap_or_else(|_| InjectedContext::empty());
+        .unwrap_or_else(|_| Ok(InjectedContext::empty(consciousness_ctx.clone())))
+        .unwrap_or_else(|_| InjectedContext::empty(consciousness_ctx.clone()));
 
-        // 4. Build response
+        // 5. Build response
         let has_context = !context.related_memories.is_empty()
             || !context.file_history.is_empty()
             || !context.related_goals.is_empty();
@@ -229,9 +532,11 @@ impl PreFileReadHandler {
             status: HookStatus::Proceed,
             message: if has_context {
                 Some(format!(
-                    "Found {} related memories, {} history entries",
+                    "Consciousness={:.2}: {} memories, {} history, priority={}",
+                    consciousness_ctx.consciousness_level,
                     context.related_memories.len(),
-                    context.file_history.len()
+                    context.file_history.len(),
+                    format!("{:?}", consciousness_ctx.preload_priority),
                 ))
             } else {
                 None
@@ -242,6 +547,7 @@ impl PreFileReadHandler {
                 latency_ms: start.elapsed().as_millis() as u64,
                 embedders_used: self.config.search_entry_points.len(),
                 goals_checked: context.related_goals.len(),
+                consciousness_level: consciousness_ctx.consciousness_level,
             },
         })
     }
@@ -255,43 +561,66 @@ impl PreFileReadHandler {
         self.config.process_extensions.contains(extension)
     }
 
-    async fn fetch_related_context(&self, payload: &FileReadPayload) -> Result<InjectedContext, HookError> {
-        // 1. Search for related memories using file path as query
-        let related_memories = self.search_related_memories(&payload.file_path).await?;
+    async fn fetch_related_context(
+        &self,
+        file_path: &str,
+        consciousness: &ReadConsciousnessContext,
+    ) -> Result<InjectedContext, HookError> {
+        let priority = consciousness.preload_priority;
 
-        // 2. Fetch file history if enabled
-        let file_history = if self.config.include_history {
-            self.fetch_file_history(&payload.file_path).await?
+        // 1. Search for related memories (count based on consciousness)
+        let related_memories = self.search_related_memories(
+            file_path,
+            priority.context_limit(),
+        ).await?;
+
+        // 2. Fetch file history if consciousness warrants it
+        let file_history = if priority.include_history() {
+            self.fetch_file_history(file_path).await?
         } else {
             vec![]
         };
 
-        // 3. Find related goals
-        let related_goals = self.find_related_goals(&payload.file_path).await?;
+        // 3. Find related goals if consciousness warrants it
+        let related_goals = if priority.include_goals() {
+            self.find_related_goals(file_path).await?
+        } else {
+            vec![]
+        };
 
-        // 4. Generate suggestions
-        let suggestions = self.generate_suggestions(
-            &related_memories,
-            &file_history,
-            &related_goals,
-        );
+        // 4. Generate suggestions if consciousness is high enough
+        let suggestions = if priority.include_suggestions() {
+            self.generate_suggestions(
+                &related_memories,
+                &file_history,
+                &related_goals,
+                consciousness,
+            )
+        } else {
+            vec![]
+        };
 
         Ok(InjectedContext {
             related_memories,
             file_history,
             related_goals,
             suggestions,
+            consciousness: consciousness.clone(),
         })
     }
 
-    async fn search_related_memories(&self, file_path: &str) -> Result<Vec<RelatedMemory>, HookError> {
-        // Build search query from file path
+    async fn search_related_memories(
+        &self,
+        file_path: &str,
+        limit: usize,
+    ) -> Result<Vec<RelatedMemory>, HookError> {
+        // Build search query from file path using configured embedders
         let query = SearchQuery {
             text: file_path.to_string(),
             strategy: SearchStrategy::EmbedderGroup {
                 embedders: self.config.search_entry_points.clone(),
             },
-            limit: self.config.context_limit,
+            limit,
             threshold: self.config.min_context_similarity,
             namespace: None, // Search all namespaces
             filters: Some(SearchFilters {
@@ -372,8 +701,21 @@ impl PreFileReadHandler {
         memories: &[RelatedMemory],
         history: &[FileHistoryEntry],
         goals: &[RelatedGoal],
+        consciousness: &ReadConsciousnessContext,
     ) -> Vec<ContextSuggestion> {
         let mut suggestions = Vec::new();
+
+        // Add consciousness-based alert if critical
+        if consciousness.preload_priority == PreloadPriority::Critical {
+            suggestions.push(ContextSuggestion {
+                suggestion_type: SuggestionType::ConsciousnessAlert,
+                message: format!(
+                    "High consciousness file (C={:.2}): Full context activated",
+                    consciousness.consciousness_level
+                ),
+                relevance: 1.0,
+            });
+        }
 
         // Suggest reviewing related memories
         if !memories.is_empty() {
@@ -436,6 +778,7 @@ pub struct AccessRecord {
     pub timestamp: DateTime<Utc>,
     pub session_id: String,
     pub source_tool: String,
+    pub consciousness_level: f32,
 }
 
 impl FileAccessTracker {
@@ -445,6 +788,7 @@ impl FileAccessTracker {
             timestamp: Utc::now(),
             session_id: get_current_session_id(),
             source_tool: "Read".to_string(),
+            consciousness_level: 0.5, // Default, will be updated
         };
 
         // Update cache
@@ -506,22 +850,22 @@ impl FileAccessTracker {
 ```
     </section>
 
-    <section name="PostFileReadHandler">
+    <section name="PostToolUseHandler">
 ```rust
-/// Post-file-read hook handler for content embedding
-pub struct PostFileReadHandler {
+/// Post-tool-use hook handler for Read tool - content embedding
+pub struct PostToolUseReadHandler {
     /// Teleological store for persisting embeddings
     store: Arc<TeleologicalStore>,
-    /// Embedding pipeline
+    /// Embedding pipeline - uses all 13 embedders
     embedder_pipeline: Arc<EmbedderPipeline>,
     /// Content hasher for deduplication
     content_hasher: ContentHasher,
     /// Configuration
-    config: PostFileReadConfig,
+    config: PostToolUseReadConfig,
 }
 
 #[derive(Debug, Clone)]
-pub struct PostFileReadConfig {
+pub struct PostToolUseReadConfig {
     /// Maximum content size to embed (bytes)
     pub max_content_size: usize,
     /// Minimum content size to embed (bytes)
@@ -532,9 +876,11 @@ pub struct PostFileReadConfig {
     pub deduplicate: bool,
     /// Hash TTL for deduplication (seconds)
     pub dedup_ttl_seconds: u64,
+    /// Maximum embedding latency - must fit in 3000ms Constitution budget
+    pub max_embedding_latency_ms: u64,
 }
 
-impl Default for PostFileReadConfig {
+impl Default for PostToolUseReadConfig {
     fn default() -> Self {
         let mut extensions = HashSet::new();
         extensions.extend([
@@ -548,28 +894,38 @@ impl Default for PostFileReadConfig {
             embed_extensions: extensions,
             deduplicate: true,
             dedup_ttl_seconds: 3600, // 1 hour
+            // Leave buffer for response - Constitution timeout is 3000ms
+            max_embedding_latency_ms: 2500,
         }
     }
 }
 
-/// Payload for post-file-read hook
+/// Claude Code's PostToolUse payload for Read tool
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PostFileReadPayload {
-    /// File path that was read
-    pub file_path: String,
-    /// Content that was read
-    pub content: String,
-    /// Lines that were read (if partial)
-    pub line_range: Option<(usize, usize)>,
-    /// Source tool
-    pub source_tool: String,
+pub struct ClaudeCodePostToolUsePayload {
+    /// Tool name - will be "Read"
+    pub tool_name: String,
+    /// Tool input parameters (same as pre)
+    pub tool_input: ReadToolInput,
+    /// Tool response containing file content
+    pub tool_response: ReadToolResponse,
 }
 
-impl PostFileReadHandler {
+/// Read tool response from Claude Code
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadToolResponse {
+    /// File content that was read
+    pub content: String,
+    /// Any error message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+impl PostToolUseReadHandler {
     pub fn new(
         store: Arc<TeleologicalStore>,
         embedder_pipeline: Arc<EmbedderPipeline>,
-        config: PostFileReadConfig,
+        config: PostToolUseReadConfig,
     ) -> Self {
         Self {
             store,
@@ -579,17 +935,30 @@ impl PostFileReadHandler {
         }
     }
 
-    /// Handle PostFileRead event
-    pub async fn handle(&self, payload: PostFileReadPayload) -> Result<HookResponse, HookError> {
+    /// Handle PostToolUse event for Read tool
+    pub async fn handle(&self, payload: ClaudeCodePostToolUsePayload) -> Result<HookResponse, HookError> {
         let start = Instant::now();
 
+        // Validate this is a Read tool call
+        if payload.tool_name != "Read" {
+            return Ok(HookResponse::skip("Not a Read tool call"));
+        }
+
+        // Check for read errors
+        if let Some(error) = &payload.tool_response.error {
+            return Ok(HookResponse::skip(&format!("Read failed: {}", error)));
+        }
+
+        let file_path = &payload.tool_input.file_path;
+        let content = &payload.tool_response.content;
+
         // 1. Check if we should embed this file
-        if !self.should_embed(&payload) {
+        if !self.should_embed(file_path, content) {
             return Ok(HookResponse::skip("File not eligible for embedding"));
         }
 
         // 2. Check for duplicate content
-        let content_hash = self.content_hasher.hash(&payload.content);
+        let content_hash = self.content_hasher.hash(content);
         if self.config.deduplicate {
             if let Some(existing_id) = self.check_duplicate(&content_hash).await? {
                 return Ok(HookResponse {
@@ -605,28 +974,35 @@ impl PostFileReadHandler {
             }
         }
 
-        // 3. Generate teleological array
-        let teleological_array = self.embedder_pipeline
-            .generate_full(&payload.content)
-            .await
-            .map_err(HookError::EmbeddingFailed)?;
+        // 3. Generate 13-dimensional teleological array with timeout
+        let teleological_array = timeout(
+            Duration::from_millis(self.config.max_embedding_latency_ms),
+            self.embedder_pipeline.generate_full(content),
+        )
+        .await
+        .map_err(|_| HookError::Timeout("Embedding took too long"))?
+        .map_err(HookError::EmbeddingFailed)?;
 
         // 4. Determine memory type and namespace
-        let memory_type = self.classify_content(&payload.file_path, &payload.content);
-        let namespace = self.derive_namespace(&payload.file_path);
+        let memory_type = self.classify_content(file_path, content);
+        let namespace = self.derive_namespace(file_path);
 
-        // 5. Store in teleological store
+        // 5. Store in teleological store with all 13 embeddings
         let memory_id = self.store.inject(InjectionRequest {
-            content: payload.content.clone(),
+            content: content.clone(),
             teleological_array,
             memory_type,
             namespace,
             metadata: serde_json::json!({
-                "file_path": payload.file_path,
+                "file_path": file_path,
                 "content_hash": content_hash,
-                "line_range": payload.line_range,
-                "source_tool": payload.source_tool,
+                "line_range": payload.tool_input.offset.zip(payload.tool_input.limit)
+                    .map(|(o, l)| (o, o + l)),
+                "source_tool": "Read",
                 "read_at": Utc::now().to_rfc3339(),
+                "embedders_used": EmbedderType::ALL.iter()
+                    .map(|e| format!("{:?}", e))
+                    .collect::<Vec<_>>(),
             }),
         }).await.map_err(HookError::StorageError)?;
 
@@ -643,25 +1019,32 @@ impl PostFileReadHandler {
                 "memory_id": memory_id,
                 "content_hash": content_hash,
                 "embedders_generated": 13,
+                "embedder_types": [
+                    "E1_Semantic", "E2_Temporal", "E3_Causal", "E4_Counterfactual",
+                    "E5_Moral", "E6_Aesthetic", "E7_Teleological", "E8_Contextual",
+                    "E9_Structural", "E10_Behavioral", "E11_Emotional", "E12_Code",
+                    "E13_SPLADE"
+                ],
                 "memory_type": memory_type,
             })),
             metrics: HookMetrics {
                 latency_ms: start.elapsed().as_millis() as u64,
                 embedders_used: 13,
                 goals_checked: 0,
+                consciousness_level: 0.0,
             },
         })
     }
 
-    fn should_embed(&self, payload: &PostFileReadPayload) -> bool {
+    fn should_embed(&self, file_path: &str, content: &str) -> bool {
         // Check content size
-        let size = payload.content.len();
+        let size = content.len();
         if size < self.config.min_content_size || size > self.config.max_content_size {
             return false;
         }
 
         // Check file extension
-        let extension = std::path::Path::new(&payload.file_path)
+        let extension = std::path::Path::new(file_path)
             .extension()
             .and_then(|e| e.to_str())
             .unwrap_or("");
@@ -764,102 +1147,138 @@ enum HasherType {
     <section name="ShellScripts">
 ```bash
 #!/bin/bash
-# .claude/hooks/pre_file_read.sh
-# PreFileRead hook - preloads related context before file reads
+# .claude/hooks/pre_tool_use_read.sh
+# PreToolUse hook for Read tool - preloads related context before file reads
+# Timeout: 3000ms (Constitution requirement)
 
 set -e
 
-# Read input from stdin (JSON payload)
+# Read input from stdin (JSON payload from Claude Code)
 INPUT=$(cat)
 
-# Extract file path
-FILE_PATH=$(echo "$INPUT" | jq -r '.file_path')
-SOURCE_TOOL=$(echo "$INPUT" | jq -r '.source_tool // "Read"')
+# Parse Claude Code's PreToolUse format: { tool_name, tool_input: { file_path, limit?, offset? } }
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
+LIMIT=$(echo "$INPUT" | jq -r '.tool_input.limit // "null"')
+OFFSET=$(echo "$INPUT" | jq -r '.tool_input.offset // "null"')
+
+# Validate this is a Read tool call
+if [ "$TOOL_NAME" != "Read" ]; then
+  echo "Skip: Not a Read tool" >&2
+  exit 0
+fi
+
+# Validate file path exists
+if [ -z "$FILE_PATH" ]; then
+  echo "Skip: No file path provided" >&2
+  exit 0
+fi
 
 # Call MCP tool for context preloading
 RESPONSE=$(echo '{
   "jsonrpc": "2.0",
-  "id": "pre-file-read-'$(date +%s)'",
-  "method": "hooks/pre_file_read",
+  "id": "pre-tool-use-read-'$(date +%s%N)'",
+  "method": "hooks/pre_tool_use_read",
   "params": {
-    "file_path": "'"$FILE_PATH"'",
-    "source_tool": "'"$SOURCE_TOOL"'"
+    "tool_name": "'"$TOOL_NAME"'",
+    "tool_input": {
+      "file_path": "'"$FILE_PATH"'"'"$([ "$LIMIT" != "null" ] && echo ', "limit": '$LIMIT'')"''"$([ "$OFFSET" != "null" ] && echo ', "offset": '$OFFSET'')"'
+    }
   }
 }' | nc -U /tmp/contextgraph.sock 2>/dev/null || echo '{"result":{}}')
 
 # Extract injected context
 CONTEXT=$(echo "$RESPONSE" | jq -r '.result.injected_context // empty')
 
-# Output context to stdout for Claude Code to consume
+# Output context to stderr for Claude Code to consume
 if [ -n "$CONTEXT" ] && [ "$CONTEXT" != "null" ]; then
+  CONSCIOUSNESS=$(echo "$CONTEXT" | jq -r '.consciousness.consciousness_level // 0')
+  PRIORITY=$(echo "$CONTEXT" | jq -r '.consciousness.preload_priority // "Standard"')
   RELATED_COUNT=$(echo "$CONTEXT" | jq -r '.related_memories | length // 0')
   HISTORY_COUNT=$(echo "$CONTEXT" | jq -r '.file_history | length // 0')
 
   if [ "$RELATED_COUNT" -gt 0 ] || [ "$HISTORY_COUNT" -gt 0 ]; then
-    echo "Context preloaded: $RELATED_COUNT related memories, $HISTORY_COUNT history entries" >&2
+    echo "Context preloaded [C=$CONSCIOUSNESS, Priority=$PRIORITY]: $RELATED_COUNT memories, $HISTORY_COUNT history" >&2
 
-    # Output suggestions if any
-    SUGGESTIONS=$(echo "$CONTEXT" | jq -r '.suggestions[]?.message // empty')
-    if [ -n "$SUGGESTIONS" ]; then
+    # Output suggestions if any and consciousness is high enough
+    if [ "$(echo "$CONTEXT" | jq -r '.suggestions | length // 0')" -gt 0 ]; then
       echo "Suggestions:" >&2
-      echo "$SUGGESTIONS" | while read -r suggestion; do
+      echo "$CONTEXT" | jq -r '.suggestions[]?.message // empty' | while read -r suggestion; do
         echo "  - $suggestion" >&2
       done
     fi
   fi
 fi
 
-# Always proceed
+# Always proceed (don't block file reads)
 exit 0
 ```
 
 ```bash
 #!/bin/bash
-# .claude/hooks/post_file_read.sh
-# PostFileRead hook - embeds file content as teleological array
+# .claude/hooks/post_tool_use_read.sh
+# PostToolUse hook for Read tool - embeds file content as 13-dimensional teleological array
+# Timeout: 3000ms (Constitution requirement)
 
 set -e
 
-# Read input from stdin (JSON payload)
+# Read input from stdin (JSON payload from Claude Code)
 INPUT=$(cat)
 
-# Extract file path and content
-FILE_PATH=$(echo "$INPUT" | jq -r '.file_path')
-CONTENT=$(echo "$INPUT" | jq -r '.content')
-SOURCE_TOOL=$(echo "$INPUT" | jq -r '.source_tool // "Read"')
+# Parse Claude Code's PostToolUse format:
+# { tool_name, tool_input: { file_path, ... }, tool_response: { content, error? } }
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
+CONTENT=$(echo "$INPUT" | jq -r '.tool_response.content // empty')
+ERROR=$(echo "$INPUT" | jq -r '.tool_response.error // empty')
 
-# Check content size (skip very large files)
+# Validate this is a Read tool call
+if [ "$TOOL_NAME" != "Read" ]; then
+  echo "Skip: Not a Read tool" >&2
+  exit 0
+fi
+
+# Skip if there was an error
+if [ -n "$ERROR" ]; then
+  echo "Skip: Read failed - $ERROR" >&2
+  exit 0
+fi
+
+# Check content size (skip very large or very small files)
 CONTENT_SIZE=${#CONTENT}
-MAX_SIZE=100000
+MAX_SIZE=100000  # 100KB
+MIN_SIZE=50
 
 if [ "$CONTENT_SIZE" -gt "$MAX_SIZE" ]; then
   echo "Skipping embedding: content too large ($CONTENT_SIZE bytes)" >&2
   exit 0
 fi
 
-# Check minimum size
-MIN_SIZE=50
 if [ "$CONTENT_SIZE" -lt "$MIN_SIZE" ]; then
   echo "Skipping embedding: content too small ($CONTENT_SIZE bytes)" >&2
   exit 0
 fi
 
-# Call MCP tool to embed content
+# Call MCP tool to embed content with all 13 embedders
 RESPONSE=$(echo '{
   "jsonrpc": "2.0",
-  "id": "post-file-read-'$(date +%s)'",
-  "method": "hooks/post_file_read",
+  "id": "post-tool-use-read-'$(date +%s%N)'",
+  "method": "hooks/post_tool_use_read",
   "params": {
-    "file_path": "'"$FILE_PATH"'",
-    "content": '"$(echo "$CONTENT" | jq -Rs .)"',
-    "source_tool": "'"$SOURCE_TOOL"'"
+    "tool_name": "'"$TOOL_NAME"'",
+    "tool_input": {
+      "file_path": "'"$FILE_PATH"'"
+    },
+    "tool_response": {
+      "content": '"$(echo "$CONTENT" | jq -Rs .)"'
+    }
   }
 }' | nc -U /tmp/contextgraph.sock 2>/dev/null || echo '{"error":{"message":"Connection failed"}}')
 
 # Check for errors
 ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty')
 if [ -n "$ERROR" ]; then
-  echo "Warning: PostFileRead hook failed: $ERROR" >&2
+  echo "Warning: PostToolUse hook failed: $ERROR" >&2
   # Don't block, just log
   exit 0
 fi
@@ -867,11 +1286,12 @@ fi
 # Log success
 MEMORY_ID=$(echo "$RESPONSE" | jq -r '.result.injected_context.memory_id // empty')
 DEDUPLICATED=$(echo "$RESPONSE" | jq -r '.result.injected_context.deduplicated // false')
+EMBEDDERS=$(echo "$RESPONSE" | jq -r '.result.injected_context.embedders_generated // 0')
 
 if [ "$DEDUPLICATED" = "true" ]; then
   echo "Content already indexed (deduplicated)" >&2
 elif [ -n "$MEMORY_ID" ]; then
-  echo "File content embedded as memory: $MEMORY_ID" >&2
+  echo "File embedded: $MEMORY_ID (13 embedders: E1-E13)" >&2
 fi
 
 exit 0
@@ -904,12 +1324,13 @@ fn get_current_session_id() -> String {
 }
 
 impl InjectedContext {
-    pub fn empty() -> Self {
+    pub fn empty(consciousness: ReadConsciousnessContext) -> Self {
         Self {
             related_memories: vec![],
             file_history: vec![],
             related_goals: vec![],
             suggestions: vec![],
+            consciousness,
         }
     }
 }
@@ -932,11 +1353,94 @@ impl HookMetrics {
             latency_ms,
             embedders_used: 0,
             goals_checked: 0,
+            consciousness_level: 0.0,
         }
     }
+}
+
+/// Extended HookMetrics with consciousness tracking
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HookMetrics {
+    pub latency_ms: u64,
+    pub embedders_used: usize,
+    pub goals_checked: usize,
+    pub consciousness_level: f32,
+}
+```
+    </section>
+
+    <section name="SettingsConfiguration">
+```json
+// .claude/settings.local.json
+// Claude Code hook configuration for PreToolUse/PostToolUse on Read tool
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [".claude/hooks/pre_tool_use_read.sh"],
+        "timeout": 3000
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [".claude/hooks/post_tool_use_read.sh"],
+        "timeout": 3000
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Read"
+    ]
+  }
 }
 ```
     </section>
   </pseudo_code>
+
+  <timeout_budget>
+    <description>
+      Constitution requires 3000ms timeout for PreToolUse/PostToolUse hooks.
+      This is how we budget time within that constraint:
+    </description>
+    <pre_tool_use>
+      <total_budget_ms>3000</total_budget_ms>
+      <context_search_ms>50</context_search_ms>
+      <consciousness_calc_ms>5</consciousness_calc_ms>
+      <response_building_ms>10</response_building_ms>
+      <buffer_ms>2935</buffer_ms>
+    </pre_tool_use>
+    <post_tool_use>
+      <total_budget_ms>3000</total_budget_ms>
+      <dedup_check_ms>10</dedup_check_ms>
+      <embedding_generation_ms>2500</embedding_generation_ms>
+      <storage_ms>200</storage_ms>
+      <response_building_ms>50</response_building_ms>
+      <buffer_ms>240</buffer_ms>
+    </post_tool_use>
+  </timeout_budget>
+
+  <embedder_coverage>
+    <description>
+      All 13 embedders in the teleological array are used for full content embedding
+    </description>
+    <embedders>
+      <embedder id="E1">Semantic - Meaning and concepts</embedder>
+      <embedder id="E2">Temporal - Time-based patterns</embedder>
+      <embedder id="E3">Causal - Cause-effect relationships</embedder>
+      <embedder id="E4">Counterfactual - What-if scenarios</embedder>
+      <embedder id="E5">Moral - Ethical implications</embedder>
+      <embedder id="E6">Aesthetic - Code quality and style</embedder>
+      <embedder id="E7">Teleological - Purpose and goals</embedder>
+      <embedder id="E8">Contextual - Environmental context</embedder>
+      <embedder id="E9">Structural - Architecture and organization</embedder>
+      <embedder id="E10">Behavioral - Runtime patterns</embedder>
+      <embedder id="E11">Emotional - Developer intent and sentiment</embedder>
+      <embedder id="E12">Code - AST-based semantics</embedder>
+      <embedder id="E13">SPLADE - Sparse lexical representations</embedder>
+    </embedders>
+  </embedder_coverage>
 </task_spec>
 ```

@@ -472,13 +472,20 @@ async fn test_full_state_verification_goal_hierarchy_navigation() {
     // =========================================================================
     // STEP 3: Execute get_children and verify
     // =========================================================================
-    println!("📝 EXECUTING: goal/hierarchy_query get_children (ns_ml_system)");
+    // Extract actual goal UUIDs from get_all response (goals use UUIDs, not human-readable IDs)
+    let north_star_id = goals
+        .iter()
+        .find(|g| g.get("level").and_then(|v| v.as_str()) == Some("NorthStar"))
+        .and_then(|g| g.get("id").and_then(|v| v.as_str()))
+        .expect("Must have North Star goal with id");
+
+    println!("📝 EXECUTING: goal/hierarchy_query get_children (NorthStar)");
     let get_children_request = make_request(
         "goal/hierarchy_query",
         Some(JsonRpcId::Number(2)),
         Some(json!({
             "operation": "get_children",
-            "goal_id": "ns_ml_system"
+            "goal_id": north_star_id
         })),
     );
     let get_children_response = handlers.dispatch(get_children_request).await;
@@ -519,13 +526,20 @@ async fn test_full_state_verification_goal_hierarchy_navigation() {
     // =========================================================================
     // STEP 4: Execute get_ancestors and verify path
     // =========================================================================
-    println!("\n📝 EXECUTING: goal/hierarchy_query get_ancestors (i1_vector)");
+    // Extract an Immediate goal UUID from get_all response
+    let immediate_goal_id_str = goals
+        .iter()
+        .find(|g| g.get("level").and_then(|v| v.as_str()) == Some("Immediate"))
+        .and_then(|g| g.get("id").and_then(|v| v.as_str()))
+        .expect("Must have Immediate goal with id");
+
+    println!("\n📝 EXECUTING: goal/hierarchy_query get_ancestors (Immediate)");
     let get_ancestors_request = make_request(
         "goal/hierarchy_query",
         Some(JsonRpcId::Number(3)),
         Some(json!({
             "operation": "get_ancestors",
-            "goal_id": "i1_vector"
+            "goal_id": immediate_goal_id_str
         })),
     );
     let get_ancestors_response = handlers.dispatch(get_ancestors_request).await;

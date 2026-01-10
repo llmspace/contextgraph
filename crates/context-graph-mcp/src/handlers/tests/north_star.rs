@@ -574,9 +574,19 @@ async fn test_get_goal_hierarchy_returns_tree() {
     );
 
     // ACTION: Query get_children for North Star
+    // Extract the North Star goal ID from the get_all response (goals use UUIDs, not human-readable IDs)
+    let north_star_goal = goals
+        .iter()
+        .find(|g| g.get("level").and_then(|v| v.as_str()) == Some("NorthStar"))
+        .expect("Must have North Star goal");
+    let north_star_id = north_star_goal
+        .get("id")
+        .and_then(|v| v.as_str())
+        .expect("North Star must have id");
+
     let children_params = json!({
         "operation": "get_children",
-        "goal_id": "ns_knowledge"
+        "goal_id": north_star_id
     });
     let children_request = make_request(
         "goal/hierarchy_query",
@@ -604,20 +614,25 @@ async fn test_get_goal_hierarchy_returns_tree() {
     // Verify the child is the Strategic goal
     let child = &children[0];
     assert_eq!(
-        child.get("id").and_then(|v| v.as_str()),
-        Some("s1_retrieval"),
-        "Child must be s1_retrieval"
-    );
-    assert_eq!(
         child.get("level").and_then(|v| v.as_str()),
         Some("Strategic"),
         "Child level must be Strategic"
     );
 
     // ACTION: Query get_ancestors for Immediate goal
+    // Extract the Immediate goal ID from the get_all response
+    let immediate_goal = goals
+        .iter()
+        .find(|g| g.get("level").and_then(|v| v.as_str()) == Some("Immediate"))
+        .expect("Must have Immediate goal");
+    let immediate_id = immediate_goal
+        .get("id")
+        .and_then(|v| v.as_str())
+        .expect("Immediate must have id");
+
     let ancestors_params = json!({
         "operation": "get_ancestors",
-        "goal_id": "i1_vectors"
+        "goal_id": immediate_id
     });
     let ancestors_request = make_request(
         "goal/hierarchy_query",
@@ -637,7 +652,7 @@ async fn test_get_goal_hierarchy_returns_tree() {
         .and_then(|v| v.as_array())
         .expect("Must have ancestors array");
 
-    // Path: i1_vectors -> t1_semantic -> s1_retrieval -> ns_knowledge
+    // Path: Immediate -> Tactical -> Strategic -> NorthStar
     // Should have at least 3 ancestors (excluding self or including all)
     assert!(
         ancestors.len() >= 3,
@@ -651,10 +666,11 @@ async fn test_hierarchy_query_nonexistent_goal() {
     // SETUP: Full hierarchy
     let (handlers, _store, _hierarchy) = create_handlers_with_full_hierarchy();
 
-    // ACTION: Query non-existent goal
+    // ACTION: Query non-existent goal with a valid UUID format that doesn't exist
+    // Using a well-formed UUID that won't be in the hierarchy
     let params = json!({
         "operation": "get_goal",
-        "goal_id": "nonexistent_goal_xyz"
+        "goal_id": "00000000-0000-0000-0000-000000000000"
     });
     let request = make_request(
         "goal/hierarchy_query",

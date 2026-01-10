@@ -61,6 +61,178 @@ Centralize hook timeout configuration to match constitution requirements:
 
 Currently, TASK-INTEG-004 defines hooks but timeout values are scattered across individual handler files. This task centralizes configuration for consistency and easy adjustment.
 
+## Claude Code Integration
+
+### settings.json Timeout Configuration
+
+All hook timeouts are configured in Claude Code's settings.json:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": ".claude/hooks/session-start.sh",
+        "timeout": 5000
+      }
+    ],
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": ".claude/hooks/pre-tool.sh \"$TOOL_NAME\" \"$TOOL_INPUT\"",
+        "timeout": 3000
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": ".claude/hooks/post-tool.sh \"$TOOL_NAME\" \"$TOOL_OUTPUT\"",
+        "timeout": 3000
+      }
+    ],
+    "SessionEnd": [
+      {
+        "type": "command",
+        "command": ".claude/hooks/session-end.sh",
+        "timeout": 60000
+      }
+    ],
+    "PreCompact": [
+      {
+        "type": "command",
+        "command": ".claude/hooks/pre-compact.sh",
+        "timeout": 10000
+      }
+    ],
+    "SubagentStop": [
+      {
+        "type": "command",
+        "command": ".claude/hooks/subagent-stop.sh \"$AGENT_ID\"",
+        "timeout": 5000
+      }
+    ]
+  }
+}
+```
+
+### Timeout-Aware Shell Scripts
+
+Each hook script should respect its timeout with internal guards:
+
+**Example (.claude/hooks/pre-tool.sh):**
+```bash
+#!/bin/bash
+# Pre-tool hook with 3000ms timeout budget
+TOOL_NAME="$1"
+TOOL_INPUT="$2"
+START_TIME=$(date +%s%3N)
+TIMEOUT_MS=3000
+
+# Quick operations only - no blocking calls
+case "$TOOL_NAME" in
+  Write|Edit)
+    # Log edit attempt (fast)
+    echo "{\"tool\":\"$TOOL_NAME\",\"timestamp\":$(date +%s)}" >> .claude/logs/edits.jsonl
+    ;;
+  Read)
+    # Track read patterns (fast)
+    echo "{\"tool\":\"Read\",\"timestamp\":$(date +%s)}" >> .claude/logs/reads.jsonl
+    ;;
+esac
+
+# Check elapsed time
+ELAPSED=$(($(date +%s%3N) - START_TIME))
+if [ $ELAPSED -gt $((TIMEOUT_MS - 100)) ]; then
+  echo "WARNING: Hook approaching timeout" >&2
+fi
+
+exit 0
+```
+
+### GWT Consciousness Integration
+
+Timeouts can be dynamically adjusted based on consciousness state:
+
+```rust
+/// Consciousness-aware timeout context
+pub struct TimeoutConsciousnessContext {
+    /// Base timeouts from constitution
+    pub base_timeouts: HookTimeouts,
+    /// Current consciousness state
+    pub consciousness_state: ConsciousnessState,
+    /// Cognitive load (0.0-1.0)
+    pub cognitive_load: f32,
+    /// Urgency level
+    pub urgency: UrgencyLevel,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum UrgencyLevel {
+    /// Normal operation
+    Normal,
+    /// Time-sensitive operation
+    Elevated,
+    /// Critical path operation
+    Critical,
+}
+
+impl TimeoutConsciousnessContext {
+    /// Adjust timeout based on consciousness state
+    ///
+    /// Note: Can only EXTEND timeouts, never shorten below constitution minimums
+    pub fn adjusted_timeout(&self, event: HookEvent) -> Duration {
+        let base = self.base_timeouts.get(event);
+
+        // High cognitive load = extend timeout for complex processing
+        let load_factor = 1.0 + (self.cognitive_load * 0.5);
+
+        // Urgency can reduce but never below constitution minimum
+        let urgency_factor = match self.urgency {
+            UrgencyLevel::Normal => 1.0,
+            UrgencyLevel::Elevated => 0.8,
+            UrgencyLevel::Critical => 0.6,
+        };
+
+        let adjusted_ms = (base.as_millis() as f32 * load_factor * urgency_factor) as u64;
+        let min_ms = event.constitution_timeout().as_millis() as u64;
+
+        Duration::from_millis(adjusted_ms.max(min_ms))
+    }
+}
+```
+
+### Integration with HookDispatcher
+
+The HookDispatcher uses consciousness-aware timeouts:
+
+```rust
+impl HookDispatcher {
+    pub async fn dispatch_with_consciousness(
+        &self,
+        event: HookEvent,
+        consciousness: &ConsciousnessState,
+    ) -> HookResult<()> {
+        let ctx = TimeoutConsciousnessContext {
+            base_timeouts: self.timeouts.clone(),
+            consciousness_state: consciousness.clone(),
+            cognitive_load: consciousness.cognitive_load(),
+            urgency: UrgencyLevel::Normal,
+        };
+
+        let timeout = ctx.adjusted_timeout(event);
+
+        // Execute with adjusted timeout
+        tokio::time::timeout(timeout, self.dispatch(event)).await
+            .map_err(|_| HookError::Timeout(HookTimeoutError {
+                event,
+                timeout,
+                elapsed: timeout,
+            }))?
+    }
+}
+```
+
 ## Scope
 
 ### In Scope
@@ -444,6 +616,11 @@ impl HookDispatcher {
 - [ ] Timeout error includes event, limit, and elapsed time
 - [ ] HookDispatcher uses centralized timeouts
 - [ ] with_timeout helper works correctly
+- [ ] settings.json configures all 6 hook timeouts correctly
+- [ ] Shell scripts include internal timeout guards
+- [ ] Consciousness-aware timeout adjustment works
+- [ ] Adjusted timeouts never go below constitution minimums
+- [ ] Timeout errors include elapsed time for debugging
 
 ## Files to Create
 
@@ -452,6 +629,8 @@ impl HookDispatcher {
 | `crates/context-graph-mcp/src/hooks/timeouts.rs` | Timeout configuration |
 | Update `crates/context-graph-mcp/src/hooks/dispatcher.rs` | Use centralized timeouts |
 | Update `crates/context-graph-mcp/src/hooks/mod.rs` | Export timeouts |
+| `.claude/hooks/pre-tool.sh` | Timeout-aware pre-tool hook |
+| `.claude/hooks/post-tool.sh` | Timeout-aware post-tool hook |
 
 ## Risk Assessment
 

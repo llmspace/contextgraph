@@ -42,6 +42,7 @@
 mod causal;
 mod cognitive_pulse;
 mod consciousness_dispatch;
+mod exhaustive_mcp_tools;
 mod error_codes;
 mod full_state_verification;
 mod full_state_verification_gwt;
@@ -51,6 +52,7 @@ mod full_state_verification_purpose;
 mod full_state_verification_search;
 mod initialize;
 mod integration_e2e;
+mod manual_fix_verification;
 mod manual_fsv_purpose;
 mod manual_fsv_verification;
 mod manual_teleological_validation;
@@ -891,4 +893,98 @@ pub(crate) async fn create_test_handlers_with_warm_gwt_rocksdb() -> (Handlers, T
     );
 
     (handlers, tempdir)
+}
+
+/// Create test handlers with ALL components initialized for exhaustive MCP tool testing.
+///
+/// TASK-EXHAUSTIVE-MCP: This function initializes:
+/// - GWT providers (Kuramoto, Workspace, MetaCognitive, SelfEgo) with WARM state
+/// - ATC (Adaptive Threshold Calibration) - enables get_threshold_status, get_calibration_metrics, trigger_recalibration
+/// - Dream system (DreamController, DreamScheduler, AmortizedLearner) - enables trigger_dream, get_dream_status, abort_dream, get_amortized_shortcuts
+/// - Neuromodulation (NeuromodulationManager) - enables get_neuromodulation_state, adjust_neuromodulator
+///
+/// This is the ONLY test handler that enables ALL 35 MCP tools to function properly.
+///
+/// # Returns
+///
+/// `Handlers` - Fully configured handlers with all components
+pub(crate) fn create_test_handlers_with_all_components() -> Handlers {
+    use super::gwt_providers::{
+        GwtSystemProviderImpl, KuramotoProviderImpl, MetaCognitiveProviderImpl,
+        SelfEgoProviderImpl, WorkspaceProviderImpl,
+    };
+    use context_graph_core::atc::AdaptiveThresholdCalibration;
+    use context_graph_core::dream::{AmortizedLearner, DreamController, DreamScheduler};
+    use context_graph_core::neuromod::NeuromodulationManager;
+
+    let store = Arc::new(InMemoryTeleologicalStore::new());
+    let teleological_store: Arc<dyn TeleologicalMemoryStore> = store.clone();
+    let utl_processor: Arc<dyn UtlProcessor> = Arc::new(StubUtlProcessor::new());
+    let multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider> =
+        Arc::new(StubMultiArrayProvider::new());
+    let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
+        Arc::new(DefaultAlignmentCalculator::new());
+    let goal_hierarchy = Arc::new(ParkingRwLock::new(create_test_hierarchy()));
+    let johari_manager: Arc<dyn JohariTransitionManager> =
+        Arc::new(DynDefaultJohariManager::new(store));
+    let meta_utl_tracker = Arc::new(ParkingRwLock::new(MetaUtlTracker::new()));
+    let system_monitor: Arc<dyn SystemMonitor> = Arc::new(StubSystemMonitor);
+    let layer_status_provider: Arc<dyn LayerStatusProvider> = Arc::new(StubLayerStatusProvider);
+
+    // WARM STATE: Synchronized Kuramoto network (r ≈ 1.0)
+    let kuramoto_network: Arc<ParkingRwLock<dyn KuramotoProvider>> =
+        Arc::new(ParkingRwLock::new(KuramotoProviderImpl::synchronized()));
+
+    let gwt_system: Arc<dyn GwtSystemProvider> = Arc::new(GwtSystemProviderImpl::new());
+    let workspace_provider: Arc<TokioRwLock<dyn WorkspaceProvider>> =
+        Arc::new(TokioRwLock::new(WorkspaceProviderImpl::new()));
+    let meta_cognitive: Arc<TokioRwLock<dyn MetaCognitiveProvider>> =
+        Arc::new(TokioRwLock::new(MetaCognitiveProviderImpl::new()));
+
+    // WARM STATE: Non-zero purpose vector for good alignment
+    let warm_purpose_vector: [f32; 13] = [
+        0.85, 0.72, 0.68, 0.65, 0.78, 0.55, 0.82, 0.71, 0.63, 0.59, 0.76, 0.69, 0.52,
+    ];
+    let self_ego: Arc<TokioRwLock<dyn SelfEgoProvider>> = Arc::new(TokioRwLock::new(
+        SelfEgoProviderImpl::with_purpose_vector(warm_purpose_vector),
+    ));
+
+    // TASK-NEUROMOD-MCP: Create REAL NeuromodulationManager
+    let neuromod_manager: Arc<ParkingRwLock<NeuromodulationManager>> =
+        Arc::new(ParkingRwLock::new(NeuromodulationManager::new()));
+
+    // TASK-DREAM-MCP: Create REAL Dream components
+    let dream_controller: Arc<ParkingRwLock<DreamController>> =
+        Arc::new(ParkingRwLock::new(DreamController::new()));
+    let dream_scheduler: Arc<ParkingRwLock<DreamScheduler>> =
+        Arc::new(ParkingRwLock::new(DreamScheduler::new()));
+    let amortized_learner: Arc<ParkingRwLock<AmortizedLearner>> =
+        Arc::new(ParkingRwLock::new(AmortizedLearner::new()));
+
+    // TASK-ATC-001: Create REAL AdaptiveThresholdCalibration
+    let atc: Arc<ParkingRwLock<AdaptiveThresholdCalibration>> =
+        Arc::new(ParkingRwLock::new(AdaptiveThresholdCalibration::new()));
+
+    // Create handlers with ALL components wired
+    Handlers::with_gwt_and_subsystems(
+        teleological_store,
+        utl_processor,
+        multi_array_provider,
+        alignment_calculator,
+        goal_hierarchy,
+        johari_manager,
+        meta_utl_tracker,
+        system_monitor,
+        layer_status_provider,
+        kuramoto_network,
+        gwt_system,
+        workspace_provider,
+        meta_cognitive,
+        self_ego,
+        atc,
+        dream_controller,
+        dream_scheduler,
+        amortized_learner,
+        neuromod_manager,
+    )
 }

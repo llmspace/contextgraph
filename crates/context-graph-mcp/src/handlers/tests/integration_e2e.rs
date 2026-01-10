@@ -880,11 +880,21 @@ async fn test_fsv_purpose_alignment_with_hierarchy() {
     );
     let all_response = ctx.handlers.dispatch(get_all).await;
     assert!(all_response.error.is_none(), "get_all MUST succeed");
-    let all_goals = all_response.result.unwrap()["goals"]
-        .as_array()
-        .unwrap()
-        .len();
-    println!("   - get_all: {} goals", all_goals);
+    let all_result = all_response.result.unwrap();
+    let all_goals_arr = all_result["goals"].as_array().unwrap();
+    println!("   - get_all: {} goals", all_goals_arr.len());
+
+    // Extract actual goal IDs from get_all response (goals use UUIDs, not human-readable IDs)
+    let north_star_id = all_goals_arr
+        .iter()
+        .find(|g| g["level"].as_str() == Some("NorthStar"))
+        .and_then(|g| g["id"].as_str())
+        .expect("Must have North Star goal with id");
+    let immediate_id = all_goals_arr
+        .iter()
+        .find(|g| g["level"].as_str() == Some("Immediate"))
+        .and_then(|g| g["id"].as_str())
+        .expect("Must have Immediate goal with id");
 
     // Get children of North Star
     let get_children = make_request(
@@ -892,7 +902,7 @@ async fn test_fsv_purpose_alignment_with_hierarchy() {
         5,
         json!({
             "operation": "get_children",
-            "goal_id": "ns_ml_system"
+            "goal_id": north_star_id
         }),
     );
     let children_response = ctx.handlers.dispatch(get_children).await;
@@ -904,7 +914,7 @@ async fn test_fsv_purpose_alignment_with_hierarchy() {
         .as_array()
         .unwrap()
         .len();
-    println!("   - get_children(ns_ml_system): {} children", children);
+    println!("   - get_children(NorthStar): {} children", children);
 
     // Get ancestors of immediate goal
     let get_ancestors = make_request(
@@ -912,7 +922,7 @@ async fn test_fsv_purpose_alignment_with_hierarchy() {
         6,
         json!({
             "operation": "get_ancestors",
-            "goal_id": "i1_vector"
+            "goal_id": immediate_id
         }),
     );
     let ancestors_response = ctx.handlers.dispatch(get_ancestors).await;
@@ -1924,12 +1934,13 @@ async fn test_edge_case_goal_not_found() {
 
     let ctx = TestContext::new();
 
+    // Use a valid UUID format that doesn't exist in the hierarchy
     let request = make_request(
         "goal/hierarchy_query",
         1,
         json!({
             "operation": "get_goal",
-            "goal_id": "nonexistent_goal_xyz"
+            "goal_id": "00000000-0000-0000-0000-000000000000"
         }),
     );
     let response = ctx.handlers.dispatch(request).await;
