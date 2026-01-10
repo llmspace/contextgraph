@@ -126,7 +126,7 @@ fn create_test_handlers_no_gwt() -> Handlers {
 /// Create test handlers with INCOHERENT Kuramoto network (low r value).
 ///
 /// Uses KuramotoProviderImpl::incoherent() for r < 0.1.
-fn create_test_handlers_incoherent() -> Handlers {
+pub(crate) fn create_test_handlers_incoherent() -> Handlers {
     let store = Arc::new(InMemoryTeleologicalStore::new());
     let teleological_store: Arc<dyn TeleologicalMemoryStore> = store.clone();
     let utl_processor: Arc<dyn UtlProcessor> = Arc::new(StubUtlProcessor::new());

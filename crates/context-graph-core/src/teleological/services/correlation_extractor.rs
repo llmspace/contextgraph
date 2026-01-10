@@ -282,6 +282,72 @@ impl CorrelationExtractor {
     pub fn config(&self) -> &CorrelationConfig {
         &self.config
     }
+
+    /// CONSTITUTION COMPLIANT: Extract 78 cross-correlations from alignment scores.
+    ///
+    /// This method computes correlations from the 13D alignment vector WITHOUT
+    /// requiring embeddings to have the same dimension. This is the CORRECT approach
+    /// per AP-03 ("No dimension projection to fake compatibility").
+    ///
+    /// Cross-correlation between embedders i and j is computed as:
+    /// corr(i,j) = sqrt(alignment[i] * alignment[j]) * synergy[i][j]
+    ///
+    /// This captures: "when both embedders strongly align with North Star,
+    /// their interaction (weighted by synergy) is meaningful."
+    ///
+    /// # Arguments
+    /// * `alignments` - 13D purpose vector alignments (one scalar per embedder)
+    /// * `synergy_matrix` - Optional synergy matrix for weighting
+    ///
+    /// # Returns
+    /// CorrelationResult with 78 cross-correlations computed from alignments.
+    pub fn extract_from_alignments(
+        &self,
+        alignments: &[f32; SYNERGY_DIM],
+        synergy_matrix: Option<&SynergyMatrix>,
+    ) -> CorrelationResult {
+        let mut correlations = [0.0f32; CROSS_CORRELATION_COUNT];
+        let mut idx = 0;
+
+        for i in 0..SYNERGY_DIM {
+            for j in (i + 1)..SYNERGY_DIM {
+                // Compute alignment-based correlation using geometric mean
+                // This is dimension-agnostic and captures "both embedders point to North Star"
+                let ai = alignments[i].max(0.0);
+                let aj = alignments[j].max(0.0);
+                let corr = (ai * aj).sqrt();
+
+                // Apply synergy weighting
+                let weighted = if self.config.apply_synergy_weights {
+                    if let Some(matrix) = synergy_matrix {
+                        corr * matrix.get_synergy(i, j)
+                    } else {
+                        corr * SynergyMatrix::BASE_SYNERGIES[i][j]
+                    }
+                } else {
+                    corr
+                };
+
+                // Apply noise threshold
+                correlations[idx] = if weighted.abs() < self.config.min_correlation {
+                    0.0
+                } else {
+                    weighted
+                };
+
+                idx += 1;
+            }
+        }
+
+        let (sparsity, avg_magnitude, strongest) = self.compute_stats(&correlations);
+
+        CorrelationResult {
+            correlations,
+            sparsity,
+            average_magnitude: avg_magnitude,
+            strongest_pair: strongest,
+        }
+    }
 }
 
 impl Default for CorrelationExtractor {

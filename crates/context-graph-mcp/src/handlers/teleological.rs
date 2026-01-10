@@ -11,7 +11,7 @@ use super::Handlers;
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
 use context_graph_core::teleological::{
     services::{FusionEngine, ProfileManager},
-    types::{EMBEDDING_DIM, NUM_EMBEDDERS},
+    types::NUM_EMBEDDERS, // EMBEDDING_DIM removed - no longer needed after AP-03 fix
     ComparisonScope, ComponentWeights, GroupType, ProfileId, TeleologicalVector,
 };
 // FeedbackEvent and FeedbackType need full path - not re-exported from services
@@ -341,40 +341,25 @@ fn parse_feedback_type(s: &str) -> FeedbackType {
     }
 }
 
-/// Project an embedding to the target dimension (EMBEDDING_DIM = 1024).
-///
-/// Strategy:
-/// - If dim < target: zero-pad to target dimension
-/// - If dim > target: use mean-pooling to reduce to target dimension
-/// - If dim == target: return as-is
-///
-/// This ensures all embeddings are compatible with FusionEngine which expects
-/// uniform EMBEDDING_DIM dimensions for all 13 embedders.
-fn project_to_embedding_dim(embedding: Vec<f32>) -> Vec<f32> {
-    let dim = embedding.len();
-
-    if dim == EMBEDDING_DIM {
-        // Already correct dimension
-        embedding
-    } else if dim < EMBEDDING_DIM {
-        // Zero-pad to EMBEDDING_DIM
-        let mut projected = embedding;
-        projected.resize(EMBEDDING_DIM, 0.0);
-        projected
-    } else {
-        // Mean-pool to reduce dimension: divide into EMBEDDING_DIM chunks and average
-        let mut projected = vec![0.0f32; EMBEDDING_DIM];
-        let chunk_size = (dim as f32 / EMBEDDING_DIM as f32).ceil() as usize;
-
-        for (i, chunk) in embedding.chunks(chunk_size).enumerate() {
-            if i < EMBEDDING_DIM {
-                let sum: f32 = chunk.iter().sum();
-                projected[i] = sum / chunk.len() as f32;
-            }
-        }
-        projected
-    }
-}
+// ============================================================================
+// CONSTITUTION COMPLIANCE NOTE - AP-03 VIOLATION REMOVED
+// ============================================================================
+//
+// The function `project_to_embedding_dim()` was REMOVED because it violated:
+// Constitution AP-03: "No dimension projection to fake compatibility"
+//
+// The 13 embedders produce vectors of different native dimensions:
+// - E1 Semantic: 1024D          - E8 Graph: 384D
+// - E2-E4 Temporal: 512D each   - E9 HDC: 1024D
+// - E5 Causal: 768D             - E10 Multimodal: 768D
+// - E6 Sparse: ~30K vocab       - E11 Entity: 384D
+// - E7 Code: 1536D              - E12 Late Interaction: 128D/token
+//                               - E13 SPLADE: ~30K vocab (sparse)
+//
+// Per constitution, embeddings MUST be kept in native dimensions.
+// Use FusionEngine::fuse_from_alignments() which works with alignment scores
+// (one scalar per embedder) instead of requiring uniform-dimension embeddings.
+// ============================================================================
 
 /// Compute alignment scores from embedding L2 norms (normalized to [0,1]).
 fn compute_alignments_from_embeddings(embeddings: &[Vec<f32>]) -> [f32; NUM_EMBEDDERS] {
@@ -400,6 +385,78 @@ fn compute_alignments_from_embeddings(embeddings: &[Vec<f32>]) -> [f32; NUM_EMBE
     }
 
     alignments
+}
+
+/// Error types for embedding extraction.
+#[derive(Debug)]
+enum ExtractError {
+    /// Empty token-level embeddings (violates AP-04)
+    EmptyTokenLevel(usize),
+    /// Missing embedder (violates ARCH-05)
+    MissingEmbedder(usize),
+}
+
+impl ExtractError {
+    fn to_error_string(&self) -> String {
+        match self {
+            Self::EmptyTokenLevel(i) => format!(
+                "FAIL FAST [AP-04]: Embedder E{} returned empty TokenLevel. \
+                 All 13 embedders must produce valid embeddings.",
+                i + 1
+            ),
+            Self::MissingEmbedder(i) => format!(
+                "FAIL FAST [ARCH-05]: Embedder E{} returned None. \
+                 Constitution requires ALL 13 embedders to be present.",
+                i + 1
+            ),
+        }
+    }
+}
+
+/// Extract embeddings from fingerprint in native dimensions.
+///
+/// CONSTITUTION COMPLIANT:
+/// - Per AP-03: "No dimension projection to fake compatibility"
+/// - Per ARCH-05: "Missing embedders are a fatal error"
+fn extract_embeddings_from_fingerprint(
+    fingerprint: &context_graph_core::types::SemanticFingerprint,
+) -> Result<Vec<Vec<f32>>, ExtractError> {
+    let mut embeddings = Vec::with_capacity(NUM_EMBEDDERS);
+
+    for i in 0..NUM_EMBEDDERS {
+        let embedding = match fingerprint.get_embedding(i) {
+            Some(context_graph_core::types::EmbeddingSlice::Dense(slice)) => {
+                slice.to_vec()
+            }
+            Some(context_graph_core::types::EmbeddingSlice::Sparse(sparse)) => {
+                sparse.values.clone()
+            }
+            Some(context_graph_core::types::EmbeddingSlice::TokenLevel(tokens)) => {
+                if tokens.is_empty() {
+                    return Err(ExtractError::EmptyTokenLevel(i));
+                }
+                // Average token embeddings (keep native token dimension)
+                let dim = tokens[0].len();
+                let mut avg = vec![0.0f32; dim];
+                for token in tokens {
+                    for (j, &v) in token.iter().enumerate() {
+                        avg[j] += v;
+                    }
+                }
+                let n = tokens.len() as f32;
+                for v in &mut avg {
+                    *v /= n;
+                }
+                avg
+            }
+            None => {
+                return Err(ExtractError::MissingEmbedder(i));
+            }
+        };
+        embeddings.push(embedding);
+    }
+
+    Ok(embeddings)
 }
 
 // ============================================================================
@@ -620,54 +677,14 @@ impl Handlers {
             }
         };
 
-        // Extract embeddings from fingerprint and project to EMBEDDING_DIM (1024)
-        // This is REQUIRED because FusionEngine expects uniform dimensions for all embedders.
-        let fingerprint = &embedding_result.fingerprint;
-        let embeddings: Vec<Vec<f32>> = (0..NUM_EMBEDDERS)
-            .map(|i| {
-                let raw = match fingerprint.get_embedding(i) {
-                    Some(context_graph_core::types::EmbeddingSlice::Dense(slice)) => slice.to_vec(),
-                    Some(context_graph_core::types::EmbeddingSlice::Sparse(sparse)) => {
-                        // For sparse vectors, convert indices and values to a dense representation
-                        // by hashing indices into EMBEDDING_DIM buckets
-                        let mut dense = vec![0.0f32; EMBEDDING_DIM];
-                        for (&idx, &val) in sparse.indices.iter().zip(sparse.values.iter()) {
-                            let bucket = (idx as usize) % EMBEDDING_DIM;
-                            dense[bucket] += val;
-                        }
-                        dense
-                    }
-                    Some(context_graph_core::types::EmbeddingSlice::TokenLevel(tokens)) => {
-                        if tokens.is_empty() {
-                            vec![0.0; EMBEDDING_DIM]
-                        } else {
-                            let dim = tokens[0].len();
-                            let mut avg = vec![0.0f32; dim];
-                            for token in tokens {
-                                for (j, &v) in token.iter().enumerate() {
-                                    avg[j] += v;
-                                }
-                            }
-                            let n = tokens.len() as f32;
-                            for v in &mut avg {
-                                *v /= n;
-                            }
-                            avg
-                        }
-                    }
-                    None => vec![0.0; EMBEDDING_DIM],
-                };
-                // Project to EMBEDDING_DIM to ensure FusionEngine compatibility
-                project_to_embedding_dim(raw)
-            })
-            .collect();
+        // CONSTITUTION COMPLIANT: Extract embeddings using helper
+        let embeddings = extract_embeddings_from_fingerprint(&embedding_result.fingerprint)
+            .map_err(|e| e.to_error_string())?;
 
-        // Compute alignments from projected embeddings
+        // Compute alignments and fuse
         let alignments = compute_alignments_from_embeddings(&embeddings);
-
-        // Use FusionEngine for complete processing (now with uniform 1024D embeddings)
         let fusion_engine = FusionEngine::new();
-        let fusion_result = fusion_engine.fuse(&embeddings, &alignments);
+        let fusion_result = fusion_engine.fuse_from_alignments(&alignments);
 
         Ok(fusion_result.vector)
     }
@@ -711,54 +728,20 @@ impl Handlers {
         };
         let embed_duration = start.elapsed();
 
-        // Extract embeddings from fingerprint and project to EMBEDDING_DIM (1024)
-        // This is REQUIRED because FusionEngine expects uniform dimensions for all embedders.
-        let fingerprint = &embedding_result.fingerprint;
-        let embeddings: Vec<Vec<f32>> = (0..NUM_EMBEDDERS)
-            .map(|i| {
-                let raw = match fingerprint.get_embedding(i) {
-                    Some(context_graph_core::types::EmbeddingSlice::Dense(slice)) => slice.to_vec(),
-                    Some(context_graph_core::types::EmbeddingSlice::Sparse(sparse)) => {
-                        // For sparse vectors, convert indices and values to a dense representation
-                        // by hashing indices into EMBEDDING_DIM buckets
-                        let mut dense = vec![0.0f32; EMBEDDING_DIM];
-                        for (&idx, &val) in sparse.indices.iter().zip(sparse.values.iter()) {
-                            let bucket = (idx as usize) % EMBEDDING_DIM;
-                            dense[bucket] += val;
-                        }
-                        dense
-                    }
-                    Some(context_graph_core::types::EmbeddingSlice::TokenLevel(tokens)) => {
-                        if tokens.is_empty() {
-                            vec![0.0; EMBEDDING_DIM]
-                        } else {
-                            let dim = tokens[0].len();
-                            let mut avg = vec![0.0f32; dim];
-                            for token in tokens {
-                                for (j, &v) in token.iter().enumerate() {
-                                    avg[j] += v;
-                                }
-                            }
-                            let n = tokens.len() as f32;
-                            for v in &mut avg {
-                                *v /= n;
-                            }
-                            avg
-                        }
-                    }
-                    None => vec![0.0; EMBEDDING_DIM],
-                };
-                // Project to EMBEDDING_DIM to ensure FusionEngine compatibility
-                project_to_embedding_dim(raw)
-            })
-            .collect();
+        // CONSTITUTION COMPLIANT: Extract embeddings using helper
+        let embeddings = match extract_embeddings_from_fingerprint(&embedding_result.fingerprint) {
+            Ok(e) => e,
+            Err(e) => {
+                let err_msg = e.to_error_string();
+                error!("{}", err_msg);
+                return self.tool_error_with_pulse(id, &err_msg);
+            }
+        };
 
-        // Compute alignments from projected embeddings
+        // Compute alignments and fuse
         let alignments = compute_alignments_from_embeddings(&embeddings);
-
-        // Use FusionEngine for complete processing (now with uniform 1024D embeddings)
         let fusion_engine = FusionEngine::new();
-        let fusion_result = fusion_engine.fuse(&embeddings, &alignments);
+        let fusion_result = fusion_engine.fuse_from_alignments(&alignments);
 
         // Build response
         let vector_json = TeleologicalVectorJson::from_core(&fusion_result.vector, None);

@@ -130,7 +130,10 @@ pub mod error_codes {
     // Goal/alignment specific error codes (-32020 to -32029) - TASK-S003
     /// Goal not found in hierarchy
     pub const GOAL_NOT_FOUND: i32 = -32020;
-    /// North Star goal not configured in hierarchy
+    /// DEPRECATED: North Star goal not configured in hierarchy.
+    /// The system now operates autonomously without requiring North Star configuration.
+    /// This error code is no longer used - handlers use default values instead.
+    #[deprecated(note = "System operates autonomously without North Star requirement")]
     pub const NORTH_STAR_NOT_CONFIGURED: i32 = -32021;
     /// Alignment computation failed
     pub const ALIGNMENT_COMPUTATION_ERROR: i32 = -32022;

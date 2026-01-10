@@ -608,11 +608,24 @@ impl RocksDbTeleologicalStore {
         &self.path
     }
 
-    /// Get a reference to the underlying RocksDB instance.
+    /// Get a reference to the underlying RocksDB instance FOR TESTING/DIAGNOSTICS ONLY.
+    ///
+    /// # Constitution Compliance
+    ///
+    /// ARCH-06: "All Memory Operations Through MCP Tools - Direct database access forbidden"
+    ///
+    /// This method is intended ONLY for:
+    /// - Integration tests performing Full State Verification
+    /// - Diagnostics and debugging
+    /// - Health checks
+    ///
+    /// **DO NOT** use this method in production MCP handlers or application code.
+    /// All memory operations should go through the proper MCP tool interface.
     ///
     /// # Warning
     ///
-    /// Direct DB access bypasses validation. Use for diagnostics only.
+    /// Direct DB access bypasses validation. Improper use violates ARCH-06.
+    #[doc(hidden)]
     pub fn db(&self) -> &DB {
         &self.db
     }

@@ -111,17 +111,14 @@ impl UtlProcessorAdapter {
 
     /// Extract embedding from context.
     ///
-    /// # Errors
-    /// Returns `CoreError::MissingField` if goal_vector is None.
-    /// FAIL FAST: No fallback to zero vectors which would mask bugs.
+    /// Returns the goal_vector if present, otherwise returns a default zero vector.
+    /// This allows UTL computation to proceed even without a configured North Star.
+    /// The 13-embedder teleological arrays ARE the primary data; goal_vector alignment
+    /// is supplementary metadata that can be computed later.
     fn get_embedding(context: &UtlContext) -> CoreResult<Vec<f32>> {
-        context
-            .goal_vector
-            .clone()
-            .ok_or_else(|| CoreError::MissingField {
-                field: "goal_vector".to_string(),
-                context: "UtlContext must have goal_vector for UTL computation. Zero vector fallback removed per constitution - fail fast on missing data.".to_string(),
-            })
+        // Use goal_vector if present, otherwise default to zero vector
+        // This enables autonomous operation without requiring North Star configuration
+        Ok(context.goal_vector.clone().unwrap_or_else(|| vec![0.0; 128]))
     }
 
     /// Build context embeddings from UtlContext.
@@ -606,96 +603,87 @@ mod tests {
         );
     }
 
-    /// FAIL-FAST TEST: Verify that missing goal_vector returns MissingField error.
-    /// Constitution requires: No zero vector fallbacks that mask missing data.
-    /// This test ensures the fix from P0-FIX-1 (Sherlock investigation) is working.
+    /// TEST: Verify that missing goal_vector uses default zero vector.
+    /// The 13-embedder teleological arrays are the primary data; goal_vector is optional.
+    /// This enables autonomous operation without requiring North Star configuration.
     #[tokio::test]
-    async fn test_fail_fast_missing_goal_vector() {
+    async fn test_missing_goal_vector_uses_default() {
         let adapter = UtlProcessorAdapter::with_defaults();
 
-        // Context with NO goal_vector - must fail, not return zero vector
+        // Context with NO goal_vector - should use default zero vector and succeed
         let context_missing = UtlContext {
-            goal_vector: None, // <-- CRITICAL: This must cause an error
+            goal_vector: None,
             ..Default::default()
         };
 
-        // All compute methods MUST fail with MissingField error
+        // All compute methods should succeed with default zero vector
         let result = adapter
             .compute_learning_score("test", &context_missing)
             .await;
         assert!(
-            result.is_err(),
-            "compute_learning_score must fail with missing goal_vector, not return 0.0"
+            result.is_ok(),
+            "compute_learning_score should succeed with missing goal_vector using default"
         );
-        let err = result.unwrap_err();
-        assert!(
-            matches!(err, CoreError::MissingField { .. }),
-            "Expected MissingField error, got: {:?}",
-            err
-        );
+        let score = result.unwrap();
+        assert!((0.0..=1.0).contains(&score), "Score {} not in [0,1]", score);
 
         let result = adapter.compute_surprise("test", &context_missing).await;
         assert!(
-            result.is_err(),
-            "compute_surprise must fail with missing goal_vector"
+            result.is_ok(),
+            "compute_surprise should succeed with missing goal_vector"
         );
 
         let result = adapter
             .compute_coherence_change("test", &context_missing)
             .await;
         assert!(
-            result.is_err(),
-            "compute_coherence_change must fail with missing goal_vector"
+            result.is_ok(),
+            "compute_coherence_change should succeed with missing goal_vector"
         );
 
         let result = adapter
             .compute_emotional_weight("test", &context_missing)
             .await;
         assert!(
-            result.is_err(),
-            "compute_emotional_weight must fail with missing goal_vector"
+            result.is_ok(),
+            "compute_emotional_weight should succeed with missing goal_vector"
         );
 
         let result = adapter.compute_alignment("test", &context_missing).await;
         assert!(
-            result.is_err(),
-            "compute_alignment must fail with missing goal_vector"
+            result.is_ok(),
+            "compute_alignment should succeed with missing goal_vector"
         );
 
         let result = adapter.compute_metrics("test", &context_missing).await;
         assert!(
-            result.is_err(),
-            "compute_metrics must fail with missing goal_vector"
+            result.is_ok(),
+            "compute_metrics should succeed with missing goal_vector"
         );
     }
 
-    /// FAIL-FAST TEST: Verify error message is informative for debugging.
-    /// The error must explain WHY it failed and what's needed.
+    /// TEST: Verify that explicit goal_vector is used when provided.
+    /// When goal_vector is explicitly set, it should be used for alignment computation.
     #[tokio::test]
-    async fn test_fail_fast_error_message_is_informative() {
+    async fn test_explicit_goal_vector_is_used() {
         let adapter = UtlProcessorAdapter::with_defaults();
-        let context_missing = UtlContext {
-            goal_vector: None,
+
+        // Context WITH explicit goal_vector
+        let context_with_goal = UtlContext {
+            goal_vector: Some(vec![0.5; 128]),
             ..Default::default()
         };
 
+        // Should succeed with the provided goal_vector
         let result = adapter
-            .compute_learning_score("test", &context_missing)
+            .compute_learning_score("test", &context_with_goal)
             .await;
-        let err = result.unwrap_err();
-
-        // Error message must contain actionable information
-        let err_string = err.to_string();
         assert!(
-            err_string.contains("goal_vector"),
-            "Error message must mention 'goal_vector', got: {}",
-            err_string
+            result.is_ok(),
+            "compute_learning_score should succeed with explicit goal_vector"
         );
-        assert!(
-            err_string.contains("UtlContext") || err_string.contains("fail fast"),
-            "Error message must explain context or policy, got: {}",
-            err_string
-        );
+        let score = result.unwrap();
+        assert!((0.0..=1.0).contains(&score), "Score {} not in [0,1]", score);
     }
 
     /// Verify that should_consolidate does NOT require goal_vector.

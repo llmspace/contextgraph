@@ -326,11 +326,13 @@ async fn test_get_north_star_returns_data() {
     assert!(is_ns, "FSV: is_north_star must be true");
 }
 
-/// Test that purpose/drift_check fails without North Star configured.
+/// Test that drift_check works autonomously without North Star.
+/// AUTONOMOUS OPERATION: drift_check succeeds with neutral response when no North Star.
 ///
-/// This tests the fail-fast behavior required by AP-007.
+/// When no North Star is configured, there is no goal to measure drift against.
+/// The system returns a neutral "no drift" response instead of failing.
 #[tokio::test]
-async fn test_get_north_star_fails_without_north_star() {
+async fn test_drift_check_works_autonomously_without_north_star() {
     // SETUP: Empty hierarchy
     let (handlers, _store, hierarchy) = create_handlers_no_north_star();
 
@@ -340,7 +342,7 @@ async fn test_get_north_star_fails_without_north_star() {
         assert!(!h.has_north_star(), "FSV BEFORE: Must NOT have North Star");
     }
 
-    // ACTION: Try drift_check (requires North Star before fingerprint validation)
+    // ACTION: Try drift_check (returns neutral response when no North Star)
     let params = json!({
         "fingerprint_ids": ["00000000-0000-0000-0000-000000000001"]
     });
@@ -351,19 +353,30 @@ async fn test_get_north_star_fails_without_north_star() {
     );
     let response = handlers.dispatch(request).await;
 
-    // VERIFY: Response indicates failure with NORTH_STAR_NOT_CONFIGURED
+    // VERIFY: Succeeds with autonomous mode response (no North Star = no drift to measure)
     assert!(
-        response.error.is_some(),
-        "Must fail without North Star configured"
+        response.error.is_none(),
+        "Must succeed autonomously without North Star - response: {:?}",
+        response.error
     );
-    let error = response.error.unwrap();
+
+    // Verify the response indicates autonomous operation
+    let result = response.result.expect("Must have result");
+    let overall_drift = result.get("overall_drift").expect("Must have overall_drift");
     assert_eq!(
-        error.code, -32021,
-        "Must return NORTH_STAR_NOT_CONFIGURED (-32021)"
+        overall_drift.get("level").and_then(|v| v.as_str()),
+        Some("None"),
+        "Autonomous mode returns no drift"
     );
-    assert!(
-        error.message.contains("North Star") || error.message.contains("north_star"),
-        "Error message must mention North Star"
+    assert_eq!(
+        overall_drift.get("has_drifted").and_then(|v| v.as_bool()),
+        Some(false),
+        "Autonomous mode has no drift"
+    );
+    assert_eq!(
+        result.get("autonomous_mode").and_then(|v| v.as_bool()),
+        Some(true),
+        "Must indicate autonomous_mode=true"
     );
 }
 
@@ -685,13 +698,14 @@ async fn test_hierarchy_query_nonexistent_goal() {
     assert_eq!(error.code, -32020, "Must return GOAL_NOT_FOUND (-32020)");
 }
 
-/// Test purpose/drift_check fails without North Star.
+/// Test purpose/drift_check operates autonomously without North Star.
+/// AUTONOMOUS OPERATION: Returns neutral "no drift" response when no goal to measure against.
 #[tokio::test]
-async fn test_drift_check_fails_without_north_star() {
+async fn test_drift_check_autonomous_operation() {
     // SETUP: Empty hierarchy
     let (handlers, _store, _hierarchy) = create_handlers_no_north_star();
 
-    // ACTION: Try drift check
+    // ACTION: Try drift check (returns neutral response in autonomous mode)
     let params = json!({
         "fingerprint_ids": ["00000000-0000-0000-0000-000000000001"]
     });
@@ -702,14 +716,17 @@ async fn test_drift_check_fails_without_north_star() {
     );
     let response = handlers.dispatch(request).await;
 
-    // VERIFY: Fails with NORTH_STAR_NOT_CONFIGURED
+    // VERIFY: Succeeds with autonomous mode response
     assert!(
-        response.error.is_some(),
-        "Drift check must fail without North Star"
+        response.error.is_none(),
+        "Drift check succeeds autonomously - no North Star means no drift to measure"
     );
-    let error = response.error.unwrap();
+
+    // Verify autonomous mode is indicated in response
+    let result = response.result.expect("Must have result");
     assert_eq!(
-        error.code, -32021,
-        "Must return NORTH_STAR_NOT_CONFIGURED (-32021)"
+        result.get("autonomous_mode").and_then(|v| v.as_bool()),
+        Some(true),
+        "Must indicate autonomous_mode=true"
     );
 }

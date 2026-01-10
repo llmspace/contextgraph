@@ -1042,9 +1042,9 @@ Beyond the 23 tools, the MCP server supports these JSON-RPC methods:
 
 #### Purpose
 - `purpose/query` - Query by purpose vector
-- `purpose/north_star_alignment` - Check alignment
-- `purpose/drift_check` - Detect drift
-- `purpose/north_star_update` - Update North Star
+- `purpose/drift_check` - Detect alignment drift (works autonomously without North Star)
+- ~~`purpose/north_star_alignment`~~ - (Deprecated - use `purpose/drift_check`)
+- ~~`purpose/north_star_update`~~ - (Deprecated - use `auto_bootstrap_north_star`)
 
 #### Johari
 - `johari/get_distribution` - Per-embedder quadrants

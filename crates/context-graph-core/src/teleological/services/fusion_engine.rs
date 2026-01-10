@@ -338,6 +338,104 @@ impl FusionEngine {
     pub fn active_profile(&self) -> Option<&TeleologicalProfile> {
         self.active_profile.as_ref()
     }
+
+    /// CONSTITUTION COMPLIANT: Perform fusion using ONLY alignment scores.
+    ///
+    /// This method is the CORRECT approach per AP-03 ("No dimension projection to
+    /// fake compatibility"). It computes the TeleologicalVector without requiring
+    /// embeddings to have uniform dimensions.
+    ///
+    /// The 13 embedders produce vectors of different native dimensions (384D, 512D,
+    /// 768D, 1024D, 1536D, ~30K sparse). This method works with the ALIGNMENT SCORES
+    /// (one scalar per embedder) rather than the raw embedding vectors.
+    ///
+    /// # Arguments
+    /// * `alignments` - 13D purpose vector alignments (computed per-embedder in native space)
+    ///
+    /// # Returns
+    /// FusionResult containing the TeleologicalVector with:
+    /// - purpose_vector: The input alignments wrapped as PurposeVector
+    /// - cross_correlations: 78 values computed from alignment interactions
+    /// - group_alignments: 6D hierarchical aggregation
+    pub fn fuse_from_alignments(&self, alignments: &[f32; NUM_EMBEDDERS]) -> FusionResult {
+        // Step 1: Create purpose vector from alignments
+        let purpose_vector = PurposeVector::new(*alignments);
+        let pv_score = purpose_vector.aggregate_alignment();
+
+        // Step 2: Extract cross-correlations using alignment-based method
+        // This is dimension-agnostic and constitution-compliant
+        let synergy_matrix = if self.config.apply_synergy {
+            Some(self.synergy_service.matrix())
+        } else {
+            None
+        };
+
+        let corr_result = self
+            .correlation_extractor
+            .extract_from_alignments(alignments, synergy_matrix);
+        let corr_score = 1.0 - corr_result.sparsity;
+
+        // Step 3: Aggregate to groups
+        let group_result = self.group_aggregator.aggregate(alignments);
+        let group_score = group_result.coherence;
+
+        // Step 4: Apply profile modulation if enabled
+        let mut correlations = corr_result.correlations.to_vec();
+        let mut profile_id = None;
+
+        if self.config.profile_aware {
+            if let Some(profile) = &self.active_profile {
+                self.apply_profile_modulation(&mut correlations, profile, alignments);
+                profile_id = Some(ProfileId::new(profile.id.as_str()));
+            }
+        }
+
+        // Calculate synergy utilization
+        let synergy_score = if self.config.apply_synergy {
+            self.calculate_synergy_utilization(&correlations, alignments)
+        } else {
+            1.0
+        };
+
+        // Compute overall confidence
+        let confidence =
+            (pv_score * 0.3 + corr_score * 0.25 + group_score * 0.25 + synergy_score * 0.2)
+                * self.embedding_coverage(alignments);
+
+        // Build metadata (before moving group_result.alignments)
+        let active_embedders = alignments.iter().filter(|&&a| a > 0.1).count();
+        let strongest_pair = corr_result.strongest_pair.map(|(i, j, _)| (i, j));
+        let dominant_group = Some(group_result.alignments.dominant_group());
+
+        // Build the TeleologicalVector
+        let mut vector = TeleologicalVector::with_all(
+            purpose_vector,
+            correlations,
+            group_result.alignments,
+            confidence,
+        );
+
+        if let Some(pid) = &profile_id {
+            vector = vector.with_profile(pid.clone());
+        }
+
+        FusionResult {
+            vector,
+            confidence,
+            component_scores: ComponentScores {
+                purpose_vector: pv_score,
+                correlations: corr_score,
+                groups: group_score,
+                synergy: synergy_score,
+            },
+            metadata: FusionMetadata {
+                active_embedders,
+                strongest_pair,
+                dominant_group,
+                profile_id,
+            },
+        }
+    }
 }
 
 impl Default for FusionEngine {

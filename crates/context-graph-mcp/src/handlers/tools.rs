@@ -470,52 +470,61 @@ impl Handlers {
         hasher.update(content.as_bytes());
         let content_hash: [u8; 32] = hasher.finalize().into();
 
-        // AP-007: Compute purpose vector from semantic fingerprint and goal hierarchy
-        // Purpose vectors MUST be computed at storage time, not deferred (NO DEFAULT)
-        // From constitution.yaml: PV = [A(E1,V), A(E2,V), ..., A(E13,V)]
+        // ARCH-03: AUTONOMOUS OPERATION - Compute purpose vector if North Star exists,
+        // otherwise use default (neutral) alignment for autonomous seeding.
+        //
+        // From contextprd.md: "The array [of 13 embeddings] IS the teleological vector"
+        // Purpose alignment is SECONDARY metadata - the 13-embedding fingerprint is primary.
+        // This allows autonomous operation without manual North Star configuration.
+        //
+        // When North Star exists: PV = [A(E1,V), A(E2,V), ..., A(E13,V)]
+        // where A(Ei, V) = cos(θ) between embedder i and North Star goal V
+        //
+        // When no North Star: PV = [0.0; 13] (neutral alignment)
+        // Memories can be stored immediately; purpose can be recomputed later via
+        // auto_bootstrap_north_star once enough fingerprints exist.
         let purpose_vector = {
             let hierarchy = self.goal_hierarchy.read().clone();
 
-            // If no North Star goal is defined, FAIL FAST (AP-007)
+            // If no North Star goal is defined, use default purpose vector
+            // This enables AUTONOMOUS operation per ARCH-03 - no manual configuration required
             if hierarchy.north_star().is_none() {
-                error!(
-                    "store_memory: Goal hierarchy missing North Star goal. \
-                     Cannot compute purpose vector. \
-                     CONFIGURATION ERROR: Use auto_bootstrap_north_star tool for autonomous goal discovery."
+                debug!(
+                    "store_memory: No North Star configured. Using default purpose vector. \
+                     Memory will be stored with neutral alignment (can be recomputed later \
+                     via auto_bootstrap_north_star)."
                 );
-                return self.tool_error_with_pulse(
-                    id,
-                    "Goal hierarchy not configured. Cannot compute purpose vector. \
-                     Use auto_bootstrap_north_star tool for autonomous goal discovery.",
-                );
-            }
+                PurposeVector::default()
+            } else {
+                // Compute purpose vector using DefaultPurposeComputer
+                // This computes alignment for each of 13 embedding spaces
+                let config = PurposeComputeConfig::with_hierarchy(hierarchy);
 
-            // Compute purpose vector using DefaultPurposeComputer
-            let config = PurposeComputeConfig::with_hierarchy(hierarchy);
-
-            match DefaultPurposeComputer::new()
-                .compute_purpose(&embedding_output.fingerprint, &config)
-                .await
-            {
-                Ok(pv) => {
-                    debug!(
-                        aggregate_alignment = pv.aggregate_alignment(),
-                        dominant_embedder = pv.dominant_embedder,
-                        coherence = pv.coherence,
-                        "store_memory: Purpose vector computed for semantic fingerprint"
-                    );
-                    pv
-                }
-                Err(e) => {
-                    error!(
-                        error = %e,
-                        "store_memory: Failed to compute purpose vector. \
-                         Cannot store memory without alignment metadata."
-                    );
-                    return self.tool_error_with_pulse(
-                        id,
-                        &format!("Purpose vector computation failed: {}", e),
-                    );
+                match DefaultPurposeComputer::new()
+                    .compute_purpose(&embedding_output.fingerprint, &config)
+                    .await
+                {
+                    Ok(pv) => {
+                        debug!(
+                            aggregate_alignment = pv.aggregate_alignment(),
+                            dominant_embedder = pv.dominant_embedder,
+                            coherence = pv.coherence,
+                            "store_memory: Purpose vector computed for semantic fingerprint"
+                        );
+                        pv
+                    }
+                    Err(e) => {
+                        // If North Star exists but computation fails, THAT is an error
+                        error!(
+                            error = %e,
+                            "store_memory: Failed to compute purpose vector. \
+                             Cannot store memory without alignment metadata."
+                        );
+                        return self.tool_error_with_pulse(
+                            id,
+                            &format!("Purpose vector computation failed: {}", e),
+                        );
+                    }
                 }
             }
         };
