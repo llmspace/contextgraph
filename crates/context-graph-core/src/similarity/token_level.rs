@@ -5,11 +5,11 @@
 //!
 //! # Example
 //! ```
-//! use context_graph_core::similarity::token_level::{max_sim, symmetric_max_sim};
+//! use context_graph_core::similarity::{max_sim, symmetric_max_sim};
 //!
-//! // 2 query tokens, 3 doc tokens, each 128D
+//! // 2 query tokens, 3 doc tokens, each 128D (non-zero vectors required)
 //! let query: Vec<Vec<f32>> = vec![vec![1.0; 128], vec![0.5; 128]];
-//! let document: Vec<Vec<f32>> = vec![vec![1.0; 128], vec![0.0; 128], vec![0.5; 128]];
+//! let document: Vec<Vec<f32>> = vec![vec![1.0; 128], vec![0.3; 128], vec![0.5; 128]];
 //!
 //! let score = max_sim(&query, &document);
 //! assert!(score >= 0.0 && score <= 1.0);
@@ -187,10 +187,10 @@ pub struct TokenAlignment {
 ///
 /// # Example
 /// ```
-/// use context_graph_core::similarity::token_level::token_alignments;
+/// use context_graph_core::similarity::token_alignments;
 ///
 /// let query = vec![vec![1.0; 128]];
-/// let document = vec![vec![1.0; 128], vec![0.0; 128]];
+/// let document = vec![vec![1.0; 128], vec![0.3; 128]];
 ///
 /// let alignments = token_alignments(&query, &document);
 /// assert_eq!(alignments.len(), 1);
