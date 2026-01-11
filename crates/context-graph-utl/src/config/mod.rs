@@ -110,11 +110,19 @@ impl UtlConfig {
     ///
     /// This preset emphasizes coherence and consolidation over novelty,
     /// suitable for mature knowledge bases.
+    ///
+    /// # Constitution Compliance
+    ///
+    /// ΔC weights sum to 1.0 per constitution.yaml line 166.
+    /// This preset emphasizes consistency (γ=0.8) for curation tasks.
     pub fn curation_preset() -> Self {
         Self {
             coherence: CoherenceConfig {
                 similarity_weight: 0.8,
-                consistency_weight: 0.9,
+                // ΔC weights must sum to 1.0: 0.1 + 0.1 + 0.8 = 1.0
+                connectivity_weight: 0.1,
+                cluster_fit_weight: 0.1,
+                consistency_weight: 0.8, // Emphasize consistency for curation
                 ..Default::default()
             },
             lifecycle: LifecycleConfig::maturity_focused(),

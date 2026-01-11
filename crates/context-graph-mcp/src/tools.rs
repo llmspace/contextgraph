@@ -313,6 +313,49 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
             }),
         ),
 
+        // ========== UTL ΔS/ΔC COMPUTATION TOOLS (TASK-UTL-P1-001) ==========
+
+        // gwt/compute_delta_sc - Compute per-embedder ΔS and aggregate ΔC
+        ToolDefinition::new(
+            "gwt/compute_delta_sc",
+            "Compute per-embedder entropy (ΔS) and aggregate coherence (ΔC) for GWT workspace \
+             evaluation. Returns 13 ΔS values (one per embedder), aggregate ΔS, ΔC, Johari \
+             quadrant classifications, and UTL learning potential. Used by GWT workspace for \
+             winner-take-all selection and consciousness broadcasting. \
+             Constitution ref: delta_sc.ΔS_methods (lines 792-802).",
+            json!({
+                "type": "object",
+                "properties": {
+                    "vertex_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Memory vertex ID (optional, for context tracking)"
+                    },
+                    "old_fingerprint": {
+                        "type": "object",
+                        "description": "Previous TeleologicalFingerprint (serialized)"
+                    },
+                    "new_fingerprint": {
+                        "type": "object",
+                        "description": "Current TeleologicalFingerprint (serialized)"
+                    },
+                    "johari_threshold": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.5,
+                        "description": "Threshold for Johari quadrant classification"
+                    },
+                    "include_diagnostics": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include per-embedder diagnostic details"
+                    }
+                },
+                "required": ["old_fingerprint", "new_fingerprint"]
+            }),
+        ),
+
         // ========== ADAPTIVE THRESHOLD CALIBRATION (ATC) TOOLS ==========
 
         // get_threshold_status - Get current threshold status (TASK-ATC-001)
@@ -1063,6 +1106,11 @@ pub mod tool_names {
     /// TASK-GWT-001: Adjust Kuramoto coupling strength K
     pub const ADJUST_COUPLING: &str = "adjust_coupling";
 
+    // ========== UTL ΔS/ΔC COMPUTATION TOOLS (TASK-UTL-P1-001) ==========
+
+    /// TASK-UTL-P1-001: Compute per-embedder ΔS and aggregate ΔC for GWT workspace evaluation
+    pub const COMPUTE_DELTA_SC: &str = "gwt/compute_delta_sc";
+
     // ========== ADAPTIVE THRESHOLD CALIBRATION (ATC) TOOLS (TASK-ATC-001) ==========
 
     /// TASK-ATC-001: Get current ATC threshold status
@@ -1143,9 +1191,9 @@ mod tests {
     #[test]
     fn test_get_tool_definitions() {
         let tools = get_tool_definitions();
-        // 6 original + 6 GWT tools + 3 ATC tools + 4 Dream tools + 2 Neuromod tools + 1 Steering + 1 Causal + 5 Teleological + 7 Autonomous = 35 total
+        // 6 original + 6 GWT tools + 1 UTL ΔS/ΔC + 3 ATC tools + 4 Dream tools + 2 Neuromod tools + 1 Steering + 1 Causal + 5 Teleological + 7 Autonomous = 36 total
         // NOTE: 6 manual North Star tools REMOVED (created single 1024D embeddings incompatible with 13-embedder teleological arrays)
-        assert_eq!(tools.len(), 35);
+        assert_eq!(tools.len(), 36);
 
         let tool_names: Vec<_> = tools.iter().map(|t| t.name.as_str()).collect();
         // Original 6 tools
@@ -1162,6 +1210,8 @@ mod tests {
         assert!(tool_names.contains(&"get_ego_state"));
         assert!(tool_names.contains(&"trigger_workspace_broadcast"));
         assert!(tool_names.contains(&"adjust_coupling"));
+        // UTL ΔS/ΔC tool (TASK-UTL-P1-001)
+        assert!(tool_names.contains(&"gwt/compute_delta_sc"));
         // ATC tools (TASK-ATC-001)
         assert!(tool_names.contains(&"get_threshold_status"));
         assert!(tool_names.contains(&"get_calibration_metrics"));

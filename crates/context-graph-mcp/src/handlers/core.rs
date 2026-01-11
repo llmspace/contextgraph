@@ -41,6 +41,152 @@ pub enum PredictionType {
     Retrieval,
 }
 
+/// Domain enum for domain-specific accuracy tracking.
+/// TASK-METAUTL-P0-001: Enables per-domain meta-learning optimization.
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Domain {
+    /// Source code, programming-related content
+    Code,
+    /// Medical and healthcare content
+    Medical,
+    /// Legal documents and regulations
+    Legal,
+    /// Creative writing, art, design
+    Creative,
+    /// Research papers, scientific content
+    Research,
+    /// General purpose, unclassified
+    General,
+}
+
+impl Default for Domain {
+    fn default() -> Self {
+        Self::General
+    }
+}
+
+/// Meta-learning event types for logging and auditing.
+/// TASK-METAUTL-P0-001: Used to track significant meta-learning state changes.
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MetaLearningEventType {
+    /// Lambda weight adjustment occurred
+    LambdaAdjustment,
+    /// Bayesian optimization escalation triggered
+    BayesianEscalation,
+    /// Accuracy dropped below threshold
+    AccuracyAlert,
+    /// Recovery from low accuracy period
+    AccuracyRecovery,
+    /// Weight clamping applied (exceeded bounds)
+    WeightClamped,
+}
+
+/// Meta-learning event for logging significant state changes.
+/// TASK-METAUTL-P0-001: Provides audit trail for meta-learning behavior.
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+pub struct MetaLearningEvent {
+    /// Type of event
+    pub event_type: MetaLearningEventType,
+    /// When the event occurred
+    pub timestamp: Instant,
+    /// Embedder index affected (if applicable)
+    pub embedder_index: Option<usize>,
+    /// Previous value (if applicable)
+    pub previous_value: Option<f32>,
+    /// New value (if applicable)
+    pub new_value: Option<f32>,
+    /// Optional description
+    pub description: Option<String>,
+}
+
+#[allow(dead_code)]
+impl MetaLearningEvent {
+    /// Create a lambda adjustment event.
+    pub fn lambda_adjustment(embedder_idx: usize, previous: f32, new: f32) -> Self {
+        Self {
+            event_type: MetaLearningEventType::LambdaAdjustment,
+            timestamp: Instant::now(),
+            embedder_index: Some(embedder_idx),
+            previous_value: Some(previous),
+            new_value: Some(new),
+            description: None,
+        }
+    }
+
+    /// Create a bayesian escalation event.
+    pub fn bayesian_escalation(consecutive_low: usize) -> Self {
+        Self {
+            event_type: MetaLearningEventType::BayesianEscalation,
+            timestamp: Instant::now(),
+            embedder_index: None,
+            previous_value: None,
+            new_value: Some(consecutive_low as f32),
+            description: Some(format!(
+                "Escalation triggered after {} consecutive low accuracy cycles",
+                consecutive_low
+            )),
+        }
+    }
+
+    /// Create a weight clamped event.
+    pub fn weight_clamped(embedder_idx: usize, original: f32, clamped: f32) -> Self {
+        Self {
+            event_type: MetaLearningEventType::WeightClamped,
+            timestamp: Instant::now(),
+            embedder_index: Some(embedder_idx),
+            previous_value: Some(original),
+            new_value: Some(clamped),
+            description: None,
+        }
+    }
+}
+
+/// Configuration for self-correction behavior.
+/// TASK-METAUTL-P0-001: Constitution-defined parameters for meta-learning.
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+pub struct SelfCorrectionConfig {
+    /// Whether self-correction is enabled
+    pub enabled: bool,
+    /// Prediction error threshold (constitution: 0.2)
+    pub error_threshold: f32,
+    /// Maximum consecutive failures before escalation (constitution: 10)
+    pub max_consecutive_failures: usize,
+    /// Accuracy threshold below which is considered "low" (constitution: 0.7)
+    pub low_accuracy_threshold: f32,
+    /// Minimum weight bound (constitution NORTH-016: 0.05)
+    /// Note: 13 × 0.05 = 0.65 < 1.0, so sum=1.0 is achievable
+    pub min_weight: f32,
+    /// Maximum weight bound (constitution: 0.9)
+    pub max_weight: f32,
+    /// Escalation strategy
+    pub escalation_strategy: String,
+}
+
+impl Default for SelfCorrectionConfig {
+    /// Creates config with constitution-mandated defaults.
+    ///
+    /// From docs2/constitution.yaml:
+    /// - threshold: 0.2
+    /// - max_consecutive_failures: 10
+    /// - escalation_strategy: "bayesian_optimization"
+    /// - NORTH-016_WeightAdjuster: min=0.05, max_delta=0.10
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            error_threshold: 0.2,
+            max_consecutive_failures: 10,
+            low_accuracy_threshold: 0.7,
+            min_weight: 0.05, // NORTH-016: min=0.05 (13×0.05=0.65 < 1.0, sum is achievable)
+            max_weight: 0.9,
+            escalation_strategy: "bayesian_optimization".to_string(),
+        }
+    }
+}
+
 /// Stored prediction for validation
 /// TASK-S005: Stores predicted values for later validation against actual outcomes.
 #[derive(Clone, Debug)]
@@ -55,6 +201,7 @@ pub struct StoredPrediction {
 /// Meta-UTL Tracker for learning about learning
 ///
 /// TASK-S005: Tracks per-embedder accuracy, pending predictions, and optimized weights.
+/// TASK-METAUTL-P0-001: Extended with consecutive low tracking and weight clamping.
 /// Uses rolling window for accuracy tracking to maintain recency bias.
 #[derive(Debug)]
 pub struct MetaUtlTracker {
@@ -66,7 +213,7 @@ pub struct MetaUtlTracker {
     pub accuracy_indices: [usize; NUM_EMBEDDERS],
     /// Number of samples in each embedder's rolling window
     pub accuracy_counts: [usize; NUM_EMBEDDERS],
-    /// Current optimized weights (sum to 1.0)
+    /// Current optimized weights (sum to 1.0, clamped to [0.05, 0.9] per constitution)
     pub current_weights: [f32; NUM_EMBEDDERS],
     /// Total predictions made
     pub prediction_count: usize,
@@ -74,6 +221,16 @@ pub struct MetaUtlTracker {
     pub validation_count: usize,
     /// Last weight update timestamp
     pub last_weight_update: Option<Instant>,
+    /// TASK-METAUTL-P0-001: Consecutive cycles with accuracy < 0.7
+    pub consecutive_low_count: usize,
+    /// TASK-METAUTL-P0-001: Whether Bayesian escalation has been triggered
+    pub escalation_triggered: bool,
+    /// TASK-METAUTL-P0-001: Self-correction configuration
+    pub config: SelfCorrectionConfig,
+    /// TASK-METAUTL-P0-001: Tracks which embedders have been updated in current cycle
+    cycle_embedder_updated: [bool; NUM_EMBEDDERS],
+    /// TASK-METAUTL-P0-001: Number of complete accuracy recording cycles
+    cycle_count: usize,
 }
 
 impl Default for MetaUtlTracker {
@@ -89,11 +246,25 @@ impl Default for MetaUtlTracker {
             prediction_count: 0,
             validation_count: 0,
             last_weight_update: None,
+            // TASK-METAUTL-P0-001: Initialize consecutive tracking
+            consecutive_low_count: 0,
+            escalation_triggered: false,
+            config: SelfCorrectionConfig::default(),
+            cycle_embedder_updated: [false; NUM_EMBEDDERS],
+            cycle_count: 0,
         }
     }
 }
 
 impl MetaUtlTracker {
+    /// Weight precision tolerance for sum normalization
+    #[allow(dead_code)]
+    const WEIGHT_PRECISION: f32 = 1e-6;
+
+    /// Threshold for detecting accuracy trend changes
+    #[allow(dead_code)]
+    const TREND_THRESHOLD: f32 = 0.02;
+
     /// Create a new MetaUtlTracker
     pub fn new() -> Self {
         Self::default()
@@ -117,15 +288,99 @@ impl MetaUtlTracker {
     }
 
     /// Record accuracy for an embedder
+    ///
+    /// TASK-METAUTL-P0-001: Also tracks consecutive low accuracy cycles.
+    /// A "cycle" is considered complete when all 13 embedders have been updated.
+    /// Low accuracy is defined as < 0.7 (constitution).
     pub fn record_accuracy(&mut self, embedder_index: usize, accuracy: f32) {
         if embedder_index >= NUM_EMBEDDERS {
+            debug!(
+                embedder_index = embedder_index,
+                "record_accuracy: invalid embedder index, ignoring"
+            );
             return;
         }
+
+        // Clamp accuracy to [0.0, 1.0]
+        let clamped_accuracy = accuracy.clamp(0.0, 1.0);
+
         let idx = self.accuracy_indices[embedder_index];
-        self.embedder_accuracy[embedder_index][idx] = accuracy;
+        self.embedder_accuracy[embedder_index][idx] = clamped_accuracy;
         self.accuracy_indices[embedder_index] = (idx + 1) % 100;
         if self.accuracy_counts[embedder_index] < 100 {
             self.accuracy_counts[embedder_index] += 1;
+        }
+
+        // TASK-METAUTL-P0-001: Track cycle completion
+        self.cycle_embedder_updated[embedder_index] = true;
+
+        // Check if a complete cycle has occurred (all embedders updated)
+        if self.cycle_embedder_updated.iter().all(|&updated| updated) {
+            self.cycle_count += 1;
+            // Reset cycle tracking for next cycle
+            self.cycle_embedder_updated = [false; NUM_EMBEDDERS];
+            // Check consecutive low accuracy at end of cycle
+            self.check_consecutive_low_accuracy();
+        }
+    }
+
+    /// Check if overall accuracy is low and track consecutive count.
+    ///
+    /// TASK-METAUTL-P0-001: Called at the END of each complete cycle (when all
+    /// 13 embedders have been recorded). This ensures we count cycles, not
+    /// individual record_accuracy calls.
+    fn check_consecutive_low_accuracy(&mut self) {
+        // Calculate overall accuracy across all embedders
+        let mut total_accuracy = 0.0f32;
+        let mut embedder_count = 0usize;
+
+        for i in 0..NUM_EMBEDDERS {
+            if let Some(acc) = self.get_embedder_accuracy(i) {
+                total_accuracy += acc;
+                embedder_count += 1;
+            }
+        }
+
+        // Only check if we have data from all embedders
+        if embedder_count < NUM_EMBEDDERS {
+            return;
+        }
+
+        let overall_accuracy = total_accuracy / embedder_count as f32;
+        let threshold = self.config.low_accuracy_threshold; // 0.7
+
+        if overall_accuracy < threshold {
+            self.consecutive_low_count += 1;
+            debug!(
+                overall_accuracy = overall_accuracy,
+                threshold = threshold,
+                consecutive_low_count = self.consecutive_low_count,
+                cycle_count = self.cycle_count,
+                "Meta-UTL: low accuracy cycle recorded"
+            );
+
+            // Check if escalation should be triggered
+            if self.consecutive_low_count >= self.config.max_consecutive_failures
+                && !self.escalation_triggered
+            {
+                self.escalation_triggered = true;
+                tracing::warn!(
+                    consecutive_low = self.consecutive_low_count,
+                    threshold = self.config.max_consecutive_failures,
+                    "TASK-METAUTL-P0-001: Bayesian escalation triggered"
+                );
+            }
+        } else {
+            // Reset consecutive count on recovery
+            if self.consecutive_low_count > 0 {
+                debug!(
+                    previous_count = self.consecutive_low_count,
+                    overall_accuracy = overall_accuracy,
+                    "Meta-UTL: accuracy recovered, resetting consecutive low count"
+                );
+            }
+            self.consecutive_low_count = 0;
+            // Note: We don't reset escalation_triggered here - that requires explicit reset
         }
     }
 
@@ -166,16 +421,83 @@ impl MetaUtlTracker {
         }
         let older_avg = older_sum / older_count as f32;
 
-        if recent_avg > older_avg + 0.02 {
+        if recent_avg > older_avg + Self::TREND_THRESHOLD {
             Some("improving")
-        } else if recent_avg < older_avg - 0.02 {
+        } else if recent_avg < older_avg - Self::TREND_THRESHOLD {
             Some("declining")
         } else {
             Some("stable")
         }
     }
 
+    /// Redistribute surplus from over-max weights to below-max weights.
+    /// Returns the total surplus that was redistributed.
+    fn redistribute_excess_weight(&mut self, max_weight: f32) -> f32 {
+        let mut total_surplus = 0.0f32;
+        let mut capped_count = 0usize;
+
+        // Find weights above max
+        for &weight in self.current_weights.iter() {
+            if weight > max_weight {
+                total_surplus += weight - max_weight;
+                capped_count += 1;
+            }
+        }
+
+        if total_surplus < Self::WEIGHT_PRECISION {
+            return 0.0; // No surplus to redistribute
+        }
+
+        // Count weights below max that can receive redistribution
+        let below_max_count = NUM_EMBEDDERS - capped_count;
+        if below_max_count == 0 {
+            // All weights at or above max - just cap them all
+            for weight in self.current_weights.iter_mut() {
+                if *weight > max_weight {
+                    debug!(
+                        original_weight = *weight,
+                        clamped_weight = max_weight,
+                        "TASK-METAUTL-P0-001: Lambda weight clamped to maximum"
+                    );
+                    *weight = max_weight;
+                }
+            }
+            return total_surplus;
+        }
+
+        // Calculate how much each below-max weight should receive
+        let redistribution = total_surplus / below_max_count as f32;
+
+        // Apply capping and redistribution
+        for weight in self.current_weights.iter_mut() {
+            if *weight > max_weight {
+                debug!(
+                    original_weight = *weight,
+                    clamped_weight = max_weight,
+                    "TASK-METAUTL-P0-001: Lambda weight clamped to maximum"
+                );
+                *weight = max_weight;
+            } else {
+                *weight += redistribution;
+            }
+        }
+
+        total_surplus
+    }
+
     /// Update weights based on accuracy (called every 100 validations)
+    ///
+    /// TASK-METAUTL-P0-001: REQ-METAUTL-006/007 compliance.
+    ///
+    /// Priority of constraints:
+    /// 1. Sum = 1.0 (REQ-METAUTL-006, HARD)
+    /// 2. Max weight ≤ 0.9 (HARD - prevents single embedder dominance)
+    /// 3. Min weight ≥ 0.05 (SOFT - best effort, may be violated in extreme cases)
+    ///
+    /// Algorithm:
+    /// 1. Normalize weights based on accuracy (sum=1.0)
+    /// 2. Cap any weight above max, redistribute surplus proportionally
+    /// 3. Final normalization to ensure exact sum=1.0
     pub fn update_weights(&mut self) {
         // Calculate average accuracy per embedder
         let mut accuracies = [0.0f32; NUM_EMBEDDERS];
@@ -188,14 +510,51 @@ impl MetaUtlTracker {
             total_accuracy += *acc;
         }
 
-        // Normalize to get weights
+        // Normalize to get initial weights (sum = 1.0)
         if total_accuracy > 0.0 {
             for (weight, &acc) in self.current_weights.iter_mut().zip(accuracies.iter()) {
                 *weight = acc / total_accuracy;
             }
         }
 
+        let max_weight = self.config.max_weight; // 0.9
+        let mut clamping_occurred = false;
+
+        // STEP 1: Cap weights above max and redistribute surplus
+        // This is the HARD constraint for max weight
+        // Loop until no more surplus needs redistribution
+        loop {
+            let surplus = self.redistribute_excess_weight(max_weight);
+            if surplus > 0.0 {
+                clamping_occurred = true;
+            }
+            if surplus < Self::WEIGHT_PRECISION {
+                break;
+            }
+        }
+
+        // STEP 2: Final normalization to ensure exact sum=1.0
+        let weight_sum: f32 = self.current_weights.iter().sum();
+        if (weight_sum - 1.0).abs() > Self::WEIGHT_PRECISION {
+            let scale = 1.0 / weight_sum;
+            for weight in self.current_weights.iter_mut() {
+                *weight *= scale;
+            }
+        }
+
+        // Note: min_weight is a SOFT constraint. In extreme distributions
+        // where one embedder dominates, other weights may be below min_weight
+        // to maintain sum=1.0. This is mathematically necessary.
+        // See EC-001 test for documentation.
+
         self.last_weight_update = Some(Instant::now());
+
+        tracing::info!(
+            validation_count = self.validation_count,
+            weights_sum = self.current_weights.iter().sum::<f32>(),
+            clamping_occurred = clamping_occurred,
+            "Meta-UTL weights updated"
+        );
     }
 
     /// Increment validation count and check if weights need update
@@ -204,6 +563,45 @@ impl MetaUtlTracker {
         if self.validation_count.is_multiple_of(100) {
             self.update_weights();
         }
+    }
+
+    /// Check if Bayesian escalation is needed.
+    ///
+    /// TASK-METAUTL-P0-001: Returns true when accuracy has been below 0.7
+    /// for 10 or more consecutive cycles.
+    pub fn needs_escalation(&self) -> bool {
+        self.escalation_triggered
+    }
+
+    /// Get the current consecutive low accuracy count.
+    ///
+    /// TASK-METAUTL-P0-001: Returns the number of consecutive cycles
+    /// with overall accuracy below 0.7.
+    pub fn consecutive_low_count(&self) -> usize {
+        self.consecutive_low_count
+    }
+
+    /// Reset the consecutive low accuracy counter and escalation flag.
+    ///
+    /// TASK-METAUTL-P0-001: Call this after taking corrective action
+    /// (e.g., after Bayesian optimization completes).
+    pub fn reset_consecutive_low(&mut self) {
+        if self.consecutive_low_count > 0 || self.escalation_triggered {
+            debug!(
+                previous_count = self.consecutive_low_count,
+                was_escalated = self.escalation_triggered,
+                "TASK-METAUTL-P0-001: Resetting consecutive low tracking"
+            );
+        }
+        self.consecutive_low_count = 0;
+        self.escalation_triggered = false;
+    }
+
+    /// Get the self-correction configuration.
+    ///
+    /// TASK-METAUTL-P0-001: Provides access to constitution-defined parameters.
+    pub fn config(&self) -> &SelfCorrectionConfig {
+        &self.config
     }
 }
 

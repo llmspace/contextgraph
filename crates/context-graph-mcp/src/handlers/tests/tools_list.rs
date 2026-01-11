@@ -24,7 +24,7 @@ async fn test_tools_list_returns_all_35_tools() {
         .as_array()
         .expect("tools must be an array");
 
-    // Verify exactly 35 tools returned:
+    // Verify exactly 36 tools returned:
     // Original 6: inject_context, store_memory, get_memetic_status, get_graph_manifest, search_graph, utl_status
     // GWT 6: get_consciousness_state, get_kuramoto_sync, get_workspace_status, get_ego_state, trigger_workspace_broadcast, adjust_coupling
     // ATC 3 (TASK-ATC-001): get_threshold_status, get_calibration_metrics, trigger_recalibration
@@ -35,10 +35,11 @@ async fn test_tools_list_returns_all_35_tools() {
     // NOTE: Manual North Star tools REMOVED (created incompatible single 1024D embeddings)
     // Teleological 5 (TELEO-007 to TELEO-011): search_teleological, compute_teleological_vector, fuse_embeddings, update_synergy_matrix, manage_teleological_profile
     // Autonomous 7 (TASK-AUTONOMOUS-MCP): auto_bootstrap_north_star, get_alignment_drift, trigger_drift_correction, get_pruning_candidates, trigger_consolidation, discover_sub_goals, get_autonomous_status
+    // UTL 1 (TASK-UTL-P1-001): gwt/compute_delta_sc
     assert_eq!(
         tools.len(),
-        35,
-        "Must return exactly 35 tools, got {}",
+        36,
+        "Must return exactly 36 tools, got {}",
         tools.len()
     );
 }
@@ -155,5 +156,11 @@ async fn test_tools_list_contains_expected_tool_names() {
     assert!(
         tool_names.contains(&"adjust_coupling"),
         "Missing adjust_coupling tool"
+    );
+
+    // Verify UTL tool is present (TASK-UTL-P1-001)
+    assert!(
+        tool_names.contains(&"gwt/compute_delta_sc"),
+        "Missing gwt/compute_delta_sc tool (TASK-UTL-P1-001)"
     );
 }

@@ -1,6 +1,7 @@
 //! UTL computation handlers.
 //!
 //! TASK-S005: Extended with 6 Meta-UTL handlers for "learning about learning".
+//! TASK-UTL-P1-001: Added gwt/compute_delta_sc handler for ΔS/ΔC computation.
 
 use std::time::Instant;
 
@@ -9,7 +10,13 @@ use tracing::{debug, error, warn};
 use uuid::Uuid;
 
 use context_graph_core::johari::NUM_EMBEDDERS;
+use context_graph_core::teleological::Embedder;
+use context_graph_core::types::fingerprint::{EmbeddingRef, SparseVector, TeleologicalFingerprint};
+use context_graph_core::types::JohariQuadrant;
 use context_graph_core::types::{CognitivePulse, SuggestedAction, UtlContext};
+use context_graph_utl::coherence::CoherenceTracker;
+use context_graph_utl::config::{CoherenceConfig, SurpriseConfig};
+use context_graph_utl::surprise::embedder_entropy::EmbedderEntropyFactory;
 
 use crate::protocol::{error_codes, JsonRpcId, JsonRpcResponse};
 
@@ -1102,4 +1109,329 @@ impl Handlers {
             }),
         )
     }
+
+    // =========================================================================
+    // GWT Compute Delta SC Handler (TASK-UTL-P1-001)
+    // =========================================================================
+
+    /// Handle gwt/compute_delta_sc request.
+    ///
+    /// Computes ΔS (entropy change) and ΔC (coherence change) for UTL learning.
+    /// Per constitution.yaml AP-32, this tool MUST exist.
+    ///
+    /// # Parameters
+    /// - `vertex_id`: UUID of the vertex being updated
+    /// - `old_fingerprint`: Previous TeleologicalFingerprint (13 embeddings)
+    /// - `new_fingerprint`: New TeleologicalFingerprint (13 embeddings)
+    /// - `include_diagnostics`: Optional, include detailed breakdown
+    /// - `johari_threshold`: Optional, override threshold (default 0.5)
+    ///
+    /// # Response
+    /// ```json
+    /// {
+    ///   "delta_s_per_embedder": [f32; 13],
+    ///   "delta_s_aggregate": f32,
+    ///   "delta_c": f32,
+    ///   "johari_quadrants": [String; 13],
+    ///   "johari_aggregate": String,
+    ///   "utl_learning_potential": f32,
+    ///   "diagnostics": { ... } // if requested
+    /// }
+    /// ```
+    pub(super) async fn handle_gwt_compute_delta_sc(
+        &self,
+        id: Option<JsonRpcId>,
+        params: Option<serde_json::Value>,
+    ) -> JsonRpcResponse {
+        debug!("gwt/compute_delta_sc: starting");
+
+        // FAIL FAST: params required
+        let params = match params {
+            Some(p) => p,
+            None => {
+                error!("gwt/compute_delta_sc: missing parameters");
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::INVALID_PARAMS,
+                    "Missing parameters",
+                );
+            }
+        };
+
+        // Parse vertex_id
+        let vertex_id_str = match params.get("vertex_id").and_then(|v| v.as_str()) {
+            Some(s) => s,
+            None => {
+                error!("gwt/compute_delta_sc: missing 'vertex_id' parameter");
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::INVALID_PARAMS,
+                    "Missing 'vertex_id' parameter",
+                );
+            }
+        };
+
+        let _vertex_id = match Uuid::parse_str(vertex_id_str) {
+            Ok(uuid) => uuid,
+            Err(_) => {
+                error!("gwt/compute_delta_sc: invalid UUID format: {}", vertex_id_str);
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::INVALID_PARAMS,
+                    format!("Invalid UUID format: {}", vertex_id_str),
+                );
+            }
+        };
+
+        // Parse old_fingerprint
+        let old_fingerprint_value = match params.get("old_fingerprint") {
+            Some(v) => v.clone(),
+            None => {
+                error!("gwt/compute_delta_sc: missing 'old_fingerprint' parameter");
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::INVALID_PARAMS,
+                    "Missing 'old_fingerprint' parameter",
+                );
+            }
+        };
+
+        let old_fp: TeleologicalFingerprint = match serde_json::from_value(old_fingerprint_value) {
+            Ok(fp) => fp,
+            Err(e) => {
+                error!("gwt/compute_delta_sc: failed to parse old_fingerprint: {}", e);
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::INVALID_PARAMS,
+                    format!("Failed to parse old_fingerprint: {}", e),
+                );
+            }
+        };
+
+        // Parse new_fingerprint
+        let new_fingerprint_value = match params.get("new_fingerprint") {
+            Some(v) => v.clone(),
+            None => {
+                error!("gwt/compute_delta_sc: missing 'new_fingerprint' parameter");
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::INVALID_PARAMS,
+                    "Missing 'new_fingerprint' parameter",
+                );
+            }
+        };
+
+        let new_fp: TeleologicalFingerprint = match serde_json::from_value(new_fingerprint_value) {
+            Ok(fp) => fp,
+            Err(e) => {
+                error!("gwt/compute_delta_sc: failed to parse new_fingerprint: {}", e);
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::INVALID_PARAMS,
+                    format!("Failed to parse new_fingerprint: {}", e),
+                );
+            }
+        };
+
+        // Parse optional parameters
+        let include_diagnostics = params
+            .get("include_diagnostics")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        let johari_threshold = params
+            .get("johari_threshold")
+            .and_then(|v| v.as_f64())
+            .map(|v| v as f32)
+            .unwrap_or(0.5)
+            .clamp(0.35, 0.65); // Per constitution.yaml adaptive_thresholds.priors.theta_joh
+
+        // Step 2: Compute per-embedder ΔS
+        let surprise_config = SurpriseConfig::default();
+        let mut delta_s_per_embedder = [0.0f32; NUM_EMBEDDERS];
+        let mut diagnostics_per_embedder: Vec<serde_json::Value> = Vec::new();
+
+        for embedder in Embedder::all() {
+            let idx = embedder.index();
+            let calculator = EmbedderEntropyFactory::create(embedder, &surprise_config);
+
+            // Get embeddings from fingerprints
+            let old_embedding = old_fp.semantic.get(embedder);
+            let new_embedding = new_fp.semantic.get(embedder);
+
+            // Extract dense vectors (sparse/token-level handled differently)
+            let (old_vec, new_vec) = match (old_embedding, new_embedding) {
+                (EmbeddingRef::Dense(old), EmbeddingRef::Dense(new)) => {
+                    (old.to_vec(), new.to_vec())
+                }
+                (EmbeddingRef::Sparse(old_sparse), EmbeddingRef::Sparse(new_sparse)) => {
+                    // For sparse embeddings, convert to dense for ΔS computation
+                    // Use the indices/values to reconstruct a dense-ish representation
+                    let max_dim = 1024; // Use a reasonable dimension
+                    let old_dense = sparse_to_dense_truncated(old_sparse, max_dim);
+                    let new_dense = sparse_to_dense_truncated(new_sparse, max_dim);
+                    (old_dense, new_dense)
+                }
+                (EmbeddingRef::TokenLevel(old_tokens), EmbeddingRef::TokenLevel(new_tokens)) => {
+                    // For token-level embeddings, use mean pooling
+                    let old_pooled = mean_pool_tokens(old_tokens);
+                    let new_pooled = mean_pool_tokens(new_tokens);
+                    (old_pooled, new_pooled)
+                }
+                _ => {
+                    // Mismatched types - should not happen with valid fingerprints
+                    warn!("gwt/compute_delta_sc: mismatched embedding types for {:?}", embedder);
+                    delta_s_per_embedder[idx] = 1.0; // Max surprise for error
+                    continue;
+                }
+            };
+
+            // Compute ΔS
+            let history = vec![old_vec.clone()];
+            let delta_s = match calculator.compute_delta_s(&new_vec, &history, 5) {
+                Ok(ds) => ds.clamp(0.0, 1.0),
+                Err(e) => {
+                    warn!("gwt/compute_delta_sc: ΔS computation failed for {:?}: {}", embedder, e);
+                    1.0 // Max surprise on error
+                }
+            };
+
+            // Check for NaN/Inf per AP-10
+            let delta_s = if delta_s.is_nan() || delta_s.is_infinite() {
+                warn!("gwt/compute_delta_sc: ΔS for {:?} was NaN/Inf, clamping to 1.0", embedder);
+                1.0
+            } else {
+                delta_s
+            };
+
+            delta_s_per_embedder[idx] = delta_s;
+
+            if include_diagnostics {
+                diagnostics_per_embedder.push(json!({
+                    "embedder": EMBEDDER_NAMES[idx],
+                    "embedder_index": idx,
+                    "delta_s": delta_s,
+                    "old_embedding_dim": old_vec.len(),
+                    "new_embedding_dim": new_vec.len(),
+                }));
+            }
+        }
+
+        // Step 3: Compute aggregate ΔS (equal weights for now)
+        let delta_s_aggregate: f32 = delta_s_per_embedder.iter().sum::<f32>() / NUM_EMBEDDERS as f32;
+        let delta_s_aggregate = delta_s_aggregate.clamp(0.0, 1.0);
+
+        // Step 4: Compute ΔC using CoherenceTracker
+        let coherence_config = CoherenceConfig::default();
+        let tracker = CoherenceTracker::new(&coherence_config);
+
+        // Use semantic embedding (E1) for coherence computation
+        let old_semantic = &old_fp.semantic.e1_semantic;
+        let new_semantic = &new_fp.semantic.e1_semantic;
+        let history = vec![old_semantic.clone()];
+
+        // ΔC = coherence of new embedding against old
+        // NOTE: ClusterFit component NOT YET IMPLEMENTED (TASK-UTL-P1-002)
+        let delta_c = tracker.compute_coherence(new_semantic, &history).clamp(0.0, 1.0);
+
+        // Check for NaN/Inf per AP-10
+        let delta_c = if delta_c.is_nan() || delta_c.is_infinite() {
+            warn!("gwt/compute_delta_sc: ΔC was NaN/Inf, clamping to 0.5");
+            0.5
+        } else {
+            delta_c
+        };
+
+        // Step 5: Classify Johari quadrants
+        let johari_quadrants: [JohariQuadrant; NUM_EMBEDDERS] = std::array::from_fn(|i| {
+            classify_johari(delta_s_per_embedder[i], delta_c, johari_threshold)
+        });
+
+        let johari_aggregate = classify_johari(delta_s_aggregate, delta_c, johari_threshold);
+
+        // Step 6: Build response
+        let utl_learning_potential = (delta_s_aggregate * delta_c).clamp(0.0, 1.0);
+
+        let johari_quadrant_strings: Vec<String> = johari_quadrants
+            .iter()
+            .map(|q| q.to_string())
+            .collect();
+
+        let mut response = json!({
+            "delta_s_per_embedder": delta_s_per_embedder.to_vec(),
+            "delta_s_aggregate": delta_s_aggregate,
+            "delta_c": delta_c,
+            "johari_quadrants": johari_quadrant_strings,
+            "johari_aggregate": johari_aggregate.to_string(),
+            "utl_learning_potential": utl_learning_potential,
+        });
+
+        if include_diagnostics {
+            response["diagnostics"] = json!({
+                "per_embedder": diagnostics_per_embedder,
+                "johari_threshold": johari_threshold,
+                "coherence_config": {
+                    "similarity_weight": coherence_config.similarity_weight,
+                    "consistency_weight": coherence_config.consistency_weight,
+                },
+                "cluster_fit_note": "ClusterFit component NOT YET IMPLEMENTED (TASK-UTL-P1-002)",
+            });
+        }
+
+        debug!(
+            "gwt/compute_delta_sc: completed - ΔS_agg={:.4}, ΔC={:.4}, L_pot={:.4}, quadrant={}",
+            delta_s_aggregate, delta_c, utl_learning_potential, johari_aggregate
+        );
+
+        JsonRpcResponse::success(id, response)
+    }
+}
+
+/// Classify a (ΔS, ΔC) pair into a JohariQuadrant.
+///
+/// Per constitution.yaml johari mapping:
+/// - Open: ΔS < threshold, ΔC > threshold (low surprise, high coherence)
+/// - Blind: ΔS > threshold, ΔC < threshold (high surprise, low coherence)
+/// - Hidden: ΔS < threshold, ΔC < threshold (low surprise, low coherence)
+/// - Unknown: ΔS > threshold, ΔC > threshold (high surprise, high coherence)
+fn classify_johari(delta_s: f32, delta_c: f32, threshold: f32) -> JohariQuadrant {
+    match (delta_s < threshold, delta_c > threshold) {
+        (true, true) => JohariQuadrant::Open,    // Low surprise, high coherence
+        (false, false) => JohariQuadrant::Blind, // High surprise, low coherence
+        (true, false) => JohariQuadrant::Hidden, // Low surprise, low coherence
+        (false, true) => JohariQuadrant::Unknown, // High surprise, high coherence
+    }
+}
+
+/// Convert sparse vector to truncated dense representation.
+fn sparse_to_dense_truncated(sparse: &SparseVector, max_dim: usize) -> Vec<f32> {
+    let mut dense = vec![0.0f32; max_dim];
+    for (&idx, &val) in sparse.indices.iter().zip(sparse.values.iter()) {
+        let idx = idx as usize;
+        if idx < max_dim {
+            dense[idx] = val;
+        }
+    }
+    dense
+}
+
+/// Mean pool token-level embeddings.
+fn mean_pool_tokens(tokens: &[Vec<f32>]) -> Vec<f32> {
+    if tokens.is_empty() {
+        return vec![0.0f32; 128]; // ColBERT token dim
+    }
+
+    let dim = tokens[0].len();
+    let mut pooled = vec![0.0f32; dim];
+    let n = tokens.len() as f32;
+
+    for token in tokens {
+        for (i, &val) in token.iter().enumerate() {
+            if i < pooled.len() {
+                pooled[i] += val / n;
+            }
+        }
+    }
+
+    pooled
 }

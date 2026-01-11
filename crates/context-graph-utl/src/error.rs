@@ -118,6 +118,19 @@ pub enum UtlError {
     /// Memory allocation or capacity error
     #[error("Memory/capacity error: {0}")]
     CapacityError(String),
+
+    /// ClusterFit computation error.
+    #[error("ClusterFit error: {0}")]
+    ClusterFitError(String),
+
+    /// Insufficient cluster data for valid computation.
+    #[error("Insufficient cluster data: need at least {required} members, got {actual}")]
+    InsufficientClusterData {
+        /// Minimum required cluster members
+        required: usize,
+        /// Actual cluster members provided
+        actual: usize,
+    },
 }
 
 /// Result type for UTL operations.
@@ -218,7 +231,18 @@ impl UtlError {
                 | UtlError::PhaseError(_)
                 | UtlError::EntropyError(_)
                 | UtlError::NumericOverflow { .. }
+                | UtlError::ClusterFitError(_)
         )
+    }
+
+    /// Create ClusterFitError with message.
+    pub fn cluster_fit(msg: impl Into<String>) -> Self {
+        UtlError::ClusterFitError(msg.into())
+    }
+
+    /// Create InsufficientClusterData error.
+    pub fn insufficient_cluster(required: usize, actual: usize) -> Self {
+        UtlError::InsufficientClusterData { required, actual }
     }
 }
 
@@ -404,5 +428,27 @@ mod tests {
         let msg = format!("{}", err);
         assert!(msg.contains("capacity"));
         assert!(msg.contains("Buffer overflow"));
+    }
+
+    #[test]
+    fn test_cluster_fit_error() {
+        let err = UtlError::cluster_fit("Silhouette computation failed");
+        let msg = format!("{}", err);
+        assert!(msg.contains("ClusterFit"));
+        assert!(msg.contains("Silhouette"));
+    }
+
+    #[test]
+    fn test_insufficient_cluster_data_error() {
+        let err = UtlError::insufficient_cluster(5, 2);
+        let msg = format!("{}", err);
+        assert!(msg.contains("Insufficient cluster data"));
+        assert!(msg.contains("5"));
+        assert!(msg.contains("2"));
+    }
+
+    #[test]
+    fn test_cluster_fit_is_computation_error() {
+        assert!(UtlError::cluster_fit("test").is_computation_error());
     }
 }

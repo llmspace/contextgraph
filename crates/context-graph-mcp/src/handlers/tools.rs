@@ -97,6 +97,10 @@ impl Handlers {
                 self.call_trigger_workspace_broadcast(id, arguments).await
             }
             tool_names::ADJUST_COUPLING => self.call_adjust_coupling(id, arguments).await,
+            // TASK-UTL-P1-001: UTL ΔS/ΔC computation
+            tool_names::COMPUTE_DELTA_SC => {
+                self.handle_gwt_compute_delta_sc(id, Some(arguments)).await
+            }
             // TASK-ATC-001: Adaptive Threshold Calibration tools
             tool_names::GET_THRESHOLD_STATUS => {
                 self.handle_get_threshold_status(id, Some(arguments)).await
