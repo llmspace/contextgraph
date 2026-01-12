@@ -1,0 +1,63 @@
+//! RocksDB-backed TeleologicalMemoryStore implementation.
+//!
+//! This module provides a persistent storage implementation for TeleologicalFingerprints
+//! using RocksDB with 17 column families for efficient indexing and retrieval.
+//!
+//! # Column Families Used
+//!
+//! - `fingerprints`: Primary storage for ~63KB TeleologicalFingerprints
+//! - `purpose_vectors`: 13D purpose vectors for fast purpose-only queries (52 bytes)
+//! - `e13_splade_inverted`: Inverted index for Stage 1 (Recall) sparse search
+//! - `e1_matryoshka_128`: E1 truncated 128D vectors for Stage 2 (Semantic ANN)
+//! - `e12_late_interaction`: ColBERT token embeddings for Stage 5 (MaxSim rerank)
+//! - `emb_0` through `emb_12`: Per-embedder quantized storage
+//!
+//! # FAIL FAST Policy
+//!
+//! **NO FALLBACKS. NO MOCK DATA. ERRORS ARE FATAL.**
+//!
+//! Every RocksDB operation that fails returns a detailed error with:
+//! - The operation that failed
+//! - The column family involved
+//! - The key being accessed
+//! - The underlying RocksDB error
+//!
+//! # Thread Safety
+//!
+//! The store is thread-safe for concurrent reads and writes via RocksDB's internal locking.
+//! HNSW indexes are protected by `RwLock` for concurrent query access.
+//!
+//! # Module Structure
+//!
+//! - `types`: Error types, configuration, and result aliases
+//! - `helpers`: Utility functions for similarity computation and Johari analysis
+//! - `store`: Core RocksDbTeleologicalStore struct and constructors
+//! - `index_ops`: HNSW index add/remove operations
+//! - `inverted_index`: SPLADE inverted index operations
+//! - `crud`: CRUD operation implementations
+//! - `search`: Search operation implementations
+//! - `persistence`: Batch, statistics, persistence operations
+//! - `content`: Content storage operations
+//! - `ego_node`: Ego node storage operations
+//! - `trait_impl`: TeleologicalMemoryStore trait implementation (thin wrapper)
+//! - `tests`: Comprehensive test suite
+
+mod content;
+mod crud;
+mod ego_node;
+mod helpers;
+mod index_ops;
+mod inverted_index;
+mod persistence;
+mod search;
+mod store;
+mod trait_impl;
+mod types;
+
+#[cfg(test)]
+mod tests;
+
+// Re-export all public types for backwards compatibility
+pub use helpers::{compute_cosine_similarity, get_aggregate_dominant_quadrant, query_purpose_alignment};
+pub use store::RocksDbTeleologicalStore;
+pub use types::{TeleologicalStoreConfig, TeleologicalStoreError, TeleologicalStoreResult};
