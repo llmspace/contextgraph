@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **ID** | TASK-DELTA-P1-003 |
-| **Version** | 1.0 |
-| **Status** | ready |
+| **Version** | 2.0 |
+| **Status** | **COMPLETED** |
 | **Layer** | surface |
 | **Sequence** | 3 of 4 |
 | **Priority** | P1 |
@@ -16,6 +16,16 @@
 | **Depends On** | TASK-DELTA-P1-001, TASK-DELTA-P1-002 |
 | **Spec Ref** | SPEC-UTL-001 |
 | **Gap Ref** | MASTER-CONSCIOUSNESS-GAP-ANALYSIS.md GAP 1 |
+
+---
+
+## CRITICAL STATUS UPDATE
+
+**This task is COMPLETED.** The MCP handler was implemented as part of the unified TASK-DELTA-P1-002 implementation.
+
+**Actual Implementation**:
+- Handler: `crates/context-graph-mcp/src/handlers/utl/gwt.rs` (`handle_gwt_compute_delta_sc()`)
+- Tool registered in tools/list via standard handler routing
 
 ---
 

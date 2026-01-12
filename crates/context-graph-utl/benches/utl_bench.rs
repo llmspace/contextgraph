@@ -148,7 +148,7 @@ fn bench_coherence_tracking(c: &mut Criterion) {
     let context = generate_context(50, 1536);
 
     c.bench_function("coherence_tracking", |b| {
-        b.iter(|| tracker.compute_coherence(black_box(&embedding), black_box(&context)))
+        b.iter(|| tracker.compute_coherence_legacy(black_box(&embedding), black_box(&context)))
     });
 }
 

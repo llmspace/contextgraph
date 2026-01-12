@@ -36,11 +36,14 @@ mod structural;
 mod tracker;
 mod window;
 
+#[cfg(test)]
+mod manual_verify;
+
 pub use cluster_fit::{
     compute_cluster_fit, ClusterContext, ClusterFitConfig, ClusterFitResult, DistanceMetric,
 };
 pub use structural::{compute_structural_coherence, StructuralCoherenceCalculator};
-pub use tracker::CoherenceTracker;
+pub use tracker::{CoherenceResult, CoherenceTracker, GraphContext};
 pub use window::{RollingWindow, WindowConfig};
 
 #[cfg(test)]
@@ -83,9 +86,9 @@ mod tests {
             tracker.update(emb);
         }
 
-        // Test coherence computation
+        // Test coherence computation (using legacy method for backward compatibility)
         let current = vec![0.13, 0.23, 0.27, 0.37];
-        let coherence = tracker.compute_coherence(&current, &embeddings);
+        let coherence = tracker.compute_coherence_legacy(&current, &embeddings);
 
         // High coherence expected since embeddings are similar
         assert!((0.0..=1.0).contains(&coherence));

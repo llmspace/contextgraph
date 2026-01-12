@@ -138,7 +138,7 @@ impl UtlProcessor {
             .compute_surprise(embedding, context_embeddings);
         let delta_c = self
             .coherence_tracker
-            .compute_coherence(embedding, context_embeddings);
+            .compute_coherence_legacy(embedding, context_embeddings);
         let w_e = self
             .emotional_calculator
             .compute_emotional_weight(content, emotional_state);

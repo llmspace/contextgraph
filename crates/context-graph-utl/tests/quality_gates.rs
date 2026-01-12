@@ -271,18 +271,18 @@ fn test_coherence_recovery_within_limit() {
     // Step 1: Establish baseline coherence
     let baseline_embedding = generate_embedding(1536, 1);
     let baseline_context = generate_context(50, 1536);
-    let baseline_coherence = tracker.compute_coherence(&baseline_embedding, &baseline_context);
+    let baseline_coherence = tracker.compute_coherence_legacy(&baseline_embedding, &baseline_context);
     println!("  Baseline coherence: {:.4}", baseline_coherence);
 
     // Step 2: Simulate disruption (inject dissimilar content)
     let disrupted_embedding = generate_embedding(1536, 99999);
     let disrupted_context = generate_context(50, 1536);
-    let disrupted_coherence = tracker.compute_coherence(&disrupted_embedding, &disrupted_context);
+    let disrupted_coherence = tracker.compute_coherence_legacy(&disrupted_embedding, &disrupted_context);
     println!("  Disrupted coherence: {:.4}", disrupted_coherence);
 
     // Step 3: Simulate recovery (return to similar patterns)
     let recovery_embedding = generate_embedding(1536, 2);
-    let recovered_coherence = tracker.compute_coherence(&recovery_embedding, &baseline_context);
+    let recovered_coherence = tracker.compute_coherence_legacy(&recovery_embedding, &baseline_context);
     println!("  Recovered coherence: {:.4}", recovered_coherence);
 
     let recovery_time = start.elapsed();

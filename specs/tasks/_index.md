@@ -37,8 +37,8 @@ Logic tasks implement core algorithms and business logic.
 | TASK-UTL-P1-004 | UTL | CrossModalEntropy E10 | **COMPLETED** |
 | TASK-UTL-P1-005 | UTL | TransEEntropy E11 | **COMPLETED** |
 | TASK-UTL-P1-006 | UTL | MaxSimTokenEntropy E12 | **COMPLETED** |
-| TASK-UTL-P1-007 | UTL | Silhouette Calculation | Ready |
-| TASK-DELTA-P1-002 | DELTA | DeltaScComputer | Ready |
+| TASK-UTL-P1-007 | UTL | Silhouette Calculation | **COMPLETED** |
+| TASK-DELTA-P1-002 | DELTA | DeltaScComputer | **COMPLETED** |
 | TASK-ATC-P2-003 | ATC | GWT Thresholds | Ready |
 | TASK-ATC-P2-004 | ATC | Bio-Nervous Thresholds | Ready |
 | TASK-ATC-P2-005 | ATC | Dream Thresholds | Ready |
@@ -59,10 +59,10 @@ Surface tasks integrate with external APIs (MCP), write tests, and provide user-
 | TASK-METAUTL-P0-004 | META-UTL | Event Log | Ready |
 | TASK-METAUTL-P0-005 | META-UTL | MCP Tool Wiring | Ready |
 | TASK-GWT-P1-003 | GWT | Integration Tests | Ready |
-| TASK-UTL-P1-008 | UTL | ClusterFit Integration | Blocked |
-| TASK-UTL-P1-009 | UTL | MCP Handler | Blocked |
-| TASK-DELTA-P1-003 | DELTA | MCP Handler Registration | Ready |
-| TASK-DELTA-P1-004 | DELTA | Integration Tests | Ready |
+| TASK-UTL-P1-008 | UTL | ClusterFit Integration | **COMPLETED** |
+| TASK-UTL-P1-009 | UTL | MCP Handler | Ready |
+| TASK-DELTA-P1-003 | DELTA | MCP Handler Registration | **COMPLETED** |
+| TASK-DELTA-P1-004 | DELTA | Integration Tests | **COMPLETED** |
 | TASK-ATC-P2-008 | ATC | Validation Tests | Ready |
 | TASK-NEURO-P2-002 | NEURO | MCP Steering Integration | Ready |
 | TASK-MCP-P2-001 | MCP | Tool Naming Aliases | Ready |

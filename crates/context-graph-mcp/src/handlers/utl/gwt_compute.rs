@@ -147,7 +147,7 @@ pub(crate) fn compute_delta_c(
 
     // 1. Connectivity component: similarity between old and new embeddings
     let connectivity = tracker
-        .compute_coherence(new_semantic, &history)
+        .compute_coherence_legacy(new_semantic, &history)
         .clamp(0.0, 1.0);
 
     // 2. ClusterFit component: silhouette-based cluster fit
