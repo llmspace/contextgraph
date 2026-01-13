@@ -29,8 +29,9 @@ use super::functions::get_suggested_action;
 /// let weight = retrieval.get_weight(JohariQuadrant::Open);
 /// assert_eq!(weight, 1.0);
 ///
+/// // Constitution: Blind (ΔS>0.5, ΔC<0.5) → TriggerDream
 /// let action = retrieval.get_action(JohariQuadrant::Blind);
-/// assert_eq!(action, SuggestedAction::EpistemicAction);
+/// assert_eq!(action, SuggestedAction::TriggerDream);
 /// ```
 #[derive(Debug, Clone)]
 pub struct QuadrantRetrieval {

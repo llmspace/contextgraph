@@ -12,11 +12,11 @@
 //!
 //! # Constitution Reference
 //!
-//! Johari quadrant to action mapping (constitution.yaml:159-163):
-//! - Open: DirectRecall
-//! - Blind: EpistemicAction
-//! - Hidden: GetNeighborhood
-//! - Unknown: TriggerDream
+//! Johari quadrant to action mapping (constitution.yaml utl.johari lines 154-157):
+//! - Open (ΔS<0.5, ΔC>0.5): DirectRecall
+//! - Blind (ΔS>0.5, ΔC<0.5): TriggerDream
+//! - Hidden (ΔS<0.5, ΔC<0.5): GetNeighborhood
+//! - Unknown (ΔS>0.5, ΔC>0.5): EpistemicAction
 
 use std::time::Instant;
 
@@ -256,11 +256,12 @@ async fn test_pulse_values_in_valid_ranges() {
 #[tokio::test]
 async fn test_johari_quadrant_action_mapping() {
     // Verify expected mapping exists in code
+    // Constitution: utl.johari (lines 154-157)
     let expected_mappings = vec![
-        ("Open", "DirectRecall"),
-        ("Blind", "EpistemicAction"),
-        ("Hidden", "GetNeighborhood"),
-        ("Unknown", "TriggerDream"),
+        ("Open", "DirectRecall"),     // ΔS<0.5, ΔC>0.5
+        ("Blind", "TriggerDream"),    // ΔS>0.5, ΔC<0.5 - FIXED ISS-011
+        ("Hidden", "GetNeighborhood"), // ΔS<0.5, ΔC<0.5
+        ("Unknown", "EpistemicAction"), // ΔS>0.5, ΔC>0.5 - FIXED ISS-011
     ];
 
     for (quadrant, expected_action) in expected_mappings {

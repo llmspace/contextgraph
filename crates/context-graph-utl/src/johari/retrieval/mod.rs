@@ -14,11 +14,11 @@
 //!
 //! # Suggested Actions
 //!
-//! Based on the constitution.yaml specifications:
-//! - **Open** -> DirectRecall
-//! - **Blind** -> EpistemicAction (epistemic_action/dream)
-//! - **Hidden** -> GetNeighborhood (get_neighborhood)
-//! - **Unknown** -> TriggerDream (frontier exploration)
+//! Based on the constitution.yaml utl.johari specifications (lines 154-157):
+//! - **Open** (ΔS<0.5, ΔC>0.5) -> DirectRecall
+//! - **Blind** (ΔS>0.5, ΔC<0.5) -> TriggerDream (sleep consolidation)
+//! - **Hidden** (ΔS<0.5, ΔC<0.5) -> GetNeighborhood (context exploration)
+//! - **Unknown** (ΔS>0.5, ΔC>0.5) -> EpistemicAction (belief update)
 
 mod action;
 mod functions;

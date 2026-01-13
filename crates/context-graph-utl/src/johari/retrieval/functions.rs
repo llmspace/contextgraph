@@ -9,8 +9,11 @@ use super::action::SuggestedAction;
 
 /// Returns the suggested action for a given Johari quadrant.
 ///
-/// This is a convenience function that maps quadrants to their corresponding
-/// actions as specified in the UTL constitution.
+/// # Constitution Compliance (constitution.yaml utl.johari lines 154-157)
+/// - Open (ΔS<0.5, ΔC>0.5) → DirectRecall
+/// - Hidden (ΔS<0.5, ΔC<0.5) → GetNeighborhood
+/// - Blind (ΔS>0.5, ΔC<0.5) → TriggerDream (ISS-011 FIX)
+/// - Unknown (ΔS>0.5, ΔC>0.5) → EpistemicAction (ISS-011 FIX)
 ///
 /// # Arguments
 ///
@@ -26,17 +29,26 @@ use super::action::SuggestedAction;
 /// use context_graph_utl::johari::{get_suggested_action, SuggestedAction, JohariQuadrant};
 ///
 /// assert_eq!(get_suggested_action(JohariQuadrant::Open), SuggestedAction::DirectRecall);
-/// assert_eq!(get_suggested_action(JohariQuadrant::Blind), SuggestedAction::EpistemicAction);
+/// assert_eq!(get_suggested_action(JohariQuadrant::Blind), SuggestedAction::TriggerDream);
 /// assert_eq!(get_suggested_action(JohariQuadrant::Hidden), SuggestedAction::GetNeighborhood);
-/// assert_eq!(get_suggested_action(JohariQuadrant::Unknown), SuggestedAction::TriggerDream);
+/// assert_eq!(get_suggested_action(JohariQuadrant::Unknown), SuggestedAction::EpistemicAction);
 /// ```
 #[inline]
 pub fn get_suggested_action(quadrant: JohariQuadrant) -> SuggestedAction {
     match quadrant {
+        // Low surprise, high confidence → Direct retrieval works
         JohariQuadrant::Open => SuggestedAction::DirectRecall,
-        JohariQuadrant::Blind => SuggestedAction::EpistemicAction,
+
+        // Low surprise, low confidence → Explore neighborhood for context
         JohariQuadrant::Hidden => SuggestedAction::GetNeighborhood,
-        JohariQuadrant::Unknown => SuggestedAction::TriggerDream,
+
+        // High surprise, low confidence → Need dream consolidation to integrate
+        // FIXED ISS-011: Was incorrectly EpistemicAction
+        JohariQuadrant::Blind => SuggestedAction::TriggerDream,
+
+        // High surprise, high confidence → Epistemic action to update beliefs
+        // FIXED ISS-011: Was incorrectly TriggerDream
+        JohariQuadrant::Unknown => SuggestedAction::EpistemicAction,
     }
 }
 

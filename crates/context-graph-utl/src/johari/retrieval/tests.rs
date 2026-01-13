@@ -12,21 +12,26 @@ mod tests {
 
     #[test]
     fn test_suggested_action_mapping() {
+        // Constitution compliance: utl.johari (lines 154-157)
         assert_eq!(
             get_suggested_action(JohariQuadrant::Open),
-            SuggestedAction::DirectRecall
+            SuggestedAction::DirectRecall,
+            "Open (low surprise, high confidence) → DirectRecall"
         );
         assert_eq!(
             get_suggested_action(JohariQuadrant::Blind),
-            SuggestedAction::EpistemicAction
+            SuggestedAction::TriggerDream, // FIXED ISS-011: Was EpistemicAction
+            "Blind (high surprise, low confidence) → TriggerDream"
         );
         assert_eq!(
             get_suggested_action(JohariQuadrant::Hidden),
-            SuggestedAction::GetNeighborhood
+            SuggestedAction::GetNeighborhood,
+            "Hidden (low surprise, low confidence) → GetNeighborhood"
         );
         assert_eq!(
             get_suggested_action(JohariQuadrant::Unknown),
-            SuggestedAction::TriggerDream
+            SuggestedAction::EpistemicAction, // FIXED ISS-011: Was TriggerDream
+            "Unknown (high surprise, high confidence) → EpistemicAction"
         );
     }
 
@@ -136,7 +141,7 @@ mod tests {
         );
         assert_eq!(
             retrieval.get_action(JohariQuadrant::Blind),
-            SuggestedAction::EpistemicAction
+            SuggestedAction::TriggerDream // FIXED ISS-011: Was EpistemicAction
         );
     }
 
@@ -195,31 +200,31 @@ mod tests {
 
     #[test]
     fn test_constitution_compliance() {
-        // Verify mappings match constitution.yaml specification
+        // Verify mappings match constitution.yaml utl.johari (lines 154-157)
         let retrieval = QuadrantRetrieval::with_default_weights();
 
-        // Open -> direct recall
+        // Constitution: utl.johari.Open = "ΔS<0.5, ΔC>0.5 → DirectRecall"
         assert_eq!(
             retrieval.get_action(JohariQuadrant::Open),
             SuggestedAction::DirectRecall
         );
 
-        // Blind -> discovery (epistemic_action/dream)
+        // Constitution: utl.johari.Blind = "ΔS>0.5, ΔC<0.5 → TriggerDream"
         assert_eq!(
             retrieval.get_action(JohariQuadrant::Blind),
-            SuggestedAction::EpistemicAction
+            SuggestedAction::TriggerDream // FIXED ISS-011
         );
 
-        // Hidden -> private (get_neighborhood)
+        // Constitution: utl.johari.Hidden = "ΔS<0.5, ΔC<0.5 → GetNeighborhood"
         assert_eq!(
             retrieval.get_action(JohariQuadrant::Hidden),
             SuggestedAction::GetNeighborhood
         );
 
-        // Unknown -> frontier
+        // Constitution: utl.johari.Unknown = "ΔS>0.5, ΔC>0.5 → EpistemicAction"
         assert_eq!(
             retrieval.get_action(JohariQuadrant::Unknown),
-            SuggestedAction::TriggerDream
+            SuggestedAction::EpistemicAction // FIXED ISS-011
         );
     }
 }

@@ -197,6 +197,8 @@ pub trait WorkspaceProvider: Send + Sync {
 }
 
 /// Provider trait for meta-cognitive loop operations.
+///
+/// All methods are async per Constitution AP-08: "No sync I/O in async context".
 /// TASK-GWT-001: Required for meta_score computation and dream triggering.
 #[async_trait]
 pub trait MetaCognitiveProvider: Send + Sync {
@@ -215,15 +217,15 @@ pub trait MetaCognitiveProvider: Send + Sync {
     ) -> CoreResult<MetaCognitiveState>;
 
     /// Get current Acetylcholine level (learning rate modulator).
-    fn acetylcholine(&self) -> f32;
+    async fn acetylcholine(&self) -> f32;
 
     /// Get current monitoring frequency (Hz).
     #[allow(dead_code)]
-    fn monitoring_frequency(&self) -> f32;
+    async fn monitoring_frequency(&self) -> f32;
 
     /// Get recent meta-scores for trend analysis.
     #[allow(dead_code)]
-    fn get_recent_scores(&self) -> Vec<f32>;
+    async fn get_recent_scores(&self) -> Vec<f32>;
 }
 
 /// Provider trait for self-ego node operations.
