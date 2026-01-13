@@ -13,6 +13,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use parking_lot::RwLock;
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::watch;
@@ -87,7 +89,7 @@ impl Default for ResourceSnapshot {
 #[derive(Debug)]
 pub struct WakeController {
     /// Current state
-    state: Arc<std::sync::RwLock<WakeState>>,
+    state: Arc<RwLock<WakeState>>,
 
     /// Interrupt flag (shared with dream phases)
     interrupt_flag: Arc<AtomicBool>,
@@ -97,16 +99,16 @@ pub struct WakeController {
     wake_receiver: watch::Receiver<Option<WakeReason>>,
 
     /// Wake start time (for latency measurement)
-    wake_start: Arc<std::sync::RwLock<Option<Instant>>>,
+    wake_start: Arc<RwLock<Option<Instant>>>,
 
     /// Wake completion time
-    wake_complete: Arc<std::sync::RwLock<Option<Instant>>>,
+    wake_complete: Arc<RwLock<Option<Instant>>>,
 
     /// Maximum allowed latency (Constitution: <100ms)
     max_latency: Duration,
 
     /// GPU monitor for budget enforcement
-    gpu_monitor: Arc<std::sync::RwLock<GpuMonitor>>,
+    gpu_monitor: Arc<RwLock<GpuMonitor>>,
 
     /// Maximum GPU usage during dream (Constitution: 30%)
     max_gpu_usage: f32,
@@ -130,14 +132,14 @@ impl WakeController {
         let (wake_sender, wake_receiver) = watch::channel(None);
 
         Self {
-            state: Arc::new(std::sync::RwLock::new(WakeState::Idle)),
+            state: Arc::new(RwLock::new(WakeState::Idle)),
             interrupt_flag: Arc::new(AtomicBool::new(false)),
             wake_sender,
             wake_receiver,
-            wake_start: Arc::new(std::sync::RwLock::new(None)),
-            wake_complete: Arc::new(std::sync::RwLock::new(None)),
+            wake_start: Arc::new(RwLock::new(None)),
+            wake_complete: Arc::new(RwLock::new(None)),
             max_latency: constants::MAX_WAKE_LATENCY,
-            gpu_monitor: Arc::new(std::sync::RwLock::new(GpuMonitor::new())),
+            gpu_monitor: Arc::new(RwLock::new(GpuMonitor::new())),
             max_gpu_usage: constants::MAX_GPU_USAGE,
             gpu_check_interval: Duration::from_millis(100),
             last_gpu_check: Arc::new(AtomicU64::new(0)),
@@ -153,7 +155,7 @@ impl WakeController {
 
     /// Prepare controller for a new dream cycle.
     pub fn prepare_for_dream(&self) {
-        let mut state = self.state.write().expect("Lock poisoned");
+        let mut state = self.state.write();
         *state = WakeState::Dreaming;
         drop(state);
 
@@ -161,8 +163,8 @@ impl WakeController {
         self.interrupt_flag.store(false, Ordering::SeqCst);
 
         // Clear wake times
-        *self.wake_start.write().expect("Lock poisoned") = None;
-        *self.wake_complete.write().expect("Lock poisoned") = None;
+        *self.wake_start.write() = None;
+        *self.wake_complete.write() = None;
 
         // Send None to clear any previous wake reason
         let _ = self.wake_sender.send(None);
@@ -176,7 +178,7 @@ impl WakeController {
     /// Measures latency from signal to completion.
     #[must_use = "check if wake signal was sent successfully"]
     pub fn signal_wake(&self, reason: WakeReason) -> Result<(), WakeError> {
-        let current_state = *self.state.read().expect("Lock poisoned");
+        let current_state = *self.state.read();
 
         if current_state != WakeState::Dreaming {
             debug!("Wake signal ignored: not in dreaming state ({:?})", current_state);
@@ -185,13 +187,13 @@ impl WakeController {
 
         // Record wake start time
         {
-            let mut wake_start = self.wake_start.write().expect("Lock poisoned");
+            let mut wake_start = self.wake_start.write();
             *wake_start = Some(Instant::now());
         }
 
         // Update state
         {
-            let mut state = self.state.write().expect("Lock poisoned");
+            let mut state = self.state.write();
             *state = WakeState::Waking;
         }
 
@@ -225,13 +227,13 @@ impl WakeController {
 
         // Record completion time
         {
-            let mut wake_complete = self.wake_complete.write().expect("Lock poisoned");
+            let mut wake_complete = self.wake_complete.write();
             *wake_complete = Some(wake_time);
         }
 
         // Calculate latency
         let latency = {
-            let wake_start = self.wake_start.read().expect("Lock poisoned");
+            let wake_start = self.wake_start.read();
             wake_start
                 .map(|start| wake_time.duration_since(start))
                 .unwrap_or(Duration::ZERO)
@@ -252,7 +254,7 @@ impl WakeController {
 
         // Update state
         {
-            let mut state = self.state.write().expect("Lock poisoned");
+            let mut state = self.state.write();
             *state = WakeState::Completing;
         }
 
@@ -265,13 +267,13 @@ impl WakeController {
 
     /// Reset controller to idle state.
     pub fn reset(&self) {
-        let mut state = self.state.write().expect("Lock poisoned");
+        let mut state = self.state.write();
         *state = WakeState::Idle;
         drop(state);
 
         self.interrupt_flag.store(false, Ordering::SeqCst);
-        *self.wake_start.write().expect("Lock poisoned") = None;
-        *self.wake_complete.write().expect("Lock poisoned") = None;
+        *self.wake_start.write() = None;
+        *self.wake_complete.write() = None;
 
         let _ = self.wake_sender.send(None);
 
@@ -294,7 +296,7 @@ impl WakeController {
         }
         self.last_gpu_check.store(now_ms, Ordering::Relaxed);
 
-        let usage = self.gpu_monitor.read().expect("Lock poisoned").get_usage();
+        let usage = self.gpu_monitor.read().get_usage();
 
         if usage > self.max_gpu_usage {
             warn!(
@@ -318,7 +320,7 @@ impl WakeController {
     /// Get current resource snapshot.
     pub fn get_resource_snapshot(&self) -> ResourceSnapshot {
         ResourceSnapshot {
-            gpu_usage: self.gpu_monitor.read().expect("Lock poisoned").get_usage(),
+            gpu_usage: self.gpu_monitor.read().get_usage(),
             memory_bytes: 0, // Future: Implement memory tracking
             cpu_usage: 0.0,  // Future: Implement CPU tracking
             timestamp: Instant::now(),
@@ -332,12 +334,12 @@ impl WakeController {
 
     /// Get current state.
     pub fn state(&self) -> WakeState {
-        *self.state.read().expect("Lock poisoned")
+        *self.state.read()
     }
 
     /// Check if currently dreaming.
     pub fn is_dreaming(&self) -> bool {
-        *self.state.read().expect("Lock poisoned") == WakeState::Dreaming
+        *self.state.read() == WakeState::Dreaming
     }
 
     /// Check if wake has been signaled.
@@ -357,7 +359,7 @@ impl WakeController {
 
     /// Update GPU usage for testing.
     pub fn set_gpu_usage(&self, usage: f32) {
-        self.gpu_monitor.write().expect("Lock poisoned").set_simulated_usage(usage);
+        self.gpu_monitor.write().set_simulated_usage(usage);
     }
 
     /// Reset the GPU check rate limiter (for testing).

@@ -31,6 +31,10 @@ hnsw_rs = "0.3"
 # Parallel batch comparisons (TASK-LOGIC-004: BatchComparator)
 rayon = "1.10"
 
+# Fast spinlock-based locking for wake_controller (TASK-17: TASK-PERF-005)
+# parking_lot provides ~100-500ns lock times vs std::sync::RwLock ~1-5μs
+parking_lot = "0.12"
+
 [features]
 default = []
 # Enable test utilities (stubs, zeroed() methods) for downstream crate tests

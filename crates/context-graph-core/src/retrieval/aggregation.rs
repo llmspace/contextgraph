@@ -140,7 +140,9 @@ impl AggregationStrategy {
     /// // RRF(d) = 1/(60+1) + 1/(60+3) + 1/(60+2) = 1/61 + 1/63 + 1/62 ≈ 0.0492
     /// ```
     pub fn aggregate_rrf(ranked_lists: &[(usize, Vec<Uuid>)], k: f32) -> HashMap<Uuid, f32> {
-        let mut scores: HashMap<Uuid, f32> = HashMap::new();
+        // Pre-allocate for total IDs across all ranked lists to avoid reallocations
+        let total_ids: usize = ranked_lists.iter().map(|(_, ids)| ids.len()).sum();
+        let mut scores: HashMap<Uuid, f32> = HashMap::with_capacity(total_ids);
 
         for (_space_idx, ranked_ids) in ranked_lists {
             for (rank, memory_id) in ranked_ids.iter().enumerate() {
@@ -162,7 +164,9 @@ impl AggregationStrategy {
         k: f32,
         weights: &[f32; NUM_EMBEDDERS],
     ) -> HashMap<Uuid, f32> {
-        let mut scores: HashMap<Uuid, f32> = HashMap::new();
+        // Pre-allocate for total IDs across all ranked lists to avoid reallocations
+        let total_ids: usize = ranked_lists.iter().map(|(_, ids)| ids.len()).sum();
+        let mut scores: HashMap<Uuid, f32> = HashMap::with_capacity(total_ids);
 
         for (space_idx, ranked_ids) in ranked_lists {
             let weight = if *space_idx < NUM_EMBEDDERS {

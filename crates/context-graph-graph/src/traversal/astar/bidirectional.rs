@@ -53,20 +53,21 @@ pub fn astar_bidirectional(
             .ok_or(GraphError::MissingHyperbolicData(goal))?,
     );
 
-    // Forward search state
+    // Forward search state - pre-allocate for expected exploration (half of max_nodes)
+    let estimated_nodes = params.max_nodes / 2;
     let mut forward_open: BinaryHeap<AstarNode> = BinaryHeap::new();
-    let mut forward_g: HashMap<NodeId, f32> = HashMap::new();
-    let mut forward_parent: HashMap<NodeId, NodeId> = HashMap::new();
+    let mut forward_g: HashMap<NodeId, f32> = HashMap::with_capacity(estimated_nodes);
+    let mut forward_parent: HashMap<NodeId, NodeId> = HashMap::with_capacity(estimated_nodes);
     let mut forward_closed: HashSet<NodeId> = HashSet::new();
 
     let h_start = params.heuristic_scale * ball.distance(&start_point, &goal_point);
     forward_open.push(AstarNode::new(start, 0.0, h_start));
     forward_g.insert(start, 0.0);
 
-    // Backward search state
+    // Backward search state - pre-allocate for expected exploration (half of max_nodes)
     let mut backward_open: BinaryHeap<AstarNode> = BinaryHeap::new();
-    let mut backward_g: HashMap<NodeId, f32> = HashMap::new();
-    let mut backward_parent: HashMap<NodeId, NodeId> = HashMap::new();
+    let mut backward_g: HashMap<NodeId, f32> = HashMap::with_capacity(estimated_nodes);
+    let mut backward_parent: HashMap<NodeId, NodeId> = HashMap::with_capacity(estimated_nodes);
     let mut backward_closed: HashSet<NodeId> = HashSet::new();
 
     let h_goal = params.heuristic_scale * ball.distance(&goal_point, &start_point);

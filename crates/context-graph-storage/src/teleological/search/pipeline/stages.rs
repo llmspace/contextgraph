@@ -213,7 +213,8 @@ impl<'a> StageExecutor<'a> {
 
         // Compute RRF scores
         // RRF(d) = Σ 1/(k + rank_i(d)) for each ranking i
-        let mut rrf_scores: HashMap<Uuid, f32> = HashMap::new();
+        // Pre-allocate for candidates to avoid reallocations in hot path
+        let mut rrf_scores: HashMap<Uuid, f32> = HashMap::with_capacity(candidates.len());
 
         // Search semantic embedder
         let semantic_results = self.single_search.search(

@@ -79,12 +79,12 @@ pub fn astar_search(
     let mut open_set: BinaryHeap<AstarNode> = BinaryHeap::new();
     open_set.push(AstarNode::new(start, 0.0, h_start));
 
-    // Track best g-score for each node
-    let mut g_scores: HashMap<NodeId, f32> = HashMap::new();
+    // Track best g-score for each node - pre-allocate for max_nodes to avoid reallocations
+    let mut g_scores: HashMap<NodeId, f32> = HashMap::with_capacity(params.max_nodes);
     g_scores.insert(start, 0.0);
 
-    // Track parent for path reconstruction
-    let mut came_from: HashMap<NodeId, NodeId> = HashMap::new();
+    // Track parent for path reconstruction - pre-allocate for max_nodes
+    let mut came_from: HashMap<NodeId, NodeId> = HashMap::with_capacity(params.max_nodes);
 
     // Closed set (already explored)
     let mut closed_set: HashSet<NodeId> = HashSet::new();

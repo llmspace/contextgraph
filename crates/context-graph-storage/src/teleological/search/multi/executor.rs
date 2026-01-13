@@ -167,7 +167,9 @@ impl MultiEmbedderSearch {
             .collect();
 
         // FAIL FAST: Check for any errors
-        let mut per_embedder: HashMap<EmbedderIndex, PerEmbedderResults> = HashMap::new();
+        // Pre-allocate for number of embedders (max 13) to avoid reallocations
+        let mut per_embedder: HashMap<EmbedderIndex, PerEmbedderResults> =
+            HashMap::with_capacity(embedders_searched.len());
         for result in search_results {
             let (embedder, results) = result?;
             per_embedder.insert(embedder, results);
@@ -237,7 +239,9 @@ impl MultiEmbedderSearch {
             })
             .collect();
 
-        let mut per_embedder: HashMap<EmbedderIndex, PerEmbedderResults> = HashMap::new();
+        // Pre-allocate for number of embedders (max 13) to avoid reallocations
+        let mut per_embedder: HashMap<EmbedderIndex, PerEmbedderResults> =
+            HashMap::with_capacity(embedders_searched.len());
         for result in search_results {
             let (embedder, results) = result?;
             per_embedder.insert(embedder, results);
@@ -317,7 +321,10 @@ impl MultiEmbedderSearch {
             .collect();
 
         // Step 2: Group by ID across embedders
-        let mut id_scores: HashMap<Uuid, Vec<(EmbedderIndex, f32, f32)>> = HashMap::new();
+        // Pre-allocate based on total hits across all embedders
+        let total_hits: usize = per_embedder.values().map(|r| r.hits.len()).sum();
+        let mut id_scores: HashMap<Uuid, Vec<(EmbedderIndex, f32, f32)>> =
+            HashMap::with_capacity(total_hits);
         for (embedder, scores) in &normalized {
             for (id, original, norm) in scores {
                 id_scores

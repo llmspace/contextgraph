@@ -80,8 +80,8 @@ impl MatrixStrategySearch {
 
         // If purely diagonal, delegate to MultiEmbedderSearch with weighted aggregation
         if analysis.is_diagonal {
-            // Create weight map from diagonal
-            let mut weights = HashMap::new();
+            // Create weight map from diagonal - pre-allocate for 13 embedders
+            let mut weights = HashMap::with_capacity(13);
             for &idx in &analysis.active_embedders {
                 if let Some(embedder) = self.index_to_embedder(idx) {
                     weights.insert(embedder, matrix.get(idx, idx));
@@ -193,8 +193,9 @@ impl MatrixStrategySearch {
         results: &MultiEmbedderSearchResults,
         matrix: &SearchMatrix,
     ) -> Vec<AggregatedHit> {
-        // Group per-embedder scores by ID
-        let mut id_scores: HashMap<Uuid, HashMap<usize, f32>> = HashMap::new();
+        // Group per-embedder scores by ID - pre-allocate based on aggregated hits count
+        let mut id_scores: HashMap<Uuid, HashMap<usize, f32>> =
+            HashMap::with_capacity(results.aggregated_hits.len());
 
         for (embedder, per_result) in &results.per_embedder {
             if let Some(idx) = embedder.to_index() {
@@ -268,8 +269,8 @@ impl MatrixStrategySearch {
     fn compute_correlation(&self, results: &MultiEmbedderSearchResults) -> CorrelationAnalysis {
         let mut correlation_matrix = [[0.0f32; 13]; 13];
 
-        // Collect scores per embedder for all IDs
-        let mut embedder_scores: HashMap<usize, Vec<(Uuid, f32)>> = HashMap::new();
+        // Collect scores per embedder for all IDs - pre-allocate for 13 embedders
+        let mut embedder_scores: HashMap<usize, Vec<(Uuid, f32)>> = HashMap::with_capacity(13);
         for (embedder, per_result) in &results.per_embedder {
             if let Some(idx) = embedder.to_index() {
                 for hit in &per_result.hits {
