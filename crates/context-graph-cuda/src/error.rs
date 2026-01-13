@@ -32,6 +32,15 @@ pub enum CudaError {
     /// Invalid configuration parameter.
     #[error("Invalid configuration: {0}")]
     InvalidConfig(String),
+
+    /// FAISS operation failed.
+    #[error("FAISS {operation} failed with error code {code}")]
+    FaissError {
+        /// Operation that failed
+        operation: String,
+        /// FAISS error code
+        code: i32,
+    },
 }
 
 /// Result type for CUDA operations.

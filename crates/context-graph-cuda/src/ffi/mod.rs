@@ -16,5 +16,7 @@
 //! - Sufficient buffer sizes for string outputs
 
 pub mod cuda_driver;
+pub mod faiss;
 
 pub use cuda_driver::*;
+pub use faiss::*;

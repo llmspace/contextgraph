@@ -53,6 +53,7 @@ pub use cone::{
 pub use cone::{cone_check_batch_gpu, cone_check_single_gpu};
 pub use error::{CudaError, CudaResult};
 pub use ffi::{
+    // CUDA Driver API exports
     cuda_result_to_string, decode_driver_version, is_cuda_success,
     cuDeviceGet, cuDeviceGetAttribute, cuDeviceGetCount, cuDeviceGetName,
     cuDeviceTotalMem_v2, cuDriverGetVersion, cuInit,
@@ -61,7 +62,18 @@ pub use ffi::{
     CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
     CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_X, CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK,
     CU_DEVICE_ATTRIBUTE_WARP_SIZE,
+    // FAISS FFI exports
+    check_faiss_result, gpu_available, GpuResources, MetricType,
+    FaissIndex, FaissGpuResourcesProvider, FaissStandardGpuResources,
+    faiss_index_factory, faiss_Index_free, faiss_Index_train, faiss_Index_is_trained,
+    faiss_Index_add_with_ids, faiss_Index_search, faiss_IndexIVF_set_nprobe,
+    faiss_Index_ntotal, faiss_write_index, faiss_read_index,
+    faiss_StandardGpuResources_new, faiss_StandardGpuResources_free,
+    faiss_index_cpu_to_gpu, faiss_get_num_gpus,
+    FAISS_OK,
 };
+#[cfg(feature = "cuda")]
+pub use ffi::gpu_count_direct;
 pub use ops::VectorOps;
 pub use poincare::{poincare_distance_batch_cpu, poincare_distance_cpu, PoincareCudaConfig};
 #[cfg(feature = "cuda")]
