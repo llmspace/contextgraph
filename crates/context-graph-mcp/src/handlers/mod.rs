@@ -22,6 +22,7 @@
 //! - `teleological`: Teleological search, fusion, and profile handlers (TELEO-H1 to TELEO-H5)
 //! - `autonomous`: NORTH autonomous system handlers (TASK-AUTONOMOUS-MCP)
 //! - `epistemic`: Epistemic action handlers for GWT workspace (TASK-MCP-002)
+//! - `merge`: Merge concepts handler for node consolidation (TASK-MCP-004)
 
 mod atc;
 mod autonomous;
@@ -32,6 +33,7 @@ mod epistemic;
 mod johari;
 mod lifecycle;
 mod memory;
+mod merge;
 mod neuromod;
 // NOTE: mod north_star REMOVED - Manual North Star tools created single 1024D embeddings
 // that cannot be meaningfully compared to 13-embedder teleological arrays.

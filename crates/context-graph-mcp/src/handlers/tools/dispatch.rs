@@ -153,6 +153,8 @@ impl Handlers {
             }
             // TASK-MCP-002: Epistemic action for GWT workspace belief management
             tool_names::EPISTEMIC_ACTION => self.call_epistemic_action(id, arguments).await,
+            // TASK-MCP-004: Merge concepts for node consolidation
+            tool_names::MERGE_CONCEPTS => self.call_merge_concepts(id, arguments).await,
             _ => JsonRpcResponse::error(
                 id,
                 error_codes::TOOL_NOT_FOUND,
