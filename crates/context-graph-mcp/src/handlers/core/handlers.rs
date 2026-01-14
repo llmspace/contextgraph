@@ -12,7 +12,7 @@ use parking_lot::RwLock;
 
 use context_graph_core::alignment::GoalAlignmentCalculator;
 use context_graph_core::atc::AdaptiveThresholdCalibration;
-use context_graph_core::dream::{AmortizedLearner, DreamController, DreamScheduler};
+use context_graph_core::dream::{AmortizedLearner, DreamController, DreamScheduler, TriggerManager};
 // TASK-IDENTITY-P0-001: Import GWT identity components for shared monitor wiring
 use context_graph_core::gwt::ego_node::SelfEgoNode;
 use context_graph_core::gwt::listeners::IdentityContinuityListener;
@@ -128,6 +128,13 @@ pub struct Handlers {
     pub(in crate::handlers) amortized_learner:
         Option<Arc<RwLock<context_graph_core::dream::AmortizedLearner>>>,
 
+    // ========== DREAM TRIGGER MANAGER (TASK-35) ==========
+    /// TriggerManager for manual dream triggering via MCP.
+    /// TASK-35: Required for trigger_dream to call request_manual_trigger().
+    /// Uses RwLock because trigger operations mutate internal state.
+    pub(in crate::handlers) trigger_manager:
+        Option<Arc<RwLock<TriggerManager>>>,
+
     // ========== NEUROMODULATION (TASK-NEUROMOD-MCP) ==========
     /// Neuromodulation manager for controlling system behavior modulation.
     /// TASK-NEUROMOD-MCP: Required for get_neuromodulation_state, adjust_neuromodulator.
@@ -211,6 +218,8 @@ impl Handlers {
             dream_controller: None,
             dream_scheduler: None,
             amortized_learner: None,
+            // TASK-35: TriggerManager defaults to None - use with_trigger_manager() for manual triggering
+            trigger_manager: None,
             // TASK-NEUROMOD-MCP: Neuromod defaults to None - use with_neuromod() for full support
             neuromod_manager: None,
             // TASK-IDENTITY-P0-001: Identity fields default to None - use with_default_gwt() for full support
@@ -277,6 +286,8 @@ impl Handlers {
             dream_controller: None,
             dream_scheduler: None,
             amortized_learner: None,
+            // TASK-35: TriggerManager defaults to None - use with_trigger_manager() for manual triggering
+            trigger_manager: None,
             // TASK-NEUROMOD-MCP: Neuromod defaults to None
             neuromod_manager: None,
             // TASK-IDENTITY-P0-001: Identity fields default to None
@@ -341,6 +352,8 @@ impl Handlers {
             dream_controller: None,
             dream_scheduler: None,
             amortized_learner: None,
+            // TASK-35: TriggerManager defaults to None - use with_trigger_manager() for manual triggering
+            trigger_manager: None,
             // TASK-NEUROMOD-MCP: Neuromod defaults to None
             neuromod_manager: None,
             // TASK-IDENTITY-P0-001: Identity fields default to None
@@ -397,6 +410,8 @@ impl Handlers {
             dream_controller: None,
             dream_scheduler: None,
             amortized_learner: None,
+            // TASK-35: TriggerManager defaults to None - use with_trigger_manager() for manual triggering
+            trigger_manager: None,
             // TASK-NEUROMOD-MCP: Neuromod defaults to None
             neuromod_manager: None,
             // TASK-IDENTITY-P0-001: Identity fields default to None
@@ -457,6 +472,8 @@ impl Handlers {
             dream_controller: None,
             dream_scheduler: None,
             amortized_learner: None,
+            // TASK-35: TriggerManager defaults to None - use with_trigger_manager() for manual triggering
+            trigger_manager: None,
             // TASK-NEUROMOD-MCP: Neuromod defaults to None
             neuromod_manager: None,
             // TASK-IDENTITY-P0-001: Identity fields default to None
@@ -527,6 +544,8 @@ impl Handlers {
             dream_controller: None,
             dream_scheduler: None,
             amortized_learner: None,
+            // TASK-35: TriggerManager defaults to None - use with_trigger_manager() for manual triggering
+            trigger_manager: None,
             // TASK-NEUROMOD-MCP: Neuromod defaults to None
             neuromod_manager: None,
             // TASK-IDENTITY-P0-001: Identity fields default to None
@@ -594,6 +613,9 @@ impl Handlers {
             dream_controller: Some(dream_controller),
             dream_scheduler: Some(dream_scheduler),
             amortized_learner: Some(amortized_learner),
+            // TASK-35: TriggerManager defaults to None in this constructor
+            // Use with_trigger_manager() to add after construction if needed
+            trigger_manager: None,
             neuromod_manager: Some(neuromod_manager),
             // TASK-IDENTITY-P0-001: Identity fields default to None for this constructor
             identity_listener: None,
@@ -704,6 +726,15 @@ impl Handlers {
         let amortized_learner: Arc<RwLock<AmortizedLearner>> =
             Arc::new(RwLock::new(AmortizedLearner::new()));
 
+        // TASK-35: Create REAL TriggerManager for manual dream triggering
+        // Constitution trigger rules:
+        // - Manual: Highest priority, bypasses cooldown
+        // - IdentityCritical: IC < 0.5 (AP-26, AP-38, IDENTITY-007)
+        // - GpuOverload: GPU approaching 30%
+        // - HighEntropy: Entropy > 0.7 for 5 minutes
+        let trigger_manager: Arc<RwLock<TriggerManager>> =
+            Arc::new(RwLock::new(TriggerManager::new()));
+
         // TASK-ATC-001: Create REAL AdaptiveThresholdCalibration with constitution-mandated defaults
         // Constitution adaptive_thresholds section:
         // - Level 1 EWMA Drift Tracker (per-query)
@@ -735,6 +766,8 @@ impl Handlers {
             dream_controller: Some(dream_controller),
             dream_scheduler: Some(dream_scheduler),
             amortized_learner: Some(amortized_learner),
+            // TASK-35: REAL TriggerManager wired for manual dream triggering
+            trigger_manager: Some(trigger_manager),
             // TASK-NEUROMOD-MCP: REAL NeuromodulationManager wired
             neuromod_manager: Some(neuromod_manager),
             // TASK-IDENTITY-P0-001: REAL identity continuity wiring (AP-40 fix)
@@ -743,6 +776,36 @@ impl Handlers {
             // TASK-12 (GWT-006): REAL Kuramoto stepper for 100Hz phase updates
             kuramoto_stepper: Some(RwLock::new(kuramoto_stepper)),
         }
+    }
+
+    // ========================================================================
+    // TASK-35: TriggerManager Builder Method
+    // ========================================================================
+
+    /// Configure TriggerManager for manual dream triggering.
+    ///
+    /// TASK-35: Required for trigger_dream MCP tool to call request_manual_trigger().
+    /// This method enables manual dream triggering via the MCP interface.
+    ///
+    /// # Arguments
+    ///
+    /// * `trigger_manager` - Shared TriggerManager instance
+    ///
+    /// # Returns
+    ///
+    /// Self with trigger_manager configured
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let trigger_manager = Arc::new(RwLock::new(TriggerManager::new()));
+    /// let handlers = Handlers::new(...)
+    ///     .with_trigger_manager(trigger_manager);
+    /// ```
+    #[allow(dead_code)]
+    pub fn with_trigger_manager(mut self, trigger_manager: Arc<RwLock<TriggerManager>>) -> Self {
+        self.trigger_manager = Some(trigger_manager);
+        self
     }
 
     // ========================================================================

@@ -928,7 +928,7 @@ pub(crate) fn create_test_handlers_with_all_components() -> Handlers {
         SelfEgoProviderImpl, WorkspaceProviderImpl,
     };
     use context_graph_core::atc::AdaptiveThresholdCalibration;
-    use context_graph_core::dream::{AmortizedLearner, DreamController, DreamScheduler};
+    use context_graph_core::dream::{AmortizedLearner, DreamController, DreamScheduler, TriggerManager};
     use context_graph_core::neuromod::NeuromodulationManager;
 
     let store = Arc::new(InMemoryTeleologicalStore::new());
@@ -979,7 +979,12 @@ pub(crate) fn create_test_handlers_with_all_components() -> Handlers {
     let atc: Arc<ParkingRwLock<AdaptiveThresholdCalibration>> =
         Arc::new(ParkingRwLock::new(AdaptiveThresholdCalibration::new()));
 
+    // TASK-35: Create REAL TriggerManager for manual dream triggering
+    let trigger_manager: Arc<ParkingRwLock<TriggerManager>> =
+        Arc::new(ParkingRwLock::new(TriggerManager::new()));
+
     // Create handlers with ALL components wired
+    // TASK-35: Add trigger_manager via builder method
     Handlers::with_gwt_and_subsystems(
         teleological_store,
         utl_processor,
@@ -1001,4 +1006,5 @@ pub(crate) fn create_test_handlers_with_all_components() -> Handlers {
         amortized_learner,
         neuromod_manager,
     )
+    .with_trigger_manager(trigger_manager)
 }

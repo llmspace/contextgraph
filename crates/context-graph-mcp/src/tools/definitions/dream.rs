@@ -8,21 +8,29 @@ use crate::tools::types::ToolDefinition;
 pub fn definitions() -> Vec<ToolDefinition> {
     vec![
         // trigger_dream - Manually trigger a dream consolidation cycle
+        // TASK-35: Updated to require rationale and use TriggerManager
         ToolDefinition::new(
             "trigger_dream",
-            "Manually trigger a dream consolidation cycle. System must be idle (activity < 0.15). \
-             Executes NREM (3 min) + REM (2 min) phases. Returns DreamReport with metrics. \
-             Aborts automatically on external query (wake latency < 100ms).",
+            "Manually trigger a dream consolidation cycle via TriggerManager. \
+             Requires rationale for audit logging. GPU must be < 80% eligible. \
+             Manual triggers have highest priority and bypass cooldown. \
+             Returns immediately; actual dream executes in background scheduler.",
             json!({
                 "type": "object",
                 "properties": {
+                    "rationale": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024,
+                        "description": "REQUIRED: Reason for manual trigger (for audit logging)"
+                    },
                     "force": {
                         "type": "boolean",
                         "default": false,
-                        "description": "Force dream even if activity is above threshold (not recommended)"
+                        "description": "Force trigger even if GPU busy or in cooldown (not recommended)"
                     }
                 },
-                "required": []
+                "required": ["rationale"]
             }),
         ),
 

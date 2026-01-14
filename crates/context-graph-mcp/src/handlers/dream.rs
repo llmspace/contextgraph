@@ -21,8 +21,6 @@
 use serde_json::json;
 use tracing::{debug, error, info, warn};
 
-use context_graph_core::dream::scheduler::TriggerDecision;
-
 use crate::protocol::{error_codes, JsonRpcId, JsonRpcResponse};
 
 use super::Handlers;
@@ -30,17 +28,24 @@ use super::Handlers;
 impl Handlers {
     /// trigger_dream tool implementation.
     ///
-    /// TASK-DREAM-MCP: Manually trigger a dream consolidation cycle.
-    /// FAIL FAST if DreamController not initialized.
+    /// TASK-35: Wires MCP trigger_dream to TriggerManager.request_manual_trigger().
+    /// FAIL FAST if TriggerManager not initialized.
     ///
     /// Arguments:
-    /// - force: bool - Force trigger even if activity threshold not met (default: false)
+    /// - rationale: string - REQUIRED reason for manual trigger (for audit logging)
+    /// - force: bool - Force trigger even if GPU busy (not recommended, violates constitution)
     ///
     /// Returns:
-    /// - triggered: bool - Whether dream cycle was started
-    /// - reason: string - Reason for trigger decision
-    /// - current_state: string - Current dream state
-    /// - activity_level: f32 - Current activity level
+    /// - triggered: bool - Whether manual trigger was accepted
+    /// - trigger_reason: string - "Manual" if accepted
+    /// - gpu_utilization: Option<f32> - Current GPU usage if available
+    /// - gpu_eligible: bool - Whether GPU < 80% (constitution: dream.trigger.gpu)
+    /// - error: Option<string> - Error message if failed
+    ///
+    /// # Constitution Compliance
+    /// - GPU eligibility: dream.trigger.gpu = "<80%"
+    /// - GPU budget during dream: dream.constraints.gpu = "<30%"
+    /// - AP-26: No silent failures - FAIL FAST on missing components
     pub(super) async fn call_trigger_dream(
         &self,
         id: Option<JsonRpcId>,
@@ -48,28 +53,28 @@ impl Handlers {
     ) -> JsonRpcResponse {
         debug!("Handling trigger_dream tool call");
 
-        // FAIL FAST: Check dream controller
-        let dream_controller = match &self.dream_controller {
-            Some(dc) => dc,
+        // FAIL FAST: TriggerManager is REQUIRED
+        let trigger_manager = match &self.trigger_manager {
+            Some(tm) => tm,
             None => {
-                error!("trigger_dream: DreamController not initialized");
+                error!("trigger_dream: TriggerManager not initialized - FAIL FAST per AP-26");
                 return JsonRpcResponse::error(
                     id,
                     error_codes::DREAM_NOT_INITIALIZED,
-                    "DreamController not initialized - use with_dream() constructor",
+                    "TriggerManager not initialized. Configure with with_trigger_manager().",
                 );
             }
         };
 
-        // FAIL FAST: Check dream scheduler
-        let dream_scheduler = match &self.dream_scheduler {
-            Some(ds) => ds,
-            None => {
-                error!("trigger_dream: DreamScheduler not initialized");
+        // Parse rationale - REQUIRED for audit logging
+        let rationale = match args.get("rationale").and_then(|v| v.as_str()) {
+            Some(r) if !r.trim().is_empty() => r.to_string(),
+            _ => {
+                warn!("trigger_dream: rationale is required for audit compliance");
                 return JsonRpcResponse::error(
                     id,
-                    error_codes::DREAM_NOT_INITIALIZED,
-                    "DreamScheduler not initialized - use with_dream() constructor",
+                    error_codes::INVALID_PARAMS,
+                    "rationale is required for manual dream trigger (audit compliance)",
                 );
             }
         };
@@ -77,91 +82,111 @@ impl Handlers {
         // Parse force parameter
         let force = args.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
 
-        // Get current activity level from scheduler
-        let activity_level = {
-            let scheduler = dream_scheduler.read();
-            scheduler.get_average_activity()
+        // Check GPU eligibility (unless forced)
+        // Constitution: dream.trigger.gpu = "<80%"
+        let (gpu_utilization, gpu_eligible) = {
+            let manager = trigger_manager.read();
+            let gpu_usage = manager.current_gpu_usage();
+            // Eligibility threshold is 80% per constitution
+            let eligible = gpu_usage < 0.80;
+            (gpu_usage, eligible)
         };
 
-        // Check if dream should trigger (unless forced)
-        let should_trigger = {
-            let scheduler = dream_scheduler.read();
-            force || scheduler.should_trigger_dream()
-        };
-
-        if !should_trigger {
-            let trigger_decision = {
-                let scheduler = dream_scheduler.read();
-                scheduler.check_trigger()
-            };
-
-            let reason = match trigger_decision {
-                TriggerDecision::Wait(wait_reason) => {
-                    format!("Waiting: {:?}", wait_reason)
-                }
-                TriggerDecision::Blocked(block_reason) => {
-                    format!("Blocked: {:?}", block_reason)
-                }
-                _ => "Unknown reason".to_string(),
-            };
-
-            let current_state = {
-                let controller = dream_controller.read();
-                controller.get_status().state.phase_name().to_string()
-            };
-
+        if !gpu_eligible && !force {
+            info!(
+                "trigger_dream: GPU not eligible ({}% >= 80%), rationale: {}",
+                gpu_utilization * 100.0,
+                rationale
+            );
             return self.tool_result_with_pulse(
                 id,
                 json!({
                     "triggered": false,
-                    "reason": reason,
-                    "current_state": current_state,
-                    "activity_level": activity_level,
-                    "force_available": true
+                    "trigger_reason": null,
+                    "gpu_utilization": gpu_utilization,
+                    "gpu_eligible": false,
+                    "error": format!(
+                        "GPU usage {}% >= 80% eligibility threshold. Use force=true to override (not recommended).",
+                        (gpu_utilization * 100.0).round()
+                    ),
+                    "rationale_received": rationale,
+                    "constitution_ref": "dream.trigger.gpu = '<80%'"
                 }),
             );
         }
 
-        // Note: start_dream_cycle is async, but we have a sync RwLock.
-        // We need to use tokio task or spawn_blocking. For MCP handlers,
-        // we'll just report that the trigger was accepted.
-        // The actual dream cycle runs in the background.
-
-        let current_state = {
-            let controller = dream_controller.read();
-            controller.get_status().state.phase_name().to_string()
+        // Check cooldown
+        let cooldown_remaining = {
+            let manager = trigger_manager.read();
+            manager.cooldown_remaining()
         };
 
-        // Check if already dreaming
-        let is_dreaming = {
-            let controller = dream_controller.read();
-            controller.get_status().is_dreaming
+        if let Some(remaining) = cooldown_remaining {
+            if !force {
+                info!(
+                    "trigger_dream: In cooldown ({}s remaining), rationale: {}",
+                    remaining.as_secs(),
+                    rationale
+                );
+                return self.tool_result_with_pulse(
+                    id,
+                    json!({
+                        "triggered": false,
+                        "trigger_reason": null,
+                        "gpu_utilization": gpu_utilization,
+                        "gpu_eligible": gpu_eligible,
+                        "cooldown_remaining_secs": remaining.as_secs(),
+                        "error": format!(
+                            "Trigger cooldown active, {}s remaining. Use force=true to override.",
+                            remaining.as_secs()
+                        ),
+                        "rationale_received": rationale
+                    }),
+                );
+            }
+        }
+
+        // REQUEST MANUAL TRIGGER - This is the key operation
+        {
+            let mut manager = trigger_manager.write();
+            manager.request_manual_trigger();
+        }
+
+        info!(
+            "trigger_dream: Manual trigger ACCEPTED, rationale: '{}', GPU: {}%, forced: {}",
+            rationale,
+            (gpu_utilization * 100.0).round(),
+            force
+        );
+
+        // Verify trigger was set (Full State Verification)
+        let trigger_set = {
+            let manager = trigger_manager.read();
+            matches!(
+                manager.check_triggers(),
+                Some(context_graph_core::dream::types::ExtendedTriggerReason::Manual)
+            )
         };
 
-        if is_dreaming {
-            return self.tool_result_with_pulse(
+        if !trigger_set {
+            error!("trigger_dream: Manual trigger was NOT set after request_manual_trigger()");
+            return JsonRpcResponse::error(
                 id,
-                json!({
-                    "triggered": false,
-                    "reason": "Dream cycle already in progress",
-                    "current_state": current_state,
-                    "activity_level": activity_level
-                }),
+                error_codes::DREAM_TRIGGER_FAILED,
+                "Manual trigger request failed - check_triggers() did not return Manual",
             );
         }
 
-        info!("Dream cycle trigger accepted (force={})", force);
-
-        // Mark that we've requested a trigger - actual cycle would be started
-        // by the main event loop or a background task
         self.tool_result_with_pulse(
             id,
             json!({
                 "triggered": true,
-                "reason": if force { "Forced trigger accepted" } else { "Conditions met - trigger accepted" },
-                "current_state": current_state,
-                "activity_level": activity_level,
-                "note": "Dream cycle will be executed by the background scheduler"
+                "trigger_reason": "Manual",
+                "gpu_utilization": gpu_utilization,
+                "gpu_eligible": gpu_eligible,
+                "rationale_logged": rationale,
+                "forced": force,
+                "note": "Dream cycle will be executed by background scheduler when check_triggers() is called"
             }),
         )
     }

@@ -201,6 +201,9 @@ pub mod error_codes {
     pub const DREAM_ABORT_ERROR: i32 = -32072;
     /// Amortized learning error
     pub const AMORTIZED_LEARNING_ERROR: i32 = -32073;
+    /// Manual dream trigger request failed (Full State Verification failed)
+    /// TASK-35: Returned when check_triggers() does not return Manual after request_manual_trigger()
+    pub const DREAM_TRIGGER_FAILED: i32 = -32074;
 
     // Neuromodulation error codes (-32080 to -32089) - TASK-NEUROMOD-MCP
     /// Neuromodulation manager not initialized

@@ -14,13 +14,17 @@ use super::{create_handlers_with_gwt, extract_tool_content, make_tool_call_reque
 use crate::tools::tool_names;
 
 /// P4-09: FSV test to verify trigger_dream initiates REAL dream consolidation.
+/// TASK-35: Updated to require rationale and verify TriggerManager wiring.
 #[tokio::test]
 async fn test_trigger_dream_initiates_real_consolidation() {
     // SETUP: Create handlers with real GWT/Dream components
     let handlers = create_handlers_with_gwt();
 
-    // EXECUTE: Call trigger_dream tool (without force flag)
-    let args = json!({});
+    // EXECUTE: Call trigger_dream tool with REQUIRED rationale
+    // TASK-35: rationale is now mandatory for audit compliance
+    let args = json!({
+        "rationale": "P4-09 FSV test - verify real dream consolidation"
+    });
     let request = make_tool_call_request(tool_names::TRIGGER_DREAM, Some(args));
     let response = handlers.dispatch(request).await;
 
@@ -38,35 +42,41 @@ async fn test_trigger_dream_initiates_real_consolidation() {
     let triggered = content["triggered"]
         .as_bool()
         .expect("triggered must be bool");
-    // May or may not trigger depending on activity level
+    // Should trigger since we have valid rationale
 
-    // FSV-2: Must have reason string
-    let reason = content["reason"].as_str().expect("reason must be string");
-    assert!(!reason.is_empty(), "reason must not be empty");
-
-    // FSV-3: Must have current_state
-    let current_state = content["current_state"]
+    // FSV-2: TASK-35 - Must have trigger_reason field (not just "reason")
+    let trigger_reason = content["trigger_reason"]
         .as_str()
-        .expect("current_state must be string");
-    assert!(!current_state.is_empty(), "current_state must not be empty");
+        .expect("trigger_reason must be string");
+    if triggered {
+        assert_eq!(trigger_reason, "Manual", "trigger_reason should be Manual when triggered");
+    }
 
-    // FSV-4: Must have activity_level
-    let activity_level = content["activity_level"]
+    // FSV-3: Must have gpu_eligible flag (TASK-35 addition)
+    let gpu_eligible = content["gpu_eligible"]
+        .as_bool()
+        .expect("gpu_eligible must be bool");
+
+    // FSV-4: Must have gpu_utilization
+    let gpu_utilization = content["gpu_utilization"]
         .as_f64()
-        .expect("activity_level must be f64");
+        .expect("gpu_utilization must be f64");
     assert!(
-        activity_level >= 0.0,
-        "activity_level must be >= 0, got {}",
-        activity_level
+        gpu_utilization >= 0.0 && gpu_utilization <= 1.0,
+        "gpu_utilization must be in [0, 1], got {}",
+        gpu_utilization
     );
 
     println!(
-        "FSV PASSED: trigger_dream - triggered={}, state='{}', activity={:.3}, reason='{}'",
-        triggered, current_state, activity_level, reason
+        "FSV PASSED: trigger_dream - triggered={}, trigger_reason='{}', gpu={}%, eligible={}",
+        triggered, trigger_reason, (gpu_utilization * 100.0).round(), gpu_eligible
     );
 
-    // EXECUTE: Call trigger_dream with force=true
-    let args_force = json!({ "force": true });
+    // EXECUTE: Call trigger_dream with force=true (TASK-35: still requires rationale)
+    let args_force = json!({
+        "rationale": "P4-09 FSV test - force trigger override",
+        "force": true
+    });
     let request_force = make_tool_call_request(tool_names::TRIGGER_DREAM, Some(args_force));
     let response_force = handlers.dispatch(request_force).await;
 
@@ -74,17 +84,20 @@ async fn test_trigger_dream_initiates_real_consolidation() {
     let content_force = extract_tool_content(&response_force_json)
         .expect("trigger_dream force must return content");
 
-    // Force should either trigger or report already dreaming
+    // Force should trigger
     let triggered_force = content_force["triggered"]
         .as_bool()
         .expect("triggered must be bool");
-    let reason_force = content_force["reason"]
-        .as_str()
-        .expect("reason must be string");
+    let forced_flag = content_force["forced"]
+        .as_bool()
+        .expect("forced must be bool");
+
+    // TASK-35: Verify forced field is true when force=true
+    assert!(forced_flag, "forced field should be true when force=true parameter used");
 
     println!(
-        "FSV PASSED: trigger_dream force=true - triggered={}, reason='{}'",
-        triggered_force, reason_force
+        "FSV PASSED: trigger_dream force=true - triggered={}, forced={}",
+        triggered_force, forced_flag
     );
 }
 
@@ -252,11 +265,12 @@ async fn test_abort_dream_stops_cycle_properly() {
     );
 
     // Now force-trigger a dream and try to abort it
+    // TASK-35: rationale is required
     let trigger_request = make_tool_call_request(
         tool_names::TRIGGER_DREAM,
         Some(json!({
-            "force": true,
-            "phase": "nrem"
+            "rationale": "P5-01 FSV test - trigger for abort verification",
+            "force": true
         })),
     );
     let _trigger_response = handlers.dispatch(trigger_request).await;
