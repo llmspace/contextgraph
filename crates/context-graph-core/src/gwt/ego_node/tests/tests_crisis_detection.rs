@@ -6,10 +6,17 @@
 //! - Helper method behavior
 //!
 //! NO MOCK DATA: All tests use REAL data structures and verify actual state changes.
+//!
+//! # TASK-LOGIC-004 Update
+//!
+//! Tests that trigger IC < 0.5 (Critical state) must use `setup_monitor_with_callback()`
+//! to provide a mock callback, otherwise the FAIL FAST panic will trigger.
 
 use crate::gwt::ego_node::{
-    CrisisDetectionResult, IdentityContinuityMonitor, IdentityStatus, CRISIS_EVENT_COOLDOWN,
+    CrisisDetectionResult, IcCrisisCallback, IdentityContinuityMonitor, IdentityStatus,
+    CRISIS_EVENT_COOLDOWN,
 };
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Create a uniform purpose vector for testing
@@ -17,11 +24,30 @@ fn uniform_pv(val: f32) -> [f32; 13] {
     [val; 13]
 }
 
+/// Create a no-op callback for tests that need to trigger critical state.
+///
+/// This callback does nothing but satisfies the AP-26 requirement.
+fn noop_callback() -> IcCrisisCallback {
+    Arc::new(|_result| {
+        // No-op: test callback that does nothing
+    })
+}
+
 /// Setup monitor at a specific status by computing continuity.
 ///
 /// Uses real compute_continuity calls to set up the monitor state.
+///
+/// # IMPORTANT
+///
+/// For statuses that include Critical (IC < 0.5), this function provides
+/// a no-op callback to satisfy AP-26 and avoid FAIL FAST panic.
 fn setup_monitor_at_status(status: IdentityStatus) -> IdentityContinuityMonitor {
-    let mut monitor = IdentityContinuityMonitor::new();
+    // Use callback-enabled monitor for Critical status to avoid FAIL FAST panic
+    let mut monitor = if status == IdentityStatus::Critical {
+        IdentityContinuityMonitor::new(noop_callback())
+    } else {
+        IdentityContinuityMonitor::new_for_testing()
+    };
 
     // First vector (establishes baseline, always Healthy IC=1.0)
     monitor.compute_continuity(&uniform_pv(1.0), 1.0, "baseline");
@@ -44,6 +70,29 @@ fn setup_monitor_at_status(status: IdentityStatus) -> IdentityContinuityMonitor 
     monitor
 }
 
+/// Setup monitor with callback for tests that will trigger Critical state.
+///
+/// Use this when the test will cause IC < 0.5 to avoid FAIL FAST panic.
+fn setup_monitor_with_callback_at_status(status: IdentityStatus) -> IdentityContinuityMonitor {
+    let mut monitor = IdentityContinuityMonitor::new(noop_callback());
+
+    // First vector (establishes baseline, always Healthy IC=1.0)
+    monitor.compute_continuity(&uniform_pv(1.0), 1.0, "baseline");
+
+    // Second vector to set target status based on IC thresholds
+    let kuramoto_r = match status {
+        IdentityStatus::Healthy => 0.95,
+        IdentityStatus::Warning => 0.80,
+        IdentityStatus::Degraded => 0.60,
+        IdentityStatus::Critical => 0.30,
+    };
+
+    monitor.compute_continuity(&uniform_pv(1.0), kuramoto_r, "target_status");
+    let _ = monitor.detect_crisis();
+
+    monitor
+}
+
 // ============================================================================
 // FSV Edge Case Tests (5 Required Cases from Task Spec)
 // ============================================================================
@@ -52,7 +101,7 @@ fn setup_monitor_at_status(status: IdentityStatus) -> IdentityContinuityMonitor 
 fn test_crisis_detection_first_call_no_history() {
     println!("=== FSV: First detection with no compute_continuity ===");
 
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     // BEFORE
     println!("BEFORE: history_len = {}", monitor.history_len());
@@ -150,7 +199,8 @@ fn test_crisis_detection_entering_crisis_from_healthy() {
 fn test_crisis_detection_entering_critical() {
     println!("=== FSV: Warning -> Critical = entering_critical ===");
 
-    let mut monitor = setup_monitor_at_status(IdentityStatus::Warning);
+    // Use callback-enabled monitor since we're triggering Critical
+    let mut monitor = setup_monitor_with_callback_at_status(IdentityStatus::Warning);
 
     // BEFORE
     println!("BEFORE: previous_status = {:?}", monitor.previous_status());
@@ -179,7 +229,8 @@ fn test_crisis_detection_entering_critical() {
 fn test_crisis_detection_direct_to_critical() {
     println!("=== FSV: Healthy -> Critical = both flags ===");
 
-    let mut monitor = setup_monitor_at_status(IdentityStatus::Healthy);
+    // Use callback-enabled monitor since we're triggering Critical
+    let mut monitor = setup_monitor_with_callback_at_status(IdentityStatus::Healthy);
 
     // Crash directly to Critical
     monitor.compute_continuity(&uniform_pv(1.0), 0.20, "crash_to_critical");
@@ -236,7 +287,8 @@ fn test_crisis_detection_recovery_from_critical() {
 fn test_crisis_detection_cooldown_initially_can_emit() {
     println!("=== FSV: No cooldown initially ===");
 
-    let mut monitor = setup_monitor_at_status(IdentityStatus::Healthy);
+    // Use callback-enabled monitor since we're triggering Critical
+    let mut monitor = setup_monitor_with_callback_at_status(IdentityStatus::Healthy);
     monitor.compute_continuity(&uniform_pv(1.0), 0.30, "crisis");
 
     let result = monitor.detect_crisis();
@@ -251,7 +303,8 @@ fn test_crisis_detection_cooldown_initially_can_emit() {
 fn test_crisis_detection_cooldown_blocks_rapid_events() {
     println!("=== FSV: Cooldown blocks rapid events ===");
 
-    let mut monitor = setup_monitor_at_status(IdentityStatus::Healthy);
+    // Use callback-enabled monitor since we're triggering Critical
+    let mut monitor = setup_monitor_with_callback_at_status(IdentityStatus::Healthy);
 
     // First crisis
     monitor.compute_continuity(&uniform_pv(1.0), 0.30, "crisis1");
@@ -282,7 +335,7 @@ fn test_crisis_detection_cooldown_blocks_rapid_events() {
 fn test_mark_event_emitted_sets_time() {
     println!("=== FSV: mark_event_emitted sets last_event_time ===");
 
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     // BEFORE
     assert!(monitor.time_since_last_event().is_none());
@@ -307,7 +360,7 @@ fn test_mark_event_emitted_sets_time() {
 fn test_previous_status_getter() {
     println!("=== FSV: previous_status getter ===");
 
-    let monitor = IdentityContinuityMonitor::new();
+    let monitor = IdentityContinuityMonitor::new_for_testing();
 
     // Default should be Healthy
     assert_eq!(monitor.previous_status(), IdentityStatus::Healthy);
@@ -319,7 +372,7 @@ fn test_previous_status_getter() {
 fn test_status_changed_method() {
     println!("=== FSV: status_changed method ===");
 
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     // No computation yet - status_changed should be false
     assert!(!monitor.status_changed());
@@ -341,7 +394,7 @@ fn test_status_changed_method() {
 fn test_entering_critical_method() {
     println!("=== FSV: entering_critical method ===");
 
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     // No computation yet
     assert!(!monitor.entering_critical());
@@ -366,8 +419,9 @@ fn test_entering_critical_method() {
 fn test_status_ordinal_ordering() {
     println!("=== FSV: Status ordinal ordering ===");
 
-    // We can verify ordinal ordering through recovery detection
-    let mut monitor = setup_monitor_at_status(IdentityStatus::Critical);
+    // Use callback-enabled monitor since we start at Critical
+    // and need to test recovery transitions
+    let mut monitor = setup_monitor_with_callback_at_status(IdentityStatus::Critical);
 
     // Recovery tests verify ordinal ordering implicitly
     // Critical(0) -> Degraded(1) = recovery
@@ -462,7 +516,8 @@ fn test_crisis_detection_result_debug_and_clone() {
 fn test_full_crisis_lifecycle() {
     println!("=== FSV: Full crisis detection lifecycle ===");
 
-    let mut monitor = IdentityContinuityMonitor::new();
+    // Use callback-enabled monitor since we go through Critical
+    let mut monitor = IdentityContinuityMonitor::new(noop_callback());
 
     // Phase 1: Start healthy
     println!("PHASE 1: Initial state");
@@ -515,8 +570,8 @@ fn test_full_crisis_lifecycle() {
 fn test_cooldown_constant_value() {
     println!("=== FSV: CRISIS_EVENT_COOLDOWN constant value ===");
 
-    // Verify the constant is 30 seconds as specified
-    assert_eq!(CRISIS_EVENT_COOLDOWN, Duration::from_secs(30));
+    // Verify the constant is 1000ms per TASK-FOUNDATION-003 spec
+    assert_eq!(CRISIS_EVENT_COOLDOWN, Duration::from_millis(1000));
 
-    println!("EVIDENCE: CRISIS_EVENT_COOLDOWN = 30 seconds");
+    println!("EVIDENCE: CRISIS_EVENT_COOLDOWN = 1000ms (1 second)");
 }

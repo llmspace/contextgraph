@@ -56,35 +56,39 @@ impl Handlers {
             }
         };
 
-        // Compute alignments and fuse
+        // Compute alignments and fuse using constitution-compliant method
         let alignments = compute_alignments_from_embeddings(&embeddings);
         let fusion_engine = FusionEngine::new();
         let fusion_result = fusion_engine.fuse_from_alignments(&alignments);
-
-        // Build response
-        let vector_json = TeleologicalVectorJson::from_core(&fusion_result.vector, None);
 
         info!(
             "compute_teleological_vector completed in {:?} (tucker={})",
             embed_duration, params.compute_tucker
         );
 
+        // Return alignment-based result (AP-03/AP-05 compliant - no raw embeddings)
         self.tool_result_with_pulse(
             id,
             json!({
                 "success": true,
-                "vector": vector_json,
+                "purpose_vector": fusion_result.purpose_vector.to_vec(),
+                "group_alignments": {
+                    "semantic": fusion_result.group_alignments[0],
+                    "temporal": fusion_result.group_alignments[1],
+                    "structural": fusion_result.group_alignments[2],
+                    "experiential": fusion_result.group_alignments[3],
+                },
                 "embedding_latency_ms": embed_duration.as_millis(),
                 "fusion_confidence": fusion_result.confidence,
-                "component_scores": {
-                    "purpose_vector": fusion_result.component_scores.purpose_vector,
-                    "correlations": fusion_result.component_scores.correlations,
-                    "groups": fusion_result.component_scores.groups,
-                },
                 "metadata": {
-                    "active_embedders": fusion_result.metadata.active_embedders,
-                    "strongest_pair": fusion_result.metadata.strongest_pair,
-                    "dominant_group": fusion_result.metadata.dominant_group.map(|g| format!("{:?}", g)),
+                    "active_embedders": fusion_result.active_embedders,
+                    "dominant_group": fusion_result.dominant_group.map(|g| match g {
+                        0 => "Semantic",
+                        1 => "Temporal",
+                        2 => "Structural",
+                        3 => "Experiential",
+                        _ => "Unknown",
+                    }),
                 },
             }),
         )

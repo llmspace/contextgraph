@@ -101,11 +101,17 @@ impl Handlers {
         let embeddings = extract_embeddings_from_fingerprint(&embedding_result.fingerprint)
             .map_err(|e| e.to_error_string())?;
 
-        // Compute alignments and fuse
+        // Compute alignments and fuse using constitution-compliant method (AP-03/AP-05)
         let alignments = compute_alignments_from_embeddings(&embeddings);
         let fusion_engine = FusionEngine::new();
         let fusion_result = fusion_engine.fuse_from_alignments(&alignments);
 
-        Ok((fusion_result.vector, semantic_fingerprint))
+        // Create TeleologicalVector from alignment result for search compatibility
+        // Note: Cross-correlations are zeroed as they require raw embeddings (AP-05 violation)
+        use context_graph_core::types::fingerprint::PurposeVector;
+        let purpose_vector = PurposeVector::new(fusion_result.purpose_vector);
+        let teleological_vector = TeleologicalVector::new(purpose_vector);
+
+        Ok((teleological_vector, semantic_fingerprint))
     }
 }

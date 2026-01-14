@@ -66,8 +66,11 @@ pub use ego_node::{
     CrisisProtocolResult, IdentityContinuity, IdentityContinuityMonitor, IdentityCrisisEvent,
     IdentityStatus, PurposeSnapshot, PurposeVectorHistory, PurposeVectorHistoryProvider,
     SelfAwarenessLoop, SelfEgoNode, SelfReflectionResult, CRISIS_EVENT_COOLDOWN,
-    IC_CRISIS_THRESHOLD, IC_CRITICAL_THRESHOLD, MAX_PV_HISTORY_SIZE,
+    IC_CRITICAL_THRESHOLD, IC_HEALTHY_THRESHOLD, IC_WARNING_THRESHOLD, MAX_PV_HISTORY_SIZE,
 };
+// Re-export deprecated constant for backwards compatibility
+#[allow(deprecated)]
+pub use ego_node::IC_CRISIS_THRESHOLD;
 
 // Re-export from listeners
 pub use listeners::{

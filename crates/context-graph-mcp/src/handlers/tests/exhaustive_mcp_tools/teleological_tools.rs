@@ -92,11 +92,15 @@ async fn test_compute_teleological_vector_basic() {
     assert_success(&response, "compute_teleological_vector");
 
     let data = get_tool_data(&response);
-    // Response contains nested structure: { "vector": { "purpose_vector": [...], ... }, ... }
-    let vector = data.get("vector").expect("Must have vector field");
+    // Response uses new AlignmentFusionResult format (Constitution v5.0.0)
+    // { "success": true, "purpose_vector": [...], "group_alignments": {...}, ... }
     assert!(
-        vector.get("purpose_vector").is_some(),
-        "Must have purpose_vector inside vector"
+        data.get("purpose_vector").is_some(),
+        "Must have purpose_vector at top level"
+    );
+    assert!(
+        data.get("group_alignments").is_some(),
+        "Must have group_alignments at top level"
     );
 }
 

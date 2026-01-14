@@ -3,7 +3,8 @@
 //! Tests IC monitoring, crisis detection, and serialization.
 
 use super::super::{
-    IdentityContinuityMonitor, IdentityStatus, IC_CRISIS_THRESHOLD, MAX_PV_HISTORY_SIZE,
+    IdentityContinuityMonitor, IdentityStatus, IC_CRITICAL_THRESHOLD, IC_WARNING_THRESHOLD,
+    MAX_PV_HISTORY_SIZE,
 };
 
 /// Helper: Create a purpose vector with uniform values
@@ -13,11 +14,11 @@ fn uniform_pv(val: f32) -> [f32; 13] {
 
 #[test]
 fn test_identity_continuity_monitor_new() {
-    let monitor = IdentityContinuityMonitor::new();
+    let monitor = IdentityContinuityMonitor::new_for_testing();
 
     assert!(monitor.is_empty());
     assert_eq!(monitor.history_len(), 0);
-    assert_eq!(monitor.crisis_threshold(), IC_CRISIS_THRESHOLD);
+    assert_eq!(monitor.crisis_threshold(), IC_CRITICAL_THRESHOLD);
     assert!(monitor.last_result().is_none());
     assert!(monitor.identity_coherence().is_none());
     assert!(monitor.current_status().is_none());
@@ -26,7 +27,7 @@ fn test_identity_continuity_monitor_new() {
 
 #[test]
 fn test_identity_continuity_monitor_with_threshold() {
-    let monitor = IdentityContinuityMonitor::with_threshold(0.8);
+    let monitor = IdentityContinuityMonitor::with_threshold_for_testing(0.8);
 
     assert_eq!(monitor.crisis_threshold(), 0.8);
     assert!(monitor.is_empty());
@@ -35,17 +36,17 @@ fn test_identity_continuity_monitor_with_threshold() {
 #[test]
 fn test_identity_continuity_monitor_with_threshold_clamping() {
     // Test high value clamping
-    let monitor_high = IdentityContinuityMonitor::with_threshold(1.5);
+    let monitor_high = IdentityContinuityMonitor::with_threshold_for_testing(1.5);
     assert_eq!(monitor_high.crisis_threshold(), 1.0);
 
     // Test negative value clamping
-    let monitor_low = IdentityContinuityMonitor::with_threshold(-0.5);
+    let monitor_low = IdentityContinuityMonitor::with_threshold_for_testing(-0.5);
     assert_eq!(monitor_low.crisis_threshold(), 0.0);
 }
 
 #[test]
 fn test_identity_continuity_monitor_with_capacity() {
-    let monitor = IdentityContinuityMonitor::with_capacity(50);
+    let monitor = IdentityContinuityMonitor::with_capacity_for_testing(50);
 
     assert_eq!(monitor.history().max_size, 50);
     assert!(monitor.is_empty());
@@ -56,13 +57,13 @@ fn test_identity_continuity_monitor_default() {
     let monitor = IdentityContinuityMonitor::default();
 
     assert!(monitor.is_empty());
-    assert_eq!(monitor.crisis_threshold(), IC_CRISIS_THRESHOLD);
+    assert_eq!(monitor.crisis_threshold(), IC_CRITICAL_THRESHOLD);
     assert_eq!(monitor.history().max_size, MAX_PV_HISTORY_SIZE);
 }
 
 #[test]
 fn test_identity_continuity_monitor_first_vector() {
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
     let pv = uniform_pv(0.8);
 
     // BEFORE
@@ -89,7 +90,7 @@ fn test_identity_continuity_monitor_first_vector() {
 
 #[test]
 fn test_identity_continuity_monitor_second_vector_identical() {
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
     let pv = uniform_pv(0.8);
 
     // First vector
@@ -112,7 +113,7 @@ fn test_identity_continuity_monitor_second_vector_identical() {
 
 #[test]
 fn test_identity_continuity_monitor_drift_detection() {
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     // First vector - high values
     let pv1 = uniform_pv(0.9);
@@ -130,7 +131,7 @@ fn test_identity_continuity_monitor_drift_detection() {
 
 #[test]
 fn test_identity_continuity_monitor_real_drift() {
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     // First vector - realistic purpose vector
     let pv1 = [0.9, 0.85, 0.92, 0.8, 0.88, 0.75, 0.95, 0.82, 0.87, 0.78, 0.91, 0.83, 0.86];
@@ -149,7 +150,7 @@ fn test_identity_continuity_monitor_real_drift() {
 
 #[test]
 fn test_identity_continuity_monitor_low_kuramoto_r() {
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
     let pv = uniform_pv(0.8);
 
     // First vector
@@ -174,7 +175,7 @@ fn test_identity_continuity_monitor_low_kuramoto_r() {
 #[test]
 fn test_identity_continuity_monitor_crisis_threshold_custom() {
     // More strict threshold
-    let mut monitor = IdentityContinuityMonitor::with_threshold(0.9);
+    let mut monitor = IdentityContinuityMonitor::with_threshold_for_testing(0.9);
     let pv = uniform_pv(0.8);
 
     monitor.compute_continuity(&pv, 0.95, "First");
@@ -191,14 +192,14 @@ fn test_identity_continuity_monitor_crisis_threshold_custom() {
 
     // Standard threshold would not be crisis
     assert!(
-        result.identity_coherence >= IC_CRISIS_THRESHOLD,
+        result.identity_coherence >= IC_WARNING_THRESHOLD,
         "IC=0.85 >= standard threshold 0.7"
     );
 }
 
 #[test]
 fn test_identity_continuity_monitor_history_accumulation() {
-    let mut monitor = IdentityContinuityMonitor::with_capacity(5);
+    let mut monitor = IdentityContinuityMonitor::with_capacity_for_testing(5);
 
     // Add 7 vectors
     for i in 0..7 {
@@ -216,7 +217,7 @@ fn test_identity_continuity_monitor_history_accumulation() {
 
 #[test]
 fn test_identity_continuity_monitor_serialization() {
-    let mut original = IdentityContinuityMonitor::with_threshold(0.8);
+    let mut original = IdentityContinuityMonitor::with_threshold_for_testing(0.8);
     let pv1 = uniform_pv(0.75);
     let pv2 = uniform_pv(0.8);
     original.compute_continuity(&pv1, 0.9, "First");
@@ -238,7 +239,7 @@ fn test_identity_continuity_monitor_serialization() {
 
 #[test]
 fn test_identity_continuity_monitor_json_serialization() {
-    let mut original = IdentityContinuityMonitor::new();
+    let mut original = IdentityContinuityMonitor::new_for_testing();
     original.compute_continuity(&uniform_pv(0.7), 0.9, "Test");
 
     // Serialize to JSON

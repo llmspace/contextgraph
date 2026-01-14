@@ -240,28 +240,33 @@ async fn test_val_004_fuse_embeddings_uniform_fusion() {
 
     assert!(parsed["success"].as_bool().unwrap_or(false), "MUST succeed");
 
-    // Validate vector structure
-    let vector = &parsed["vector"];
-
-    let pv = vector["purpose_vector"]
+    // Validate new AlignmentFusionResult format (Constitution v5.0.0)
+    let pv = parsed["purpose_vector"]
         .as_array()
-        .expect("purpose_vector array");
-    let cc = vector["cross_correlations"]
-        .as_array()
-        .expect("cross_correlations array");
-    let ga = vector["group_alignments"]
-        .as_array()
-        .expect("group_alignments array");
+        .expect("purpose_vector array at top level");
+    let ga = &parsed["group_alignments"];
 
     // Log physical evidence
     eprintln!("=== PHYSICAL EVIDENCE: fuse_embeddings uniform fusion ===");
     eprintln!("Vector dimensions:");
     eprintln!("  - purpose_vector: {} elements (expected 13)", pv.len());
+    eprintln!("  - group_alignments: object with 4 groups");
     eprintln!(
-        "  - cross_correlations: {} elements (expected 78)",
-        cc.len()
+        "    - semantic: {}",
+        ga["semantic"].as_f64().unwrap_or(-1.0)
     );
-    eprintln!("  - group_alignments: {} elements (expected 6)", ga.len());
+    eprintln!(
+        "    - temporal: {}",
+        ga["temporal"].as_f64().unwrap_or(-1.0)
+    );
+    eprintln!(
+        "    - structural: {}",
+        ga["structural"].as_f64().unwrap_or(-1.0)
+    );
+    eprintln!(
+        "    - experiential: {}",
+        ga["experiential"].as_f64().unwrap_or(-1.0)
+    );
     eprintln!(
         "Confidence: {}",
         parsed["confidence"].as_f64().unwrap_or(-1.0)
@@ -273,10 +278,14 @@ async fn test_val_004_fuse_embeddings_uniform_fusion() {
     eprintln!("NOTE: Explicit alignments [0.8; 13] provided (all > 0.1 threshold)");
     eprintln!("==========================================================");
 
-    // CRITICAL: Verify exact dimensions
-    assert_eq!(pv.len(), 13, "purpose_vector MUST have 13 elements");
-    assert_eq!(cc.len(), 78, "cross_correlations MUST have 78 elements");
-    assert_eq!(ga.len(), 6, "group_alignments MUST have 6 elements");
+    // CRITICAL: Verify purpose_vector has 13 elements (one per embedder)
+    assert_eq!(pv.len(), 13, "purpose_vector MUST have 13 elements (one per embedder)");
+
+    // Verify group_alignments structure
+    assert!(ga.get("semantic").is_some(), "Must have semantic alignment");
+    assert!(ga.get("temporal").is_some(), "Must have temporal alignment");
+    assert!(ga.get("structural").is_some(), "Must have structural alignment");
+    assert!(ga.get("experiential").is_some(), "Must have experiential alignment");
 
     // Confidence must be in [0, 1]
     let confidence = parsed["confidence"].as_f64().expect("confidence");
@@ -291,6 +300,18 @@ async fn test_val_004_fuse_embeddings_uniform_fusion() {
         parsed["metadata"]["active_embedders"].as_u64(),
         Some(13),
         "active_embedders MUST be 13 when all alignments > 0.1 threshold"
+    );
+
+    // Verify constitution compliance markers
+    assert_eq!(
+        parsed["metadata"]["constitution_compliant"].as_bool(),
+        Some(true),
+        "Must be constitution compliant"
+    );
+    assert_eq!(
+        parsed["metadata"]["api_version"].as_str(),
+        Some("5.0.0"),
+        "Must use v5.0.0 API"
     );
 }
 

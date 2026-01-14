@@ -287,15 +287,22 @@ async fn test_fuse_embeddings_basic() {
         "Should succeed"
     );
 
-    // Verify vector is returned
-    assert!(parsed.get("vector").is_some(), "Must have vector");
-    let vector = &parsed["vector"];
+    // Verify new AlignmentFusionResult format (Constitution v5.0.0)
+    assert!(
+        parsed.get("purpose_vector").is_some(),
+        "Must have purpose_vector at top level"
+    );
+    assert!(
+        parsed.get("group_alignments").is_some(),
+        "Must have group_alignments at top level"
+    );
 
-    // Check vector components exist
-    assert!(vector.get("purpose_vector").is_some());
-    assert!(vector.get("cross_correlations").is_some());
-    assert!(vector.get("group_alignments").is_some());
-    assert!(vector.get("confidence").is_some());
+    // Check group_alignments structure
+    let group_alignments = &parsed["group_alignments"];
+    assert!(group_alignments.get("semantic").is_some());
+    assert!(group_alignments.get("temporal").is_some());
+    assert!(group_alignments.get("structural").is_some());
+    assert!(group_alignments.get("experiential").is_some());
 
     // Verify confidence in valid range
     let confidence = parsed["confidence"].as_f64().expect("confidence");
@@ -303,6 +310,11 @@ async fn test_fuse_embeddings_basic() {
         (0.0..=1.0).contains(&confidence),
         "Confidence should be [0,1]"
     );
+
+    // Verify metadata has new fields
+    let metadata = &parsed["metadata"];
+    assert!(metadata.get("constitution_compliant").is_some());
+    assert!(metadata.get("api_version").is_some());
 }
 
 #[tokio::test]

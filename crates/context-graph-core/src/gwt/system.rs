@@ -119,8 +119,16 @@ impl GwtSystem {
 
         // Create and register listeners
         // TECH-GWT-IC-001: Wire TriggerManager to DreamEventListener for IC-based dream triggering
-        let dream_listener = DreamEventListener::new(Arc::clone(&dream_queue))
-            .with_trigger_manager(Arc::clone(&trigger_manager));
+        // AP-26: TriggerManager and callback are REQUIRED - no optional wiring
+        let dream_consolidation_callback: crate::gwt::listeners::DreamConsolidationCallback = Arc::new(|reason| {
+            // Log dream trigger for now - production may want to integrate with dream orchestrator
+            tracing::info!("Dream consolidation triggered: {:?}", reason);
+        });
+        let dream_listener = DreamEventListener::new(
+            Arc::clone(&dream_queue),
+            Arc::clone(&trigger_manager),
+            dream_consolidation_callback,
+        );
         let neuromod_listener = NeuromodulationEventListener::new(Arc::clone(&neuromod_manager));
         let meta_listener = MetaCognitiveEventListener::new(
             Arc::clone(&meta_cognitive),

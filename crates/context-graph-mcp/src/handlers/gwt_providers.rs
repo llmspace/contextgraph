@@ -21,7 +21,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use context_graph_core::error::CoreResult;
 use context_graph_core::gwt::{
-    ego_node::{CrisisDetectionResult, IdentityContinuity, IdentityContinuityMonitor, IdentityStatus},
+    ego_node::{CrisisDetectionResult, IcCrisisCallback, IdentityContinuity, IdentityContinuityMonitor, IdentityStatus},
     ConsciousnessCalculator, ConsciousnessMetrics, ConsciousnessState, GlobalWorkspace,
     MetaCognitiveLoop, MetaCognitiveState, SelfEgoNode, StateMachineManager, StateTransition,
 };
@@ -156,6 +156,18 @@ pub struct GwtSystemProviderImpl {
     identity_monitor: Arc<TokioRwLock<IdentityContinuityMonitor>>,
 }
 
+/// Test-only: Create a noop callback for isolated monitors
+///
+/// This callback does nothing but satisfies the AP-26 requirement.
+/// Uses a named function to avoid HRTB lifetime issues with closures.
+#[cfg(test)]
+fn noop_callback_for_tests() -> IcCrisisCallback {
+    fn noop(_: &CrisisDetectionResult) {
+        // No-op: test callback that does nothing
+    }
+    Arc::new(noop)
+}
+
 impl GwtSystemProviderImpl {
     /// Create with shared monitor reference (PREFERRED for production)
     ///
@@ -196,7 +208,11 @@ impl GwtSystemProviderImpl {
         Self {
             calculator: ConsciousnessCalculator::new(),
             state_machine: RwLock::new(StateMachineManager::new()),
-            identity_monitor: Arc::new(TokioRwLock::new(IdentityContinuityMonitor::new())),
+            // Create noop callback for test-only isolated monitor
+            // This monitor is NOT connected to any DreamEventListener
+            identity_monitor: Arc::new(TokioRwLock::new(IdentityContinuityMonitor::new(
+                noop_callback_for_tests()
+            ))),
         }
     }
 }

@@ -10,23 +10,48 @@ use std::time::Duration;
 /// Reference: constitution.yaml line 390 (identity_trajectory: 1000)
 pub const MAX_PV_HISTORY_SIZE: usize = 1000;
 
-/// Default crisis threshold per constitution.yaml line 369
-/// IC < 0.7 indicates identity drift (warning/degraded state)
-pub const IC_CRISIS_THRESHOLD: f32 = 0.7;
-
-/// Critical threshold triggering dream consolidation per constitution.yaml line 369
-/// IC < 0.5 triggers introspective dream (critical state)
+/// IC threshold for CRITICAL status (IC < this = CRITICAL, triggers dream).
+///
+/// Per IDENTITY-002: IC < 0.5 is CRITICAL and MUST trigger dream consolidation.
+///
+/// # Constitution Reference
+///
+/// - IDENTITY-002: IC < 0.5 = CRITICAL
+/// - IDENTITY-007: IC < 0.5 -> auto-trigger dream
+/// - GWT-003: IC < 0.5 -> dream consolidation
+/// - AP-26: No silent failures on IC crisis
 pub const IC_CRITICAL_THRESHOLD: f32 = 0.5;
+
+/// IC threshold for WARNING status.
+///
+/// Per IDENTITY-002: IC in [0.7, 0.9) is WARNING.
+pub const IC_WARNING_THRESHOLD: f32 = 0.7;
+
+/// IC threshold for HEALTHY status.
+///
+/// Per IDENTITY-002: IC >= 0.9 is HEALTHY.
+pub const IC_HEALTHY_THRESHOLD: f32 = 0.9;
+
+/// Cooldown between crisis events to prevent spam.
+///
+/// Per TASK-IDENTITY-P0-004: Crisis Detection
+pub const CRISIS_EVENT_COOLDOWN: Duration = Duration::from_millis(1000);
+
+// DEPRECATED: Alias for backwards compatibility during migration
+/// Default crisis threshold per constitution.yaml line 369.
+/// IC < 0.7 indicates identity drift (warning/degraded state).
+///
+/// **DEPRECATED**: Use `IC_CRITICAL_THRESHOLD` for critical (< 0.5) or
+/// `IC_WARNING_THRESHOLD` for warning (< 0.7) checks.
+#[deprecated(
+    since = "5.0.0",
+    note = "Use IC_CRITICAL_THRESHOLD (0.5) for critical checks or IC_WARNING_THRESHOLD (0.7) for degraded checks"
+)]
+pub const IC_CRISIS_THRESHOLD: f32 = IC_WARNING_THRESHOLD;
 
 /// Epsilon for numerical stability in magnitude comparisons
 /// Prevents division by zero in cosine similarity calculation
 pub(crate) const COSINE_EPSILON: f32 = 1e-8;
-
-/// Minimum time between crisis event emissions (30 seconds)
-/// Prevents event spam during IC fluctuations
-/// Per constitution.yaml: throttle workspace events
-/// TASK-IDENTITY-P0-004: Crisis Detection
-pub const CRISIS_EVENT_COOLDOWN: Duration = Duration::from_secs(30);
 
 /// Snapshot of purpose vector at a point in time
 ///

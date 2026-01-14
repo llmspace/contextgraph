@@ -73,7 +73,7 @@ fn fsv_purpose_vector_history_full_lifecycle() {
 
 #[test]
 fn fsv_identity_continuity_monitor_complete_lifecycle() {
-    let mut monitor = IdentityContinuityMonitor::with_capacity(10);
+    let mut monitor = IdentityContinuityMonitor::with_capacity_for_testing(10);
     assert!(monitor.is_empty());
     assert_eq!(monitor.history_len(), 0);
     assert!(monitor.last_result().is_none());
@@ -112,7 +112,7 @@ fn fsv_identity_continuity_monitor_complete_lifecycle() {
 
 #[test]
 fn fsv_identity_continuity_monitor_edge_cases() {
-    let mut monitor1 = IdentityContinuityMonitor::new();
+    let mut monitor1 = IdentityContinuityMonitor::new_for_testing();
     let pv_pos = uniform_pv(1.0);
     let pv_neg = uniform_pv(-1.0);
 
@@ -123,7 +123,7 @@ fn fsv_identity_continuity_monitor_edge_cases() {
     assert_eq!(result1.identity_coherence, 0.0);
     assert_eq!(result1.status, IdentityStatus::Critical);
 
-    let mut monitor2 = IdentityContinuityMonitor::new();
+    let mut monitor2 = IdentityContinuityMonitor::new_for_testing();
     let pv = uniform_pv(0.8);
 
     monitor2.compute_continuity(&pv, 0.9, "First");
@@ -132,14 +132,14 @@ fn fsv_identity_continuity_monitor_edge_cases() {
     assert_eq!(result2.identity_coherence, 0.0);
     assert_eq!(result2.status, IdentityStatus::Critical);
 
-    let mut monitor3 = IdentityContinuityMonitor::new();
+    let mut monitor3 = IdentityContinuityMonitor::new_for_testing();
     monitor3.compute_continuity(&uniform_pv(1.0), 1.0, "First");
     let result3 = monitor3.compute_continuity(&uniform_pv(1.0), 1.0, "Perfect");
 
     assert_eq!(result3.identity_coherence, 1.0);
     assert_eq!(result3.status, IdentityStatus::Healthy);
 
-    let mut monitor4 = IdentityContinuityMonitor::new();
+    let mut monitor4 = IdentityContinuityMonitor::new_for_testing();
     monitor4.compute_continuity(&uniform_pv(0.8), 1.0, "First");
     let result4 = monitor4.compute_continuity(&uniform_pv(0.8), 0.7, "Boundary");
 

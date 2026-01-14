@@ -58,11 +58,28 @@ impl IdentityContinuityListener {
     ///
     /// # Returns
     /// New `IdentityContinuityListener` instance
+    ///
+    /// # Constitution Compliance
+    ///
+    /// Per AP-26, IDENTITY-007: The IC monitor's crisis callback logs the event.
+    /// The actual dream consolidation is triggered via `WorkspaceEvent::IdentityCritical`
+    /// which is emitted separately by this listener and handled by `DreamEventListener`.
     pub fn new(
         ego_node: Arc<RwLock<SelfEgoNode>>,
         broadcaster: Arc<WorkspaceEventBroadcaster>,
     ) -> Self {
-        let monitor = Arc::new(RwLock::new(IdentityContinuityMonitor::new()));
+        // Create crisis callback that logs IC crisis events
+        // Dream consolidation is triggered via WorkspaceEvent::IdentityCritical (emitted below)
+        let crisis_callback: crate::gwt::ego_node::IcCrisisCallback = Arc::new(|result| {
+            tracing::warn!(
+                "IC crisis callback: IC={:.3} status={:?}->{:?}",
+                result.identity_coherence,
+                result.previous_status,
+                result.current_status,
+            );
+        });
+
+        let monitor = Arc::new(RwLock::new(IdentityContinuityMonitor::new(crisis_callback)));
         let protocol = Arc::new(CrisisProtocol::new(ego_node));
 
         Self {

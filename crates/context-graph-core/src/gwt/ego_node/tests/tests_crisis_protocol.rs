@@ -47,7 +47,7 @@ async fn test_protocol_healthy_no_action() {
 
     let ego = create_test_ego();
     let protocol = CrisisProtocol::new(ego.clone());
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     let detection = create_detection(0.95, IdentityStatus::Healthy, IdentityStatus::Healthy, true);
 
@@ -80,7 +80,7 @@ async fn test_protocol_warning_snapshot_only() {
 
     let ego = create_test_ego();
     let protocol = CrisisProtocol::new(ego.clone());
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     let detection = create_detection(0.75, IdentityStatus::Healthy, IdentityStatus::Warning, true);
 
@@ -125,7 +125,7 @@ async fn test_protocol_critical_event_emitted() {
 
     let ego = create_test_ego();
     let protocol = CrisisProtocol::new(ego.clone());
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     let detection = create_detection(
         0.30,
@@ -175,7 +175,7 @@ async fn test_protocol_critical_cooldown_blocks() {
 
     let ego = create_test_ego();
     let protocol = CrisisProtocol::new(ego.clone());
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     let detection = create_detection(
         0.30,
@@ -263,7 +263,7 @@ async fn test_protocol_direct_to_critical() {
 
     let ego = create_test_ego();
     let protocol = CrisisProtocol::new(ego.clone());
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     let detection = create_detection(0.20, IdentityStatus::Healthy, IdentityStatus::Critical, true);
 
@@ -285,7 +285,7 @@ async fn test_protocol_degraded_snapshot_no_event() {
 
     let ego = create_test_ego();
     let protocol = CrisisProtocol::new(ego.clone());
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     let detection = create_detection(
         0.55, // IC in Degraded range (0.5-0.7)
@@ -320,7 +320,7 @@ async fn test_event_reason_entering_critical() {
 
     let ego = create_test_ego();
     let protocol = CrisisProtocol::new(ego);
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     let result = protocol.execute(detection, &mut monitor).await.unwrap();
 
@@ -347,7 +347,7 @@ async fn test_event_reason_remains_critical() {
 
     let ego = create_test_ego();
     let protocol = CrisisProtocol::new(ego);
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     let result = protocol.execute(detection, &mut monitor).await.unwrap();
 
@@ -365,7 +365,7 @@ async fn test_cooldown_remaining_calculation() {
 
     let ego = create_test_ego();
     let protocol = CrisisProtocol::new(ego.clone());
-    let mut monitor = IdentityContinuityMonitor::new();
+    let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     // Simulate 5 seconds since last event, cooldown is 30 seconds
     let elapsed = Duration::from_secs(5);

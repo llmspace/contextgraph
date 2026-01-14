@@ -4,7 +4,11 @@
 
 #![allow(clippy::assertions_on_constants)] // Intentional assertions on constant thresholds for documentation
 
-use super::super::{cosine_similarity_13d, IC_CRISIS_THRESHOLD, IC_CRITICAL_THRESHOLD};
+use super::super::{
+    cosine_similarity_13d, IC_CRITICAL_THRESHOLD, IC_HEALTHY_THRESHOLD, IC_WARNING_THRESHOLD,
+};
+#[allow(deprecated)]
+use super::super::IC_CRISIS_THRESHOLD;
 
 #[test]
 fn test_cosine_similarity_13d_identical_vectors() {
@@ -165,32 +169,96 @@ fn test_cosine_similarity_13d_clamping() {
 }
 
 // =========================================================================
-// IC Threshold Constants Tests
+// IC Threshold Constants Tests (IDENTITY-002)
 // =========================================================================
 
 #[test]
-fn test_ic_crisis_threshold_value() {
+fn test_ic_critical_threshold_value() {
+    // Per IDENTITY-002: IC < 0.5 = CRITICAL
     assert_eq!(
-        IC_CRISIS_THRESHOLD, 0.7,
-        "IC_CRISIS_THRESHOLD should be 0.7 per constitution.yaml"
+        IC_CRITICAL_THRESHOLD, 0.5,
+        "IC_CRITICAL_THRESHOLD should be 0.5 per IDENTITY-002"
     );
 }
 
 #[test]
-fn test_ic_critical_threshold_value() {
+fn test_ic_warning_threshold_value() {
+    // Per IDENTITY-002: IC in [0.7, 0.9) = WARNING
     assert_eq!(
-        IC_CRITICAL_THRESHOLD, 0.5,
-        "IC_CRITICAL_THRESHOLD should be 0.5 per constitution.yaml"
+        IC_WARNING_THRESHOLD, 0.7,
+        "IC_WARNING_THRESHOLD should be 0.7 per IDENTITY-002"
+    );
+}
+
+#[test]
+fn test_ic_healthy_threshold_value() {
+    // Per IDENTITY-002: IC >= 0.9 = HEALTHY
+    assert_eq!(
+        IC_HEALTHY_THRESHOLD, 0.9,
+        "IC_HEALTHY_THRESHOLD should be 0.9 per IDENTITY-002"
+    );
+}
+
+#[test]
+#[allow(deprecated)]
+fn test_ic_crisis_threshold_deprecated_alias() {
+    // IC_CRISIS_THRESHOLD is deprecated, but should equal IC_WARNING_THRESHOLD for backwards compat
+    assert_eq!(
+        IC_CRISIS_THRESHOLD, IC_WARNING_THRESHOLD,
+        "Deprecated IC_CRISIS_THRESHOLD should equal IC_WARNING_THRESHOLD"
     );
 }
 
 #[test]
 fn test_ic_thresholds_relationship() {
-    // Critical should be lower than crisis (more severe)
+    // Thresholds should be properly ordered: CRITICAL < WARNING < HEALTHY
     assert!(
-        IC_CRITICAL_THRESHOLD < IC_CRISIS_THRESHOLD,
-        "CRITICAL ({}) must be < CRISIS ({})",
+        IC_CRITICAL_THRESHOLD < IC_WARNING_THRESHOLD,
+        "CRITICAL ({}) must be < WARNING ({})",
         IC_CRITICAL_THRESHOLD,
-        IC_CRISIS_THRESHOLD
+        IC_WARNING_THRESHOLD
+    );
+    assert!(
+        IC_WARNING_THRESHOLD < IC_HEALTHY_THRESHOLD,
+        "WARNING ({}) must be < HEALTHY ({})",
+        IC_WARNING_THRESHOLD,
+        IC_HEALTHY_THRESHOLD
+    );
+}
+
+#[test]
+fn test_ic_threshold_status_classification() {
+    // Per IDENTITY-002 constitution rule:
+    // IC < 0.5 = CRITICAL (must trigger dream consolidation)
+    // IC in [0.5, 0.7) = DEGRADED
+    // IC in [0.7, 0.9) = WARNING
+    // IC >= 0.9 = HEALTHY
+
+    // Test boundary: 0.49 is CRITICAL
+    let ic_critical = 0.49_f32;
+    assert!(
+        ic_critical < IC_CRITICAL_THRESHOLD,
+        "IC=0.49 should be CRITICAL (< 0.5)"
+    );
+
+    // Test boundary: 0.50 is DEGRADED (not CRITICAL)
+    let ic_degraded = 0.50_f32;
+    assert!(
+        ic_degraded >= IC_CRITICAL_THRESHOLD && ic_degraded < IC_WARNING_THRESHOLD,
+        "IC=0.50 should be DEGRADED ([0.5, 0.7))"
+    );
+
+    // Test boundary: 0.70 is WARNING
+    let ic_warning = 0.70_f32;
+    assert!(
+        ic_warning >= IC_WARNING_THRESHOLD && ic_warning < IC_HEALTHY_THRESHOLD,
+        "IC=0.70 should be WARNING ([0.7, 0.9))"
+    );
+
+    // Test boundary: 0.90 is HEALTHY
+    let ic_healthy = 0.90_f32;
+    assert!(
+        ic_healthy >= IC_HEALTHY_THRESHOLD,
+        "IC=0.90 should be HEALTHY (>= 0.9)"
     );
 }

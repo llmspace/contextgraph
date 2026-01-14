@@ -43,10 +43,15 @@ pub use crisis_protocol::{
     CrisisAction, CrisisProtocol, CrisisProtocolResult, IdentityCrisisEvent,
 };
 pub use identity_continuity::IdentityContinuity;
-pub use monitor::{CrisisDetectionResult, IdentityContinuityMonitor};
+pub use monitor::{
+    CrisisDetectionResult, IcCrisisCallback, IdentityContinuityMonitor, OptionalIcCrisisCallback,
+};
 pub use purpose_vector_history::{PurposeVectorHistory, PurposeVectorHistoryProvider};
 pub use self_ego_node::SelfEgoNode;
 pub use types::{
     IdentityStatus, PurposeSnapshot, SelfReflectionResult, CRISIS_EVENT_COOLDOWN,
-    IC_CRISIS_THRESHOLD, IC_CRITICAL_THRESHOLD, MAX_PV_HISTORY_SIZE,
+    IC_CRITICAL_THRESHOLD, IC_HEALTHY_THRESHOLD, IC_WARNING_THRESHOLD, MAX_PV_HISTORY_SIZE,
 };
+// Re-export deprecated constant for backwards compatibility
+#[allow(deprecated)]
+pub use types::IC_CRISIS_THRESHOLD;
