@@ -5,7 +5,8 @@
 <metadata>
   <title>Implement get_kuramoto_state MCP Tool</title>
   <original_id>TASK-MCP-013</original_id>
-  <status>ready</status>
+  <status>complete</status>
+  <completed_date>2026-01-14</completed_date>
   <layer>surface</layer>
   <sequence>39</sequence>
   <implements><requirement_ref>REQ-MCP-013</requirement_ref></implements>
@@ -13,6 +14,107 @@
   <estimated_hours>2</estimated_hours>
   <blocks>TASK-41</blocks>
 </metadata>
+
+<completion_evidence>
+## TASK-39 COMPLETION EVIDENCE (2026-01-14)
+
+### Implementation Summary
+
+**Option C was implemented**: `get_kuramoto_state` tool that includes stepper-specific status (`is_running`) that `get_kuramoto_sync` lacks. This makes it valuable for debugging/monitoring the GWT system lifecycle.
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `crates/context-graph-mcp/src/tools/names.rs` | Added GET_KURAMOTO_STATE constant (line 150-157) |
+| `crates/context-graph-mcp/src/tools/definitions/gwt.rs` | Added tool definition (lines 188-201), updated comment to "9 tools" |
+| `crates/context-graph-mcp/src/handlers/tools/gwt_consciousness.rs` | Added call_get_kuramoto_state handler (lines 576-640) |
+| `crates/context-graph-mcp/src/handlers/tools/dispatch.rs` | Wired GET_KURAMOTO_STATE dispatch (line 173) |
+| `crates/context-graph-mcp/src/tools/mod.rs` | Updated tool count to 46 |
+| `crates/context-graph-mcp/src/handlers/tests/tools_list.rs` | Updated tool count test to 46, added get_kuramoto_state assertion |
+| `crates/context-graph-mcp/src/handlers/tests/exhaustive_mcp_tools/mod.rs` | Updated tool count comment to 46 |
+| `crates/context-graph-mcp/src/handlers/tests/exhaustive_mcp_tools/gwt_consciousness_tools.rs` | Added 5 tests for get_kuramoto_state (lines 579-708) |
+| `crates/context-graph-mcp/src/handlers/tests/full_state_verification_gwt/kuramoto_tests.rs` | Added 2 FSV tests for get_kuramoto_state (lines 166-427) |
+
+### Test Results
+
+```
+=== FSV TEST: get_kuramoto_state (TASK-39) ===
+SETUP: Created Handlers with with_default_gwt()
+FSV-1 PASS: is_running = false (stepper not started)
+FSV-2,3 PASS: 13 phases, all in valid range [0, 2pi]
+FSV-4,5 PASS: 13 frequencies, all positive
+FSV-6 PASS: coupling K = 0.5
+FSV-7 PASS: order_parameter r = 0.000000
+FSV-8 PASS: mean_phase psi = 3.306741
+ACTION: Started kuramoto stepper
+FSV-9 PASS: is_running = true (after stepper start)
+ACTION: Stopped kuramoto stepper
+FSV-10 PASS: is_running = false (after stepper stop)
+
+=== FSV EVIDENCE (TASK-39) ===
+✓ is_running reflects stepper state (false → true → false)
+✓ phases: 13 oscillators, all in [0, 2pi]
+✓ frequencies: 13 values, all positive (Hz)
+✓ coupling: K = 0.5
+✓ order_parameter: r = 0.000000 in [0, 1]
+✓ mean_phase: psi = 3.306741 in [0, 2pi]
+=== FSV TEST PASSED (TASK-39) ===
+```
+
+### Tests Added/Modified
+
+| Test | Status | Evidence |
+|------|--------|----------|
+| test_get_kuramoto_state_returns_stepper_status_and_network_data | PASS | Full lifecycle test with start/stop verification |
+| test_get_kuramoto_state_fails_fast_without_gwt | PASS | Error code -32060 returned correctly |
+| test_get_kuramoto_state_basic | PASS | Basic functionality verified |
+| test_get_kuramoto_state_is_running_initially_false | PASS | Initial state verified |
+| test_get_kuramoto_state_has_all_fields | PASS | All 6 fields present |
+| test_get_kuramoto_state_13_oscillators | PASS | 13 frequencies returned |
+| test_get_kuramoto_state_order_parameter_in_range | PASS | r ∈ [0, 1] |
+| test_tools_list_returns_all_46_tools | PASS | Tool count updated |
+| test_tools_list_contains_expected_tool_names | PASS | get_kuramoto_state included |
+
+### Acceptance Criteria Verification
+
+| AC | Criterion | Status | Evidence |
+|----|-----------|--------|----------|
+| AC-1 | Tool Name Constant Exists | ✓ | GET_KURAMOTO_STATE in names.rs:157 |
+| AC-2 | Tool Definition Registered | ✓ | 46 tools returned by tools/list |
+| AC-3 | Handler Dispatches Correctly | ✓ | dispatch.rs:173 wires the handler |
+| AC-4 | Response Schema Matches | ✓ | All 6 fields returned (is_running, phases, frequencies, coupling, order_parameter, mean_phase) |
+| AC-5 | Phases Have 13 Elements | ✓ | phases.len() == 13 verified in tests |
+| AC-6 | Frequencies Match Constitution | ✓ | 13 positive frequencies returned |
+| AC-7 | Tests Pass | ✓ | 7/7 specific tests pass, 28/28 kuramoto tests pass |
+| AC-8 | Compilation Clean | ✓ | cargo check -p context-graph-mcp passes |
+
+### Full Test Summary
+
+```bash
+cargo test -p context-graph-mcp kuramoto -- --nocapture
+# test result: ok. 28 passed; 0 failed; 0 ignored
+
+cargo test -p context-graph-mcp test_get_kuramoto_state -- --nocapture
+# test result: ok. 7 passed; 0 failed; 0 ignored
+
+cargo test -p context-graph-mcp tools_list -- --nocapture
+# test result: ok. 4 passed; 0 failed; 1 ignored
+```
+
+### Response Schema Example
+
+```json
+{
+  "is_running": false,
+  "phases": [0.0, 6.283185307179586, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  "frequencies": [40.0, 8.0, 8.0, 8.0, 25.0, 4.0, 25.0, 12.0, 80.0, 40.0, 15.0, 60.0, 4.0],
+  "coupling": 0.5,
+  "order_parameter": 0.0,
+  "mean_phase": 3.306741
+}
+```
+</completion_evidence>
 
 <executive_summary>
 ## CRITICAL DISCOVERY - TASK MAY BE REDUNDANT

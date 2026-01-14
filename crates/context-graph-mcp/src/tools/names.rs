@@ -146,3 +146,12 @@ pub const GET_COHERENCE_STATE: &str = "get_coherence_state";
 /// a minimal snapshot for monitoring identity health without bulk data.
 /// Requires GWT providers to be initialized via with_gwt() constructor.
 pub const GET_IDENTITY_CONTINUITY: &str = "get_identity_continuity";
+
+// ========== KURAMOTO STATE TOOL (TASK-39) ==========
+
+/// TASK-39: Get detailed Kuramoto network state including stepper status.
+/// Unlike get_kuramoto_sync (network data only), this includes is_running
+/// which indicates whether the KuramotoStepper background task is active.
+/// Returns: is_running, phases (13), frequencies (13), coupling, order_parameter, mean_phase.
+/// Requires GWT providers to be initialized via with_gwt() constructor.
+pub const GET_KURAMOTO_STATE: &str = "get_kuramoto_state";

@@ -2,11 +2,12 @@
 //! TASK-GWT-001: Consciousness state, Kuramoto sync, workspace, ego, broadcast, coupling.
 //! TASK-34: High-level coherence state tool.
 //! TASK-38: Identity continuity focused tool.
+//! TASK-39: Kuramoto state with stepper status tool.
 
 use serde_json::json;
 use crate::tools::types::ToolDefinition;
 
-/// Returns GWT tool definitions (8 tools).
+/// Returns GWT tool definitions (9 tools).
 pub fn definitions() -> Vec<ToolDefinition> {
     vec![
         // get_consciousness_state - GWT consciousness state (TASK-GWT-001)
@@ -180,6 +181,21 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "description": "Include recent IC history values (optional, up to 10 entries)"
                     }
                 },
+                "required": []
+            }),
+        ),
+
+        // get_kuramoto_state - Kuramoto state with stepper status (TASK-39)
+        ToolDefinition::new(
+            "get_kuramoto_state",
+            "Get detailed Kuramoto oscillator network state including stepper running status. \
+             Returns is_running (stepper active), phases (13 oscillator phases), frequencies \
+             (13 natural frequencies), coupling (K), order_parameter (r), mean_phase (psi). \
+             Unlike get_kuramoto_sync, includes stepper lifecycle status for debugging/monitoring. \
+             Requires GWT providers to be initialized via with_gwt() constructor.",
+            json!({
+                "type": "object",
+                "properties": {},
                 "required": []
             }),
         ),

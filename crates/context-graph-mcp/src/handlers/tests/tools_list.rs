@@ -5,7 +5,7 @@ use crate::protocol::JsonRpcId;
 use super::{create_test_handlers, make_request};
 
 #[tokio::test]
-async fn test_tools_list_returns_all_44_tools() {
+async fn test_tools_list_returns_all_46_tools() {
     let handlers = create_test_handlers();
     let request = make_request("tools/list", Some(JsonRpcId::Number(1)), None);
 
@@ -24,9 +24,9 @@ async fn test_tools_list_returns_all_44_tools() {
         .as_array()
         .expect("tools must be an array");
 
-    // Verify exactly 45 tools returned:
+    // Verify exactly 46 tools returned:
     // Core 6: inject_context, store_memory, get_memetic_status, get_graph_manifest, search_graph, utl_status
-    // GWT 8: get_consciousness_state, get_kuramoto_sync, get_workspace_status, get_ego_state, trigger_workspace_broadcast, adjust_coupling, get_coherence_state (TASK-34), get_identity_continuity (TASK-38)
+    // GWT 9: get_consciousness_state, get_kuramoto_sync, get_workspace_status, get_ego_state, trigger_workspace_broadcast, adjust_coupling, get_coherence_state (TASK-34), get_identity_continuity (TASK-38), get_kuramoto_state (TASK-39)
     // ATC 3 (TASK-ATC-001): get_threshold_status, get_calibration_metrics, trigger_recalibration
     // Dream 5 (TASK-DREAM-MCP, TASK-37): trigger_dream, get_dream_status, abort_dream, get_amortized_shortcuts, get_gpu_status
     // Neuromod 2 (TASK-NEUROMOD-MCP): get_neuromodulation_state, adjust_neuromodulator
@@ -42,8 +42,8 @@ async fn test_tools_list_returns_all_44_tools() {
     // Johari 1 (TASK-MCP-005): get_johari_classification
     assert_eq!(
         tools.len(),
-        45,
-        "Must return exactly 45 tools, got {}",
+        46,
+        "Must return exactly 46 tools, got {}",
         tools.len()
     );
 }
@@ -190,5 +190,11 @@ async fn test_tools_list_contains_expected_tool_names() {
     assert!(
         tool_names.contains(&"get_identity_continuity"),
         "Missing get_identity_continuity tool (TASK-38)"
+    );
+
+    // Verify kuramoto state tool is present (TASK-39)
+    assert!(
+        tool_names.contains(&"get_kuramoto_state"),
+        "Missing get_kuramoto_state tool (TASK-39)"
     );
 }

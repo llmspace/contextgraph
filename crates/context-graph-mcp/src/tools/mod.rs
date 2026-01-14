@@ -41,11 +41,12 @@ mod tests {
         // + 1 Epistemic tool (TASK-MCP-001) = 43 total
         // + 1 Merge tool (TASK-MCP-003) = 44 total
         // + 1 Johari classification tool (TASK-MCP-005) = 45 total
-        // NOTE: GWT now has 8 tools (TASK-33/34 added get_coherence_state, TASK-38 added get_identity_continuity)
+        // + 1 Kuramoto state tool (TASK-39) = 46 total
+        // NOTE: GWT now has 9 tools (TASK-33/34 added get_coherence_state, TASK-38 added get_identity_continuity, TASK-39 added get_kuramoto_state)
         // NOTE: Dream now has 5 tools (TASK-37 added get_gpu_status)
         // NOTE: 6 manual North Star tools REMOVED (created single 1024D embeddings
         // incompatible with 13-embedder teleological arrays)
-        assert_eq!(tools.len(), 45);
+        assert_eq!(tools.len(), 46);
 
         let tool_names: Vec<_> = tools.iter().map(|t| t.name.as_str()).collect();
 

@@ -1,4 +1,4 @@
-//! GWT/Consciousness MCP tools tests (7 tools):
+//! GWT/Consciousness MCP tools tests (9 tools):
 //! - get_consciousness_state
 //! - get_kuramoto_sync
 //! - get_workspace_status
@@ -6,6 +6,8 @@
 //! - trigger_workspace_broadcast
 //! - adjust_coupling
 //! - get_coherence_state (TASK-34)
+//! - get_identity_continuity (TASK-38)
+//! - get_kuramoto_state (TASK-39)
 
 use serde_json::json;
 use uuid::Uuid;
@@ -571,5 +573,136 @@ async fn test_get_coherence_state_exclude_phases_explicitly() {
     assert!(
         phases.is_none() || phases.unwrap().is_null(),
         "phases should be null when include_phases=false"
+    );
+}
+
+// -------------------------------------------------------------------------
+// get_kuramoto_state (TASK-39)
+// -------------------------------------------------------------------------
+
+/// TASK-39: Basic test for get_kuramoto_state tool.
+/// Unlike get_kuramoto_sync, this includes is_running for stepper status.
+#[tokio::test]
+async fn test_get_kuramoto_state_basic() {
+    let handlers = create_test_handlers_with_warm_gwt();
+    let request = make_tool_call("get_kuramoto_state", json!({}));
+
+    let response = handlers.dispatch(request).await;
+    assert_success(&response, "get_kuramoto_state");
+
+    let data = get_tool_data(&response);
+
+    // Must have is_running field (unique to get_kuramoto_state)
+    let is_running = data.get("is_running");
+    assert!(is_running.is_some(), "Must have is_running field");
+    assert!(
+        is_running.unwrap().is_boolean(),
+        "is_running must be boolean"
+    );
+
+    // Must have 13 phases
+    let phases = data
+        .get("phases")
+        .expect("Must have phases")
+        .as_array()
+        .expect("phases must be array");
+    assert_eq!(
+        phases.len(),
+        synthetic_data::kuramoto::NUM_OSCILLATORS,
+        "Must have exactly 13 oscillator phases"
+    );
+}
+
+/// TASK-39: Verify is_running reflects stepper state.
+/// Initially false (stepper not started).
+#[tokio::test]
+async fn test_get_kuramoto_state_is_running_initially_false() {
+    let handlers = create_test_handlers_with_warm_gwt();
+    let request = make_tool_call("get_kuramoto_state", json!({}));
+
+    let response = handlers.dispatch(request).await;
+    assert_success(&response, "get_kuramoto_state");
+
+    let data = get_tool_data(&response);
+    let is_running = data
+        .get("is_running")
+        .expect("Must have is_running")
+        .as_bool()
+        .expect("is_running must be bool");
+
+    // Initially false - stepper not started
+    assert!(!is_running, "is_running should be false initially");
+}
+
+/// TASK-39: Verify all expected fields are returned.
+#[tokio::test]
+async fn test_get_kuramoto_state_has_all_fields() {
+    let handlers = create_test_handlers_with_warm_gwt();
+    let request = make_tool_call("get_kuramoto_state", json!({}));
+
+    let response = handlers.dispatch(request).await;
+    assert_success(&response, "get_kuramoto_state");
+
+    let data = get_tool_data(&response);
+
+    // Verify all required fields exist
+    assert!(data.get("is_running").is_some(), "Missing is_running");
+    assert!(data.get("phases").is_some(), "Missing phases");
+    assert!(data.get("frequencies").is_some(), "Missing frequencies");
+    assert!(data.get("coupling").is_some(), "Missing coupling");
+    assert!(
+        data.get("order_parameter").is_some(),
+        "Missing order_parameter"
+    );
+    assert!(data.get("mean_phase").is_some(), "Missing mean_phase");
+}
+
+/// TASK-39: Verify 13 oscillators with valid frequencies.
+#[tokio::test]
+async fn test_get_kuramoto_state_13_oscillators() {
+    let handlers = create_test_handlers_with_warm_gwt();
+    let request = make_tool_call("get_kuramoto_state", json!({}));
+
+    let response = handlers.dispatch(request).await;
+    assert_success(&response, "get_kuramoto_state");
+
+    let data = get_tool_data(&response);
+
+    // Verify 13 frequencies
+    let frequencies = data
+        .get("frequencies")
+        .expect("Must have frequencies")
+        .as_array()
+        .expect("frequencies must be array");
+    assert_eq!(frequencies.len(), 13, "Must have exactly 13 frequencies");
+
+    // All frequencies must be positive
+    for (i, freq) in frequencies.iter().enumerate() {
+        let f = freq.as_f64().expect("freq must be f64");
+        assert!(f > 0.0, "Frequency[{}] = {} must be positive", i, f);
+    }
+}
+
+/// TASK-39: Verify order_parameter is in valid range [0, 1].
+#[tokio::test]
+async fn test_get_kuramoto_state_order_parameter_in_range() {
+    let handlers = create_test_handlers_with_warm_gwt();
+    let request = make_tool_call("get_kuramoto_state", json!({}));
+
+    let response = handlers.dispatch(request).await;
+    assert_success(&response, "get_kuramoto_state");
+
+    let data = get_tool_data(&response);
+
+    let r = data
+        .get("order_parameter")
+        .expect("Must have order_parameter")
+        .as_f64()
+        .expect("order_parameter must be f64");
+
+    assert!(
+        (0.0..=1.0).contains(&r),
+        "order_parameter r={} must be in [0, 1]",
+        r
     );
 }

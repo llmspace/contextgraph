@@ -3,6 +3,7 @@
 //! TASK-GWT-001: Consciousness queries - get_consciousness_state, get_kuramoto_sync, get_ego_state.
 //! TASK-34: High-level coherence state tool - get_coherence_state.
 //! TASK-38: Focused identity continuity tool - get_identity_continuity.
+//! TASK-39: Kuramoto state with stepper status tool - get_kuramoto_state.
 
 use serde_json::json;
 use tracing::{debug, error};
@@ -570,5 +571,71 @@ impl Handlers {
         }
 
         self.tool_result_with_pulse(id, response)
+    }
+
+    /// get_kuramoto_state tool implementation.
+    ///
+    /// TASK-39: Returns Kuramoto network state WITH stepper running status.
+    /// Unlike get_kuramoto_sync (network data only), this includes is_running
+    /// which indicates whether the background stepping task is active.
+    ///
+    /// FAIL FAST on missing GWT components - no stubs or fallbacks.
+    ///
+    /// Returns:
+    /// - is_running: Whether KuramotoStepper background task is running
+    /// - phases: All 13 oscillator phases [0, 2pi]
+    /// - frequencies: All 13 natural frequencies (Hz per constitution.yaml line 221)
+    /// - coupling: Coupling strength K
+    /// - order_parameter: r in [0, 1]
+    /// - mean_phase: psi in [0, 2pi]
+    pub(crate) async fn call_get_kuramoto_state(
+        &self,
+        id: Option<JsonRpcId>,
+    ) -> JsonRpcResponse {
+        debug!("Handling get_kuramoto_state tool call");
+
+        // FAIL FAST: Check kuramoto provider
+        let kuramoto = match &self.kuramoto_network {
+            Some(k) => k,
+            None => {
+                error!("get_kuramoto_state: Kuramoto network not initialized");
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::GWT_NOT_INITIALIZED,
+                    "Kuramoto network not initialized - use with_gwt() constructor",
+                );
+            }
+        };
+
+        // Get stepper running status (unique to get_kuramoto_state)
+        let is_running = self.is_kuramoto_running();
+
+        // Acquire read lock on network
+        let network = kuramoto.read();
+
+        // Get order parameter (r, psi)
+        let (r, psi) = network.order_parameter();
+
+        // Get all 13 oscillator phases
+        let phases = network.phases();
+
+        // Get all 13 natural frequencies
+        let frequencies = network.natural_frequencies();
+
+        // Get coupling strength K
+        let coupling = network.coupling_strength();
+
+        // Return complete state
+        self.tool_result_with_pulse(
+            id,
+            json!({
+                "is_running": is_running,
+                "phases": phases.to_vec(),
+                "frequencies": frequencies.to_vec(),
+                "coupling": coupling,
+                "order_parameter": r,
+                "mean_phase": psi
+            }),
+        )
     }
 }

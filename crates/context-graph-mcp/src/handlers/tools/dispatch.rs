@@ -169,6 +169,8 @@ impl Handlers {
             tool_names::GET_IDENTITY_CONTINUITY => {
                 self.call_get_identity_continuity(id, arguments).await
             }
+            // TASK-39: Kuramoto state with stepper status
+            tool_names::GET_KURAMOTO_STATE => self.call_get_kuramoto_state(id).await,
             _ => JsonRpcResponse::error(
                 id,
                 error_codes::TOOL_NOT_FOUND,
