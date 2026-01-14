@@ -29,6 +29,8 @@ mod gwt_workspace;
 mod helpers;
 mod memory_tools;
 mod meta_learning_tools;
+// TASK-015: Session lifecycle hook tools per ARCH-07
+mod session_tools;
 mod status_tools;
 
 // All implementations are on the Handlers struct, so no re-exports needed.

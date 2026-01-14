@@ -40,20 +40,19 @@ mod tests {
     #[test]
     fn test_get_tool_definitions() {
         let tools = get_tool_definitions();
-        // 6 original + 8 GWT tools + 1 UTL delta-S/C + 3 ATC tools + 5 Dream tools
-        // + 2 Neuromod tools + 1 Steering + 1 Causal + 5 Teleological + 7 Autonomous = 39 total
-        // + 3 Meta-UTL tools (TASK-METAUTL-P0-005) = 42 total
-        // + 1 Epistemic tool (TASK-MCP-001) = 43 total
-        // + 1 Merge tool (TASK-MCP-003) = 44 total
-        // + 1 Johari classification tool (TASK-MCP-005) = 45 total
-        // + 1 Kuramoto state tool (TASK-39) = 46 total
-        // + 5 SPEC-AUTONOMOUS-001 tools = 51 total (get_learner_state, observe_outcome, execute_prune, get_health_status, trigger_healing)
+        // 6 original + 9 GWT tools + 1 UTL delta-S/C + 3 ATC tools + 5 Dream tools
+        // + 2 Neuromod tools + 1 Steering + 1 Causal + 5 Teleological + 12 Autonomous = 45 total
+        // + 3 Meta-UTL tools (TASK-METAUTL-P0-005) = 48 total
+        // + 1 Epistemic tool (TASK-MCP-001) = 49 total
+        // + 1 Merge tool (TASK-MCP-003) = 50 total
+        // + 1 Johari classification tool (TASK-MCP-005) = 51 total
+        // + 4 Session tools (TASK-013/014) = 55 total (session_start, session_end, pre_tool_use, post_tool_use)
         // NOTE: GWT now has 9 tools (TASK-33/34 added get_coherence_state, TASK-38 added get_identity_continuity, TASK-39 added get_kuramoto_state)
         // NOTE: Dream now has 5 tools (TASK-37 added get_gpu_status)
         // NOTE: Autonomous now has 12 tools (7 original + 5 SPEC-AUTONOMOUS-001)
         // NOTE: 6 manual North Star tools REMOVED (created single 1024D embeddings
         // incompatible with 13-embedder teleological arrays)
-        assert_eq!(tools.len(), 51);
+        assert_eq!(tools.len(), 55);
 
         let tool_names: Vec<_> = tools.iter().map(|t| t.name.as_str()).collect();
 
@@ -134,6 +133,12 @@ mod tests {
 
         // Johari classification tools (TASK-MCP-005)
         assert!(tool_names.contains(&"get_johari_classification"));
+
+        // Session tools (TASK-013/014)
+        assert!(tool_names.contains(&"session_start"));
+        assert!(tool_names.contains(&"session_end"));
+        assert!(tool_names.contains(&"pre_tool_use"));
+        assert!(tool_names.contains(&"post_tool_use"));
     }
 
     #[test]

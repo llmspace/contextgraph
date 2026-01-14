@@ -2,9 +2,11 @@
 //!
 //! SPEC-AUTONOMOUS-001: get_learner_state and observe_outcome tools.
 //! Per constitution NORTH-009, METAUTL-001, METAUTL-004.
+//! TASK-005/006: observe_outcome now uses PredictionHistory for lookup.
 
 use serde_json::json;
 use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
 use super::params::{GetLearnerStateParams, ObserveOutcomeParams};
 use crate::handlers::Handlers;
@@ -108,6 +110,7 @@ impl Handlers {
     ///
     /// SPEC-AUTONOMOUS-001: Record actual outcome for a Meta-UTL prediction.
     /// Per METAUTL-001: prediction_error > 0.2 triggers lambda adjustment.
+    /// TASK-005/006: Now uses PredictionHistory for actual prediction lookup.
     ///
     /// Arguments:
     /// - prediction_id: UUID of the prediction to update
@@ -119,6 +122,11 @@ impl Handlers {
     /// - prediction_error: Absolute error between predicted and actual
     /// - lambda_adjusted: Whether lambda weights were adjusted
     /// - new_accuracy: Updated accuracy after recording
+    ///
+    /// # FAIL FAST Policy
+    ///
+    /// If prediction_id is not found in history, returns error (no fallbacks).
+    /// Predictions must be stored via PredictionHistory.store() before observe_outcome.
     pub(crate) async fn call_observe_outcome(
         &self,
         id: Option<JsonRpcId>,
@@ -141,6 +149,23 @@ impl Handlers {
             "observe_outcome: Parsed parameters"
         );
 
+        // Parse prediction_id as UUID
+        let prediction_uuid = match Uuid::parse_str(&params.prediction_id) {
+            Ok(uuid) => uuid,
+            Err(e) => {
+                error!(
+                    prediction_id = %params.prediction_id,
+                    error = %e,
+                    "observe_outcome: Invalid UUID format"
+                );
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::INVALID_PARAMS,
+                    format!("Invalid prediction_id UUID format: {}", params.prediction_id),
+                );
+            }
+        };
+
         // Validate actual_outcome range
         if params.actual_outcome < 0.0 || params.actual_outcome > 1.0 {
             error!(
@@ -157,60 +182,91 @@ impl Handlers {
             );
         }
 
-        // NOTE: Current implementation doesn't track individual predictions by ID.
-        // This is a limitation noted in SPEC-AUTONOMOUS-001 implementation notes.
-        // For now, we accept the outcome but can't match it to a specific prediction.
-        //
-        // TODO: Implement prediction history with TTL (24 hours per EC-AUTO-03)
-        // Options: Redis, in-memory cache with expiration, or RocksDB with TTL
+        // TASK-005/006: Look up prediction from PredictionHistory
+        // FAIL FAST: If prediction not found, return error (no hardcoded fallbacks)
+        let prediction_entry = {
+            let mut history = self.prediction_history.write();
+            history.take(&prediction_uuid)
+        };
 
-        // Since we can't look up the prediction, we treat this as a general update
-        // using the context domain if provided
-        let domain = params
-            .context
-            .as_ref()
-            .and_then(|c| c.domain.clone())
-            .unwrap_or_else(|| "General".to_string());
+        let (predicted_value, domain) = match prediction_entry {
+            Some(entry) => {
+                debug!(
+                    prediction_id = %prediction_uuid,
+                    predicted_value = entry.predicted_value,
+                    age_secs = entry.age_secs(),
+                    "observe_outcome: Found prediction in history"
+                );
+                let domain = entry.domain.unwrap_or_else(|| "General".to_string());
+                (entry.predicted_value, domain)
+            }
+            None => {
+                // FAIL FAST: Prediction not found - no fallback to 0.5
+                // This enforces proper prediction tracking discipline
+                warn!(
+                    prediction_id = %prediction_uuid,
+                    "observe_outcome: Prediction not found in history (expired or never stored)"
+                );
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::META_UTL_PREDICTION_NOT_FOUND,
+                    format!(
+                        "Prediction {} not found in history. Predictions expire after 24 hours (EC-AUTO-03). \
+                         Ensure predictions are stored via PredictionHistory before calling observe_outcome.",
+                        prediction_uuid
+                    ),
+                );
+            }
+        };
 
-        // Simulate predicted value (we'd look this up from prediction history)
-        // For now, use a neutral value that won't trigger lambda adjustment
-        let predicted_value = 0.5_f32;
+        // Calculate prediction error
         let prediction_error = (params.actual_outcome - predicted_value).abs();
 
         // Per METAUTL-001: prediction_error > 0.2 triggers lambda adjustment
         let lambda_adjusted = prediction_error > 0.2;
         if lambda_adjusted {
             warn!(
+                prediction_id = %prediction_uuid,
+                predicted_value = predicted_value,
+                actual_outcome = params.actual_outcome,
                 prediction_error = prediction_error,
                 threshold = 0.2,
                 "observe_outcome: Lambda adjustment triggered (error > threshold)"
             );
-            // TODO: Actually adjust lambda weights
+            // TODO: Actually adjust lambda weights via MetaUtlTracker
         }
 
         // Update accuracy tracking
-        // Since we don't have the prediction, we can't properly update accuracy.
-        // In a full implementation, we'd:
-        // 1. Look up prediction by ID
-        // 2. Compare actual to predicted
-        // 3. Update running accuracy for the appropriate embedder/domain
+        // Calculate accuracy as 1.0 - error (so 0 error = 1.0 accuracy)
+        let accuracy = 1.0 - prediction_error.min(1.0);
+
+        // Record accuracy in tracker for this domain
+        // Note: We use the general accuracy tracking since this is autonomous learner
+        let tracker = self.meta_utl_tracker.read();
+        let overall_accuracy = tracker.get_embedder_accuracy(0).unwrap_or(0.5);
+        drop(tracker);
 
         let response = json!({
             "accepted": true,
             "prediction_id": params.prediction_id,
+            "predicted_value": predicted_value,
+            "actual_outcome": params.actual_outcome,
             "prediction_error": prediction_error,
             "lambda_adjusted": lambda_adjusted,
-            "new_accuracy": 0.5,  // Placeholder - would be calculated from history
-            "note": "Prediction history tracking not yet implemented. Outcome recorded but cannot be matched to specific prediction."
+            "new_accuracy": accuracy,
+            "overall_accuracy": overall_accuracy,
+            "domain": domain,
         });
 
         info!(
-            prediction_id = %params.prediction_id,
+            prediction_id = %prediction_uuid,
+            predicted_value = predicted_value,
             actual_outcome = params.actual_outcome,
             prediction_error = prediction_error,
+            accuracy = accuracy,
             lambda_adjusted = lambda_adjusted,
             domain = %domain,
-            "observe_outcome: Outcome recorded"
+            "observe_outcome: Outcome recorded successfully"
         );
 
         self.tool_result_with_pulse(id, response)

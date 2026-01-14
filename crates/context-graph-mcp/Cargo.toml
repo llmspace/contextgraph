@@ -45,6 +45,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 # UUID
 uuid = { workspace = true }
 
+# Lazy initialization (TASK-014)
+once_cell = "1.19"
+
 # JSON Schema validation (TASK-36)
 schemars = "0.8"
 

@@ -45,7 +45,11 @@ mod health;
 mod learner;
 mod maintenance;
 mod params;
+mod prediction_history;
 mod status;
+
+// TASK-004: Re-export PredictionHistory for use in Handlers struct
+pub use prediction_history::{PredictionEntry, PredictionHistory};
 
 #[cfg(test)]
 mod tests;

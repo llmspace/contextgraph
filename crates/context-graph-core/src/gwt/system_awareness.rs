@@ -105,9 +105,24 @@ impl GwtSystem {
             timestamp: chrono::Utc::now(),
         }).await;
 
-        // 5. Log graceful degradation message
-        // TODO(TASK-GWT-P1-002): Wire to actual DreamController
-        tracing::info!("Dream trigger recorded. DreamController integration pending.");
+        // 5. TASK-009: Wire to TriggerManager for dream consolidation
+        // Per AP-26, AP-38, IDENTITY-007: IC < 0.5 MUST trigger dream
+        {
+            use crate::dream::DreamPhase;
+
+            let mut manager = self.trigger_manager.lock();
+            manager.update_identity_coherence(identity_coherence);
+
+            // Request manual trigger for immediate dream consolidation
+            // Using FullCycle as default per constitution DREAM-001
+            manager.request_manual_trigger(DreamPhase::FullCycle);
+
+            tracing::info!(
+                identity_coherence = identity_coherence,
+                reason = reason,
+                "TASK-009: IdentityCritical event wired to TriggerManager (manual trigger requested)"
+            );
+        }
 
         Ok(())
     }

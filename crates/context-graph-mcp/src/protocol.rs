@@ -263,6 +263,16 @@ pub mod error_codes {
     pub const TCP_FRAME_ERROR: i32 = -32113;
     /// TCP client timeout - request processing exceeded request_timeout
     pub const TCP_CLIENT_TIMEOUT: i32 = -32114;
+
+    // Session lifecycle error codes (-32120 to -32129) - TASK-013
+    /// Session not found - session_id does not exist
+    pub const SESSION_NOT_FOUND: i32 = -32120;
+    /// Session expired - session TTL exceeded
+    pub const SESSION_EXPIRED: i32 = -32121;
+    /// Session already exists - duplicate session_id
+    pub const SESSION_EXISTS: i32 = -32122;
+    /// No active session - must call session_start first
+    pub const NO_ACTIVE_SESSION: i32 = -32123;
 }
 
 /// MCP method names.

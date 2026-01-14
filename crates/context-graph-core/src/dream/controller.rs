@@ -24,7 +24,7 @@ use tracing::{debug, error, info, warn};
 
 use super::amortized::AmortizedLearner;
 use super::constants;
-use super::nrem::{NremPhase, NremReport};
+use super::nrem::{MemoryProvider, NremPhase, NremReport};
 use super::rem::{RemPhase, RemReport};
 use super::scheduler::DreamScheduler;
 use super::WakeReason;
@@ -494,6 +494,29 @@ impl DreamController {
     /// Check if a dream cycle should be triggered
     pub fn should_trigger_dream(&self) -> bool {
         self.scheduler.should_trigger_dream()
+    }
+
+    /// Set the memory provider for NREM phase.
+    ///
+    /// TASK-008: Allows injecting a real memory provider for Hebbian replay.
+    /// Per DREAM-001: Provider data feeds dw = eta * phi_i * phi_j.
+    /// Per AP-35: Must not return stub data when real data is available.
+    ///
+    /// # Arguments
+    ///
+    /// * `provider` - Implementation of `MemoryProvider` trait
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use context_graph_storage::GraphMemoryProvider;
+    ///
+    /// let storage = Arc::new(RocksDbMemex::open("/tmp/test")?);
+    /// let provider = Arc::new(GraphMemoryProvider::new(storage));
+    /// controller.set_memory_provider(provider);
+    /// ```
+    pub fn set_memory_provider(&mut self, provider: Arc<dyn MemoryProvider>) {
+        self.nrem.set_memory_provider(provider);
     }
 
     /// Create an aborted report

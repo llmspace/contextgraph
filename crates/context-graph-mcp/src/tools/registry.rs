@@ -24,7 +24,7 @@ use super::types::ToolDefinition;
 /// use context_graph_mcp::tools::{ToolRegistry, register_all_tools};
 ///
 /// let registry = register_all_tools();
-/// assert_eq!(registry.len(), 51);
+/// assert_eq!(registry.len(), 55);
 ///
 /// // O(1) lookup
 /// if let Some(tool) = registry.get("inject_context") {
@@ -115,12 +115,12 @@ impl Default for ToolRegistry {
     }
 }
 
-/// Register all 51 Context Graph MCP tools.
+/// Register all 55 Context Graph MCP tools.
 ///
 /// Uses existing definitions from tools/definitions/ modules.
 /// FAIL FAST: Panics on duplicate registration or wrong tool count.
 ///
-/// # Tool Categories (51 total)
+/// # Tool Categories (55 total)
 ///
 /// | Category | Count | Source |
 /// |----------|-------|--------|
@@ -138,12 +138,13 @@ impl Default for ToolRegistry {
 /// | Epistemic | 1 | definitions/epistemic.rs |
 /// | Merge | 1 | definitions/merge.rs |
 /// | Johari | 1 | definitions/johari.rs |
+/// | Session | 4 | definitions/session.rs (TASK-013) |
 ///
 /// # Panics
 ///
 /// Panics if:
 /// - Any tool name is registered twice (duplicate detection)
-/// - Total tool count is not exactly 51 (indicates missing/extra tools)
+/// - Total tool count is not exactly 55 (indicates missing/extra tools)
 pub fn register_all_tools() -> ToolRegistry {
     use super::definitions;
 
@@ -193,12 +194,16 @@ pub fn register_all_tools() -> ToolRegistry {
     for tool in definitions::johari::definitions() {
         registry.register(tool);
     }
+    // TASK-013: Session lifecycle tools per ARCH-07
+    for tool in definitions::session::definitions() {
+        registry.register(tool);
+    }
 
-    // FAIL FAST: Verify exactly 51 tools are registered
+    // FAIL FAST: Verify exactly 55 tools are registered
     let actual_count = registry.len();
     assert_eq!(
-        actual_count, 51,
-        "TASK-41: Expected 51 tools, got {}. Check definitions modules for missing/extra tools.",
+        actual_count, 55,
+        "TASK-41: Expected 55 tools, got {}. Check definitions modules for missing/extra tools.",
         actual_count
     );
 
@@ -218,13 +223,13 @@ mod tests {
     }
 
     #[test]
-    fn test_register_all_tools_returns_51() {
+    fn test_register_all_tools_returns_55() {
         println!("\n=== FSV TEST: register_all_tools (TASK-41) ===");
 
         let registry = register_all_tools();
 
         println!("FSV-1: Tool count = {}", registry.len());
-        assert_eq!(registry.len(), 51, "Must have exactly 51 tools");
+        assert_eq!(registry.len(), 55, "Must have exactly 55 tools");
 
         // Verify critical tools exist
         let critical_tools = [
@@ -254,6 +259,11 @@ mod tests {
             "epistemic_action",
             "merge_concepts",
             "get_johari_classification",
+            // Session (TASK-013)
+            "session_start",
+            "session_end",
+            "pre_tool_use",
+            "post_tool_use",
         ];
 
         for name in critical_tools {
@@ -262,7 +272,7 @@ mod tests {
         }
 
         println!("\n=== FSV EVIDENCE (TASK-41) ===");
-        println!(" 51 tools registered");
+        println!(" 55 tools registered");
         println!(" All critical tools present");
         println!("=== FSV TEST PASSED (TASK-41) ===\n");
     }
@@ -310,7 +320,7 @@ mod tests {
     fn test_list_returns_all_tools_sorted() {
         let registry = register_all_tools();
         let tools = registry.list();
-        assert_eq!(tools.len(), 51);
+        assert_eq!(tools.len(), 55);
 
         // Verify sorted by name
         for i in 1..tools.len() {
@@ -327,7 +337,7 @@ mod tests {
     fn test_tool_names_returns_sorted_names() {
         let registry = register_all_tools();
         let names = registry.tool_names();
-        assert_eq!(names.len(), 51);
+        assert_eq!(names.len(), 55);
 
         // Verify sorted
         for i in 1..names.len() {
@@ -378,6 +388,7 @@ mod tests {
             ("Epistemic", "epistemic_action"),
             ("Merge", "merge_concepts"),
             ("Johari", "get_johari_classification"),
+            ("Session", "session_start"),  // TASK-013
         ];
 
         for (category, tool_name) in category_representatives {

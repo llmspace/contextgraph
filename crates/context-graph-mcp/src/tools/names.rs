@@ -165,3 +165,18 @@ pub const GET_IDENTITY_CONTINUITY: &str = "get_identity_continuity";
 /// Returns: is_running, phases (13), frequencies (13), coupling, order_parameter, mean_phase.
 /// Requires GWT providers to be initialized via with_gwt() constructor.
 pub const GET_KURAMOTO_STATE: &str = "get_kuramoto_state";
+
+// ========== SESSION TOOLS (TASK-013) ==========
+
+/// TASK-013: Initialize new MCP session per ARCH-07.
+/// Returns session_id, created_at, expires_at, ttl_minutes.
+pub const SESSION_START: &str = "session_start";
+/// TASK-013: Terminate MCP session per ARCH-07.
+/// Returns session_id, duration_seconds, tool_count, status.
+pub const SESSION_END: &str = "session_end";
+/// TASK-013: Pre-tool use hook per ARCH-07.
+/// Records tool invocation before execution.
+pub const PRE_TOOL_USE: &str = "pre_tool_use";
+/// TASK-013: Post-tool use hook per ARCH-07.
+/// Records tool completion and outcome.
+pub const POST_TOOL_USE: &str = "post_tool_use";

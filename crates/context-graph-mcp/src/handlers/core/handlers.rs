@@ -15,6 +15,8 @@ use context_graph_core::atc::AdaptiveThresholdCalibration;
 use context_graph_core::dream::{
     AmortizedLearner, DreamController, DreamScheduler, GpuMonitor, StubGpuMonitor, TriggerManager,
 };
+// TASK-004: Import PredictionHistory for autonomous learner predictions
+use super::super::autonomous::PredictionHistory;
 // TASK-IDENTITY-P0-001: Import GWT identity components for shared monitor wiring
 use context_graph_core::gwt::ego_node::SelfEgoNode;
 use context_graph_core::gwt::listeners::IdentityContinuityListener;
@@ -169,6 +171,13 @@ pub struct Handlers {
     /// The stepper uses the kuramoto_network field and calls step() every 10ms.
     /// Uses RwLock to allow start/stop lifecycle methods from Arc<Handlers>.
     pub(in crate::handlers) kuramoto_stepper: Option<RwLock<super::super::kuramoto_stepper::KuramotoStepper>>,
+
+    // ========== PREDICTION HISTORY (TASK-004) ==========
+    /// Prediction history for autonomous learner predictions.
+    /// TASK-004: Required for observe_outcome to look up original predicted values.
+    /// TTL: 24 hours per EC-AUTO-03.
+    /// Uses RwLock because store/take operations mutate internal state.
+    pub(in crate::handlers) prediction_history: Arc<RwLock<PredictionHistory>>,
 }
 
 impl Handlers {
@@ -238,6 +247,8 @@ impl Handlers {
             workspace_broadcaster: None,
             // TASK-12: Kuramoto stepper defaults to None - use with_default_gwt() for full GWT support
             kuramoto_stepper: None,
+            // TASK-004: Prediction history for autonomous learner
+            prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
     }
 
@@ -308,6 +319,8 @@ impl Handlers {
             workspace_broadcaster: None,
             // TASK-12: Kuramoto stepper defaults to None
             kuramoto_stepper: None,
+            // TASK-004: Prediction history for autonomous learner
+            prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
     }
 
@@ -376,6 +389,8 @@ impl Handlers {
             workspace_broadcaster: None,
             // TASK-12: Kuramoto stepper defaults to None
             kuramoto_stepper: None,
+            // TASK-004: Prediction history for autonomous learner
+            prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
     }
 
@@ -436,6 +451,8 @@ impl Handlers {
             workspace_broadcaster: None,
             // TASK-12: Kuramoto stepper defaults to None
             kuramoto_stepper: None,
+            // TASK-004: Prediction history for autonomous learner
+            prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
     }
 
@@ -500,6 +517,8 @@ impl Handlers {
             workspace_broadcaster: None,
             // TASK-12: Kuramoto stepper defaults to None
             kuramoto_stepper: None,
+            // TASK-004: Prediction history for autonomous learner
+            prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
     }
 
@@ -574,6 +593,8 @@ impl Handlers {
             workspace_broadcaster: None,
             // TASK-12: Kuramoto stepper defaults to None (kuramoto_network is provided but stepper is not created here)
             kuramoto_stepper: None,
+            // TASK-004: Prediction history for autonomous learner
+            prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
     }
 
@@ -645,6 +666,8 @@ impl Handlers {
             workspace_broadcaster: None,
             // TASK-12: Kuramoto stepper defaults to None (kuramoto_network is provided but stepper is not created here)
             kuramoto_stepper: None,
+            // TASK-004: Prediction history for autonomous learner
+            prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
     }
 
@@ -801,6 +824,8 @@ impl Handlers {
             workspace_broadcaster: Some(workspace_broadcaster),
             // TASK-12 (GWT-006): REAL Kuramoto stepper for 100Hz phase updates
             kuramoto_stepper: Some(RwLock::new(kuramoto_stepper)),
+            // TASK-004: Prediction history for autonomous learner
+            prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
     }
 

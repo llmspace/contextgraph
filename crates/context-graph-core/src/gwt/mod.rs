@@ -13,7 +13,7 @@
 //!    - R(t): Self-Reflection (Meta-UTL awareness)
 //!    - D(t): Differentiation (Purpose vector entropy)
 //!
-//! 2. **Kuramoto Synchronization**: 8 oscillators (KURAMOTO_N) for layer-level sync
+//! 2. **Kuramoto Synchronization**: 13 oscillators (KURAMOTO_N) - one per embedder
 //!    - Order parameter r measures synchronization level
 //!    - Thresholds: r ≥ 0.8 (CONSCIOUS), r < 0.5 (FRAGMENTED)
 //!

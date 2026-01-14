@@ -5,7 +5,7 @@ use crate::protocol::JsonRpcId;
 use super::{create_test_handlers, make_request};
 
 #[tokio::test]
-async fn test_tools_list_returns_all_51_tools() {
+async fn test_tools_list_returns_all_55_tools() {
     let handlers = create_test_handlers();
     let request = make_request("tools/list", Some(JsonRpcId::Number(1)), None);
 
@@ -24,7 +24,7 @@ async fn test_tools_list_returns_all_51_tools() {
         .as_array()
         .expect("tools must be an array");
 
-    // Verify exactly 51 tools returned:
+    // Verify exactly 55 tools returned:
     // Core 6: inject_context, store_memory, get_memetic_status, get_graph_manifest, search_graph, utl_status
     // GWT 9: get_consciousness_state, get_kuramoto_sync, get_workspace_status, get_ego_state, trigger_workspace_broadcast, adjust_coupling, get_coherence_state (TASK-34), get_identity_continuity (TASK-38), get_kuramoto_state (TASK-39)
     // ATC 3 (TASK-ATC-001): get_threshold_status, get_calibration_metrics, trigger_recalibration
@@ -40,10 +40,11 @@ async fn test_tools_list_returns_all_51_tools() {
     // Epistemic 1 (TASK-MCP-002): epistemic_action
     // Merge 1 (TASK-MCP-004): merge_concepts
     // Johari 1 (TASK-MCP-005): get_johari_classification
+    // Session 4 (TASK-013/014): session_start, session_end, pre_tool_use, post_tool_use
     assert_eq!(
         tools.len(),
-        51,
-        "Must return exactly 51 tools, got {}",
+        55,
+        "Must return exactly 55 tools, got {}",
         tools.len()
     );
 }
@@ -218,5 +219,23 @@ async fn test_tools_list_contains_expected_tool_names() {
     assert!(
         tool_names.contains(&"trigger_healing"),
         "Missing trigger_healing tool (SPEC-AUTONOMOUS-001)"
+    );
+
+    // Verify Session tools are present (TASK-013/014)
+    assert!(
+        tool_names.contains(&"session_start"),
+        "Missing session_start tool (TASK-013)"
+    );
+    assert!(
+        tool_names.contains(&"session_end"),
+        "Missing session_end tool (TASK-013)"
+    );
+    assert!(
+        tool_names.contains(&"pre_tool_use"),
+        "Missing pre_tool_use tool (TASK-013)"
+    );
+    assert!(
+        tool_names.contains(&"post_tool_use"),
+        "Missing post_tool_use tool (TASK-013)"
     );
 }

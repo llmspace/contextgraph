@@ -49,6 +49,17 @@ pub struct MetaUtlTracker {
     /// TASK-METAUTL-P1-001: Per-domain accuracy tracking for lambda recalibration
     #[allow(dead_code)]
     pub domain_accuracy: HashMap<Domain, DomainAccuracyTracker>,
+
+    /// TASK-010: Lambda_s weight (semantic/structure focus)
+    /// Per constitution lifecycle: infancy=0.7, adolescence=0.5, mature=adaptive
+    pub lambda_s: f32,
+
+    /// TASK-010: Lambda_c weight (contextual focus)
+    /// Per constitution lifecycle: infancy=0.3, adolescence=0.5, mature=adaptive
+    pub lambda_c: f32,
+
+    /// TASK-010: Current lifecycle stage for lambda defaults
+    pub lifecycle_stage: String,
 }
 
 impl Default for MetaUtlTracker {
@@ -72,6 +83,10 @@ impl Default for MetaUtlTracker {
             cycle_count: 0,
             // TASK-METAUTL-P1-001: Per-domain accuracy tracking
             domain_accuracy: HashMap::new(),
+            // TASK-010: Lambda weights - default to adolescence (0.5/0.5)
+            lambda_s: 0.5,
+            lambda_c: 0.5,
+            lifecycle_stage: "adolescence".to_string(),
         }
     }
 }
@@ -481,6 +496,140 @@ impl MetaUtlTracker {
     #[allow(dead_code)]
     pub fn get_domain_tracker(&self, domain: Domain) -> Option<&DomainAccuracyTracker> {
         self.domain_accuracy.get(&domain)
+    }
+
+    // ========== TASK-010: Lambda Reset Methods for trigger_healing ==========
+
+    /// Reset lambda weights to lifecycle stage defaults.
+    ///
+    /// TASK-010: Enables trigger_healing to reset UTL to known good state.
+    /// Per constitution METAUTL lifecycle:
+    /// - infancy: (0.7, 0.3) - exploration-focused
+    /// - adolescence: (0.5, 0.5) - balanced
+    /// - mature: Cannot reset - requires full optimization
+    ///
+    /// # Arguments
+    /// * `stage` - One of "infancy", "adolescence", or "mature"
+    ///
+    /// # Returns
+    /// * `Ok(())` - Reset successful
+    /// * `Err(String)` - Stage is "mature" (cannot reset) or unknown
+    ///
+    /// # Example
+    /// ```ignore
+    /// let mut tracker = MetaUtlTracker::new();
+    /// tracker.reset_lambdas_to_stage("infancy")?; // Sets lambda_s=0.7, lambda_c=0.3
+    /// ```
+    pub fn reset_lambdas_to_stage(&mut self, stage: &str) -> Result<(), String> {
+        let (old_lambda_s, old_lambda_c) = (self.lambda_s, self.lambda_c);
+        let old_stage = self.lifecycle_stage.clone();
+
+        match stage.to_lowercase().as_str() {
+            "infancy" => {
+                self.lambda_s = 0.7;
+                self.lambda_c = 0.3;
+                self.lifecycle_stage = "infancy".to_string();
+                tracing::info!(
+                    old_lambda_s = old_lambda_s,
+                    old_lambda_c = old_lambda_c,
+                    new_lambda_s = self.lambda_s,
+                    new_lambda_c = self.lambda_c,
+                    old_stage = old_stage,
+                    new_stage = stage,
+                    "TASK-010: Lambda weights reset to infancy defaults"
+                );
+                Ok(())
+            }
+            "adolescence" => {
+                self.lambda_s = 0.5;
+                self.lambda_c = 0.5;
+                self.lifecycle_stage = "adolescence".to_string();
+                tracing::info!(
+                    old_lambda_s = old_lambda_s,
+                    old_lambda_c = old_lambda_c,
+                    new_lambda_s = self.lambda_s,
+                    new_lambda_c = self.lambda_c,
+                    old_stage = old_stage,
+                    new_stage = stage,
+                    "TASK-010: Lambda weights reset to adolescence defaults"
+                );
+                Ok(())
+            }
+            "mature" => {
+                tracing::error!(
+                    "TASK-010: Cannot reset mature stage - requires full optimization"
+                );
+                Err("Cannot reset lambda weights for mature stage - requires full Bayesian optimization".to_string())
+            }
+            unknown => {
+                tracing::error!(
+                    stage = unknown,
+                    "TASK-010: Unknown lifecycle stage"
+                );
+                Err(format!("Unknown lifecycle stage: '{}'. Valid stages: infancy, adolescence, mature", unknown))
+            }
+        }
+    }
+
+    /// Reset accuracy tracking to cold start state.
+    ///
+    /// TASK-010: Clears all accuracy data, enabling fresh learning.
+    /// Called during high/critical severity healing.
+    ///
+    /// This resets:
+    /// - Per-embedder accuracy windows
+    /// - Domain accuracy tracking
+    /// - Consecutive low count
+    /// - Escalation flag
+    /// - Prediction/validation counts
+    pub fn reset_accuracy(&mut self) {
+        let old_prediction_count = self.prediction_count;
+        let old_validation_count = self.validation_count;
+        let domain_count = self.domain_accuracy.len();
+
+        // Clear per-embedder accuracy
+        self.embedder_accuracy = [[0.0; 100]; NUM_EMBEDDERS];
+        self.accuracy_indices = [0; NUM_EMBEDDERS];
+        self.accuracy_counts = [0; NUM_EMBEDDERS];
+        self.cycle_embedder_updated = [false; NUM_EMBEDDERS];
+        self.cycle_count = 0;
+
+        // Reset counts
+        self.prediction_count = 0;
+        self.validation_count = 0;
+
+        // Clear domain accuracy
+        self.domain_accuracy.clear();
+
+        // Reset consecutive low tracking
+        self.consecutive_low_count = 0;
+        self.escalation_triggered = false;
+
+        // Reset weights to uniform
+        let initial_weight = 1.0 / NUM_EMBEDDERS as f32;
+        self.current_weights = [initial_weight; NUM_EMBEDDERS];
+        self.last_weight_update = None;
+
+        tracing::info!(
+            old_prediction_count = old_prediction_count,
+            old_validation_count = old_validation_count,
+            domain_count_cleared = domain_count,
+            "TASK-010: Accuracy tracking reset to cold start"
+        );
+    }
+
+    /// Get current lambda weights.
+    ///
+    /// TASK-010: For MCP tool exposure and introspection.
+    pub fn get_lambda_weights(&self) -> (f32, f32) {
+        (self.lambda_s, self.lambda_c)
+    }
+
+    /// Get current lifecycle stage.
+    ///
+    /// TASK-010: For MCP tool exposure and introspection.
+    pub fn get_lifecycle_stage(&self) -> &str {
+        &self.lifecycle_stage
     }
 }
 

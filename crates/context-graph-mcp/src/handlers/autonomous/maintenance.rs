@@ -548,30 +548,48 @@ impl Handlers {
             // Verify node exists before soft-deleting
             match self.teleological_store.retrieve(uuid).await {
                 Ok(Some(_fp)) => {
-                    // Node exists - perform soft delete
-                    // NOTE: TeleologicalMemoryStore trait doesn't have a soft_delete method.
-                    // For now, we mark this as successfully "pruned" but the actual deletion
-                    // would need to be implemented in the storage layer per SEC-06.
-                    //
-                    // TODO: Add soft_delete method to TeleologicalMemoryStore trait
-                    // that marks nodes with deleted_at timestamp for 30-day retention
+                    // Node exists - perform soft delete via trait method
+                    // delete(id, soft=true) marks node for 30-day retention per SEC-06
+                    match self.teleological_store.delete(uuid, true).await {
+                        Ok(true) => {
+                            info!(
+                                uuid = %uuid,
+                                reason = %params.reason,
+                                "execute_prune: Node soft-deleted successfully"
+                            );
+                            pruned_count += 1;
 
-                    info!(
-                        uuid = %uuid,
-                        reason = %params.reason,
-                        "execute_prune: Node marked for pruning (soft delete pending implementation)"
-                    );
-                    pruned_count += 1;
-
-                    // Handle cascade if requested
-                    if params.cascade {
-                        // TODO: Implement cascade deletion by finding edges and dependent nodes
-                        // For now, we note that cascade is requested but can't perform it
-                        // without edge traversal capability in the store trait
-                        debug!(
-                            uuid = %uuid,
-                            "execute_prune: Cascade requested but not yet implemented"
-                        );
+                            // Handle cascade if requested
+                            if params.cascade {
+                                // TODO: Implement cascade deletion by finding edges and dependent nodes
+                                // For now, we note that cascade is requested but can't perform it
+                                // without edge traversal capability in the store trait
+                                debug!(
+                                    uuid = %uuid,
+                                    "execute_prune: Cascade requested but not yet implemented"
+                                );
+                            }
+                        }
+                        Ok(false) => {
+                            // Delete returned false - node was already deleted or gone
+                            warn!(uuid = %uuid, "execute_prune: Node delete returned false (may be already deleted)");
+                            errors.push(json!({
+                                "node_id": node_id_str,
+                                "error": format!("Node {} delete failed - may be already deleted", uuid)
+                            }));
+                        }
+                        Err(e) => {
+                            // FAIL FAST: Storage layer error during delete
+                            error!(
+                                uuid = %uuid,
+                                error = %e,
+                                "execute_prune: Soft delete failed"
+                            );
+                            errors.push(json!({
+                                "node_id": node_id_str,
+                                "error": format!("Soft delete failed: {}", e)
+                            }));
+                        }
                     }
                 }
                 Ok(None) => {
@@ -616,7 +634,7 @@ impl Handlers {
                 "soft_deleted": true,
                 "recoverable_until": recoverable_until.to_rfc3339(),
                 "reason": params.reason,
-                "note": "Soft delete marks nodes for removal after 30-day retention. Full deletion implementation pending storage layer updates."
+                "note": "Nodes soft-deleted via TeleologicalMemoryStore.delete(id, soft=true). Recoverable for 30 days per SEC-06."
             }),
         )
     }

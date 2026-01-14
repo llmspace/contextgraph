@@ -177,6 +177,11 @@ impl Handlers {
             }
             // TASK-39: Kuramoto state with stepper status
             tool_names::GET_KURAMOTO_STATE => self.call_get_kuramoto_state(id).await,
+            // TASK-013/014: Session lifecycle hooks per ARCH-07
+            tool_names::SESSION_START => self.call_session_start(id, arguments).await,
+            tool_names::SESSION_END => self.call_session_end(id, arguments).await,
+            tool_names::PRE_TOOL_USE => self.call_pre_tool_use(id, arguments).await,
+            tool_names::POST_TOOL_USE => self.call_post_tool_use(id, arguments).await,
             _ => JsonRpcResponse::error(
                 id,
                 error_codes::TOOL_NOT_FOUND,

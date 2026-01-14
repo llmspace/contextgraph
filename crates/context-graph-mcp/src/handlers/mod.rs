@@ -23,6 +23,7 @@
 //! - `autonomous`: NORTH autonomous system handlers (TASK-AUTONOMOUS-MCP)
 //! - `epistemic`: Epistemic action handlers for GWT workspace (TASK-MCP-002)
 //! - `merge`: Merge concepts handler for node consolidation (TASK-MCP-004)
+//! - `session`: Session lifecycle management for MCP hooks (TASK-012)
 
 mod atc;
 mod autonomous;
@@ -42,6 +43,8 @@ pub mod gwt_providers;
 pub mod gwt_traits;
 mod purpose;
 mod search;
+// TASK-012: Session lifecycle management
+pub mod session;
 mod steering;
 mod system;
 mod teleological;
@@ -107,3 +110,17 @@ pub fn create_gwt_provider_with_listener(
     let shared_monitor = listener.monitor();
     gwt_providers::GwtSystemProviderImpl::with_shared_monitor(shared_monitor)
 }
+
+// ============================================================================
+// Session Management Singleton (TASK-014)
+// ============================================================================
+
+use once_cell::sync::Lazy;
+
+/// Global session manager for MCP lifecycle hooks.
+///
+/// Per ARCH-07: Hooks control memory lifecycle - SessionStart/PreToolUse/PostToolUse/SessionEnd.
+/// This singleton manages all MCP sessions across the server lifetime.
+///
+/// # TASK-014
+pub static SESSION_MANAGER: Lazy<session::SessionManager> = Lazy::new(session::SessionManager::new);
