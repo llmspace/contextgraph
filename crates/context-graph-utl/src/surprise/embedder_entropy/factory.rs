@@ -92,7 +92,7 @@ impl EmbedderEntropyFactory {
             | Embedder::TemporalPeriodic
             | Embedder::TemporalPositional
             | Embedder::Sparse
-            | Embedder::Graph => {
+            | Embedder::Emotional => {
                 Box::new(DefaultKnnEntropy::from_config(embedder, config))
             }
         }
@@ -114,7 +114,7 @@ impl EmbedderEntropyFactory {
             Self::create(Embedder::Causal, config),
             Self::create(Embedder::Sparse, config),
             Self::create(Embedder::Code, config),
-            Self::create(Embedder::Graph, config),
+            Self::create(Embedder::Emotional, config),
             Self::create(Embedder::Hdc, config),
             Self::create(Embedder::Multimodal, config),
             Self::create(Embedder::Entity, config),
@@ -172,7 +172,7 @@ mod tests {
             Embedder::TemporalPositional,
             Embedder::Sparse,
             Embedder::Code,       // Uses HybridGmmKnnEntropy
-            Embedder::Graph,
+            Embedder::Emotional,
             Embedder::Multimodal, // Uses CrossModalEntropy
             Embedder::Entity,
             Embedder::LateInteraction,
@@ -235,7 +235,7 @@ mod tests {
             Embedder::Causal,
             Embedder::Sparse,
             Embedder::Code,
-            Embedder::Graph,
+            Embedder::Emotional,
             Embedder::Hdc,
             Embedder::Multimodal,
             Embedder::Entity,

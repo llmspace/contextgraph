@@ -14,6 +14,7 @@
 //! - REM: 2 minutes, attractor exploration, temp=2.0
 //! - Constraints: 100 queries, <100ms wake, <30% GPU
 
+use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -27,6 +28,7 @@ use super::constants;
 use super::nrem::{MemoryProvider, NremPhase, NremReport};
 use super::rem::{RemPhase, RemReport};
 use super::scheduler::DreamScheduler;
+use super::types::{ConsolidationCallback, ConsolidationMetrics};
 use super::WakeReason;
 use crate::error::{CoreError, CoreResult};
 
@@ -144,7 +146,6 @@ pub struct DreamReport {
 ///
 /// Manages the complete dream cycle lifecycle including phase transitions,
 /// interrupt handling, and resource monitoring.
-#[derive(Debug)]
 pub struct DreamController {
     /// Current dream state
     state: DreamState,
@@ -185,6 +186,10 @@ pub struct DreamController {
 
     /// Peak GPU usage during current cycle
     peak_gpu_usage: f32,
+
+    /// TASK-L02: Optional callback for consolidation completion.
+    /// Called when dream cycle completes successfully.
+    consolidation_callback: Option<ConsolidationCallback>,
 }
 
 impl DreamController {
@@ -204,6 +209,7 @@ impl DreamController {
             last_dream_completed: None,
             cycle_start: None,
             peak_gpu_usage: 0.0,
+            consolidation_callback: None,
         }
     }
 
@@ -319,6 +325,52 @@ impl DreamController {
             shortcuts_created,
             cycle_start.elapsed()
         );
+
+        // TASK-L02: Invoke consolidation callback for lambda adjustment
+        // SPEC-DREAM-LAMBDA-001: Wire DreamController to MetaUtlTracker
+        // METAUTL-003: `"dream_triggered → lambda_adjustment"`
+        let edges_pruned = nrem_report.as_ref().map(|r| r.edges_pruned).unwrap_or(0) as u32;
+        let duration = cycle_start.elapsed();
+
+        // Compute quality and coherence from consolidation results
+        // Quality: ratio of pruned edges to total processed (approximated by memories_replayed * edges per memory)
+        // Coherence: placeholder computed from shortcuts ratio (will be replaced with Kuramoto order parameter)
+        let quality = {
+            let memories = nrem_report.as_ref().map(|r| r.memories_replayed).unwrap_or(0);
+            if memories > 0 {
+                // Approximate: each memory ~10 edges, quality = edges_pruned / estimated_total
+                let estimated_edges = memories * 10;
+                (edges_pruned as f32 / estimated_edges.max(1) as f32).clamp(0.0, 1.0)
+            } else {
+                0.0
+            }
+        };
+
+        let coherence = {
+            // Placeholder: coherence based on shortcuts_created / edges_pruned ratio
+            // High shortcuts with moderate pruning = good coherence
+            if edges_pruned > 0 {
+                let ratio = shortcuts_created as f32 / edges_pruned as f32;
+                // Normalize ratio to [0, 1] using sigmoid-like function
+                (1.0 - (-ratio).exp()).clamp(0.0, 1.0)
+            } else if shortcuts_created > 0 {
+                1.0 // All shortcuts, no pruning = high coherence
+            } else {
+                0.0
+            }
+        };
+
+        let consolidation_metrics = ConsolidationMetrics {
+            quality,
+            coherence,
+            edges_pruned,
+            shortcuts_created: shortcuts_created as u32,
+            duration,
+            success: true,
+            blind_spots_found: 0, // Placeholder: will be computed by identity layer
+        };
+
+        self.invoke_consolidation_callback(consolidation_metrics);
 
         Ok(DreamReport {
             completed: true,
@@ -519,6 +571,70 @@ impl DreamController {
         self.nrem.set_memory_provider(provider);
     }
 
+    // ========================================================================
+    // TASK-L02: Consolidation Callback Methods
+    // SPEC-DREAM-LAMBDA-001: Wire DreamController to MetaUtlTracker.
+    // METAUTL-003: `"dream_triggered → lambda_adjustment"`
+    // ========================================================================
+
+    /// Set a callback to be invoked when dream consolidation completes successfully.
+    ///
+    /// The callback receives `ConsolidationMetrics` containing quality and coherence
+    /// scores that can be used to adjust lambda weights via `MetaUtlTracker::adjust_lambdas()`.
+    ///
+    /// # Arguments
+    ///
+    /// * `callback` - Thread-safe callback function
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use std::sync::Arc;
+    ///
+    /// controller.set_consolidation_callback(Arc::new(|metrics| {
+    ///     info!("Consolidation completed: quality={}, coherence={}",
+    ///           metrics.quality, metrics.coherence);
+    /// }));
+    /// ```
+    pub fn set_consolidation_callback(&mut self, callback: ConsolidationCallback) {
+        self.consolidation_callback = Some(callback);
+    }
+
+    /// Clear the consolidation callback.
+    ///
+    /// After calling this, no callback will be invoked on consolidation completion.
+    pub fn clear_consolidation_callback(&mut self) {
+        self.consolidation_callback = None;
+    }
+
+    /// Check if a consolidation callback is registered.
+    ///
+    /// # Returns
+    ///
+    /// `true` if a callback is set, `false` otherwise.
+    pub fn has_consolidation_callback(&self) -> bool {
+        self.consolidation_callback.is_some()
+    }
+
+    /// Invoke the consolidation callback if one is registered.
+    ///
+    /// This is called internally when a dream cycle completes successfully.
+    /// The callback is invoked synchronously, so any expensive operations
+    /// should be performed asynchronously inside the callback.
+    ///
+    /// # Arguments
+    ///
+    /// * `metrics` - Consolidation metrics from the completed cycle
+    fn invoke_consolidation_callback(&self, metrics: ConsolidationMetrics) {
+        if let Some(ref callback) = self.consolidation_callback {
+            debug!(
+                "Invoking consolidation callback: quality={}, coherence={}",
+                metrics.quality, metrics.coherence
+            );
+            callback(metrics);
+        }
+    }
+
     /// Create an aborted report
     fn create_aborted_report(
         &self,
@@ -636,5 +752,106 @@ mod tests {
         controller.set_interrupt();
 
         assert!(controller.interrupt_flag.load(Ordering::SeqCst));
+    }
+
+    // ========================================================================
+    // TASK-L02: Consolidation Callback Tests
+    // SPEC-DREAM-LAMBDA-001: Wire DreamController to MetaUtlTracker
+    // ========================================================================
+
+    #[test]
+    fn test_callback_initially_none() {
+        let controller = DreamController::new();
+        assert!(!controller.has_consolidation_callback());
+    }
+
+    #[test]
+    fn test_set_consolidation_callback() {
+        use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+
+        let mut controller = DreamController::new();
+        let called = Arc::new(AtomicBool::new(false));
+        let called_clone = called.clone();
+
+        controller.set_consolidation_callback(Arc::new(move |_metrics| {
+            called_clone.store(true, AtomicOrdering::SeqCst);
+        }));
+
+        assert!(controller.has_consolidation_callback());
+
+        // Invoke callback manually to test
+        let metrics = ConsolidationMetrics {
+            quality: 0.8,
+            coherence: 0.7,
+            edges_pruned: 100,
+            shortcuts_created: 10,
+            duration: Duration::from_secs(30),
+            success: true,
+            blind_spots_found: 2,
+        };
+        controller.invoke_consolidation_callback(metrics);
+
+        assert!(called.load(AtomicOrdering::SeqCst));
+    }
+
+    #[test]
+    fn test_clear_consolidation_callback() {
+        let mut controller = DreamController::new();
+
+        controller.set_consolidation_callback(Arc::new(|_| {}));
+        assert!(controller.has_consolidation_callback());
+
+        controller.clear_consolidation_callback();
+        assert!(!controller.has_consolidation_callback());
+    }
+
+    #[test]
+    fn test_callback_receives_correct_metrics() {
+        use std::sync::Mutex;
+
+        let mut controller = DreamController::new();
+        let received_metrics = Arc::new(Mutex::new(None));
+        let metrics_clone = received_metrics.clone();
+
+        controller.set_consolidation_callback(Arc::new(move |metrics| {
+            *metrics_clone.lock().unwrap() = Some(metrics);
+        }));
+
+        let input_metrics = ConsolidationMetrics {
+            quality: 0.85,
+            coherence: 0.75,
+            edges_pruned: 50,
+            shortcuts_created: 5,
+            duration: Duration::from_secs(60),
+            success: true,
+            blind_spots_found: 3,
+        };
+        controller.invoke_consolidation_callback(input_metrics.clone());
+
+        let received = received_metrics.lock().unwrap();
+        let received = received.as_ref().expect("Callback should have been called");
+        assert_eq!(received.quality, 0.85);
+        assert_eq!(received.coherence, 0.75);
+        assert_eq!(received.edges_pruned, 50);
+        assert_eq!(received.shortcuts_created, 5);
+        assert!(received.success);
+    }
+
+    #[test]
+    fn test_invoke_without_callback_is_safe() {
+        let controller = DreamController::new();
+
+        // This should not panic
+        let metrics = ConsolidationMetrics {
+            quality: 0.5,
+            coherence: 0.5,
+            edges_pruned: 10,
+            shortcuts_created: 1,
+            duration: Duration::from_secs(10),
+            success: true,
+            blind_spots_found: 0,
+        };
+        controller.invoke_consolidation_callback(metrics);
+        // No panic = success
     }
 }

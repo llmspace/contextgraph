@@ -153,7 +153,7 @@ mod tests {
                 | Embedder::TemporalPositional => vec![0.5f32; 512],
                 Embedder::Causal | Embedder::Multimodal => vec![0.5f32; 768],
                 Embedder::Code => vec![0.5f32; 1536],
-                Embedder::Graph | Embedder::Entity => vec![0.5f32; 384],
+                Embedder::Emotional | Embedder::Entity => vec![0.5f32; 384],
                 Embedder::Sparse | Embedder::KeywordSplade => vec![0.5f32; 100], // Sparse test
                 Embedder::LateInteraction => vec![0.5f32; 128], // Token-level
             };
@@ -212,7 +212,7 @@ mod tests {
                 | Embedder::TemporalPositional => 512,
                 Embedder::Causal | Embedder::Multimodal => 768,
                 Embedder::Code => 1536,
-                Embedder::Graph | Embedder::Entity => 384,
+                Embedder::Emotional | Embedder::Entity => 384,
                 Embedder::Sparse | Embedder::KeywordSplade => 100,
                 Embedder::LateInteraction => 128,
             };

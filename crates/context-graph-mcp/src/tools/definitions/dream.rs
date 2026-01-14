@@ -1,12 +1,14 @@
 //! Dream consolidation tool definitions.
 //! TASK-DREAM-MCP: Dream triggers, status, abort, amortized shortcuts.
 //! TASK-37: Added get_gpu_status for GPU utilization monitoring.
+//! TASK-S01: Added trigger_mental_check for entropy-based triggering.
 
 use serde_json::json;
 use crate::tools::types::ToolDefinition;
 
-/// Returns Dream tool definitions (5 tools).
+/// Returns Dream tool definitions (6 tools).
 /// TASK-37: Added get_gpu_status tool.
+/// TASK-S01: Added trigger_mental_check tool.
 pub fn definitions() -> Vec<ToolDefinition> {
     vec![
         // trigger_dream - Manually trigger a dream consolidation cycle
@@ -106,6 +108,78 @@ pub fn definitions() -> Vec<ToolDefinition> {
             json!({
                 "type": "object",
                 "properties": {},
+                "required": []
+            }),
+        ),
+
+        // trigger_mental_check - Trigger mental_check workflow based on entropy
+        // TASK-S01: Per SPEC-TRIGGER-MCP-001
+        ToolDefinition::new(
+            "trigger_mental_check",
+            "Trigger a mental_check workflow based on entropy threshold. \
+             Entropy values in [0.0, 1.0] are validated. Triggers fire when entropy > threshold (default 0.7). \
+             Returns status (initiated/queued/skipped), trigger reason, and workflow_id if initiated. \
+             Use force=true to trigger even if entropy is below threshold. \
+             FAILS FAST if TriggerManager not initialized (AP-26).",
+            json!({
+                "type": "object",
+                "properties": {
+                    "entropy": {
+                        "type": "number",
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "description": "REQUIRED: Current entropy value [0.0, 1.0]. Trigger fires when > threshold (0.7)."
+                    },
+                    "force": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Force trigger even if entropy below threshold (for testing/debugging)."
+                    },
+                    "phase": {
+                        "type": "string",
+                        "enum": ["nrem", "rem", "full_cycle"],
+                        "default": "full_cycle",
+                        "description": "Dream phase to execute: 'nrem' (consolidation), 'rem' (discovery), 'full_cycle' (both)."
+                    }
+                },
+                "required": ["entropy"]
+            }),
+        ),
+
+        // get_trigger_config - Get current trigger configuration
+        // TASK-S02: Per SPEC-TRIGGER-MCP-001 REQ-CONFIG-01
+        ToolDefinition::new(
+            "get_trigger_config",
+            "Get current trigger configuration including thresholds, cooldowns, and trigger count. \
+             Returns entropy_threshold (default 0.7), ic_threshold (default 0.3), cooldown_ms, \
+             last_trigger_timestamp, trigger_count, and enabled status. \
+             FAILS FAST if TriggerManager not initialized (AP-26).",
+            json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
+        ),
+
+        // get_trigger_history - Get trigger history
+        // TASK-S03: Per SPEC-TRIGGER-MCP-001 REQ-HISTORY-01
+        ToolDefinition::new(
+            "get_trigger_history",
+            "Get recent trigger history showing when and why triggers fired. \
+             Returns a list of trigger events with timestamp, entropy value, reason, and workflow status. \
+             Useful for debugging and observability of dream cycle triggers. \
+             Limited to last 100 entries. FAILS FAST if TriggerManager not initialized (AP-26).",
+            json!({
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "default": 20,
+                        "description": "Maximum number of history entries to return (default 20, max 100)"
+                    }
+                },
                 "required": []
             }),
         ),

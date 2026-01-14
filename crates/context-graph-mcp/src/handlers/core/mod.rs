@@ -35,6 +35,9 @@ pub use self::meta_utl_tracker::MetaUtlTracker;
 // TASK-METAUTL-P0-001/002: Meta-UTL types (will be used in later tasks)
 #[allow(unused_imports)]
 pub use self::types::{LambdaAdjustment, PredictionType, SelfCorrectionConfig, StoredPrediction};
+// TASK-F02: Lambda adjustment types for dream-triggered optimization
+#[allow(unused_imports)]
+pub use self::types::{AdjustmentReason, LambdaAdjustmentResult, LambdaError};
 // TASK-METAUTL-P0-003: Bayesian optimization escalation types (will be used in TASK-METAUTL-P0-005/006)
 #[allow(unused_imports)]
 pub use self::bayesian_optimizer::{

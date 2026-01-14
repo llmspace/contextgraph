@@ -678,6 +678,7 @@ dependencies = [
  "chrono",
  "config",
  "dashmap",
+ "half",
  "hnsw_rs",
  "nvml-wrapper",
  "parking_lot",

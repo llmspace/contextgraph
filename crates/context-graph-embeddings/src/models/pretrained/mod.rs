@@ -1,4 +1,4 @@
-//! Pretrained embedding models for the 12-model ensemble.
+//! Pretrained embedding models for the 13-model ensemble (E1-E13).
 //!
 //! This module contains implementations for models that require
 //! loading pretrained weights from HuggingFace repositories.

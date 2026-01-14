@@ -108,12 +108,15 @@ pub use triggers::{
 #[cfg(feature = "nvml")]
 pub use triggers::NvmlGpuMonitor;
 pub use types::{
+    ConsolidationCallback,
+    ConsolidationMetrics,
     DreamPhase,
     EntropyWindow,
     ExtendedTriggerReason,
     GpuTriggerState,
     HebbianConfig,
     HyperbolicWalkConfig,
+    InvalidMetricsError,
     NodeActivation,
     WalkStep,
 };

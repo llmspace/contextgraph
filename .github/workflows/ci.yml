@@ -76,6 +76,23 @@ jobs:
           ./scripts/check-ffi-consolidation.sh
 
   # =============================================================================
+  # Embedder Count Validation Gate (TASK-S05)
+  # =============================================================================
+  # Enforces: Exactly 13 embedders (E1-E13) in Multi-Array Storage pipeline
+  embedder-count:
+    name: Embedder Count
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check embedder count
+        run: |
+          chmod +x scripts/check-embedder-count.sh
+          ./scripts/check-embedder-count.sh
+
+  # =============================================================================
   # Unit Tests
   # =============================================================================
   test:

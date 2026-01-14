@@ -50,6 +50,12 @@ pub const ABORT_DREAM: &str = "abort_dream";
 pub const GET_AMORTIZED_SHORTCUTS: &str = "get_amortized_shortcuts";
 /// TASK-37: Get GPU utilization and dream eligibility status
 pub const GET_GPU_STATUS: &str = "get_gpu_status";
+/// TASK-S01: Trigger mental_check workflow based on entropy threshold
+pub const TRIGGER_MENTAL_CHECK: &str = "trigger_mental_check";
+/// TASK-S02: Get current trigger configuration
+pub const GET_TRIGGER_CONFIG: &str = "get_trigger_config";
+/// TASK-S03: Get trigger history
+pub const GET_TRIGGER_HISTORY: &str = "get_trigger_history";
 
 // ========== NEUROMODULATION TOOLS (TASK-NEUROMOD-MCP) ==========
 

@@ -2,16 +2,21 @@
 //!
 //! TASK-S005: Tracks per-embedder accuracy, pending predictions, and optimized weights.
 //! TASK-METAUTL-P0-001: Extended with consecutive low tracking and weight clamping.
+//! TASK-L01: Lambda adjustment for dream consolidation.
 
 use std::collections::HashMap;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use tracing::debug;
 use uuid::Uuid;
 
+use context_graph_core::dream::ConsolidationMetrics;
 use context_graph_core::johari::NUM_EMBEDDERS;
 
-use super::types::{Domain, DomainAccuracyTracker, SelfCorrectionConfig, StoredPrediction};
+use super::types::{
+    AdjustmentReason, Domain, DomainAccuracyTracker, LambdaAdjustmentResult, LambdaError,
+    SelfCorrectionConfig, StoredPrediction,
+};
 
 /// Meta-UTL Tracker for learning about learning
 ///
@@ -60,6 +65,9 @@ pub struct MetaUtlTracker {
 
     /// TASK-010: Current lifecycle stage for lambda defaults
     pub lifecycle_stage: String,
+
+    /// TASK-L01: Timestamps of recent lambda adjustments for rate limiting
+    pub adjustment_times: Vec<Instant>,
 }
 
 impl Default for MetaUtlTracker {
@@ -87,6 +95,8 @@ impl Default for MetaUtlTracker {
             lambda_s: 0.5,
             lambda_c: 0.5,
             lifecycle_stage: "adolescence".to_string(),
+            // TASK-L01: Initialize rate limiting
+            adjustment_times: Vec::new(),
         }
     }
 }
@@ -99,6 +109,28 @@ impl MetaUtlTracker {
     /// Threshold for detecting accuracy trend changes
     #[allow(dead_code)]
     const TREND_THRESHOLD: f32 = 0.02;
+
+    // =========================================================================
+    // TASK-L01: Lambda Adjustment Constants (per SPEC-DREAM-LAMBDA-001)
+    // =========================================================================
+
+    /// Minimum lambda value to prevent division by zero downstream.
+    pub const LAMBDA_MIN: f32 = 0.001;
+
+    /// Maximum lambda value.
+    pub const LAMBDA_MAX: f32 = 1.0;
+
+    /// Rate limit: max adjustments per minute.
+    const MAX_ADJUSTMENTS_PER_MINUTE: u32 = 10;
+
+    /// Threshold above which quality triggers lambda_s increase.
+    const QUALITY_THRESHOLD: f32 = 0.7;
+
+    /// Threshold above which coherence triggers lambda_c decrease.
+    const COHERENCE_THRESHOLD: f32 = 0.8;
+
+    /// Delta for lambda adjustments.
+    const LAMBDA_DELTA: f32 = 0.05;
 
     /// Create a new MetaUtlTracker
     pub fn new() -> Self {
@@ -631,6 +663,190 @@ impl MetaUtlTracker {
     pub fn get_lifecycle_stage(&self) -> &str {
         &self.lifecycle_stage
     }
+
+    // =========================================================================
+    // TASK-L01: Lambda Adjustment Methods (per SPEC-DREAM-LAMBDA-001)
+    // =========================================================================
+
+    /// Check rate limit for lambda adjustments.
+    ///
+    /// Returns `Ok(())` if under limit, `Err(LambdaError::RateLimitExceeded)` otherwise.
+    fn check_rate_limit(&mut self) -> Result<(), LambdaError> {
+        let now = Instant::now();
+        let one_minute_ago = now - Duration::from_secs(60);
+
+        // Remove old timestamps
+        self.adjustment_times.retain(|&t| t > one_minute_ago);
+
+        // Check count
+        if self.adjustment_times.len() as u32 >= Self::MAX_ADJUSTMENTS_PER_MINUTE {
+            return Err(LambdaError::RateLimitExceeded {
+                count: self.adjustment_times.len() as u32,
+            });
+        }
+
+        // Record this adjustment
+        self.adjustment_times.push(now);
+
+        Ok(())
+    }
+
+    /// Adjust lambda weights based on dream consolidation metrics.
+    ///
+    /// # Arguments
+    ///
+    /// * `metrics` - Consolidation metrics from completed dream cycle
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(LambdaAdjustmentResult)` - Successful adjustment with before/after values
+    /// * `Err(LambdaError)` - Adjustment failed
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Validate metrics (no NaN/Infinity)
+    /// 2. Check rate limit (max 10/minute)
+    /// 3. Compute adjustment:
+    ///    - If quality > 0.7: increase lambda_s by 0.05
+    ///    - If coherence > 0.8: decrease lambda_c by 0.05
+    ///    - Otherwise: no change
+    /// 4. Clamp to [LAMBDA_MIN, LAMBDA_MAX]
+    /// 5. Log before/after values
+    /// 6. Return adjustment record
+    ///
+    /// # Thread Safety
+    ///
+    /// This method requires `&mut self`. Callers MUST hold exclusive access.
+    /// For shared access, wrap in `Arc<Mutex<MetaUtlTracker>>`.
+    ///
+    /// # Constitution Compliance
+    ///
+    /// METAUTL-003: `"dream_triggered → lambda_adjustment"`
+    pub fn adjust_lambdas(
+        &mut self,
+        metrics: ConsolidationMetrics,
+    ) -> Result<LambdaAdjustmentResult, LambdaError> {
+        // 1. Validate metrics
+        metrics.validate()?;
+
+        // 2. Check rate limit
+        self.check_rate_limit()?;
+
+        // 3. Store before values
+        let lambda_s_before = self.lambda_s;
+        let lambda_c_before = self.lambda_c;
+
+        // 4. Compute adjustments based on metrics
+        if metrics.quality > Self::QUALITY_THRESHOLD {
+            self.lambda_s += Self::LAMBDA_DELTA;
+        }
+        if metrics.coherence > Self::COHERENCE_THRESHOLD {
+            self.lambda_c -= Self::LAMBDA_DELTA;
+        }
+
+        // 5. Clamp to valid range
+        let mut clamping_occurred = false;
+
+        if self.lambda_s > Self::LAMBDA_MAX {
+            self.lambda_s = Self::LAMBDA_MAX;
+            clamping_occurred = true;
+            tracing::warn!(
+                value = self.lambda_s,
+                max = Self::LAMBDA_MAX,
+                "TASK-L01: Lambda_s clamped to maximum"
+            );
+        }
+        if self.lambda_s < Self::LAMBDA_MIN {
+            self.lambda_s = Self::LAMBDA_MIN;
+            clamping_occurred = true;
+            tracing::warn!(
+                value = self.lambda_s,
+                min = Self::LAMBDA_MIN,
+                "TASK-L01: Lambda_s clamped to minimum"
+            );
+        }
+        if self.lambda_c > Self::LAMBDA_MAX {
+            self.lambda_c = Self::LAMBDA_MAX;
+            clamping_occurred = true;
+            tracing::warn!(
+                value = self.lambda_c,
+                max = Self::LAMBDA_MAX,
+                "TASK-L01: Lambda_c clamped to maximum"
+            );
+        }
+        if self.lambda_c < Self::LAMBDA_MIN {
+            self.lambda_c = Self::LAMBDA_MIN;
+            clamping_occurred = true;
+            tracing::warn!(
+                value = self.lambda_c,
+                min = Self::LAMBDA_MIN,
+                "TASK-L01: Lambda_c clamped to minimum"
+            );
+        }
+
+        // 6. Create adjustment record
+        let adjustment = LambdaAdjustmentResult::new(
+            lambda_s_before,
+            self.lambda_s,
+            lambda_c_before,
+            self.lambda_c,
+            clamping_occurred,
+            AdjustmentReason::DreamConsolidation,
+        );
+
+        // 7. Log adjustment
+        tracing::info!(
+            lambda_s_before = lambda_s_before,
+            lambda_s_after = self.lambda_s,
+            lambda_c_before = lambda_c_before,
+            lambda_c_after = self.lambda_c,
+            quality = metrics.quality,
+            coherence = metrics.coherence,
+            clamping = clamping_occurred,
+            "METAUTL-003: Lambda weights adjusted from dream consolidation"
+        );
+
+        Ok(adjustment)
+    }
+
+    /// Reset lambdas to default values for a lifecycle stage.
+    ///
+    /// Returns a `LambdaAdjustmentResult` with before/after values and reason `ManualReset`.
+    pub fn reset_lambdas(&mut self, stage: &str) -> LambdaAdjustmentResult {
+        let lambda_s_before = self.lambda_s;
+        let lambda_c_before = self.lambda_c;
+
+        // Default values per lifecycle stage
+        let (new_s, new_c) = match stage.to_lowercase().as_str() {
+            "infant" | "infancy" => (0.7, 0.3),
+            "adolescent" | "adolescence" => (0.5, 0.5),
+            "adult" | "mature" => (0.6, 0.4),
+            "elder" => (0.7, 0.3),
+            _ => (0.5, 0.5), // Default
+        };
+
+        self.lambda_s = new_s;
+        self.lambda_c = new_c;
+        self.lifecycle_stage = stage.to_string();
+
+        tracing::info!(
+            lambda_s_before = lambda_s_before,
+            lambda_s_after = self.lambda_s,
+            lambda_c_before = lambda_c_before,
+            lambda_c_after = self.lambda_c,
+            stage = stage,
+            "TASK-L01: Lambda weights reset to stage defaults"
+        );
+
+        LambdaAdjustmentResult::new(
+            lambda_s_before,
+            self.lambda_s,
+            lambda_c_before,
+            self.lambda_c,
+            false,
+            AdjustmentReason::ManualReset,
+        )
+    }
 }
 
 #[cfg(test)]
@@ -706,5 +922,162 @@ mod tests {
         let domain_tracker = tracker.get_domain_tracker(Domain::Code);
         assert!(domain_tracker.is_some());
         assert!(domain_tracker.unwrap().consecutive_low_count > 0);
+    }
+
+    // =========================================================================
+    // TASK-L01: Lambda Adjustment Tests
+    // =========================================================================
+
+    /// Create valid ConsolidationMetrics for testing.
+    fn valid_metrics(quality: f32, coherence: f32) -> ConsolidationMetrics {
+        ConsolidationMetrics {
+            quality,
+            coherence,
+            edges_pruned: 100,
+            shortcuts_created: 10,
+            duration: Duration::from_secs(30),
+            success: true,
+            blind_spots_found: 2,
+        }
+    }
+
+    #[test]
+    fn test_adjust_lambdas_high_quality() {
+        let mut tracker = MetaUtlTracker::new();
+        tracker.lambda_s = 0.5;
+        tracker.lambda_c = 0.5;
+        let metrics = valid_metrics(0.85, 0.5); // quality > 0.7, coherence < 0.8
+
+        let adj = tracker.adjust_lambdas(metrics).unwrap();
+
+        assert!((adj.lambda_s_before - 0.5).abs() < f32::EPSILON);
+        assert!((adj.lambda_s_after - 0.55).abs() < f32::EPSILON);
+        assert!((adj.lambda_c_before - 0.5).abs() < f32::EPSILON);
+        assert!((adj.lambda_c_after - 0.5).abs() < f32::EPSILON); // No change
+        assert!(adj.was_adjusted());
+    }
+
+    #[test]
+    fn test_adjust_lambdas_high_coherence() {
+        let mut tracker = MetaUtlTracker::new();
+        tracker.lambda_s = 0.5;
+        tracker.lambda_c = 0.5;
+        let metrics = valid_metrics(0.5, 0.9); // quality < 0.7, coherence > 0.8
+
+        let adj = tracker.adjust_lambdas(metrics).unwrap();
+
+        assert!((adj.lambda_s_after - 0.5).abs() < f32::EPSILON); // No change
+        assert!((adj.lambda_c_after - 0.45).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_adjust_lambdas_both_high() {
+        let mut tracker = MetaUtlTracker::new();
+        tracker.lambda_s = 0.5;
+        tracker.lambda_c = 0.5;
+        let metrics = valid_metrics(0.85, 0.9); // Both above threshold
+
+        let adj = tracker.adjust_lambdas(metrics).unwrap();
+
+        assert!((adj.lambda_s_after - 0.55).abs() < f32::EPSILON);
+        assert!((adj.lambda_c_after - 0.45).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_adjust_lambdas_below_thresholds() {
+        let mut tracker = MetaUtlTracker::new();
+        tracker.lambda_s = 0.5;
+        tracker.lambda_c = 0.5;
+        let metrics = valid_metrics(0.5, 0.5); // Both below threshold
+
+        let adj = tracker.adjust_lambdas(metrics).unwrap();
+
+        assert!(!adj.was_adjusted());
+        assert!((adj.lambda_s_after - 0.5).abs() < f32::EPSILON);
+        assert!((adj.lambda_c_after - 0.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_adjust_lambdas_clamping_max() {
+        let mut tracker = MetaUtlTracker::new();
+        tracker.lambda_s = 0.98; // Near max
+        tracker.lambda_c = 0.5;
+        let metrics = valid_metrics(0.85, 0.5);
+
+        let adj = tracker.adjust_lambdas(metrics).unwrap();
+
+        assert!((adj.lambda_s_after - MetaUtlTracker::LAMBDA_MAX).abs() < f32::EPSILON); // Clamped
+        assert!(adj.clamping_occurred);
+    }
+
+    #[test]
+    fn test_adjust_lambdas_clamping_min() {
+        let mut tracker = MetaUtlTracker::new();
+        tracker.lambda_s = 0.5;
+        tracker.lambda_c = 0.02; // Near min
+        let metrics = valid_metrics(0.5, 0.9);
+
+        let adj = tracker.adjust_lambdas(metrics).unwrap();
+
+        assert!((adj.lambda_c_after - MetaUtlTracker::LAMBDA_MIN).abs() < f32::EPSILON); // Clamped to LAMBDA_MIN
+        assert!(adj.clamping_occurred);
+    }
+
+    #[test]
+    fn test_adjust_lambdas_invalid_metrics_nan() {
+        let mut tracker = MetaUtlTracker::new();
+        let mut metrics = valid_metrics(0.5, 0.5);
+        metrics.quality = f32::NAN;
+
+        let result = tracker.adjust_lambdas(metrics);
+        assert!(matches!(result, Err(LambdaError::InvalidMetrics(_))));
+    }
+
+    #[test]
+    fn test_adjust_lambdas_invalid_metrics_out_of_range() {
+        let mut tracker = MetaUtlTracker::new();
+        let mut metrics = valid_metrics(0.5, 0.5);
+        metrics.quality = 1.5;
+
+        let result = tracker.adjust_lambdas(metrics);
+        assert!(matches!(result, Err(LambdaError::InvalidMetrics(_))));
+    }
+
+    #[test]
+    fn test_adjust_lambdas_rate_limit() {
+        let mut tracker = MetaUtlTracker::new();
+        tracker.lambda_s = 0.5;
+        tracker.lambda_c = 0.5;
+
+        // Call MAX_ADJUSTMENTS_PER_MINUTE times successfully
+        for _ in 0..MetaUtlTracker::MAX_ADJUSTMENTS_PER_MINUTE {
+            let metrics = valid_metrics(0.85, 0.5);
+            tracker.adjust_lambdas(metrics).unwrap();
+        }
+
+        // Next call should fail
+        let metrics = valid_metrics(0.85, 0.5);
+        let result = tracker.adjust_lambdas(metrics);
+        assert!(matches!(result, Err(LambdaError::RateLimitExceeded { .. })));
+    }
+
+    #[test]
+    fn test_reset_lambdas() {
+        let mut tracker = MetaUtlTracker::new();
+        tracker.lambda_s = 0.3;
+        tracker.lambda_c = 0.7;
+
+        let adj = tracker.reset_lambdas("infancy");
+
+        // infancy defaults: lambda_s=0.7, lambda_c=0.3
+        assert!((adj.lambda_s_after - 0.7).abs() < f32::EPSILON);
+        assert!((adj.lambda_c_after - 0.3).abs() < f32::EPSILON);
+        assert_eq!(adj.reason, AdjustmentReason::ManualReset);
+    }
+
+    #[test]
+    fn test_constants() {
+        assert!((MetaUtlTracker::LAMBDA_MIN - 0.001).abs() < f32::EPSILON);
+        assert!((MetaUtlTracker::LAMBDA_MAX - 1.0).abs() < f32::EPSILON);
     }
 }

@@ -95,7 +95,7 @@ pub(crate) fn embedder_index_to_embedder(idx: crate::index::config::EmbedderInde
         EmbedderIndex::E5Causal => Embedder::Causal,
         EmbedderIndex::E6Sparse => Embedder::Sparse,
         EmbedderIndex::E7Code => Embedder::Code,
-        EmbedderIndex::E8Graph => Embedder::Graph,
+        EmbedderIndex::E8Graph => Embedder::Emotional,
         EmbedderIndex::E9HDC => Embedder::Hdc,
         EmbedderIndex::E10Multimodal => Embedder::Multimodal,
         EmbedderIndex::E11Entity => Embedder::Entity,

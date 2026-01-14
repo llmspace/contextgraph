@@ -153,7 +153,7 @@ impl WarmEmbeddingPipeline {
 
     /// Warm all models (call after [`new()`](Self::new) if used).
     ///
-    /// Loads all 12 models into VRAM and validates them. Unlike
+    /// Loads all 13 models into VRAM and validates them. Unlike
     /// [`create_and_warm()`](Self::create_and_warm), this method returns
     /// an error instead of exiting on failure.
     ///
@@ -238,7 +238,7 @@ impl WarmEmbeddingPipeline {
         self.initialized.load(Ordering::SeqCst)
     }
 
-    /// Get a status line for quick monitoring (e.g., `WARM: 12/12 models | 24.0GB VRAM | OK`).
+    /// Get a status line for quick monitoring (e.g., `WARM: 13/13 models | 24.0GB VRAM | OK`).
     #[must_use]
     pub fn status_line(&self) -> String {
         WarmDiagnostics::status_line(&self.loader)

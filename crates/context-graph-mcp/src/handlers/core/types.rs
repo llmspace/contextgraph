@@ -3,12 +3,16 @@
 //! TASK-S005: Prediction types for meta-UTL tracking.
 //! TASK-METAUTL-P0-001: Domain and meta-learning event types.
 //! TASK-METAUTL-P0-004: Added serializable timestamp to MetaLearningEvent.
+//! TASK-F02: Lambda adjustment types for dream-triggered optimization.
 
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use uuid::Uuid;
+
+use context_graph_core::dream::InvalidMetricsError;
 
 /// Prediction type for tracking
 /// TASK-S005: Used to distinguish storage vs retrieval predictions.
@@ -347,4 +351,259 @@ pub struct StoredPrediction {
     pub predicted_values: serde_json::Value,
     #[allow(dead_code)]
     pub fingerprint_id: Uuid,
+}
+
+// =============================================================================
+// TASK-F02: Lambda Adjustment Types for Dream-Triggered Optimization
+// =============================================================================
+
+/// Reason for lambda adjustment.
+///
+/// Per SPEC-DREAM-LAMBDA-001 and TECH-DREAM-LAMBDA-001.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AdjustmentReason {
+    /// Triggered by dream consolidation.
+    DreamConsolidation,
+    /// Manual reset to lifecycle stage.
+    ManualReset,
+    /// Bayesian optimization.
+    BayesianOptimization,
+}
+
+impl std::fmt::Display for AdjustmentReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DreamConsolidation => write!(f, "dream_consolidation"),
+            Self::ManualReset => write!(f, "manual_reset"),
+            Self::BayesianOptimization => write!(f, "bayesian_optimization"),
+        }
+    }
+}
+
+/// Result of a lambda adjustment operation.
+///
+/// Contains before/after values for observability and logging.
+/// Per SPEC-DREAM-LAMBDA-001 and TECH-DREAM-LAMBDA-001.
+///
+/// Note: This is distinct from `LambdaAdjustment` which tracks deltas.
+/// This struct provides full observability with before/after snapshots.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LambdaAdjustmentResult {
+    /// Lambda_s (semantic/structure focus) before adjustment.
+    pub lambda_s_before: f32,
+
+    /// Lambda_s after adjustment.
+    pub lambda_s_after: f32,
+
+    /// Lambda_c (contextual focus) before adjustment.
+    pub lambda_c_before: f32,
+
+    /// Lambda_c after adjustment.
+    pub lambda_c_after: f32,
+
+    /// Whether any value was clamped to bounds.
+    pub clamping_occurred: bool,
+
+    /// Reason for adjustment.
+    pub reason: AdjustmentReason,
+
+    /// Timestamp of adjustment (not serialized).
+    #[serde(skip)]
+    pub timestamp: Option<Instant>,
+}
+
+impl LambdaAdjustmentResult {
+    /// Create a new LambdaAdjustmentResult with current timestamp.
+    pub fn new(
+        lambda_s_before: f32,
+        lambda_s_after: f32,
+        lambda_c_before: f32,
+        lambda_c_after: f32,
+        clamping_occurred: bool,
+        reason: AdjustmentReason,
+    ) -> Self {
+        Self {
+            lambda_s_before,
+            lambda_s_after,
+            lambda_c_before,
+            lambda_c_after,
+            clamping_occurred,
+            reason,
+            timestamp: Some(Instant::now()),
+        }
+    }
+
+    /// Calculate the delta for lambda_s.
+    pub fn lambda_s_delta(&self) -> f32 {
+        self.lambda_s_after - self.lambda_s_before
+    }
+
+    /// Calculate the delta for lambda_c.
+    pub fn lambda_c_delta(&self) -> f32 {
+        self.lambda_c_after - self.lambda_c_before
+    }
+
+    /// Check if any adjustment was made.
+    pub fn was_adjusted(&self) -> bool {
+        (self.lambda_s_delta().abs() > f32::EPSILON)
+            || (self.lambda_c_delta().abs() > f32::EPSILON)
+    }
+}
+
+/// Errors during lambda adjustment.
+///
+/// Per SPEC-DREAM-LAMBDA-001 error codes E_DREAM_LAMBDA_001 through E_DREAM_LAMBDA_004.
+#[derive(Debug, Error, Clone)]
+pub enum LambdaError {
+    /// Invalid metrics provided.
+    #[error("{0}")]
+    InvalidMetrics(#[from] InvalidMetricsError),
+
+    /// MetaUtlTracker mutex is poisoned.
+    #[error("E_DREAM_LAMBDA_002: MetaUtlTracker mutex poisoned - unrecoverable")]
+    MutexPoisoned,
+
+    /// Callback invoked before initialization.
+    #[error("E_DREAM_LAMBDA_003: MetaUtlTracker not initialized")]
+    NotInitialized,
+
+    /// Rate limit exceeded.
+    #[error("E_DREAM_LAMBDA_004: Lambda adjustment rate limit exceeded ({count}/minute > 10)")]
+    RateLimitExceeded { count: u32 },
+}
+
+impl LambdaError {
+    /// Create a rate limit exceeded error.
+    pub fn rate_limit(count: u32) -> Self {
+        Self::RateLimitExceeded { count }
+    }
+
+    /// Get the error code.
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::InvalidMetrics(_) => "E_DREAM_LAMBDA_001",
+            Self::MutexPoisoned => "E_DREAM_LAMBDA_002",
+            Self::NotInitialized => "E_DREAM_LAMBDA_003",
+            Self::RateLimitExceeded { .. } => "E_DREAM_LAMBDA_004",
+        }
+    }
+}
+
+// =============================================================================
+// TASK-F02 Tests
+// =============================================================================
+
+#[cfg(test)]
+mod task_f02_tests {
+    use super::*;
+
+    #[test]
+    fn test_adjustment_reason_display() {
+        assert_eq!(
+            format!("{}", AdjustmentReason::DreamConsolidation),
+            "dream_consolidation"
+        );
+        assert_eq!(
+            format!("{}", AdjustmentReason::ManualReset),
+            "manual_reset"
+        );
+        assert_eq!(
+            format!("{}", AdjustmentReason::BayesianOptimization),
+            "bayesian_optimization"
+        );
+        println!("[PASS] AdjustmentReason::Display works correctly");
+    }
+
+    #[test]
+    fn test_adjustment_reason_serde() {
+        let reason = AdjustmentReason::DreamConsolidation;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, r#""dream_consolidation""#);
+
+        let parsed: AdjustmentReason = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, reason);
+        println!("[PASS] AdjustmentReason serde roundtrip works");
+    }
+
+    #[test]
+    fn test_lambda_adjustment_result_new() {
+        let adj = LambdaAdjustmentResult::new(
+            0.5, 0.55, // lambda_s before/after
+            0.6, 0.55, // lambda_c before/after
+            false,
+            AdjustmentReason::DreamConsolidation,
+        );
+
+        assert!(adj.timestamp.is_some());
+        assert!((adj.lambda_s_delta() - 0.05).abs() < f32::EPSILON);
+        assert!((adj.lambda_c_delta() - (-0.05)).abs() < f32::EPSILON);
+        assert!(adj.was_adjusted());
+        println!("[PASS] LambdaAdjustmentResult::new() works correctly");
+    }
+
+    #[test]
+    fn test_lambda_adjustment_result_no_change() {
+        let adj = LambdaAdjustmentResult::new(
+            0.5, 0.5, 0.6, 0.6, false,
+            AdjustmentReason::DreamConsolidation,
+        );
+
+        assert!(!adj.was_adjusted());
+        println!("[PASS] LambdaAdjustmentResult::was_adjusted() correctly detects no change");
+    }
+
+    #[test]
+    fn test_lambda_adjustment_result_serde() {
+        let adj = LambdaAdjustmentResult::new(
+            0.5, 0.55, 0.6, 0.55, true,
+            AdjustmentReason::DreamConsolidation,
+        );
+
+        let json = serde_json::to_string(&adj).unwrap();
+        assert!(json.contains("lambda_s_before"));
+        assert!(json.contains("0.5"));
+        assert!(json.contains("clamping_occurred"));
+
+        // timestamp should NOT be in JSON (skipped)
+        assert!(!json.contains("timestamp"));
+        println!("[PASS] LambdaAdjustmentResult serde works correctly");
+    }
+
+    #[test]
+    fn test_lambda_error_codes() {
+        let err = LambdaError::InvalidMetrics(InvalidMetricsError::NaN {
+            field: "quality",
+        });
+        assert_eq!(err.code(), "E_DREAM_LAMBDA_001");
+
+        let err = LambdaError::MutexPoisoned;
+        assert_eq!(err.code(), "E_DREAM_LAMBDA_002");
+
+        let err = LambdaError::NotInitialized;
+        assert_eq!(err.code(), "E_DREAM_LAMBDA_003");
+
+        let err = LambdaError::rate_limit(15);
+        assert_eq!(err.code(), "E_DREAM_LAMBDA_004");
+        println!("[PASS] LambdaError codes are correct");
+    }
+
+    #[test]
+    fn test_lambda_error_display() {
+        let err = LambdaError::rate_limit(15);
+        let msg = format!("{}", err);
+        assert!(msg.contains("E_DREAM_LAMBDA_004"));
+        assert!(msg.contains("15"));
+        assert!(msg.contains("10"));
+        println!("[PASS] LambdaError::Display works correctly");
+    }
+
+    #[test]
+    fn test_lambda_error_from_invalid_metrics() {
+        let inner = InvalidMetricsError::NaN { field: "quality" };
+        let err: LambdaError = inner.into();
+
+        assert!(matches!(err, LambdaError::InvalidMetrics(_)));
+        println!("[PASS] LambdaError::from(InvalidMetricsError) works correctly");
+    }
 }

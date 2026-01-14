@@ -35,6 +35,9 @@ rayon = "1.10"
 # parking_lot provides ~100-500ns lock times vs std::sync::RwLock ~1-5μs
 parking_lot = "0.12"
 
+# Half-precision floating point for FP16 quantization (TASK-L03: E12 Quantization)
+half = "2.3"
+
 # Real NVML GPU monitoring (TASK-23: NvmlGpuMonitor)
 # Feature-gated to allow builds on systems without NVIDIA drivers
 nvml-wrapper = { version = "0.10", optional = true }

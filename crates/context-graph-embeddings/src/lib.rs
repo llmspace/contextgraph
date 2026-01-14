@@ -14,7 +14,7 @@
 //!
 //! # Architecture
 //!
-//! - **ModelId**: Enum identifying the 12 models in the ensemble
+//! - **ModelId**: Enum identifying the 13 models in the ensemble (E1-E13)
 //! - **EmbeddingProvider**: Trait for embedding generation
 //! - **EmbeddingModel**: Trait for individual model implementations
 //! - **ModelRegistry**: Manages model lifecycle and GPU resources

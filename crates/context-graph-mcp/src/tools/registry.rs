@@ -24,7 +24,7 @@ use super::types::ToolDefinition;
 /// use context_graph_mcp::tools::{ToolRegistry, register_all_tools};
 ///
 /// let registry = register_all_tools();
-/// assert_eq!(registry.len(), 55);
+/// assert_eq!(registry.len(), 58);
 ///
 /// // O(1) lookup
 /// if let Some(tool) = registry.get("inject_context") {
@@ -199,11 +199,12 @@ pub fn register_all_tools() -> ToolRegistry {
         registry.register(tool);
     }
 
-    // FAIL FAST: Verify exactly 55 tools are registered
+    // FAIL FAST: Verify exactly 58 tools are registered
+    // TASK-S01/S02/S03: Added 3 trigger tools (55 → 58)
     let actual_count = registry.len();
     assert_eq!(
-        actual_count, 55,
-        "TASK-41: Expected 55 tools, got {}. Check definitions modules for missing/extra tools.",
+        actual_count, 58,
+        "TASK-41: Expected 58 tools, got {}. Check definitions modules for missing/extra tools.",
         actual_count
     );
 
@@ -223,13 +224,13 @@ mod tests {
     }
 
     #[test]
-    fn test_register_all_tools_returns_55() {
+    fn test_register_all_tools_returns_58() {
         println!("\n=== FSV TEST: register_all_tools (TASK-41) ===");
 
         let registry = register_all_tools();
 
         println!("FSV-1: Tool count = {}", registry.len());
-        assert_eq!(registry.len(), 55, "Must have exactly 55 tools");
+        assert_eq!(registry.len(), 58, "Must have exactly 58 tools (55 + 3 trigger tools from TASK-S01/S02/S03)");
 
         // Verify critical tools exist
         let critical_tools = [
@@ -320,7 +321,7 @@ mod tests {
     fn test_list_returns_all_tools_sorted() {
         let registry = register_all_tools();
         let tools = registry.list();
-        assert_eq!(tools.len(), 55);
+        assert_eq!(tools.len(), 58);
 
         // Verify sorted by name
         for i in 1..tools.len() {
@@ -337,7 +338,7 @@ mod tests {
     fn test_tool_names_returns_sorted_names() {
         let registry = register_all_tools();
         let names = registry.tool_names();
-        assert_eq!(names.len(), 55);
+        assert_eq!(names.len(), 58);
 
         // Verify sorted
         for i in 1..names.len() {

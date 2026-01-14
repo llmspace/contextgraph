@@ -1,6 +1,7 @@
 //! Configuration management for the Context Graph system.
 
 pub mod constants;
+pub mod embedder_config;
 mod sub_configs;
 
 #[cfg(test)]
@@ -15,6 +16,12 @@ use crate::error::{CoreError, CoreResult};
 pub use sub_configs::{
     CudaConfig, EmbeddingConfig, FeatureFlags, IndexConfig, LoggingConfig, McpConfig, ServerConfig,
     StorageConfig, UtlConfig,
+};
+
+// Re-export embedder configuration types (TASK-L04)
+pub use embedder_config::{
+    check_deprecated_names, deserialize_embedder, deserialize_embedder_opt,
+    DeprecatedNameUsage, EmbedderConfig, EmbedderWeightsConfig,
 };
 
 /// System development phase.

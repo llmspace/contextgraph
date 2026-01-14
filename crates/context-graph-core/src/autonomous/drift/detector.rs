@@ -376,12 +376,12 @@ fn get_embedder_recommendation(info: &EmbedderDriftInfo) -> (String, String) {
             ),
             "Ensure code-related memories align with technical goals".to_string(),
         ),
-        Embedder::Graph => (
+        Embedder::Emotional => (
             format!(
-                "Relational graph drift at {} level (sim: {:.2})",
+                "Emotional/connectivity drift at {} level (sim: {:.2})",
                 severity, info.similarity
             ),
-            "Review entity relationship structures".to_string(),
+            "Review connectivity and emotional alignment patterns".to_string(),
         ),
         Embedder::Hdc => (
             format!(

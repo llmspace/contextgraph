@@ -331,7 +331,7 @@ impl SemanticFingerprint {
             Embedder::Causal => EmbeddingRef::Dense(&self.e5_causal),
             Embedder::Sparse => EmbeddingRef::Sparse(&self.e6_sparse),
             Embedder::Code => EmbeddingRef::Dense(&self.e7_code),
-            Embedder::Graph => EmbeddingRef::Dense(&self.e8_graph),
+            Embedder::Emotional => EmbeddingRef::Dense(&self.e8_graph),
             Embedder::Hdc => EmbeddingRef::Dense(&self.e9_hdc),
             Embedder::Multimodal => EmbeddingRef::Dense(&self.e10_multimodal),
             Embedder::Entity => EmbeddingRef::Dense(&self.e11_entity),
@@ -444,10 +444,10 @@ impl SemanticFingerprint {
             });
         }
 
-        // E8: Graph
+        // E8: Emotional (connectivity)
         if self.e8_graph.len() != E8_DIM {
             return Err(ValidationError::DimensionMismatch {
-                embedder: Embedder::Graph,
+                embedder: Embedder::Emotional,
                 expected: E8_DIM,
                 actual: self.e8_graph.len(),
             });

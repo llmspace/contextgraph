@@ -1,14 +1,14 @@
 //! Core types for single model embedding output.
 //!
 //! This module provides the `ModelEmbedding` struct which represents
-//! the output from a single embedding model in the 12-model pipeline.
+//! the output from a single embedding model in the 13-model pipeline.
 
 use crate::types::ModelId;
 
 /// Represents the embedding output from a single model.
 ///
 /// # Fields
-/// - `model_id`: Which of the 12 models produced this embedding
+/// - `model_id`: Which of the 13 models produced this embedding
 /// - `vector`: The embedding vector (f32 for GPU compatibility)
 /// - `latency_us`: Time taken to generate embedding in microseconds
 /// - `attention_weights`: Optional attention scores for interpretability

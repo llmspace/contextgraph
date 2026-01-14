@@ -161,7 +161,7 @@ impl WarmDiagnostics {
 
     /// Generate a minimal status line for quick monitoring.
     ///
-    /// Format: `WARM: 12/12 models | 24.0GB/24.0GB VRAM | OK`
+    /// Format: `WARM: 13/13 models | 24.0GB/24.0GB VRAM | OK`
     #[must_use]
     pub fn status_line(loader: &WarmLoader) -> String {
         let summary = loader.loading_summary();

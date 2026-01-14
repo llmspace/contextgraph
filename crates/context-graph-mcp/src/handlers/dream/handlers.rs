@@ -2,6 +2,7 @@
 //!
 //! TASK-DREAM-MCP: MCP tool handlers for dream consolidation system.
 //! TASK-37: Added get_gpu_status for GPU utilization monitoring.
+//! TASK-S01: Added trigger_mental_check for entropy-based triggering.
 //! NO BACKWARDS COMPATIBILITY - FAIL FAST WITH ROBUST LOGGING.
 //!
 //! ## Constitution Reference
@@ -23,6 +24,7 @@
 //! - abort_dream: Abort current dream cycle (<100ms mandate)
 //! - get_amortized_shortcuts: Get shortcut candidates from amortized learning
 //! - get_gpu_status: Get GPU utilization and dream eligibility (TASK-37)
+//! - trigger_mental_check: Entropy-based trigger for mental_check workflow (TASK-S01)
 
 use context_graph_core::dream::DreamPhase;
 use serde_json::json;
@@ -30,7 +32,8 @@ use tracing::{debug, error, info, warn};
 
 use crate::protocol::{error_codes, JsonRpcId, JsonRpcResponse};
 
-use super::Handlers;
+use crate::handlers::Handlers;
+use super::types::{TriggerConfigDto, TriggerHistoryEntry, TriggerMcpError};
 
 impl Handlers {
     /// trigger_dream tool implementation.
@@ -55,7 +58,7 @@ impl Handlers {
     /// - GPU eligibility: dream.trigger.gpu = "<80%"
     /// - GPU budget during dream: dream.constraints.gpu = "<30%"
     /// - AP-26: No silent failures - FAIL FAST on missing components
-    pub(super) async fn call_trigger_dream(
+    pub(crate) async fn call_trigger_dream(
         &self,
         id: Option<JsonRpcId>,
         args: serde_json::Value,
@@ -228,7 +231,7 @@ impl Handlers {
     /// - is_dreaming: bool - Whether currently in dream cycle
     /// - scheduler: object - Scheduler state (activity, cooldown, etc.)
     /// - constitution_compliance: object - Compliance with constitution mandates
-    pub(super) async fn call_get_dream_status(&self, id: Option<JsonRpcId>) -> JsonRpcResponse {
+    pub(crate) async fn call_get_dream_status(&self, id: Option<JsonRpcId>) -> JsonRpcResponse {
         debug!("Handling get_dream_status tool call");
 
         // FAIL FAST: Check dream controller
@@ -320,7 +323,7 @@ impl Handlers {
     /// - abort_latency_ms: u64 - Time taken to abort
     /// - previous_state: string - State before abort
     /// - mandate_met: bool - Whether <100ms mandate was met
-    pub(super) async fn call_abort_dream(
+    pub(crate) async fn call_abort_dream(
         &self,
         id: Option<JsonRpcId>,
         args: serde_json::Value,
@@ -436,7 +439,7 @@ impl Handlers {
     /// - shortcuts: array - List of shortcut candidates
     /// - total_candidates: usize - Total number of candidates
     /// - shortcuts_created_this_cycle: usize - Shortcuts created in current/last cycle
-    pub(super) async fn call_get_amortized_shortcuts(
+    pub(crate) async fn call_get_amortized_shortcuts(
         &self,
         id: Option<JsonRpcId>,
         args: serde_json::Value,
@@ -530,7 +533,7 @@ impl Handlers {
     /// - dream.trigger.gpu = "<80%" - Eligibility to START dream
     /// - dream.constraints.gpu = "<30%" - Budget during dream (abort if exceeded)
     /// - AP-26: No silent failures - returns explicit error on unavailable GPU
-    pub(super) async fn call_get_gpu_status(&self, id: Option<JsonRpcId>) -> JsonRpcResponse {
+    pub(crate) async fn call_get_gpu_status(&self, id: Option<JsonRpcId>) -> JsonRpcResponse {
         debug!("Handling get_gpu_status tool call");
 
         // FAIL FAST: GpuMonitor is REQUIRED
@@ -661,5 +664,302 @@ impl Handlers {
                 )
             }
         }
+    }
+
+    /// trigger_mental_check tool implementation.
+    ///
+    /// TASK-S01: Per SPEC-TRIGGER-MCP-001.
+    /// Validates entropy input, checks threshold, and triggers mental_check workflow.
+    /// FAIL FAST if TriggerManager not initialized.
+    ///
+    /// Arguments:
+    /// - entropy: f32 - REQUIRED entropy value [0.0, 1.0]
+    /// - force: bool - Force trigger even if below threshold (default: false)
+    /// - phase: string - Dream phase to execute (nrem/rem/full_cycle, default: full_cycle)
+    ///
+    /// Returns:
+    /// - status: TriggerStatus - initiated/queued/skipped
+    /// - trigger_reason: TriggerReasonDto - Why trigger fired
+    /// - workflow_id: Option<String> - Workflow ID if initiated
+    /// - message: String - Human-readable message
+    /// - entropy: f32 - Input entropy value
+    /// - threshold_exceeded: bool - Whether entropy > threshold
+    /// - threshold: f32 - Current threshold value
+    ///
+    /// # Constitution Compliance
+    /// - Default entropy threshold: 0.7
+    /// - AP-26: No silent failures - FAIL FAST on missing components
+    pub(crate) async fn call_trigger_mental_check(
+        &self,
+        id: Option<JsonRpcId>,
+        args: serde_json::Value,
+    ) -> JsonRpcResponse {
+        use super::types::{TriggerMentalCheckRequest, TriggerMentalCheckResponse, TriggerReasonDto};
+
+        debug!("Handling trigger_mental_check tool call");
+
+        // FAIL FAST: TriggerManager is REQUIRED
+        let trigger_manager = match &self.trigger_manager {
+            Some(tm) => tm,
+            None => {
+                error!("trigger_mental_check: TriggerManager not initialized - FAIL FAST per AP-26");
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::DREAM_NOT_INITIALIZED,
+                    "TriggerManager not initialized. Configure with with_trigger_manager().",
+                );
+            }
+        };
+
+        // Parse and validate request
+        let request: TriggerMentalCheckRequest = match serde_json::from_value(args.clone()) {
+            Ok(r) => r,
+            Err(e) => {
+                warn!("trigger_mental_check: Invalid request: {}", e);
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::INVALID_PARAMS,
+                    format!("Invalid request: {}. Required: entropy (f32 in [0.0, 1.0])", e),
+                );
+            }
+        };
+
+        // Validate entropy range
+        if let Err(mcp_err) = request.validate() {
+            warn!("trigger_mental_check: Validation failed: {}", mcp_err);
+            return JsonRpcResponse::error(
+                id,
+                error_codes::INVALID_PARAMS,
+                format!("Entropy validation failed: {}", mcp_err),
+            );
+        }
+
+        // Get current threshold from TriggerManager
+        let threshold = {
+            let manager = trigger_manager.read();
+            manager.entropy_threshold()
+        };
+
+        let entropy = request.entropy;
+        let threshold_exceeded = entropy > threshold || request.force;
+
+        // Check if trigger should fire
+        if !threshold_exceeded {
+            info!(
+                "trigger_mental_check: Entropy {:.3} <= threshold {:.3} - skipped",
+                entropy, threshold
+            );
+            let response = TriggerMentalCheckResponse::skipped(entropy, threshold);
+            return self.tool_result_with_pulse(id, serde_json::to_value(response).unwrap());
+        }
+
+        // Determine trigger reason
+        let trigger_reason = if request.force {
+            TriggerReasonDto::Manual {
+                phase: request.phase.clone().unwrap_or_else(|| "full_cycle".to_string()),
+            }
+        } else {
+            TriggerReasonDto::HighEntropy
+        };
+
+        // Parse phase (default: full_cycle)
+        let phase = match request.phase.as_deref() {
+            Some("nrem") => DreamPhase::Nrem,
+            Some("rem") => DreamPhase::Rem,
+            Some("full_cycle") | None => DreamPhase::FullCycle,
+            Some(invalid) => {
+                warn!(
+                    "trigger_mental_check: Invalid phase '{}', must be nrem/rem/full_cycle",
+                    invalid
+                );
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::INVALID_PARAMS,
+                    format!("Invalid phase '{}'. Must be 'nrem', 'rem', or 'full_cycle'", invalid),
+                );
+            }
+        };
+
+        // Check if another workflow is in progress (would be queued)
+        let is_dreaming = if let Some(dc) = &self.dream_controller {
+            let controller = dc.read();
+            controller.get_status().is_dreaming
+        } else {
+            false
+        };
+
+        if is_dreaming {
+            info!(
+                "trigger_mental_check: Trigger queued - another workflow in progress (entropy={:.3})",
+                entropy
+            );
+            let response = TriggerMentalCheckResponse::queued(entropy, threshold, trigger_reason);
+            return self.tool_result_with_pulse(id, serde_json::to_value(response).unwrap());
+        }
+
+        // REQUEST TRIGGER via TriggerManager
+        {
+            let mut manager = trigger_manager.write();
+            manager.request_manual_trigger(phase);
+        }
+
+        // Generate workflow ID
+        let workflow_id = format!(
+            "mental_check_{}_{}",
+            chrono::Utc::now().format("%Y%m%d_%H%M%S"),
+            uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("0000")
+        );
+
+        info!(
+            "trigger_mental_check: Trigger INITIATED - entropy={:.3}, threshold={:.3}, phase={:?}, workflow_id={}",
+            entropy, threshold, phase, workflow_id
+        );
+
+        // Record in trigger history (if available)
+        {
+            let mut manager = trigger_manager.write();
+            // Update entropy for trigger reason tracking
+            manager.update_entropy(entropy);
+        }
+
+        let response = TriggerMentalCheckResponse::initiated(
+            entropy,
+            threshold,
+            trigger_reason,
+            Some(workflow_id),
+        );
+
+        self.tool_result_with_pulse(id, serde_json::to_value(response).unwrap())
+    }
+
+    // ========== TASK-S02: get_trigger_config ==========
+
+    /// Handle get_trigger_config MCP tool.
+    ///
+    /// Returns current TriggerManager configuration including thresholds,
+    /// cooldowns, and trigger count.
+    ///
+    /// # Constitution
+    /// - AP-26: No silent failures - fails fast if TriggerManager not initialized
+    ///
+    /// # Returns
+    /// - `TriggerConfigDto` with entropy_threshold, ic_threshold, cooldown_ms,
+    ///   last_trigger_timestamp, trigger_count, enabled
+    pub(crate) async fn call_get_trigger_config(
+        &self,
+        id: Option<JsonRpcId>,
+    ) -> JsonRpcResponse {
+        debug!("call_get_trigger_config: TASK-S02");
+
+        // FAIL FAST if TriggerManager not initialized (AP-26)
+        let trigger_manager = match &self.trigger_manager {
+            Some(tm) => tm,
+            None => {
+                let err = TriggerMcpError::not_initialized();
+                error!(
+                    code = err.code(),
+                    guidance = "Call initialize_trigger_manager() first",
+                    "E_TRIGGER_MCP_004: TriggerManager not initialized"
+                );
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::INTERNAL_ERROR,
+                    format!("{}", err),
+                );
+            }
+        };
+
+        // Build TriggerConfigDto from TriggerManager state
+        let manager = trigger_manager.read();
+
+        let config_dto = TriggerConfigDto {
+            entropy_threshold: manager.entropy_threshold(),
+            ic_threshold: manager.ic_threshold(),
+            cooldown_ms: manager.cooldown_ms(),
+            // last_trigger_timestamp: None for now (Instant doesn't convert to ISO 8601)
+            last_trigger_timestamp: None,
+            trigger_count: manager.trigger_count(),
+            enabled: manager.is_enabled(),
+        };
+
+        debug!(
+            entropy_threshold = config_dto.entropy_threshold,
+            ic_threshold = config_dto.ic_threshold,
+            cooldown_ms = config_dto.cooldown_ms,
+            trigger_count = config_dto.trigger_count,
+            enabled = config_dto.enabled,
+            "get_trigger_config: returning TriggerConfigDto"
+        );
+
+        self.tool_result_with_pulse(id, serde_json::to_value(config_dto).unwrap())
+    }
+
+    /// TASK-S03: Handle get_trigger_history tool call.
+    ///
+    /// Returns recent trigger history showing when and why triggers fired.
+    /// Limited to last 100 entries, with optional limit parameter.
+    ///
+    /// Per SPEC-TRIGGER-MCP-001 REQ-HISTORY-01.
+    pub(crate) async fn call_get_trigger_history(
+        &self,
+        id: Option<JsonRpcId>,
+        arguments: serde_json::Value,
+    ) -> JsonRpcResponse {
+        debug!("call_get_trigger_history: TASK-S03");
+
+        // FAIL FAST if TriggerManager not initialized (AP-26)
+        let trigger_manager = match &self.trigger_manager {
+            Some(tm) => tm,
+            None => {
+                let err = TriggerMcpError::not_initialized();
+                error!(
+                    code = err.code(),
+                    guidance = "Call initialize_trigger_manager() first",
+                    "E_TRIGGER_MCP_004: TriggerManager not initialized"
+                );
+                return JsonRpcResponse::error(
+                    id,
+                    error_codes::INTERNAL_ERROR,
+                    format!("{}", err),
+                );
+            }
+        };
+
+        // Parse optional limit parameter (default 20, max 100)
+        let limit = arguments
+            .get("limit")
+            .and_then(|v| v.as_u64())
+            .map(|v| v.min(100) as usize)
+            .unwrap_or(20);
+
+        // Get history from TriggerManager and convert to DTOs
+        let manager = trigger_manager.read();
+        let history = manager.trigger_history();
+
+        // Take the most recent 'limit' entries (history is in chronological order)
+        let recent: Vec<TriggerHistoryEntry> = history
+            .iter()
+            .rev()
+            .take(limit)
+            .map(|item| {
+                TriggerHistoryEntry::new(
+                    item.entropy,
+                    item.reason.clone().into(),
+                    item.workflow_initiated,
+                    None, // workflow_id not tracked in core
+                )
+            })
+            .collect();
+
+        debug!(
+            total_history = history.len(),
+            returned = recent.len(),
+            limit = limit,
+            "get_trigger_history: returning {} of {} entries",
+            recent.len(),
+            history.len()
+        );
+
+        self.tool_result_with_pulse(id, serde_json::to_value(recent).unwrap())
     }
 }

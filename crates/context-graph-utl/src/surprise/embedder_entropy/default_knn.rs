@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn test_default_knn_identical_vectors_low_surprise() {
-        let calculator = DefaultKnnEntropy::new(Embedder::Graph);
+        let calculator = DefaultKnnEntropy::new(Embedder::Emotional);
 
         let current = vec![0.5f32; 384];
         let history: Vec<Vec<f32>> = vec![current.clone(); 10];
@@ -252,7 +252,7 @@ mod tests {
             Embedder::TemporalPositional,
             Embedder::Sparse,
             Embedder::Code,
-            Embedder::Graph,
+            Embedder::Emotional,
             Embedder::Multimodal,
             Embedder::Entity,
             Embedder::LateInteraction,
@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn test_default_knn_reset() {
-        let mut calculator = DefaultKnnEntropy::new(Embedder::Graph);
+        let mut calculator = DefaultKnnEntropy::new(Embedder::Emotional);
 
         // Simulate some updates
         calculator.update_statistics(0.3);

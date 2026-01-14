@@ -10,12 +10,50 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::sync::atomic::{AtomicBool, Ordering};
+use thiserror::Error;
 
 // Import dimension constants from the fingerprint module (via public re-export)
 use crate::types::fingerprint::{
     E10_DIM, E11_DIM, E12_TOKEN_DIM, E13_SPLADE_VOCAB, E1_DIM, E2_DIM, E3_DIM, E4_DIM, E5_DIM,
     E6_SPARSE_VOCAB, E7_DIM, E8_DIM, E9_DIM,
 };
+
+/// Emit deprecation warning for E8_Graph usage.
+fn emit_e8_deprecation_warning(context: &str) {
+    static WARNED: AtomicBool = AtomicBool::new(false);
+
+    // Only warn once per process to avoid spam
+    if !WARNED.swap(true, Ordering::Relaxed) {
+        tracing::warn!(
+            target: "context_graph::deprecation",
+            canonical = "E8_Emotional",
+            deprecated = "E8_Graph",
+            context = context,
+            "DEPRECATION: E8 embedder should be referenced as 'E8_Emotional', not 'E8_Graph'. \
+             The 'Graph' name will be removed in version 1.0.0."
+        );
+    }
+}
+
+/// Error when parsing embedder name.
+#[derive(Debug, Error, Clone)]
+pub enum EmbedderNameError {
+    /// Ambiguous name without E8 prefix.
+    #[error("E_E8_NAME_001: Ambiguous name '{name}'. {suggestion}")]
+    Ambiguous { name: String, suggestion: String },
+
+    /// Unknown embedder name.
+    #[error("E_E8_NAME_002: Unknown embedder '{name}'. Valid names: {valid_names:?}")]
+    Unknown {
+        name: String,
+        valid_names: Vec<&'static str>,
+    },
+
+    /// Deprecated name used after deprecation period.
+    #[error("E_E8_NAME_003: Deprecated name '{deprecated}' no longer supported. Use '{canonical}'")]
+    DeprecatedRemoved { deprecated: String, canonical: String },
+}
 
 /// The 13 embedding models in the teleological array system.
 ///
@@ -46,8 +84,15 @@ pub enum Embedder {
     Sparse = 5,
     /// E7: Code via Qodo-Embed (1536D dense)
     Code = 6,
-    /// E8: Graph structure via MiniLM (384D dense)
-    Graph = 7,
+    /// E8: Emotional/connectivity patterns via MiniLM (384D dense)
+    ///
+    /// Constitution: teleological_purpose = V_connectivity
+    ///
+    /// # Canonical Name
+    ///
+    /// The canonical name is `Emotional` per constitution.
+    /// The `Graph` alias is deprecated and emits a warning.
+    Emotional = 7,
     /// E9: HDC projected from 10K-bit hyperdimensional (1024D dense)
     Hdc = 8,
     /// E10: Multimodal via CLIP (768D dense)
@@ -63,6 +108,20 @@ pub enum Embedder {
 impl Embedder {
     /// Total number of embedders in the system.
     pub const COUNT: usize = 13;
+
+    /// Deprecated alias for E8_Emotional.
+    ///
+    /// # Deprecation
+    ///
+    /// Use `Embedder::Emotional` instead. This alias will be removed
+    /// in a future release.
+    ///
+    /// # Warning
+    ///
+    /// Using this constant emits a deprecation warning at compile time.
+    #[deprecated(since = "0.9.0", note = "Use Embedder::Emotional instead")]
+    #[allow(non_upper_case_globals)]
+    pub const Graph: Self = Self::Emotional;
 
     /// Get the array index for this embedder (0-12).
     #[inline]
@@ -83,7 +142,7 @@ impl Embedder {
             4 => Some(Self::Causal),
             5 => Some(Self::Sparse),
             6 => Some(Self::Code),
-            7 => Some(Self::Graph),
+            7 => Some(Self::Emotional),
             8 => Some(Self::Hdc),
             9 => Some(Self::Multimodal),
             10 => Some(Self::Entity),
@@ -107,7 +166,7 @@ impl Embedder {
                 vocab_size: E6_SPARSE_VOCAB,
             }, // 30522
             Self::Code => EmbedderDims::Dense(E7_DIM),     // 1536
-            Self::Graph => EmbedderDims::Dense(E8_DIM),    // 384
+            Self::Emotional => EmbedderDims::Dense(E8_DIM), // 384
             Self::Hdc => EmbedderDims::Dense(E9_DIM),      // 1024 (projected)
             Self::Multimodal => EmbedderDims::Dense(E10_DIM), // 768
             Self::Entity => EmbedderDims::Dense(E11_DIM),  // 384
@@ -137,7 +196,7 @@ impl Embedder {
             Self::Causal => "E5_Causal",
             Self::Sparse => "E6_Sparse_Lexical",
             Self::Code => "E7_Code",
-            Self::Graph => "E8_Graph",
+            Self::Emotional => "E8_Emotional",
             Self::Hdc => "E9_HDC",
             Self::Multimodal => "E10_Multimodal",
             Self::Entity => "E11_Entity",
@@ -158,7 +217,7 @@ impl Embedder {
             Self::Causal => "E5",
             Self::Sparse => "E6",
             Self::Code => "E7",
-            Self::Graph => "E8",
+            Self::Emotional => "E8",
             Self::Hdc => "E9",
             Self::Multimodal => "E10",
             Self::Entity => "E11",
@@ -195,6 +254,111 @@ impl Embedder {
             Self::KeywordSplade => 1.1, // Sparse = variable
             _ => 1.0,                   // Baseline
         }
+    }
+
+    /// Get the teleological purpose for this embedder.
+    pub fn purpose(self) -> &'static str {
+        match self {
+            Self::Semantic => "V_semantic",
+            Self::TemporalRecent => "V_temporal_recent",
+            Self::TemporalPeriodic => "V_temporal_periodic",
+            Self::TemporalPositional => "V_temporal_positional",
+            Self::Causal => "V_causality",
+            Self::Sparse => "V_sparse",
+            Self::Code => "V_code",
+            Self::Emotional => "V_connectivity", // Per constitution
+            Self::Hdc => "V_hdc",
+            Self::Multimodal => "V_multimodal",
+            Self::Entity => "V_entity",
+            Self::LateInteraction => "V_late_interaction",
+            Self::KeywordSplade => "V_keyword",
+        }
+    }
+
+    /// Create embedder from string name.
+    ///
+    /// Accepts both canonical and deprecated names.
+    /// Deprecated names emit a tracing warning.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Embedder name (case-insensitive)
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Embedder)` - Valid embedder
+    /// * `Err(EmbedderNameError)` - Invalid or ambiguous name
+    pub fn from_name(name: &str) -> Result<Self, EmbedderNameError> {
+        let normalized = name.to_lowercase().replace('-', "_");
+
+        match normalized.as_str() {
+            // E1
+            "e1" | "e1_semantic" | "semantic" => Ok(Self::Semantic),
+            // E2
+            "e2" | "e2_temporal_recent" | "temporal_recent" => Ok(Self::TemporalRecent),
+            // E3
+            "e3" | "e3_temporal_periodic" | "temporal_periodic" => Ok(Self::TemporalPeriodic),
+            // E4
+            "e4" | "e4_temporal_positional" | "temporal_positional" => Ok(Self::TemporalPositional),
+            // E5
+            "e5" | "e5_causal" | "causal" => Ok(Self::Causal),
+            // E6
+            "e6" | "e6_sparse" | "e6_sparse_lexical" | "sparse" | "sparse_lexical" => {
+                Ok(Self::Sparse)
+            }
+            // E7
+            "e7" | "e7_code" | "code" => Ok(Self::Code),
+            // E8 - Canonical
+            "e8" | "e8_emotional" | "emotional" => Ok(Self::Emotional),
+            // E8 - Deprecated aliases
+            "e8_graph" => {
+                emit_e8_deprecation_warning("from_name()");
+                Ok(Self::Emotional)
+            }
+            // Ambiguous: "graph" without prefix
+            "graph" => Err(EmbedderNameError::Ambiguous {
+                name: name.to_string(),
+                suggestion: "Use 'E8_Emotional' for the E8 embedder".to_string(),
+            }),
+            // E9
+            "e9" | "e9_hdc" | "hdc" => Ok(Self::Hdc),
+            // E10
+            "e10" | "e10_multimodal" | "multimodal" => Ok(Self::Multimodal),
+            // E11
+            "e11" | "e11_entity" | "entity" => Ok(Self::Entity),
+            // E12
+            "e12" | "e12_late_interaction" | "late_interaction" | "lateinteraction" => {
+                Ok(Self::LateInteraction)
+            }
+            // E13
+            "e13" | "e13_splade" | "e13_keyword_splade" | "keyword_splade" | "keywordsplade" => {
+                Ok(Self::KeywordSplade)
+            }
+            // Unknown
+            _ => Err(EmbedderNameError::Unknown {
+                name: name.to_string(),
+                valid_names: Self::all_names(),
+            }),
+        }
+    }
+
+    /// Get all valid embedder names.
+    pub fn all_names() -> Vec<&'static str> {
+        vec![
+            "E1_Semantic",
+            "E2_Temporal_Recent",
+            "E3_Temporal_Periodic",
+            "E4_Temporal_Positional",
+            "E5_Causal",
+            "E6_Sparse_Lexical",
+            "E7_Code",
+            "E8_Emotional",
+            "E9_HDC",
+            "E10_Multimodal",
+            "E11_Entity",
+            "E12_Late_Interaction",
+            "E13_SPLADE",
+        ]
     }
 }
 
@@ -556,5 +720,124 @@ mod tests {
             128
         );
         println!("[PASS] EmbedderDims::primary_dim() works correctly");
+    }
+
+    // ========================================
+    // E8 Naming Tests (TASK-F04)
+    // ========================================
+
+    #[test]
+    fn test_e8_canonical_name() {
+        // E8 canonical name per constitution is "Emotional"
+        assert_eq!(Embedder::Emotional.name(), "E8_Emotional");
+        assert_eq!(Embedder::Emotional.short_name(), "E8");
+        println!("[PASS] E8 canonical name is E8_Emotional");
+    }
+
+    #[test]
+    fn test_e8_purpose() {
+        // E8 purpose per constitution is V_connectivity
+        assert_eq!(Embedder::Emotional.purpose(), "V_connectivity");
+        println!("[PASS] E8 purpose is V_connectivity");
+    }
+
+    #[test]
+    fn test_e8_from_name_canonical() {
+        // Canonical names should work
+        assert_eq!(Embedder::from_name("E8").unwrap(), Embedder::Emotional);
+        assert_eq!(
+            Embedder::from_name("E8_Emotional").unwrap(),
+            Embedder::Emotional
+        );
+        assert_eq!(
+            Embedder::from_name("emotional").unwrap(),
+            Embedder::Emotional
+        );
+        assert_eq!(
+            Embedder::from_name("EMOTIONAL").unwrap(),
+            Embedder::Emotional
+        );
+        println!("[PASS] E8 canonical names parse correctly");
+    }
+
+    #[test]
+    fn test_e8_from_name_deprecated() {
+        // Deprecated E8_Graph should still work (with warning emitted)
+        let result = Embedder::from_name("E8_Graph");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Embedder::Emotional);
+        println!("[PASS] E8_Graph deprecated name still parses (with warning)");
+    }
+
+    #[test]
+    fn test_e8_from_name_ambiguous() {
+        // "graph" without E8 prefix should be ambiguous
+        let result = Embedder::from_name("graph");
+        assert!(result.is_err());
+        match result {
+            Err(EmbedderNameError::Ambiguous { name, suggestion }) => {
+                assert_eq!(name, "graph");
+                assert!(suggestion.contains("E8_Emotional"));
+                println!("[PASS] 'graph' is correctly ambiguous");
+            }
+            _ => panic!("Expected Ambiguous error"),
+        }
+    }
+
+    #[test]
+    fn test_e8_from_name_unknown() {
+        // Unknown names should error
+        let result = Embedder::from_name("nonexistent");
+        assert!(result.is_err());
+        match result {
+            Err(EmbedderNameError::Unknown { name, valid_names }) => {
+                assert_eq!(name, "nonexistent");
+                assert!(!valid_names.is_empty());
+                println!("[PASS] Unknown names error correctly");
+            }
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+
+    #[test]
+    fn test_e8_all_names() {
+        let names = Embedder::all_names();
+        // Should include E8_Emotional
+        assert!(names.contains(&"E8_Emotional"));
+        // Should have 13 canonical names
+        assert_eq!(names.len(), 13);
+        // Should NOT include deprecated E8_Graph
+        assert!(!names.contains(&"E8_Graph"));
+        println!("[PASS] all_names() returns 13 canonical names including E8_Emotional");
+    }
+
+    #[test]
+    fn test_e8_name_error_codes() {
+        let ambiguous = EmbedderNameError::Ambiguous {
+            name: "graph".to_string(),
+            suggestion: "Use E8_Emotional".to_string(),
+        };
+        assert!(format!("{}", ambiguous).contains("E_E8_NAME_001"));
+
+        let unknown = EmbedderNameError::Unknown {
+            name: "foo".to_string(),
+            valid_names: vec!["E1_Semantic"],
+        };
+        assert!(format!("{}", unknown).contains("E_E8_NAME_002"));
+
+        let deprecated_removed = EmbedderNameError::DeprecatedRemoved {
+            deprecated: "E8_Graph".to_string(),
+            canonical: "E8_Emotional".to_string(),
+        };
+        assert!(format!("{}", deprecated_removed).contains("E_E8_NAME_003"));
+        println!("[PASS] EmbedderNameError codes are correct");
+    }
+
+    #[test]
+    fn test_e8_index_unchanged() {
+        // E8 (Emotional) should still be at index 7
+        assert_eq!(Embedder::Emotional.index(), 7);
+        assert_eq!(Embedder::from_index(7), Some(Embedder::Emotional));
+        println!("[PASS] E8 index is still 7");
     }
 }

@@ -5,7 +5,7 @@ use crate::protocol::JsonRpcId;
 use super::{create_test_handlers, make_request};
 
 #[tokio::test]
-async fn test_tools_list_returns_all_55_tools() {
+async fn test_tools_list_returns_all_58_tools() {
     let handlers = create_test_handlers();
     let request = make_request("tools/list", Some(JsonRpcId::Number(1)), None);
 
@@ -24,11 +24,11 @@ async fn test_tools_list_returns_all_55_tools() {
         .as_array()
         .expect("tools must be an array");
 
-    // Verify exactly 55 tools returned:
+    // Verify exactly 58 tools returned:
     // Core 6: inject_context, store_memory, get_memetic_status, get_graph_manifest, search_graph, utl_status
     // GWT 9: get_consciousness_state, get_kuramoto_sync, get_workspace_status, get_ego_state, trigger_workspace_broadcast, adjust_coupling, get_coherence_state (TASK-34), get_identity_continuity (TASK-38), get_kuramoto_state (TASK-39)
     // ATC 3 (TASK-ATC-001): get_threshold_status, get_calibration_metrics, trigger_recalibration
-    // Dream 5 (TASK-DREAM-MCP, TASK-37): trigger_dream, get_dream_status, abort_dream, get_amortized_shortcuts, get_gpu_status
+    // Dream 8 (TASK-DREAM-MCP, TASK-37, TASK-S01/S02/S03): trigger_dream, get_dream_status, abort_dream, get_amortized_shortcuts, get_gpu_status, trigger_mental_check, get_trigger_config, get_trigger_history
     // Neuromod 2 (TASK-NEUROMOD-MCP): get_neuromodulation_state, adjust_neuromodulator
     // Steering 1 (TASK-STEERING-001): get_steering_feedback
     // Causal 1 (TASK-CAUSAL-001): omni_infer
@@ -43,8 +43,8 @@ async fn test_tools_list_returns_all_55_tools() {
     // Session 4 (TASK-013/014): session_start, session_end, pre_tool_use, post_tool_use
     assert_eq!(
         tools.len(),
-        55,
-        "Must return exactly 55 tools, got {}",
+        58,
+        "Must return exactly 58 tools, got {}",
         tools.len()
     );
 }

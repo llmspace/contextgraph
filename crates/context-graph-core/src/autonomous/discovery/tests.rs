@@ -413,7 +413,7 @@ mod tests {
         ));
         embedder_magnitudes.push((Embedder::Causal, l2_norm(&centroid.e5_causal)));
         embedder_magnitudes.push((Embedder::Code, l2_norm(&centroid.e7_code)));
-        embedder_magnitudes.push((Embedder::Graph, l2_norm(&centroid.e8_graph)));
+        embedder_magnitudes.push((Embedder::Emotional, l2_norm(&centroid.e8_graph)));
         embedder_magnitudes.push((Embedder::Hdc, l2_norm(&centroid.e9_hdc)));
         embedder_magnitudes.push((Embedder::Multimodal, l2_norm(&centroid.e10_multimodal)));
         embedder_magnitudes.push((Embedder::Entity, l2_norm(&centroid.e11_entity)));

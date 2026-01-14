@@ -176,7 +176,7 @@ fn test_allocate_all_13_embedders_within_budget() {
         (Embedder::Causal, 150_000_000, "E5: 150MB (768D Longformer)"),
         (Embedder::Sparse, 50_000_000, "E6: 50MB sparse SPLADE"),
         (Embedder::Code, 300_000_000, "E7: 300MB (1536D Qodo)"),
-        (Embedder::Graph, 75_000_000, "E8: 75MB (384D MiniLM)"),
+        (Embedder::Emotional, 75_000_000, "E8: 75MB (384D MiniLM)"),
         (Embedder::Hdc, 50_000_000, "E9: 50MB (1024D projected)"),
         (Embedder::Multimodal, 150_000_000, "E10: 150MB (768D CLIP)"),
         (Embedder::Entity, 75_000_000, "E11: 75MB (384D MiniLM)"),

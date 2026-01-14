@@ -264,6 +264,37 @@ impl TriggerConfig {
     }
 }
 
+/// A single trigger history item.
+///
+/// TASK-S03: Records when and why a trigger fired.
+/// Kept simple to avoid cross-crate dependencies.
+#[derive(Debug, Clone)]
+pub struct TriggerHistoryItem {
+    /// When the trigger fired (monotonic instant for duration calculations).
+    pub triggered_at: Instant,
+
+    /// The entropy value when triggered.
+    pub entropy: f32,
+
+    /// The reason the trigger fired.
+    pub reason: ExtendedTriggerReason,
+
+    /// Whether a workflow was initiated (vs queued/skipped).
+    pub workflow_initiated: bool,
+}
+
+impl TriggerHistoryItem {
+    /// Create a new history item.
+    pub fn new(entropy: f32, reason: ExtendedTriggerReason, workflow_initiated: bool) -> Self {
+        Self {
+            triggered_at: Instant::now(),
+            entropy,
+            reason,
+            workflow_initiated,
+        }
+    }
+}
+
 /// Unified trigger manager for dream cycles.
 ///
 /// Combines all trigger mechanisms into a single interface:
@@ -288,6 +319,8 @@ impl TriggerConfig {
 /// 4. HighEntropy - Entropy > 0.7 for 5 minutes
 #[derive(Debug)]
 pub struct TriggerManager {
+    /// Trigger history (TASK-S03) - capped at 100 entries
+    trigger_history: Vec<TriggerHistoryItem>,
     /// Configuration with thresholds (TASK-21)
     config: TriggerConfig,
 
@@ -316,6 +349,9 @@ pub struct TriggerManager {
     /// Last trigger time
     last_trigger_time: Option<Instant>,
 
+    /// Count of triggers fired (TASK-S02)
+    trigger_count: u32,
+
     /// Whether triggers are enabled
     enabled: bool,
 }
@@ -332,6 +368,7 @@ impl TriggerManager {
     pub fn new() -> Self {
         let config = TriggerConfig::default();
         Self {
+            trigger_history: Vec::new(), // TASK-S03: Start with empty history
             trigger_cooldown: config.cooldown, // Use config cooldown
             config,
             current_ic: None,
@@ -340,6 +377,7 @@ impl TriggerManager {
             manual_trigger: None, // TASK-DREAM-PH-002: Now stores Option<DreamPhase>
             last_trigger_reason: None,
             last_trigger_time: None,
+            trigger_count: 0, // TASK-S02: Start with no triggers
             enabled: true,
         }
     }
@@ -355,6 +393,7 @@ impl TriggerManager {
     pub fn with_config(config: TriggerConfig) -> Self {
         config.validate(); // Fail-fast per AP-26
         Self {
+            trigger_history: Vec::new(), // TASK-S03: Start with empty history
             trigger_cooldown: config.cooldown,
             config,
             current_ic: None,
@@ -363,6 +402,7 @@ impl TriggerManager {
             manual_trigger: None, // TASK-DREAM-PH-002: Now stores Option<DreamPhase>
             last_trigger_reason: None,
             last_trigger_time: None,
+            trigger_count: 0, // TASK-S02: Start with no triggers
             enabled: true,
         }
     }
@@ -577,8 +617,17 @@ impl TriggerManager {
     pub fn mark_triggered(&mut self, reason: ExtendedTriggerReason) {
         info!("Dream triggered: {:?}", reason);
 
+        // TASK-S03: Record in history before resetting entropy window
+        let current_entropy = self.entropy_window.average();
+        self.push_history(TriggerHistoryItem::new(
+            current_entropy,
+            reason,
+            true, // workflow_initiated = true when mark_triggered is called
+        ));
+
         self.last_trigger_reason = Some(reason);
         self.last_trigger_time = Some(Instant::now());
+        self.trigger_count = self.trigger_count.saturating_add(1); // TASK-S02
 
         // Reset states - TASK-DREAM-PH-002: manual_trigger is now Option
         self.manual_trigger = None;
@@ -641,6 +690,54 @@ impl TriggerManager {
     #[inline]
     pub fn ic_threshold(&self) -> f32 {
         self.config.ic_threshold
+    }
+
+    /// Get entropy threshold for high entropy trigger.
+    ///
+    /// TASK-S01: Added to support trigger_mental_check MCP tool.
+    /// Default: 0.7 per Constitution dream.trigger.entropy.
+    #[inline]
+    pub fn entropy_threshold(&self) -> f32 {
+        self.config.entropy_threshold
+    }
+
+    /// Get cooldown duration in milliseconds.
+    ///
+    /// TASK-S02: Added to support get_trigger_config MCP tool.
+    /// Default: 60000ms per Constitution.
+    #[inline]
+    pub fn cooldown_ms(&self) -> u64 {
+        self.config.cooldown.as_millis() as u64
+    }
+
+    /// Get total trigger count for current session.
+    ///
+    /// TASK-S02: Added to support get_trigger_config MCP tool.
+    #[inline]
+    pub fn trigger_count(&self) -> u32 {
+        self.trigger_count
+    }
+
+    /// Get trigger history (most recent first).
+    ///
+    /// TASK-S03: Added to support get_trigger_history MCP tool.
+    /// Returns up to the last 100 trigger events.
+    pub fn trigger_history(&self) -> &[TriggerHistoryItem] {
+        &self.trigger_history
+    }
+
+    /// Push a new history item (capped at 100 entries).
+    ///
+    /// TASK-S03: Records trigger for history tracking.
+    fn push_history(&mut self, item: TriggerHistoryItem) {
+        const MAX_HISTORY: usize = 100;
+
+        self.trigger_history.push(item);
+
+        // Trim if over capacity (remove oldest)
+        if self.trigger_history.len() > MAX_HISTORY {
+            self.trigger_history.remove(0);
+        }
     }
 
     /// Get last trigger reason.

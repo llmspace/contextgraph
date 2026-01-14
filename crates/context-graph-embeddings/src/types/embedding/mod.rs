@@ -1,7 +1,7 @@
 //! Single model embedding output with validation and normalization.
 //!
 //! This module provides the `ModelEmbedding` struct which represents
-//! the output from a single embedding model in the 12-model pipeline.
+//! the output from a single embedding model in the 13-model pipeline.
 //!
 //! # Submodules
 //! - `types` - Core struct definition and constructors

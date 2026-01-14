@@ -8,10 +8,12 @@
 //! Any deviation from constitution values is a BUG.
 
 use std::collections::VecDeque;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use thiserror::Error;
 use uuid::Uuid;
 
 // ============================================================================
@@ -657,6 +659,152 @@ impl std::fmt::Display for ExtendedTriggerReason {
 }
 
 // ============================================================================
+// CONSOLIDATION METRICS TYPES - TASK-F01
+// Constitution Compliance: METAUTL-003 (dream_triggered → lambda_adjustment)
+// ============================================================================
+
+/// Error when ConsolidationMetrics contains invalid values.
+///
+/// Per SPEC-DREAM-LAMBDA-001: NaN/Infinity values MUST be rejected.
+#[derive(Debug, Error, Clone, PartialEq)]
+pub enum InvalidMetricsError {
+    /// A field contains NaN.
+    #[error("E_DREAM_LAMBDA_001: Field '{field}' contains NaN")]
+    NaN { field: &'static str },
+
+    /// A field contains Infinity.
+    #[error("E_DREAM_LAMBDA_001: Field '{field}' contains Infinity")]
+    Infinite { field: &'static str },
+
+    /// A field is outside valid range.
+    #[error("E_DREAM_LAMBDA_001: Field '{field}' value {value} outside [{min}, {max}]")]
+    OutOfRange {
+        field: &'static str,
+        value: f32,
+        min: f32,
+        max: f32,
+    },
+}
+
+/// Metrics from a dream consolidation cycle.
+///
+/// Used by `MetaUtlTracker.adjust_lambdas()` to compute lambda adjustments.
+/// All metrics are normalized to [0.0, 1.0] unless otherwise specified.
+///
+/// # Constitution Compliance
+///
+/// METAUTL-003: `"dream_triggered → lambda_adjustment"`
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ConsolidationMetrics {
+    /// Quality of the consolidation [0.0, 1.0].
+    /// Higher values indicate better memory organization.
+    /// Computed from: edges_pruned / edges_evaluated ratio.
+    pub quality: f32,
+
+    /// Coherence achieved after consolidation [0.0, 1.0].
+    /// Higher values indicate better graph consistency.
+    /// Computed from: Kuramoto order parameter post-consolidation.
+    pub coherence: f32,
+
+    /// Number of edges pruned during NREM phase.
+    /// Used for logging and analysis, not lambda computation.
+    pub edges_pruned: u32,
+
+    /// Number of new shortcuts created during REM phase.
+    /// Used for logging and analysis, not lambda computation.
+    pub shortcuts_created: u32,
+
+    /// Duration of the consolidation cycle.
+    pub duration: Duration,
+
+    /// Whether the consolidation completed successfully.
+    /// If false, `adjust_lambdas` MUST NOT be called.
+    pub success: bool,
+
+    /// Optional: blind spots discovered during REM walk.
+    /// For observability, not lambda computation.
+    pub blind_spots_found: u32,
+}
+
+impl ConsolidationMetrics {
+    /// Validate that metrics contain no NaN or Infinity values.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if valid, `Err(InvalidMetricsError)` with field name if invalid.
+    pub fn validate(&self) -> Result<(), InvalidMetricsError> {
+        if self.quality.is_nan() {
+            return Err(InvalidMetricsError::NaN { field: "quality" });
+        }
+        if self.quality.is_infinite() {
+            return Err(InvalidMetricsError::Infinite { field: "quality" });
+        }
+        if self.coherence.is_nan() {
+            return Err(InvalidMetricsError::NaN { field: "coherence" });
+        }
+        if self.coherence.is_infinite() {
+            return Err(InvalidMetricsError::Infinite { field: "coherence" });
+        }
+        if !(0.0..=1.0).contains(&self.quality) {
+            return Err(InvalidMetricsError::OutOfRange {
+                field: "quality",
+                value: self.quality,
+                min: 0.0,
+                max: 1.0,
+            });
+        }
+        if !(0.0..=1.0).contains(&self.coherence) {
+            return Err(InvalidMetricsError::OutOfRange {
+                field: "coherence",
+                value: self.coherence,
+                min: 0.0,
+                max: 1.0,
+            });
+        }
+        Ok(())
+    }
+}
+
+// ============================================================================
+// TASK-L02: CONSOLIDATION CALLBACK TYPE
+// ============================================================================
+
+/// Callback type for dream consolidation completion.
+///
+/// SPEC-DREAM-LAMBDA-001: Wire DreamController to MetaUtlTracker.
+/// METAUTL-003: `"dream_triggered → lambda_adjustment"`
+///
+/// # Thread Safety
+///
+/// The callback is invoked from the dream thread. The callback MUST be
+/// `Send + Sync` to allow cross-thread invocation.
+///
+/// # Semantics
+///
+/// - Called ONLY on successful consolidation (metrics.success == true)
+/// - Called synchronously after consolidation completes
+/// - Errors are logged but do not abort the dream cycle
+///
+/// # Example
+///
+/// ```ignore
+/// use std::sync::{Arc, Mutex};
+/// use context_graph_mcp::handlers::core::MetaUtlTracker;
+///
+/// let tracker = Arc::new(Mutex::new(MetaUtlTracker::new()));
+/// let tracker_clone = Arc::clone(&tracker);
+///
+/// let callback: ConsolidationCallback = Arc::new(move |metrics| {
+///     if let Ok(mut t) = tracker_clone.lock() {
+///         if let Err(e) = t.adjust_lambdas(metrics) {
+///             tracing::error!("Lambda adjustment failed: {}", e);
+///         }
+///     }
+/// });
+/// ```
+pub type ConsolidationCallback = Arc<dyn Fn(ConsolidationMetrics) + Send + Sync>;
+
+// ============================================================================
 // TESTS - NO MOCK DATA
 // ============================================================================
 
@@ -1057,5 +1205,135 @@ mod tests {
         let deserialized: ExtendedTriggerReason =
             serde_json::from_str(&json).expect("deserialization should succeed");
         assert_eq!(deserialized, manual);
+    }
+
+    // ============================================================================
+    // CONSOLIDATION METRICS TESTS - TASK-F01
+    // ============================================================================
+
+    fn valid_metrics() -> ConsolidationMetrics {
+        ConsolidationMetrics {
+            quality: 0.85,
+            coherence: 0.9,
+            edges_pruned: 100,
+            shortcuts_created: 10,
+            duration: Duration::from_secs(30),
+            success: true,
+            blind_spots_found: 2,
+        }
+    }
+
+    #[test]
+    fn test_consolidation_metrics_valid_passes() {
+        let metrics = valid_metrics();
+        assert!(metrics.validate().is_ok());
+    }
+
+    #[test]
+    fn test_consolidation_metrics_nan_quality_fails() {
+        let mut metrics = valid_metrics();
+        metrics.quality = f32::NAN;
+        let result = metrics.validate();
+        assert!(matches!(result, Err(InvalidMetricsError::NaN { field: "quality" })));
+    }
+
+    #[test]
+    fn test_consolidation_metrics_nan_coherence_fails() {
+        let mut metrics = valid_metrics();
+        metrics.coherence = f32::NAN;
+        let result = metrics.validate();
+        assert!(matches!(result, Err(InvalidMetricsError::NaN { field: "coherence" })));
+    }
+
+    #[test]
+    fn test_consolidation_metrics_infinity_quality_fails() {
+        let mut metrics = valid_metrics();
+        metrics.quality = f32::INFINITY;
+        let result = metrics.validate();
+        assert!(matches!(result, Err(InvalidMetricsError::Infinite { field: "quality" })));
+    }
+
+    #[test]
+    fn test_consolidation_metrics_infinity_coherence_fails() {
+        let mut metrics = valid_metrics();
+        metrics.coherence = f32::NEG_INFINITY;
+        let result = metrics.validate();
+        assert!(matches!(result, Err(InvalidMetricsError::Infinite { field: "coherence" })));
+    }
+
+    #[test]
+    fn test_consolidation_metrics_out_of_range_quality_high_fails() {
+        let mut metrics = valid_metrics();
+        metrics.quality = 1.5;
+        let result = metrics.validate();
+        assert!(matches!(
+            result,
+            Err(InvalidMetricsError::OutOfRange { field: "quality", .. })
+        ));
+    }
+
+    #[test]
+    fn test_consolidation_metrics_out_of_range_quality_negative_fails() {
+        let mut metrics = valid_metrics();
+        metrics.quality = -0.1;
+        let result = metrics.validate();
+        assert!(matches!(
+            result,
+            Err(InvalidMetricsError::OutOfRange { field: "quality", .. })
+        ));
+    }
+
+    #[test]
+    fn test_consolidation_metrics_out_of_range_coherence_fails() {
+        let mut metrics = valid_metrics();
+        metrics.coherence = 2.0;
+        let result = metrics.validate();
+        assert!(matches!(
+            result,
+            Err(InvalidMetricsError::OutOfRange { field: "coherence", .. })
+        ));
+    }
+
+    #[test]
+    fn test_consolidation_metrics_boundary_values_pass() {
+        let mut metrics = valid_metrics();
+
+        // Test 0.0 boundary
+        metrics.quality = 0.0;
+        metrics.coherence = 0.0;
+        assert!(metrics.validate().is_ok());
+
+        // Test 1.0 boundary
+        metrics.quality = 1.0;
+        metrics.coherence = 1.0;
+        assert!(metrics.validate().is_ok());
+    }
+
+    #[test]
+    fn test_consolidation_metrics_serde_roundtrip() {
+        let metrics = valid_metrics();
+        let json = serde_json::to_string(&metrics).expect("serialization should succeed");
+        let deserialized: ConsolidationMetrics = serde_json::from_str(&json).expect("deserialization should succeed");
+        assert_eq!(metrics, deserialized);
+    }
+
+    #[test]
+    fn test_invalid_metrics_error_display() {
+        let err = InvalidMetricsError::NaN { field: "quality" };
+        let msg = format!("{}", err);
+        assert!(msg.contains("E_DREAM_LAMBDA_001"));
+        assert!(msg.contains("quality"));
+        assert!(msg.contains("NaN"));
+
+        let err = InvalidMetricsError::OutOfRange {
+            field: "coherence",
+            value: 1.5,
+            min: 0.0,
+            max: 1.0,
+        };
+        let msg = format!("{}", err);
+        assert!(msg.contains("E_DREAM_LAMBDA_001"));
+        assert!(msg.contains("coherence"));
+        assert!(msg.contains("1.5"));
     }
 }

@@ -54,7 +54,7 @@ pub struct ModelPathConfig {
 
     /// Maximum number of models to keep loaded simultaneously.
     /// When exceeded, least recently used models are unloaded.
-    /// 0 means unlimited (all 12 models can be loaded).
+    /// 0 means unlimited (all 13 models can be loaded).
     #[serde(default = "default_max_loaded_models")]
     pub max_loaded_models: usize,
 }
