@@ -54,6 +54,8 @@ mod tests;
 
 // Re-export column family types
 pub use column_families::{
+    // TASK-STORAGE-P2-001: E12 Late Interaction column family
+    e12_late_interaction_cf_options,
     e13_splade_inverted_cf_options,
     e1_matryoshka_128_cf_options,
     // TASK-GWT-P1-001: Ego node column family
@@ -65,9 +67,13 @@ pub use column_families::{
     purpose_vector_cf_options,
     // Quantized embedder column families (TASK-EMB-022)
     quantized_embedder_cf_options,
+    // TASK-SESSION-04: Session identity column family
+    session_identity_cf_options,
     synergy_matrix_cf_options,
     teleological_profiles_cf_options,
     teleological_vectors_cf_options,
+    // TASK-STORAGE-P2-001: E12 Late Interaction column family constant
+    CF_E12_LATE_INTERACTION,
     CF_E13_SPLADE_INVERTED,
     CF_E1_MATRYOSHKA_128,
     // TASK-GWT-P1-001: Ego node column family constant
@@ -87,10 +93,14 @@ pub use column_families::{
     CF_EMB_9,
     CF_FINGERPRINTS,
     CF_PURPOSE_VECTORS,
+    // TASK-SESSION-04: Session identity column family constant
+    CF_SESSION_IDENTITY,
     // TASK-TELEO-006: New teleological vector column families
     CF_SYNERGY_MATRIX,
     CF_TELEOLOGICAL_PROFILES,
     CF_TELEOLOGICAL_VECTORS,
+    // TASK-CONTENT-001: Content column family
+    CF_CONTENT,
     QUANTIZED_EMBEDDER_CFS,
     QUANTIZED_EMBEDDER_CF_COUNT,
     TELEOLOGICAL_CFS,
@@ -111,13 +121,21 @@ pub use schema::{
     parse_e1_matryoshka_key,
     parse_fingerprint_key,
     parse_purpose_vector_key,
+    // TASK-SESSION-04: Session identity key functions
+    parse_session_identity_key,
+    parse_session_temporal_key,
     parse_teleological_profile_key,
     parse_teleological_vector_key,
     purpose_vector_key,
+    // TASK-SESSION-04: Session identity key functions
+    session_identity_key,
+    session_temporal_key,
     teleological_profile_key,
     teleological_vector_key,
     // TASK-GWT-P1-001: Ego node key constant
     EGO_NODE_KEY,
+    // TASK-SESSION-04: Session latest key constant
+    SESSION_LATEST_KEY,
     // TASK-TELEO-006: New key format functions
     SYNERGY_MATRIX_KEY,
 };

@@ -56,16 +56,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     "description": "Classification threshold for quadrant boundaries. Default: 0.5"
                 }
             },
-            "oneOf": [
-                {
-                    "required": ["delta_s", "delta_c"],
-                    "description": "Direct mode: provide both delta_s and delta_c"
-                },
-                {
-                    "required": ["memory_id"],
-                    "description": "Memory mode: provide memory_id to lookup from storage"
-                }
-            ]
+            "additionalProperties": false
         }),
     )]
 }
@@ -168,14 +159,16 @@ mod tests {
     }
 
     #[test]
-    fn test_schema_has_oneof_constraint() {
+    fn test_schema_disallows_additional_properties() {
         let tools = definitions();
         let schema = &tools[0].input_schema;
-        let one_of = schema.get("oneOf").expect("oneOf should exist");
-        let one_of_array = one_of.as_array().unwrap();
-
-        // Two modes: direct (delta_s + delta_c) or memory (memory_id)
-        assert_eq!(one_of_array.len(), 2);
+        // Claude API doesn't support oneOf/allOf/anyOf at root level
+        // Validation happens in handler instead
+        assert!(schema.get("oneOf").is_none(), "oneOf not allowed at root level");
+        assert_eq!(
+            schema.get("additionalProperties").and_then(|v| v.as_bool()),
+            Some(false)
+        );
     }
 
     #[test]

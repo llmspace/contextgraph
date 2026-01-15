@@ -283,11 +283,12 @@ pub fn get_all_column_family_descriptors(block_cache: &Cache) -> Vec<ColumnFamil
 }
 
 /// Total number of column families in a fully configured Context Graph database.
-/// Base (12) + Teleological (10) + Quantized Embedder (13) + Autonomous (7) = 42
+/// Base (12) + Teleological (11) + Quantized Embedder (13) + Autonomous (7) = 43
 /// TASK-CONTENT-001: +1 for CF_CONTENT
 /// TASK-GWT-P1-001: +1 for CF_EGO_NODE
 /// TASK-STORAGE-P2-001: +1 for CF_E12_LATE_INTERACTION
-pub const TOTAL_COLUMN_FAMILIES: usize = 42;
+/// TASK-SESSION-04: +1 for CF_SESSION_IDENTITY
+pub const TOTAL_COLUMN_FAMILIES: usize = 43;
 
 #[cfg(test)]
 mod tests {
@@ -596,18 +597,19 @@ mod tests {
     #[test]
     fn test_total_column_families_constant() {
         // Verify the constant is correct:
-        // 12 base + 10 teleological + 13 quantized + 7 autonomous = 42
+        // 12 base + 11 teleological + 13 quantized + 7 autonomous = 43
         // TASK-CONTENT-001: +1 for CF_CONTENT
         // TASK-GWT-P1-001: +1 for CF_EGO_NODE
         // TASK-STORAGE-P2-001: +1 for CF_E12_LATE_INTERACTION
+        // TASK-SESSION-04: +1 for CF_SESSION_IDENTITY
         assert_eq!(
-            TOTAL_COLUMN_FAMILIES, 42,
-            "Total column families should be 42 (12 base + 10 teleological + 13 quantized + 7 autonomous)"
+            TOTAL_COLUMN_FAMILIES, 43,
+            "Total column families should be 43 (12 base + 11 teleological + 13 quantized + 7 autonomous)"
         );
     }
 
     #[test]
-    fn test_get_all_column_family_descriptors_returns_42() {
+    fn test_get_all_column_family_descriptors_returns_43() {
         let cache = Cache::new_lru_cache(256 * 1024 * 1024);
         let descriptors = get_all_column_family_descriptors(&cache);
 

@@ -126,7 +126,37 @@ pub const CF_EGO_NODE: &str = "ego_node";
 /// No fallback options - let RocksDB error on open if misconfigured.
 pub const CF_E12_LATE_INTERACTION: &str = "e12_late_interaction";
 
-/// All teleological column family names (10 total: 4 original + 3 teleological + 1 content + 1 ego_node + 1 e12_late_interaction).
+// =============================================================================
+// TASK-SESSION-04: SESSION_IDENTITY COLUMN FAMILY
+// =============================================================================
+
+/// Column family for SessionIdentitySnapshot persistence.
+///
+/// Stores flattened identity snapshots for cross-session persistence.
+/// Key formats:
+/// - `s:{session_id}` -> SessionIdentitySnapshot (~3KB bincode typical, <30KB max)
+/// - `latest` -> session_id string (~40 bytes)
+/// - `t:{timestamp_ms_be}` -> session_id string (~40 bytes)
+///
+/// # Storage Details
+/// - Session key: `s:` prefix + session_id UTF-8 bytes (variable length)
+/// - Latest pointer: Fixed "latest" string key (6 bytes)
+/// - Temporal index: `t:` prefix + 8-byte big-endian timestamp (10 bytes)
+/// - Compression: LZ4 (~50% reduction for trajectory data)
+///
+/// # Performance Target
+/// - Read: <5ms p95 (warm cache) - critical for PreToolUse hot path
+/// - Write: <10ms p95
+///
+/// # Constitution Reference
+/// - IDENTITY-002: IC thresholds
+/// - GWT-003: Identity continuity
+///
+/// # FAIL FAST Policy
+/// No fallback options - let RocksDB error on open if misconfigured.
+pub const CF_SESSION_IDENTITY: &str = "session_identity";
+
+/// All teleological column family names (11 total: 4 original + 3 teleological + 1 content + 1 ego_node + 1 e12_late_interaction + 1 session_identity).
 pub const TELEOLOGICAL_CFS: &[&str] = &[
     CF_FINGERPRINTS,
     CF_PURPOSE_VECTORS,
@@ -142,10 +172,12 @@ pub const TELEOLOGICAL_CFS: &[&str] = &[
     CF_EGO_NODE,
     // TASK-STORAGE-P2-001: E12 Late Interaction token storage CF
     CF_E12_LATE_INTERACTION,
+    // TASK-SESSION-04: Session identity persistence CF
+    CF_SESSION_IDENTITY,
 ];
 
-/// Total count of teleological CFs (should be 10).
-pub const TELEOLOGICAL_CF_COUNT: usize = 10;
+/// Total count of teleological CFs (should be 11).
+pub const TELEOLOGICAL_CF_COUNT: usize = 11;
 
 // =============================================================================
 // QUANTIZED EMBEDDER COLUMN FAMILIES (13 CFs for per-embedder storage)
@@ -499,6 +531,47 @@ pub fn e12_late_interaction_cf_options(cache: &Cache) -> Options {
     opts
 }
 
+// =============================================================================
+// TASK-SESSION-04: CF OPTION BUILDER FOR SESSION_IDENTITY
+// =============================================================================
+
+/// Options for session_identity column family (~3KB typical, <30KB max).
+///
+/// Optimized for small, frequently-accessed snapshots during PreToolUse.
+///
+/// # Configuration
+/// - Bloom filter: 10 bits per key (fast existence checks)
+/// - LZ4 compression: ~50% reduction for trajectory data
+/// - Block cache: enabled (hot path requires fast reads)
+/// - Point lookup optimization for session retrieval
+///
+/// # Key Formats
+/// - `s:{session_id}` -> SessionIdentitySnapshot (~3KB bincode)
+/// - `latest` -> session_id string (~40 bytes)
+/// - `t:{timestamp_ms_be}` -> session_id string (~40 bytes)
+///
+/// # Performance Target
+/// - Read: <5ms p95 (warm cache) - critical for PreToolUse hot path
+/// - Write: <10ms p95
+///
+/// # FAIL FAST Policy
+/// No fallback options - let RocksDB error on open if misconfigured.
+#[inline]
+pub fn session_identity_cf_options(cache: &Cache) -> Options {
+    let mut block_opts = BlockBasedOptions::default();
+    block_opts.set_block_cache(cache);
+    block_opts.set_bloom_filter(10.0, false);
+    block_opts.set_cache_index_and_filter_blocks(true);
+
+    let mut opts = Options::default();
+    opts.set_block_based_table_factory(&block_opts);
+    opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    opts.optimize_for_point_lookup(64); // 64MB hint for small data
+    opts.create_if_missing(true);
+    // FAIL FAST: No fallback options - let RocksDB error on open if misconfigured
+    opts
+}
+
 /// Options for quantized embedder storage (~1-2KB per embedding).
 ///
 /// Configuration:
@@ -525,15 +598,15 @@ pub fn quantized_embedder_cf_options(cache: &Cache) -> Options {
     opts
 }
 
-/// Get all 10 teleological column family descriptors.
+/// Get all 11 teleological column family descriptors.
 ///
-/// Returns 10 descriptors: 4 original + 3 teleological + 1 content + 1 ego_node + 1 e12_late_interaction.
+/// Returns 11 descriptors: 4 original + 3 teleological + 1 content + 1 ego_node + 1 e12_late_interaction + 1 session_identity.
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 10 `ColumnFamilyDescriptor`s for teleological storage.
+/// Vector of 11 `ColumnFamilyDescriptor`s for teleological storage.
 ///
 /// # Example
 /// ```ignore
@@ -542,7 +615,7 @@ pub fn quantized_embedder_cf_options(cache: &Cache) -> Options {
 ///
 /// let cache = Cache::new_lru_cache(256 * 1024 * 1024); // 256MB
 /// let descriptors = get_teleological_cf_descriptors(&cache);
-/// assert_eq!(descriptors.len(), 10);
+/// assert_eq!(descriptors.len(), 11);
 /// ```
 pub fn get_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     vec![
@@ -572,6 +645,8 @@ pub fn get_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescrip
             CF_E12_LATE_INTERACTION,
             e12_late_interaction_cf_options(cache),
         ),
+        // TASK-SESSION-04: Session identity persistence CF
+        ColumnFamilyDescriptor::new(CF_SESSION_IDENTITY, session_identity_cf_options(cache)),
     ]
 }
 
@@ -604,14 +679,14 @@ pub fn get_quantized_embedder_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyD
 
 /// Get ALL teleological + quantized embedder column family descriptors.
 ///
-/// Returns 23 descriptors total: 10 teleological + 13 quantized embedder.
+/// Returns 24 descriptors total: 11 teleological + 13 quantized embedder.
 /// Use this when opening a database that needs both fingerprint and per-embedder storage.
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 23 `ColumnFamilyDescriptor`s.
+/// Vector of 24 `ColumnFamilyDescriptor`s.
 ///
 /// # Example
 /// ```ignore
@@ -620,7 +695,7 @@ pub fn get_quantized_embedder_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyD
 ///
 /// let cache = Cache::new_lru_cache(256 * 1024 * 1024); // 256MB
 /// let descriptors = get_all_teleological_cf_descriptors(&cache);
-/// assert_eq!(descriptors.len(), 23); // 10 teleological + 13 embedder
+/// assert_eq!(descriptors.len(), 24); // 11 teleological + 13 embedder
 /// ```
 pub fn get_all_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     let mut descriptors = get_teleological_cf_descriptors(cache);

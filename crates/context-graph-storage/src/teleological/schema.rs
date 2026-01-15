@@ -3,7 +3,7 @@
 //! All keys use fixed-size formats for efficient range scans.
 //! No variable-length prefixes (except teleological_profiles which uses string keys).
 //!
-//! # Key Formats (TASK-TELEO-006, TASK-CONTENT-001, TASK-GWT-P1-001)
+//! # Key Formats (TASK-TELEO-006, TASK-CONTENT-001, TASK-GWT-P1-001, TASK-SESSION-04)
 //!
 //! | CF | Key Format | Size |
 //! |----|------------|------|
@@ -12,6 +12,9 @@
 //! | teleological_vectors | memory_id UUID | 16 bytes |
 //! | content | fingerprint_id UUID | 16 bytes |
 //! | ego_node | "ego_node" (singleton) | 8 bytes |
+//! | session_identity | `s:{session_id}` | 2 + variable |
+//! | session_identity | `latest` (pointer) | 6 bytes |
+//! | session_identity | `t:{timestamp_ms_be}` | 10 bytes |
 //!
 //! # FAIL FAST Policy
 //!
@@ -421,4 +424,129 @@ pub fn parse_e12_late_interaction_key(key: &[u8]) -> Uuid {
             e, key
         );
     })
+}
+
+// =============================================================================
+// TASK-SESSION-04: SESSION_IDENTITY KEY HELPERS
+// =============================================================================
+
+/// Key constant for latest session pointer.
+/// Fixed 6-byte string "latest" in session_identity CF.
+pub const SESSION_LATEST_KEY: &[u8] = b"latest";
+
+/// Create session identity key: `s:{session_id}`
+///
+/// # Arguments
+/// * `session_id` - Session UUID string (typically 36 characters)
+///
+/// # Returns
+/// Key bytes: `s:` prefix (2 bytes) + session_id UTF-8 bytes
+///
+/// # Example
+/// ```ignore
+/// let key = session_identity_key("abc-123-def");
+/// assert_eq!(&key[..2], b"s:");
+/// assert_eq!(&key[2..], b"abc-123-def");
+/// ```
+#[inline]
+pub fn session_identity_key(session_id: &str) -> Vec<u8> {
+    let mut key = Vec::with_capacity(2 + session_id.len());
+    key.extend_from_slice(b"s:");
+    key.extend_from_slice(session_id.as_bytes());
+    key
+}
+
+/// Create temporal index key: `t:{timestamp_ms}` (big-endian for lexicographic ordering)
+///
+/// Big-endian encoding ensures that keys sort chronologically when iterated.
+/// This enables efficient temporal range queries.
+///
+/// # Arguments
+/// * `timestamp_ms` - Unix milliseconds timestamp
+///
+/// # Returns
+/// Key bytes: `t:` prefix (2 bytes) + 8-byte big-endian timestamp (10 bytes total)
+///
+/// # Example
+/// ```ignore
+/// let k1 = session_temporal_key(1000);
+/// let k2 = session_temporal_key(2000);
+/// assert!(k1 < k2); // Lexicographic ordering matches numeric
+/// ```
+#[inline]
+pub fn session_temporal_key(timestamp_ms: i64) -> Vec<u8> {
+    let mut key = Vec::with_capacity(10);
+    key.extend_from_slice(b"t:");
+    key.extend_from_slice(&timestamp_ms.to_be_bytes());
+    key
+}
+
+/// Parse session ID from session_identity_key.
+///
+/// # Arguments
+/// * `key` - Key bytes starting with `s:`
+///
+/// # Returns
+/// The session_id string slice
+///
+/// # Panics
+/// Panics if key doesn't start with `s:` - FAIL FAST policy.
+/// Error message includes full key context for debugging.
+#[inline]
+pub fn parse_session_identity_key(key: &[u8]) -> &str {
+    assert!(
+        key.len() > 2,
+        "STORAGE ERROR: session_identity_key too short: {} bytes. \
+         Key data: {:02x?}. Minimum is 3 bytes (prefix 's:' + at least 1 char).",
+        key.len(),
+        key
+    );
+    assert_eq!(
+        &key[0..2],
+        b"s:",
+        "STORAGE ERROR: session_identity_key must start with 's:'. \
+         Got: {:02x?}. This indicates corrupted storage or wrong CF access.",
+        &key[0..2.min(key.len())]
+    );
+    std::str::from_utf8(&key[2..]).unwrap_or_else(|e| {
+        panic!(
+            "STORAGE ERROR: session_id must be valid UTF-8. \
+             Error: {}. Key data: {:02x?}.",
+            e, key
+        );
+    })
+}
+
+/// Parse timestamp from session_temporal_key.
+///
+/// # Arguments
+/// * `key` - Exactly 10 bytes: `t:` prefix + 8-byte big-endian timestamp
+///
+/// # Returns
+/// The parsed timestamp in milliseconds
+///
+/// # Panics
+/// Panics if key doesn't start with `t:` or isn't exactly 10 bytes - FAIL FAST policy.
+#[inline]
+pub fn parse_session_temporal_key(key: &[u8]) -> i64 {
+    assert_eq!(
+        key.len(),
+        10,
+        "STORAGE ERROR: session_temporal_key must be exactly 10 bytes, got {} bytes. \
+         Key data: {:02x?}. Expected: 2-byte prefix 't:' + 8-byte timestamp.",
+        key.len(),
+        key
+    );
+    assert_eq!(
+        &key[0..2],
+        b"t:",
+        "STORAGE ERROR: session_temporal_key must start with 't:'. \
+         Got: {:02x?}. This indicates corrupted storage or wrong CF access.",
+        &key[0..2]
+    );
+    i64::from_be_bytes(
+        key[2..10]
+            .try_into()
+            .expect("timestamp bytes slice is exactly 8 bytes"),
+    )
 }

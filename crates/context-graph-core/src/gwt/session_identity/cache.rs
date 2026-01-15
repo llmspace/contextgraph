@@ -82,8 +82,7 @@ impl IdentityCache {
             return "[C:? r=? IC=?]".to_string();
         };
 
-        let state_code = state_to_code(state);
-        format!("[C:{} r={:.2} IC={:.2}]", state_code, r, ic)
+        format!("[C:{} r={:.2} IC={:.2}]", state.short_name(), r, ic)
     }
 
     /// Check if cache has been populated at least once.
@@ -136,17 +135,6 @@ pub fn clear_cache() {
 #[cfg(not(test))]
 pub fn clear_cache() {
     panic!("clear_cache() should never be called in production");
-}
-
-/// Convert consciousness state to 3-character code.
-fn state_to_code(state: ConsciousnessState) -> &'static str {
-    match state {
-        ConsciousnessState::Dormant => "DOR",
-        ConsciousnessState::Fragmented => "FRG",
-        ConsciousnessState::Emerging => "EMG",
-        ConsciousnessState::Conscious => "CON",
-        ConsciousnessState::Hypersync => "HYP",
-    }
 }
 
 /// Compute Kuramoto order parameter r from oscillator phases.
