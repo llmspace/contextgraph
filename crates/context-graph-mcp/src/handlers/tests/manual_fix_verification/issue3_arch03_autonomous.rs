@@ -4,7 +4,7 @@
 //!
 //! These tests verify that autonomous handlers work correctly when no North Star is configured.
 
-use crate::handlers::tests::{create_test_handlers_no_north_star, make_request};
+use crate::handlers::tests::{create_test_handlers_no_goals, make_request};
 use crate::protocol::JsonRpcId;
 use serde_json::json;
 
@@ -21,7 +21,7 @@ async fn test_arch03_get_autonomous_status_without_north_star() {
     println!("{}", "=".repeat(60));
 
     // BEFORE STATE: Create handlers WITHOUT North Star
-    let handlers = create_test_handlers_no_north_star();
+    let handlers = create_test_handlers_no_goals();
     println!("[BEFORE] Handlers created WITHOUT North Star (empty goal hierarchy)");
 
     // SYNTHETIC DATA: Request status with all optional params
@@ -69,11 +69,11 @@ async fn test_arch03_get_autonomous_status_without_north_star() {
         if let Some(first) = content.first() {
             if let Some(text) = first.get("text").and_then(|v| v.as_str()) {
                 if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) {
-                    // VERIFY: north_star.configured should be false
-                    if let Some(ns) = parsed.get("north_star") {
+                    // VERIFY: strategic_goals.configured should be false
+                    if let Some(ns) = parsed.get("strategic_goals") {
                         let configured = ns.get("configured").and_then(|v| v.as_bool()).unwrap_or(true);
-                        assert!(!configured, "[FAIL] north_star.configured should be false");
-                        println!("[VERIFY] north_star.configured = false - PASS");
+                        assert!(!configured, "[FAIL] strategic_goals.configured should be false");
+                        println!("[VERIFY] strategic_goals.configured = false - PASS");
                     }
 
                     // VERIFY: Should have recommendations for unconfigured state
@@ -135,7 +135,7 @@ async fn test_arch03_get_alignment_drift_without_north_star() {
     println!("ARCH-03 VERIFICATION: get_alignment_drift without North Star");
     println!("{}", "=".repeat(60));
 
-    let handlers = create_test_handlers_no_north_star();
+    let handlers = create_test_handlers_no_goals();
     println!("[BEFORE] Handlers created WITHOUT North Star");
 
     // EXECUTE: Get drift without North Star

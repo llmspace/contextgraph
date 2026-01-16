@@ -81,7 +81,7 @@ async fn test_02_memory_retrieve() {
 
     println!("\n[VERIFICATION]");
     println!("  id: {}", fingerprint.get("id").unwrap());
-    println!("  thetaToNorthStar: {}", fingerprint.get("thetaToNorthStar").unwrap());
+    println!("  alignmentScore: {}", fingerprint.get("alignmentScore").unwrap());
     println!("  accessCount: {}", fingerprint.get("accessCount").unwrap());
     println!("  contentHashHex: {}", fingerprint.get("contentHashHex").unwrap());
 

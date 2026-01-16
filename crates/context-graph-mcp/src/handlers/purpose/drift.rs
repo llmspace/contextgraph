@@ -25,7 +25,7 @@ impl Handlers {
     ///
     /// # Request Parameters
     /// - `fingerprint_ids` (required): Array of fingerprint UUIDs to check
-    /// - `goal_id` (optional): Goal to check drift against (default: North Star)
+    /// - `goal_id` (optional): Goal to check drift against (default: top-level Strategic goal)
     /// - `strategy` (optional): Comparison strategy (default: "cosine")
     ///
     /// # Response
@@ -70,10 +70,10 @@ impl Handlers {
             Err(response) => return response,
         };
 
-        // Get goal fingerprint (North Star by default, or specified goal_id)
+        // Get goal fingerprint (top-level Strategic goal by default, or specified goal_id)
         let goal_fingerprint = match self.get_goal_fingerprint(&id, &params) {
             Ok(Some(fp)) => fp,
-            Ok(None) => return self.build_no_north_star_response(id),
+            Ok(None) => return self.build_no_strategic_goal_response(id),
             Err(response) => return response,
         };
 
@@ -180,7 +180,7 @@ impl Handlers {
         }
     }
 
-    /// Get goal fingerprint from params or North Star.
+    /// Get goal fingerprint from params or top-level Strategic goal.
     fn get_goal_fingerprint(
         &self,
         id: &Option<JsonRpcId>,
@@ -217,14 +217,14 @@ impl Handlers {
                 hierarchy.top_level_goals().first().unwrap().teleological_array.clone(),
             ))
         } else {
-            Ok(None) // No North Star configured
+            Ok(None) // No Strategic goal configured
         }
     }
 
-    /// Build response when no top-level goal is configured.
+    /// Build response when no top-level Strategic goal is configured.
     /// TASK-P0-001: Updated per ARCH-03 (topics emerge from clustering)
-    fn build_no_north_star_response(&self, id: Option<JsonRpcId>) -> JsonRpcResponse {
-        debug!("purpose/drift_check: No top-level goal configured, returning no-drift response");
+    fn build_no_strategic_goal_response(&self, id: Option<JsonRpcId>) -> JsonRpcResponse {
+        debug!("purpose/drift_check: No top-level Strategic goal configured, returning no-drift response");
         JsonRpcResponse::success(
             id,
             json!({

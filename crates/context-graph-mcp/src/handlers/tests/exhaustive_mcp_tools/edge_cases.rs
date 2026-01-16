@@ -2,7 +2,7 @@
 
 use serde_json::json;
 
-use crate::handlers::tests::{create_test_handlers, create_test_handlers_no_north_star};
+use crate::handlers::tests::{create_test_handlers, create_test_handlers_no_goals};
 use super::helpers::{make_tool_call, assert_success, assert_tool_error};
 use super::synthetic_data;
 
@@ -110,7 +110,7 @@ async fn test_special_characters_in_content() {
 
 #[tokio::test]
 async fn test_no_north_star_error_handling() {
-    let handlers = create_test_handlers_no_north_star();
+    let handlers = create_test_handlers_no_goals();
     let request = make_tool_call("discover_sub_goals", json!({}));
 
     let response = handlers.dispatch(request).await;

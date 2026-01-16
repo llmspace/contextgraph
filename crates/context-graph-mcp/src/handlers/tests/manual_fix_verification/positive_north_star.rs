@@ -42,11 +42,11 @@ async fn test_autonomous_status_with_north_star() {
         if let Some(first) = content.first() {
             if let Some(text) = first.get("text").and_then(|v| v.as_str()) {
                 if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) {
-                    // VERIFY: north_star.configured should be true
-                    if let Some(ns) = parsed.get("north_star") {
+                    // VERIFY: strategic_goals.configured should be true
+                    if let Some(ns) = parsed.get("strategic_goals") {
                         let configured = ns.get("configured").and_then(|v| v.as_bool()).unwrap_or(false);
-                        assert!(configured, "[FAIL] north_star.configured should be true");
-                        println!("[VERIFY] north_star.configured = true - PASS");
+                        assert!(configured, "[FAIL] strategic_goals.configured should be true");
+                        println!("[VERIFY] strategic_goals.configured = true - PASS");
 
                         if let Some(goal_id) = ns.get("goal_id").and_then(|v| v.as_str()) {
                             println!("[EVIDENCE] North Star goal_id: {}", goal_id);
@@ -71,56 +71,5 @@ async fn test_autonomous_status_with_north_star() {
     println!("\n[POSITIVE get_autonomous_status VERIFICATION COMPLETE]\n");
 }
 
-/// Positive case: auto_bootstrap when North Star already exists.
-#[tokio::test]
-async fn test_bootstrap_with_existing_north_star() {
-    println!("\n{}", "=".repeat(60));
-    println!("POSITIVE VERIFICATION: auto_bootstrap with existing North Star");
-    println!("{}", "=".repeat(60));
-
-    let handlers = create_test_handlers();
-    println!("[BEFORE] Handlers created WITH existing North Star");
-
-    let request = make_request(
-        "tools/call",
-        Some(JsonRpcId::Number(1)),
-        Some(json!({
-            "name": "auto_bootstrap_north_star",
-            "arguments": {}
-        })),
-    );
-
-    println!("[EXECUTE] Calling auto_bootstrap with existing North Star...");
-    let response = handlers.dispatch(request).await;
-
-    assert!(response.error.is_none(), "Should not have protocol error");
-    let result = response.result.expect("Must have result");
-
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
-    assert!(!is_error, "Should succeed (report existing North Star)");
-    println!("[VERIFY] Not an error - PASS");
-
-    if let Some(content) = result.get("content").and_then(|v| v.as_array()) {
-        if let Some(first) = content.first() {
-            if let Some(text) = first.get("text").and_then(|v| v.as_str()) {
-                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) {
-                    // VERIFY: status should be "already_bootstrapped"
-                    if let Some(status) = parsed.get("status").and_then(|v| v.as_str()) {
-                        assert_eq!(status, "already_bootstrapped", "Should report already bootstrapped");
-                        println!("[VERIFY] status = \"already_bootstrapped\" - PASS");
-                    }
-
-                    // VERIFY: Should have bootstrap_result with existing goal
-                    if let Some(br) = parsed.get("bootstrap_result") {
-                        if let Some(source) = br.get("source").and_then(|v| v.as_str()) {
-                            assert_eq!(source, "existing_north_star");
-                            println!("[VERIFY] source = \"existing_north_star\" - PASS");
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    println!("\n[POSITIVE auto_bootstrap with existing VERIFICATION COMPLETE]\n");
-}
+// TASK-P0-001: Removed test_bootstrap_with_existing_north_star
+// The auto_bootstrap_north_star tool was removed per ARCH-03 (goals emerge from topic clustering).

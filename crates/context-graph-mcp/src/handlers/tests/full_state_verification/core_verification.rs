@@ -189,8 +189,8 @@ async fn verify_retrieve_returns_source_of_truth_data() {
         fp_json.get("contentHashHex").unwrap().as_str().unwrap()
     );
     println!(
-        "  - thetaToNorthStar: {}",
-        fp_json.get("thetaToNorthStar").unwrap()
+        "  - alignmentScore: {}",
+        fp_json.get("alignmentScore").unwrap()
     );
 
     // === VERIFY HANDLER RETURNS SAME DATA AS SOURCE OF TRUTH ===

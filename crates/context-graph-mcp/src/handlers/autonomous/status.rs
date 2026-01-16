@@ -50,15 +50,15 @@ impl Handlers {
             "get_autonomous_status: Parsed parameters"
         );
 
-        // Check North Star status
-        let north_star_status = {
+        // Check Strategic goal status (top-level goals)
+        let strategic_status = {
             let hierarchy = self.goal_hierarchy.read();
             match hierarchy.top_level_goals().first() {
-                Some(ns) => json!({
+                Some(goal) => json!({
                     "configured": true,
-                    "goal_id": ns.id.to_string(),
-                    "description": ns.description,
-                    "level": format!("{:?}", ns.level)
+                    "goal_id": goal.id.to_string(),
+                    "description": goal.description,
+                    "level": format!("{:?}", goal.level)
                 }),
                 // TASK-P0-001: Updated per ARCH-03 (topics emerge from clustering)
                 None => json!({
@@ -82,7 +82,7 @@ impl Handlers {
         let services = json!({
             "bootstrap_service": {
                 "ready": true,
-                "description": "Initializes autonomous system from North Star"
+                "description": "Initializes autonomous system from Strategic goals"
             },
             "drift_detector": {
                 "ready": true,
@@ -111,12 +111,12 @@ impl Handlers {
         });
 
         // Calculate overall health
-        let north_star_configured = {
+        let strategic_goals_configured = {
             let hierarchy = self.goal_hierarchy.read();
             hierarchy.has_top_level_goals()
         };
 
-        let health_score = if !north_star_configured {
+        let health_score = if !strategic_goals_configured {
             0.0
         } else {
             match severity {
@@ -133,14 +133,14 @@ impl Handlers {
                 else if health_score >= 0.5 { "degraded" }
                 else if health_score > 0.0 { "critical" }
                 else { "not_configured" },
-            "north_star_configured": north_star_configured,
+            "strategic_goals_configured": strategic_goals_configured,
             "drift_severity": format!("{:?}", severity)
         });
 
         // Generate recommendations
         let mut recommendations = Vec::new();
 
-        if !north_star_configured {
+        if !strategic_goals_configured {
             // TASK-P0-001: Updated per ARCH-03 (topics emerge from clustering)
             recommendations.push(json!({
                 "priority": "critical",
@@ -174,7 +174,7 @@ impl Handlers {
         }
 
         let mut response = json!({
-            "north_star": north_star_status,
+            "strategic_goals": strategic_status,
             "services": services,
             "overall_health": overall_health,
             "recommendations": recommendations
@@ -201,7 +201,7 @@ impl Handlers {
 
         info!(
             health_score = health_score,
-            north_star_configured = north_star_configured,
+            strategic_goals_configured = strategic_goals_configured,
             "get_autonomous_status: Status aggregation complete"
         );
 

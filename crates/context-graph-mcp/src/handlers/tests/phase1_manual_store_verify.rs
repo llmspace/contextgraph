@@ -258,8 +258,8 @@ async fn phase1_verify_mcp_retrieve_matches_store() {
     println!("\n[MCP HANDLER] Retrieved fingerprint:");
     println!("  - ID: {}", mcp_fp.get("id").unwrap());
     println!(
-        "  - thetaToNorthStar: {}",
-        mcp_fp.get("thetaToNorthStar").unwrap()
+        "  - alignmentScore: {}",
+        mcp_fp.get("alignmentScore").unwrap()
     );
     println!(
         "  - contentHashHex: {}",

@@ -5,7 +5,7 @@ use crate::protocol::JsonRpcId;
 use super::{create_test_handlers, make_request};
 
 #[tokio::test]
-async fn test_tools_list_returns_all_59_tools() {
+async fn test_tools_list_returns_all_58_tools() {
     let handlers = create_test_handlers();
     let request = make_request("tools/list", Some(JsonRpcId::Number(1)), None);
 
@@ -24,7 +24,7 @@ async fn test_tools_list_returns_all_59_tools() {
         .as_array()
         .expect("tools must be an array");
 
-    // Verify exactly 59 tools returned:
+    // Verify exactly 58 tools returned:
     // Core 6: inject_context, store_memory, get_memetic_status, get_graph_manifest, search_graph, utl_status
     // GWT 9: get_consciousness_state, get_kuramoto_sync, get_workspace_status, get_ego_state, trigger_workspace_broadcast, adjust_coupling, get_coherence_state (TASK-34), get_identity_continuity (TASK-38), get_kuramoto_state (TASK-39)
     // ATC 3 (TASK-ATC-001): get_threshold_status, get_calibration_metrics, trigger_recalibration
@@ -34,7 +34,7 @@ async fn test_tools_list_returns_all_59_tools() {
     // Causal 1 (TASK-CAUSAL-001): omni_infer
     // NOTE: Manual North Star tools REMOVED (created incompatible single 1024D embeddings)
     // Teleological 5 (TELEO-007 to TELEO-011): search_teleological, compute_teleological_vector, fuse_embeddings, update_synergy_matrix, manage_teleological_profile
-    // Autonomous 13 (TASK-AUTONOMOUS-MCP + SPEC-AUTONOMOUS-001 + TASK-FIX-002): auto_bootstrap_north_star, get_alignment_drift, get_drift_history, trigger_drift_correction, get_pruning_candidates, trigger_consolidation, discover_sub_goals, get_autonomous_status, get_learner_state, observe_outcome, execute_prune, get_health_status, trigger_healing
+    // Autonomous 12 (TASK-P0-001: auto_bootstrap_north_star REMOVED): get_alignment_drift, get_drift_history, trigger_drift_correction, get_pruning_candidates, trigger_consolidation, discover_sub_goals, get_autonomous_status, get_learner_state, observe_outcome, execute_prune, get_health_status, trigger_healing
     // UTL 1 (TASK-UTL-P1-001): gwt/compute_delta_sc
     // Meta-UTL 3 (TASK-METAUTL-P0-005): get_meta_learning_status, trigger_lambda_recalibration, get_meta_learning_log
     // Epistemic 1 (TASK-MCP-002): epistemic_action
@@ -43,8 +43,8 @@ async fn test_tools_list_returns_all_59_tools() {
     // Session 4 (TASK-013/014): session_start, session_end, pre_tool_use, post_tool_use
     assert_eq!(
         tools.len(),
-        59,
-        "Must return exactly 59 tools, got {}",
+        58,
+        "Must return exactly 58 tools, got {}",
         tools.len()
     );
 }

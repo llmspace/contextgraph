@@ -21,7 +21,7 @@
 //! # Test Scenarios
 //!
 //! ## Scenario 1: Store WITHOUT Goals (CRITICAL)
-//! - Create handlers WITHOUT top-level goals using create_test_handlers_no_north_star()
+//! - Create handlers WITHOUT top-level goals using create_test_handlers_no_goals()
 //! - Store 3+ memories via tools/call store_memory
 //! - VERIFY: No errors, fingerprints created with neutral alignment [0.0; 13]
 //!
@@ -37,7 +37,7 @@ use serde_json::json;
 
 #[allow(unused_imports)]  // Some imports used by commented-out tests
 use crate::handlers::tests::{
-    create_test_handlers_no_north_star, create_test_handlers_with_rocksdb_no_north_star,
+    create_test_handlers_no_goals, create_test_handlers_with_rocksdb_no_goals,
     extract_mcp_tool_data,
 };
 use crate::protocol::{JsonRpcId, JsonRpcRequest};
@@ -58,7 +58,7 @@ use crate::tools::tool_names;
 #[tokio::test]
 async fn test_store_memory_succeeds_without_north_star() {
     // SETUP: Create handlers WITHOUT North Star (empty goal hierarchy)
-    let handlers = create_test_handlers_no_north_star();
+    let handlers = create_test_handlers_no_goals();
 
     // EXECUTE: Store a memory - this should NOT fail even without North Star
     let request = JsonRpcRequest {
@@ -118,7 +118,7 @@ async fn test_store_memory_succeeds_without_north_star() {
 /// This verifies the "autonomous seeding" phase works correctly.
 #[tokio::test]
 async fn test_multiple_memories_stored_without_north_star() {
-    let handlers = create_test_handlers_no_north_star();
+    let handlers = create_test_handlers_no_goals();
 
     let test_contents = [
         "Machine learning optimization techniques",
@@ -231,7 +231,7 @@ async fn test_placeholder_for_removed_bootstrap_tests() {
 /// Should indicate that North Star is not configured and provide recommendations.
 #[tokio::test]
 async fn test_get_autonomous_status_without_north_star() {
-    let handlers = create_test_handlers_no_north_star();
+    let handlers = create_test_handlers_no_goals();
 
     let request = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
@@ -255,7 +255,7 @@ async fn test_get_autonomous_status_without_north_star() {
     let data = extract_mcp_tool_data(&result);
 
     // FSV: Verify north_star shows not configured
-    let north_star = data.get("north_star").expect("north_star must exist");
+    let north_star = data.get("strategic_goals").expect("strategic_goals must exist");
     let configured = north_star
         .get("configured")
         .and_then(|v| v.as_bool())
@@ -309,7 +309,7 @@ async fn test_get_autonomous_status_without_north_star() {
     );
 
     println!("[FSV] Phase 4 - get_autonomous_status without North Star: PASSED");
-    println!("[FSV]   north_star.configured: {}", configured);
+    println!("[FSV]   strategic_goals.configured: {}", configured);
     println!("[FSV]   health_status: {}", health_status);
     println!("[FSV]   recommendations.len: {}", recommendations.len());
     println!("[FSV]   AUTONOMOUS STATUS: WORKING");
@@ -366,7 +366,7 @@ async fn test_get_autonomous_status_with_metrics() {
 /// by computing drift relative to the fingerprints' centroid when no North Star.
 #[tokio::test]
 async fn test_get_alignment_drift_arch03_compliant() {
-    let handlers = create_test_handlers_no_north_star();
+    let handlers = create_test_handlers_no_goals();
 
     let request = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
@@ -412,7 +412,7 @@ async fn test_get_alignment_drift_arch03_compliant() {
 /// FSV Test: trigger_drift_correction works without North Star (ARCH-03 compliant).
 #[tokio::test]
 async fn test_trigger_drift_correction_arch03_compliant() {
-    let handlers = create_test_handlers_no_north_star();
+    let handlers = create_test_handlers_no_goals();
 
     let request = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
@@ -471,7 +471,7 @@ async fn test_trigger_drift_correction_arch03_compliant() {
 /// ARCH-03: Goals emerge from data patterns via clustering, no manual config needed.
 #[tokio::test]
 async fn test_discover_sub_goals_arch03_compliant() {
-    let handlers = create_test_handlers_no_north_star();
+    let handlers = create_test_handlers_no_goals();
 
     let request = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
@@ -540,7 +540,7 @@ async fn test_discover_sub_goals_arch03_compliant() {
 #[tokio::test]
 async fn test_full_autonomous_flow_with_rocksdb() {
     // SETUP: Create handlers with RocksDB but no North Star
-    let (handlers, _tempdir) = create_test_handlers_with_rocksdb_no_north_star().await;
+    let (handlers, _tempdir) = create_test_handlers_with_rocksdb_no_goals().await;
 
     // STEP 1: Store 5 memories for autonomous seeding
     let test_contents = [
@@ -604,7 +604,7 @@ async fn test_full_autonomous_flow_with_rocksdb() {
     );
 
     let status_data = extract_mcp_tool_data(&status_response.result.unwrap());
-    let north_star = status_data.get("north_star").expect("north_star must exist");
+    let north_star = status_data.get("strategic_goals").expect("strategic_goals must exist");
     let configured = north_star.get("configured").and_then(|v| v.as_bool()).unwrap_or(true);
     assert!(
         !configured,
@@ -659,7 +659,7 @@ async fn test_full_autonomous_flow_with_rocksdb() {
 /// 6. auto_bootstrap_north_star (with existing handlers)
 #[tokio::test]
 async fn test_all_autonomous_tools_integration() {
-    let handlers = create_test_handlers_no_north_star();
+    let handlers = create_test_handlers_no_goals();
     let mut tests_passed = 0;
     let total_tests = 6;
 
@@ -696,7 +696,7 @@ async fn test_all_autonomous_tools_integration() {
     let resp2 = handlers.dispatch(req2).await;
     let status_correct = if resp2.error.is_none() {
         let data = extract_mcp_tool_data(&resp2.result.unwrap());
-        let north_star = data.get("north_star");
+        let north_star = data.get("strategic_goals");
         north_star
             .and_then(|ns| ns.get("configured"))
             .and_then(|c| c.as_bool())

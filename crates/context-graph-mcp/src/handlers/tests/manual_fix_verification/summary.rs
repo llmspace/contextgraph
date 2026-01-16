@@ -2,7 +2,7 @@
 //!
 //! Runs all verifications and prints consolidated evidence.
 
-use crate::handlers::tests::{create_test_handlers, create_test_handlers_no_north_star, make_request};
+use crate::handlers::tests::{create_test_handlers, create_test_handlers_no_goals, make_request};
 use crate::protocol::JsonRpcId;
 use serde_json::json;
 
@@ -17,7 +17,7 @@ async fn test_all_fixes_summary() {
 
     // Run a quick verification of each fix
     let handlers = create_test_handlers();
-    let handlers_no_ns = create_test_handlers_no_north_star();
+    let handlers_no_ns = create_test_handlers_no_goals();
 
     // Issue 1: search_teleological query_content
     let req1 = make_request(
@@ -48,41 +48,9 @@ async fn test_all_fixes_summary() {
             .map(|r| !r.get("isError").and_then(|v| v.as_bool()).unwrap_or(true))
             .unwrap_or(false);
 
-    // Issue 3b: auto_bootstrap without stored fingerprints
-    // Should fail gracefully with guidance - can be either:
-    // - JsonRpcResponse::error() with message about storing fingerprints
-    // - Result with isError=true and content about storing fingerprints
-    let req3b = make_request(
-        "tools/call",
-        Some(JsonRpcId::Number(3)),
-        Some(json!({
-            "name": "auto_bootstrap_north_star",
-            "arguments": {}
-        })),
-    );
-    let res3b = handlers_no_ns.dispatch(req3b).await;
-    // ARCH-03 compliance: either error type is acceptable if message guides to store fingerprints
-    let issue3b_pass = if let Some(err) = &res3b.error {
-        // JSON-RPC error path - check message contains guidance
-        err.message.contains("teleological fingerprints") || err.message.contains("Store memories")
-    } else if let Some(result) = &res3b.result {
-        // MCP tool error path - check isError and content
-        let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
-        if is_error {
-            result.get("content")
-                .and_then(|v| v.as_array())
-                .and_then(|arr| arr.first())
-                .and_then(|first| first.get("text"))
-                .and_then(|t| t.as_str())
-                .map(|text| text.contains("teleological fingerprints") || text.contains("Store memories"))
-                .unwrap_or(false)
-        } else {
-            // Succeeded (store may have fingerprints from previous test)
-            true
-        }
-    } else {
-        false
-    };
+    // TASK-P0-001: Issue 3b (auto_bootstrap_north_star) test removed
+    // The auto_bootstrap_north_star tool was removed per ARCH-03 (goals emerge from topic clustering)
+    let issue3b_pass = true; // Removed - no longer testable
 
     // Edge case: empty query_content FAIL FAST
     let req_edge = make_request(
@@ -113,8 +81,8 @@ async fn test_all_fixes_summary() {
         if issue3a_pass { "PASS" } else { "FAIL" }
     );
     println!(
-        "Issue 3b - auto_bootstrap graceful fail without data: {}",
-        if issue3b_pass { "PASS" } else { "FAIL" }
+        "Issue 3b - auto_bootstrap (REMOVED per TASK-P0-001): {}",
+        if issue3b_pass { "SKIPPED" } else { "SKIPPED" }
     );
     println!(
         "Edge case - FAIL FAST on empty query_content: {}",

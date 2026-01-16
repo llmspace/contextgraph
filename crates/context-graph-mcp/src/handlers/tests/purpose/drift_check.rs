@@ -7,7 +7,7 @@ use serde_json::json;
 
 use crate::protocol::JsonRpcId;
 
-use super::super::{create_test_handlers, create_test_handlers_no_north_star, make_request};
+use super::super::{create_test_handlers, create_test_handlers_no_goals, make_request};
 
 /// Test purpose/drift_check with valid fingerprints.
 #[tokio::test]
@@ -152,7 +152,7 @@ async fn test_drift_check_empty_ids_fails() {
 /// becomes meaningful only after a North Star is established.
 #[tokio::test]
 async fn test_store_autonomous_operation_for_drift() {
-    let handlers = create_test_handlers_no_north_star();
+    let handlers = create_test_handlers_no_goals();
 
     // Store content - should SUCCEED without North Star (AUTONOMOUS OPERATION)
     let store_params = json!({

@@ -13,11 +13,11 @@
 //!
 //! ## Fast In-Memory Helpers (Unit Tests)
 //! - `create_test_handlers()` - Uses InMemoryTeleologicalStore with stubs
-//! - `create_test_handlers_no_north_star()` - Same but with empty goal hierarchy
+//! - `create_test_handlers_no_goals()` - Same but with empty goal hierarchy
 //!
 //! ## Real Storage Helpers (Integration Tests)
 //! - `create_test_handlers_with_rocksdb()` - Uses RocksDbTeleologicalStore with tempdir
-//! - `create_test_handlers_with_rocksdb_no_north_star()` - Same but with empty goal hierarchy
+//! - `create_test_handlers_with_rocksdb_no_goals()` - Same but with empty goal hierarchy
 //! - `create_test_handlers_with_rocksdb_store_access()` - Same but returns store for FSV assertions
 //!
 //! ## Real GPU Embedding Helpers (FSV Tests) - Feature-gated: `cuda`
@@ -70,7 +70,6 @@ mod phase5_teleological_operations;
 mod phase6_cross_agent_coordination;
 mod phase7_final_state_verification;
 mod meta_cognitive;
-mod north_star;
 mod purpose;
 mod search;
 mod stubfix_fsv_tests;
@@ -251,8 +250,8 @@ pub(crate) fn create_test_handlers() -> Handlers {
     )
 }
 
-/// Create test handlers WITHOUT a North Star goal (for testing error cases).
-pub(crate) fn create_test_handlers_no_north_star() -> Handlers {
+/// Create test handlers WITHOUT top-level goals (for testing error cases).
+pub(crate) fn create_test_handlers_no_goals() -> Handlers {
     let teleological_store: Arc<dyn TeleologicalMemoryStore> =
         Arc::new(InMemoryTeleologicalStore::new());
     let utl_processor: Arc<dyn UtlProcessor> = Arc::new(StubUtlProcessor::new());
@@ -350,10 +349,10 @@ pub(crate) async fn create_test_handlers_with_rocksdb() -> (Handlers, TempDir) {
     (handlers, tempdir)
 }
 
-/// Create test handlers with REAL RocksDbTeleologicalStore but NO North Star goal.
+/// Create test handlers with REAL RocksDbTeleologicalStore but NO top-level goals.
 ///
 /// Same as `create_test_handlers_with_rocksdb()` but with an empty goal hierarchy.
-/// Use this for testing error cases where North Star is required but missing.
+/// Use this for testing error cases where Strategic goals are required but missing.
 ///
 /// # Returns
 ///
@@ -363,16 +362,16 @@ pub(crate) async fn create_test_handlers_with_rocksdb() -> (Handlers, TempDir) {
 ///
 /// ```ignore
 /// #[tokio::test]
-/// async fn test_missing_north_star_error() {
-///     let (handlers, _tempdir) = create_test_handlers_with_rocksdb_no_north_star().await;
+/// async fn test_missing_strategic_goal_error() {
+///     let (handlers, _tempdir) = create_test_handlers_with_rocksdb_no_goals().await;
 ///
-///     // Should fail because no North Star is configured
+///     // Should fail because no Strategic goal is configured
 ///     let result = handlers.handle_purpose_align(...).await;
 ///     assert!(result.error.is_some());
 /// }
 /// ```
 #[allow(dead_code)]
-pub(crate) async fn create_test_handlers_with_rocksdb_no_north_star() -> (Handlers, TempDir) {
+pub(crate) async fn create_test_handlers_with_rocksdb_no_goals() -> (Handlers, TempDir) {
     let tempdir = TempDir::new().expect("Failed to create temp directory for RocksDB test");
     let db_path = tempdir.path().join("test_rocksdb");
 
@@ -389,7 +388,7 @@ pub(crate) async fn create_test_handlers_with_rocksdb_no_north_star() -> (Handle
         Arc::new(StubMultiArrayProvider::new());
     let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
         Arc::new(DefaultAlignmentCalculator::new());
-    let goal_hierarchy = GoalHierarchy::new(); // Empty hierarchy - no North Star
+    let goal_hierarchy = GoalHierarchy::new(); // Empty hierarchy - no Strategic goals
 
     let handlers = Handlers::new(
         teleological_store,

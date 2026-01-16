@@ -21,7 +21,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
         ToolDefinition::new(
             "get_alignment_drift",
             "Get the current alignment drift state including severity, trend, and recommendations. \
-             Drift measures how far the system has deviated from the North Star goal alignment. \
+             Drift measures how far the system has deviated from Strategic goal alignment. \
              High drift indicates memories are becoming misaligned with the primary purpose.",
             json!({
                 "type": "object",
@@ -55,7 +55,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "properties": {
                     "goal_id": {
                         "type": "string",
-                        "description": "Goal UUID to retrieve history for (defaults to North Star if not provided)"
+                        "description": "Goal UUID to retrieve history for (defaults to top-level Strategic goal if not provided)"
                     },
                     "time_range": {
                         "type": "string",
@@ -203,7 +203,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     },
                     "parent_goal_id": {
                         "type": "string",
-                        "description": "Parent goal ID to discover sub-goals for (defaults to North Star)"
+                        "description": "Parent goal ID to discover sub-goals for (defaults to top-level Strategic goal)"
                     }
                 },
                 "required": []
@@ -213,7 +213,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
         // get_autonomous_status - Get comprehensive autonomous system status
         ToolDefinition::new(
             "get_autonomous_status",
-            "Get comprehensive status of the autonomous North Star system including all services: \
+            "Get comprehensive status of the autonomous goal system including all services: \
              drift detection, correction, pruning, consolidation, and sub-goal discovery. \
              Returns health scores, recommendations, and optional detailed metrics.",
             json!({
