@@ -57,6 +57,12 @@ context-graph-storage = { path = "../context-graph-storage" }
 name = "integration"
 path = "tests/integration/mod.rs"
 
+# E2E test configuration (executes real shell scripts)
+# Run with: cargo test --package context-graph-cli --test e2e -- --test-threads=1 --nocapture
+[[test]]
+name = "e2e"
+path = "tests/e2e/mod.rs"
+
 [features]
 default = ["cuda"]
 # context-graph-core doesn't have cuda feature, only context-graph-mcp does

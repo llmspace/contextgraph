@@ -72,6 +72,19 @@ pub struct SessionIdentitySnapshot {
 }
 
 impl SessionIdentitySnapshot {
+    /// Default purpose vector with uniform teleology
+    /// Per TECH-SESSION-IDENTITY spec: "All components equal (uniform teleology)"
+    /// Uses 1/√13 ≈ 0.2773 for each component to create unit vector
+    ///
+    /// CRITICAL: Must be non-zero for cosine similarity to work correctly.
+    /// Zero vectors cause IC = 0.0 regardless of restored state.
+    pub const fn default_purpose_vector() -> [f32; KURAMOTO_N] {
+        // 1/√13 ≈ 0.2773500981126146
+        // Using uniform distribution means no bias toward any embedder
+        const UNIFORM: f32 = 0.2773501;
+        [UNIFORM; KURAMOTO_N]
+    }
+
     /// Create new snapshot with given session ID
     ///
     /// # Arguments
@@ -79,6 +92,10 @@ impl SessionIdentitySnapshot {
     ///
     /// # Returns
     /// New snapshot with default values and specified session_id
+    ///
+    /// # Note
+    /// Fresh sessions use `default_purpose_vector()` (uniform, non-zero) instead of zeros.
+    /// This ensures IC computation works correctly when restoring to/from fresh sessions.
     pub fn new(session_id: impl Into<String>) -> Self {
         Self {
             session_id: session_id.into(),
@@ -89,7 +106,9 @@ impl SessionIdentitySnapshot {
             kuramoto_phases: [0.0; KURAMOTO_N],
             coupling: 0.5, // Default coupling per constitution
 
-            purpose_vector: [0.0; KURAMOTO_N],
+            // CRITICAL: Use non-zero default for IC computation to work
+            // Zero vectors cause cosine_similarity = 0.0 (undefined direction)
+            purpose_vector: Self::default_purpose_vector(),
             trajectory: Vec::with_capacity(MAX_TRAJECTORY_LEN),
 
             last_ic: 1.0,

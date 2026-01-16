@@ -248,15 +248,46 @@ fn load_or_create_snapshot(
                     "SESSION_START: linking to previous session"
                 );
 
+                // CRITICAL FIX: RESTORE identity state from previous session
+                // This is what "restore_identity" means - we copy the previous session's
+                // identity state to the new session so it continues with the same identity.
+                // Without this, the new session starts with zero/default values and
+                // IC computation shows 0.0 (no continuity) instead of ~1.0 (full continuity).
+                //
+                // Constitution Reference: TECH-SESSION-IDENTITY restore_identity flow
+                // "The new session inherits the previous session's identity"
+                snapshot.purpose_vector = prev_snapshot.purpose_vector;
+                snapshot.kuramoto_phases = prev_snapshot.kuramoto_phases;
+                snapshot.coupling = prev_snapshot.coupling;
+                snapshot.consciousness = prev_snapshot.consciousness;
+                snapshot.integration = prev_snapshot.integration;
+                snapshot.reflection = prev_snapshot.reflection;
+                snapshot.differentiation = prev_snapshot.differentiation;
+                snapshot.crisis_threshold = prev_snapshot.crisis_threshold;
+
+                // Copy trajectory (up to MAX_TRAJECTORY_LEN)
+                for pv in prev_snapshot.trajectory.iter() {
+                    snapshot.append_to_trajectory(*pv);
+                }
+
                 snapshot.previous_session_id = Some(prev_id.to_string());
 
                 // Compute cross-session IC using formula IDENTITY-001
-                // compute_ic takes two SessionIdentitySnapshot references
+                // Now that snapshot has restored state from prev_snapshot,
+                // IC should be high (~1.0) since purpose_vector and kuramoto_phases match
                 let cross_ic = compute_ic(&snapshot, &prev_snapshot);
                 snapshot.cross_session_ic = cross_ic;
                 snapshot.last_ic = cross_ic;
 
+                info!(
+                    session_id = %session_id,
+                    restored_ic = cross_ic,
+                    restored_consciousness = snapshot.consciousness,
+                    "SESSION_START: identity state restored from previous session"
+                );
+
                 // TASK-HOOKS-013: Compute drift metrics when linking sessions
+                // After restoration, drift should be minimal (near zero)
                 drift_metrics = Some(compute_drift_metrics(&snapshot, &prev_snapshot));
             }
             Ok(None) => {
@@ -554,12 +585,22 @@ mod tests {
         let prev_id = "previous-session";
         let new_id = "new-session";
 
-        // Setup: Create previous session with known IC
+        // Setup: Create previous session with known IC and identity state
+        let prev_purpose = [0.5_f32; 13];
+        let prev_phases = [0.1_f64; 13];
+        let prev_coupling = 0.7;
+        let prev_ic = 0.95;
         {
             let memex = RocksDbMemex::open(&db_path).expect("DB must open");
             let mut prev_snapshot = SessionIdentitySnapshot::new(prev_id);
-            prev_snapshot.last_ic = 0.95;
-            prev_snapshot.purpose_vector = [0.5; 13];
+            prev_snapshot.last_ic = prev_ic;
+            prev_snapshot.purpose_vector = prev_purpose;
+            prev_snapshot.kuramoto_phases = prev_phases;
+            prev_snapshot.coupling = prev_coupling;
+            prev_snapshot.consciousness = 0.8;
+            prev_snapshot.integration = 0.75;
+            prev_snapshot.reflection = 0.65;
+            prev_snapshot.differentiation = 0.55;
             memex
                 .save_snapshot(&prev_snapshot)
                 .expect("Save must succeed");
@@ -589,7 +630,33 @@ mod tests {
             "previous_session_id must be set"
         );
 
-        println!("PASS: Session linked to previous");
+        // TC-HOOKS-017 FIX VERIFICATION: Identity state MUST be restored
+        // Before the fix, purpose_vector was [0.0; 13] after linking, causing IC=0.0
+        // After the fix, identity state is COPIED from previous session
+        assert_eq!(
+            loaded.purpose_vector, prev_purpose,
+            "purpose_vector MUST be restored from previous session"
+        );
+        assert_eq!(
+            loaded.kuramoto_phases, prev_phases,
+            "kuramoto_phases MUST be restored from previous session"
+        );
+        assert!(
+            (loaded.coupling - prev_coupling).abs() < 0.001,
+            "coupling MUST be restored from previous session"
+        );
+
+        // Verify IC is healthy (not 0.0 as before the fix)
+        assert!(
+            loaded.cross_session_ic > 0.9,
+            "cross_session_ic MUST be ~1.0 after restoration, got {}",
+            loaded.cross_session_ic
+        );
+
+        println!("PASS: Session linked to previous with identity state restored");
+        println!("  purpose_vector restored: {:?}", &loaded.purpose_vector[0..3]);
+        println!("  kuramoto_phases restored: {:?}", &loaded.kuramoto_phases[0..3]);
+        println!("  cross_session_ic: {}", loaded.cross_session_ic);
     }
 
     // =========================================================================
@@ -797,6 +864,8 @@ mod tests {
     // =========================================================================
     // TC-HOOKS-013-01: Drift metrics computed when linking sessions
     // Verify: drift_metrics is Some with valid values when previous exists
+    // UPDATED: After TC-HOOKS-017 fix, ic_delta should be ~0.0 (not -1.0)
+    //          because identity state is RESTORED before IC computation
     // =========================================================================
     #[tokio::test]
     async fn tc_hooks_013_01_drift_metrics_computed_when_linking() {
@@ -855,11 +924,35 @@ mod tests {
             drift.kuramoto_phase_drift
         );
 
-        println!("PASS: Drift metrics computed with valid values");
-        println!("  ic_delta: {}", drift.ic_delta);
-        println!("  purpose_drift: {}", drift.purpose_drift);
+        // TC-HOOKS-017 FIX VERIFICATION:
+        // After the fix, identity state is RESTORED from previous session,
+        // so ic_delta should be ~0.0 (identical purpose vectors = cosine similarity 1.0)
+        // Before the fix: ic_delta was -0.95 or -1.0 because new session had zero vectors
+        assert!(
+            drift.ic_delta.abs() < 0.1,
+            "ic_delta MUST be ~0.0 after identity restoration, got {} (bug if < -0.3)",
+            drift.ic_delta
+        );
+
+        // purpose_drift should be ~0.0 (vectors are identical after copy)
+        assert!(
+            drift.purpose_drift < 0.01,
+            "purpose_drift MUST be ~0.0 after identity restoration, got {}",
+            drift.purpose_drift
+        );
+
+        // kuramoto_phase_drift should be ~0.0 (phases are identical after copy)
+        assert!(
+            drift.kuramoto_phase_drift < 0.01,
+            "kuramoto_phase_drift MUST be ~0.0 after identity restoration, got {}",
+            drift.kuramoto_phase_drift
+        );
+
+        println!("PASS: Drift metrics computed with valid values (TC-HOOKS-017 fix verified)");
+        println!("  ic_delta: {} (MUST be ~0.0, not -1.0)", drift.ic_delta);
+        println!("  purpose_drift: {} (MUST be ~0.0)", drift.purpose_drift);
         println!("  time_since_snapshot_ms: {}", drift.time_since_snapshot_ms);
-        println!("  kuramoto_phase_drift: {}", drift.kuramoto_phase_drift);
+        println!("  kuramoto_phase_drift: {} (MUST be ~0.0)", drift.kuramoto_phase_drift);
     }
 
     // =========================================================================
@@ -1163,5 +1256,294 @@ mod tests {
             positive_drift.ic_delta);
 
         println!("PASS: Warning drift correctly detected at threshold boundaries");
+    }
+
+    // =========================================================================
+    // TC-HOOKS-017: IC Restoration Bug Fix Tests
+    // CRITICAL: These tests verify the fix for IC dropping to 0.0 after session restore
+    // Root cause: identity state was not being copied from previous session
+    // Fix: copy purpose_vector, kuramoto_phases, etc. BEFORE computing IC
+    // =========================================================================
+
+    // =========================================================================
+    // TC-HOOKS-017-01: Complete identity state restoration
+    // Verify: ALL identity fields are copied from previous to new session
+    // =========================================================================
+    #[tokio::test]
+    async fn tc_hooks_017_01_complete_identity_state_restoration() {
+        println!("\n=== TC-HOOKS-017-01: Complete Identity State Restoration ===");
+
+        let (_dir, db_path) = setup_test_db();
+        let prev_id = "session-with-identity";
+        let new_id = "restored-session";
+
+        // Setup: Create previous session with FULL identity state
+        let prev_purpose = [0.3_f32, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.1, 0.2, 0.35, 0.45, 0.55];
+        let prev_phases = [0.1_f64, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3];
+        let prev_coupling = 0.75;
+        let prev_consciousness = 0.85;
+        let prev_integration = 0.72;
+        let prev_reflection = 0.68;
+        let prev_differentiation = 0.59;
+        let prev_crisis_threshold = 0.45;
+        {
+            let memex = RocksDbMemex::open(&db_path).expect("DB must open");
+            let mut prev_snapshot = SessionIdentitySnapshot::new(prev_id);
+            prev_snapshot.last_ic = 0.95;
+            prev_snapshot.purpose_vector = prev_purpose;
+            prev_snapshot.kuramoto_phases = prev_phases;
+            prev_snapshot.coupling = prev_coupling;
+            prev_snapshot.consciousness = prev_consciousness;
+            prev_snapshot.integration = prev_integration;
+            prev_snapshot.reflection = prev_reflection;
+            prev_snapshot.differentiation = prev_differentiation;
+            prev_snapshot.crisis_threshold = prev_crisis_threshold;
+            // Add trajectory entries
+            prev_snapshot.append_to_trajectory([0.1; 13]);
+            prev_snapshot.append_to_trajectory([0.2; 13]);
+            memex
+                .save_snapshot(&prev_snapshot)
+                .expect("Save must succeed");
+        }
+
+        // Execute: Create new session linked to previous
+        let args = SessionStartArgs {
+            db_path: Some(db_path.clone()),
+            session_id: Some(new_id.to_string()),
+            previous_session_id: Some(prev_id.to_string()),
+            stdin: false,
+            format: OutputFormat::Json,
+        };
+
+        let result = execute(args).await;
+        assert!(result.is_ok(), "Execute must succeed");
+
+        // VERIFY: ALL identity fields restored from previous session
+        let memex = RocksDbMemex::open(&db_path).expect("DB must open");
+        let new_snapshot = memex
+            .load_snapshot(new_id)
+            .expect("Load must succeed")
+            .expect("Snapshot must exist");
+
+        // Verify purpose_vector (CRITICAL - this was the root cause of IC=0.0)
+        assert_eq!(
+            new_snapshot.purpose_vector, prev_purpose,
+            "purpose_vector MUST be restored"
+        );
+
+        // Verify kuramoto_phases
+        assert_eq!(
+            new_snapshot.kuramoto_phases, prev_phases,
+            "kuramoto_phases MUST be restored"
+        );
+
+        // Verify coupling
+        assert!(
+            (new_snapshot.coupling - prev_coupling).abs() < 0.001,
+            "coupling MUST be restored, got {} expected {}",
+            new_snapshot.coupling, prev_coupling
+        );
+
+        // Verify consciousness
+        assert!(
+            (new_snapshot.consciousness - prev_consciousness).abs() < 0.001,
+            "consciousness MUST be restored, got {} expected {}",
+            new_snapshot.consciousness, prev_consciousness
+        );
+
+        // Verify integration
+        assert!(
+            (new_snapshot.integration - prev_integration).abs() < 0.001,
+            "integration MUST be restored, got {} expected {}",
+            new_snapshot.integration, prev_integration
+        );
+
+        // Verify reflection
+        assert!(
+            (new_snapshot.reflection - prev_reflection).abs() < 0.001,
+            "reflection MUST be restored, got {} expected {}",
+            new_snapshot.reflection, prev_reflection
+        );
+
+        // Verify differentiation
+        assert!(
+            (new_snapshot.differentiation - prev_differentiation).abs() < 0.001,
+            "differentiation MUST be restored, got {} expected {}",
+            new_snapshot.differentiation, prev_differentiation
+        );
+
+        // Verify crisis_threshold
+        assert!(
+            (new_snapshot.crisis_threshold - prev_crisis_threshold).abs() < 0.001,
+            "crisis_threshold MUST be restored, got {} expected {}",
+            new_snapshot.crisis_threshold, prev_crisis_threshold
+        );
+
+        // Verify trajectory copied
+        assert!(
+            new_snapshot.trajectory.len() >= 2,
+            "trajectory MUST be restored, got {} entries",
+            new_snapshot.trajectory.len()
+        );
+
+        println!("PASS: All 9 identity state fields restored from previous session");
+        println!("  purpose_vector: {:?}...", &new_snapshot.purpose_vector[0..3]);
+        println!("  kuramoto_phases: {:?}...", &new_snapshot.kuramoto_phases[0..3]);
+        println!("  coupling: {}", new_snapshot.coupling);
+        println!("  consciousness: {}", new_snapshot.consciousness);
+        println!("  integration: {}", new_snapshot.integration);
+        println!("  reflection: {}", new_snapshot.reflection);
+        println!("  differentiation: {}", new_snapshot.differentiation);
+        println!("  crisis_threshold: {}", new_snapshot.crisis_threshold);
+        println!("  trajectory.len: {}", new_snapshot.trajectory.len());
+    }
+
+    // =========================================================================
+    // TC-HOOKS-017-02: IC is healthy after restoration
+    // Verify: cross_session_ic is ~1.0, NOT 0.0 (the bug symptom)
+    // =========================================================================
+    #[tokio::test]
+    async fn tc_hooks_017_02_ic_healthy_after_restoration() {
+        println!("\n=== TC-HOOKS-017-02: IC Healthy After Restoration ===");
+
+        let (_dir, db_path) = setup_test_db();
+        let prev_id = "healthy-session";
+        let new_id = "should-be-healthy-too";
+
+        // Setup: Create previous session with healthy IC
+        {
+            let memex = RocksDbMemex::open(&db_path).expect("DB must open");
+            let mut prev_snapshot = SessionIdentitySnapshot::new(prev_id);
+            prev_snapshot.last_ic = 0.95;
+            prev_snapshot.purpose_vector = [0.5; 13]; // Non-zero vector
+            prev_snapshot.kuramoto_phases = [0.1; 13];
+            memex
+                .save_snapshot(&prev_snapshot)
+                .expect("Save must succeed");
+        }
+
+        // Execute: Create new session linked to previous
+        let args = SessionStartArgs {
+            db_path: Some(db_path.clone()),
+            session_id: Some(new_id.to_string()),
+            previous_session_id: Some(prev_id.to_string()),
+            stdin: false,
+            format: OutputFormat::Json,
+        };
+
+        let result = execute(args).await;
+        assert!(result.is_ok(), "Execute must succeed");
+        let output = result.unwrap();
+
+        // VERIFY: IC classification shows healthy status
+        assert!(
+            output.ic_classification.is_some(),
+            "ic_classification must be present"
+        );
+        let ic_class = output.ic_classification.unwrap();
+
+        // IC value should be healthy (>= 0.9)
+        // Before the fix: IC was 0.0 (critical)
+        // After the fix: IC should be ~1.0 (healthy)
+        assert!(
+            ic_class.value > 0.9,
+            "IC MUST be healthy (>0.9) after restoration, got {} (BUG if 0.0)",
+            ic_class.value
+        );
+
+        // Verify level is "Healthy" not "Critical"
+        assert!(
+            ic_class.level.to_string().contains("Healthy") || ic_class.value >= 0.9,
+            "IC level MUST be Healthy, got {} with value {}",
+            ic_class.level, ic_class.value
+        );
+
+        // VERIFY: Database shows healthy IC
+        let memex = RocksDbMemex::open(&db_path).expect("DB must open");
+        let new_snapshot = memex
+            .load_snapshot(new_id)
+            .expect("Load must succeed")
+            .expect("Snapshot must exist");
+
+        assert!(
+            new_snapshot.cross_session_ic > 0.9,
+            "cross_session_ic in DB MUST be >0.9, got {} (BUG if 0.0)",
+            new_snapshot.cross_session_ic
+        );
+
+        println!("PASS: IC is healthy after session restoration");
+        println!("  IC value: {} (MUST be >0.9, BUG if 0.0)", ic_class.value);
+        println!("  IC level: {}", ic_class.level);
+        println!("  DB cross_session_ic: {}", new_snapshot.cross_session_ic);
+    }
+
+    // =========================================================================
+    // TC-HOOKS-017-03: IC delta is ~0.0, not -1.0
+    // Verify: drift_metrics.ic_delta is near zero (identical vectors)
+    // =========================================================================
+    #[tokio::test]
+    async fn tc_hooks_017_03_ic_delta_near_zero() {
+        println!("\n=== TC-HOOKS-017-03: IC Delta Near Zero ===");
+
+        let (_dir, db_path) = setup_test_db();
+        let prev_id = "stable-session";
+        let new_id = "continued-session";
+
+        // Setup: Create previous session
+        {
+            let memex = RocksDbMemex::open(&db_path).expect("DB must open");
+            let mut prev_snapshot = SessionIdentitySnapshot::new(prev_id);
+            prev_snapshot.last_ic = 0.92;
+            prev_snapshot.purpose_vector = [0.6; 13];
+            prev_snapshot.kuramoto_phases = [0.2; 13];
+            memex
+                .save_snapshot(&prev_snapshot)
+                .expect("Save must succeed");
+        }
+
+        // Execute: Create new session linked to previous
+        let args = SessionStartArgs {
+            db_path: Some(db_path.clone()),
+            session_id: Some(new_id.to_string()),
+            previous_session_id: Some(prev_id.to_string()),
+            stdin: false,
+            format: OutputFormat::Json,
+        };
+
+        let result = execute(args).await;
+        assert!(result.is_ok(), "Execute must succeed");
+        let output = result.unwrap();
+
+        // VERIFY: drift_metrics shows near-zero delta
+        assert!(
+            output.drift_metrics.is_some(),
+            "drift_metrics must be present"
+        );
+        let drift = output.drift_metrics.unwrap();
+
+        // Before fix: ic_delta was -0.92 or worse (crisis)
+        // After fix: ic_delta should be ~0.0 (vectors identical after copy)
+        assert!(
+            drift.ic_delta.abs() < 0.1,
+            "ic_delta MUST be ~0.0 after restoration, got {} (BUG if < -0.3)",
+            drift.ic_delta
+        );
+
+        // Also verify not a crisis or warning
+        assert!(
+            !drift.is_crisis_drift(),
+            "MUST NOT be crisis drift after restoration, ic_delta={}",
+            drift.ic_delta
+        );
+        assert!(
+            !drift.is_warning_drift(),
+            "MUST NOT be warning drift after restoration, ic_delta={}",
+            drift.ic_delta
+        );
+
+        println!("PASS: IC delta is ~0.0 after restoration (not -1.0)");
+        println!("  ic_delta: {} (MUST be ~0.0)", drift.ic_delta);
+        println!("  is_crisis_drift: false");
+        println!("  is_warning_drift: false");
     }
 }
