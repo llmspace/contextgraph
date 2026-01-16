@@ -112,7 +112,7 @@ pub struct SessionStartArgs {
     pub previous_session_id: Option<String>,
 
     /// Read HookInput JSON from stdin
-    #[arg(long, action = clap::ArgAction::Set, default_value = "false")]
+    #[arg(long, action = clap::ArgAction::SetTrue)]
     pub stdin: bool,
 
     /// Output format for response
@@ -356,7 +356,7 @@ mod tests {
             "session-start",
             "--session-id", "session-12345",
             "--previous-session-id", "prev-session-98765",
-            "--stdin", "true",
+            "--stdin",
             "--format", "json-compact",
         ]);
 

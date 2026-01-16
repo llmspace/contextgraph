@@ -56,6 +56,11 @@ enum Commands {
         #[command(subcommand)]
         action: commands::session::SessionCommands,
     },
+    /// Claude Code native hooks commands
+    Hooks {
+        #[command(subcommand)]
+        action: commands::hooks::HooksCommands,
+    },
 }
 
 #[tokio::main]
@@ -85,6 +90,9 @@ async fn main() {
         }
         Commands::Session { action } => {
             commands::session::handle_session_command(action).await
+        }
+        Commands::Hooks { action } => {
+            commands::hooks::handle_hooks_command(action).await
         }
     };
 

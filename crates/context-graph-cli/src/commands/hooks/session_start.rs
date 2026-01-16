@@ -1,116 +1,3 @@
-# TASK-HOOKS-006: Implement session_start Shell Executor
-
-```xml
-<task_spec id="TASK-HOOKS-006" version="2.0">
-<metadata>
-  <title>Implement session_start Shell Script and CLI Handler</title>
-  <status>DONE</status>
-  <layer>logic</layer>
-  <sequence>6</sequence>
-  <implements>
-    <requirement_ref>REQ-HOOKS-01</requirement_ref>
-    <requirement_ref>REQ-HOOKS-06</requirement_ref>
-    <requirement_ref>REQ-HOOKS-11</requirement_ref>
-    <requirement_ref>REQ-HOOKS-17</requirement_ref>
-  </implements>
-  <depends_on>
-    <task_ref status="DONE">TASK-HOOKS-001</task_ref>
-    <task_ref status="DONE">TASK-HOOKS-002</task_ref>
-    <task_ref status="DONE">TASK-HOOKS-003</task_ref>
-    <task_ref status="DONE">TASK-HOOKS-004</task_ref>
-    <task_ref status="ready">TASK-HOOKS-005</task_ref>
-  </depends_on>
-  <estimated_complexity>high</estimated_complexity>
-  <estimated_hours>2.0</estimated_hours>
-</metadata>
-```
-
-## Codebase State Summary (Audited 2026-01-15)
-
-### DONE Dependencies
-| Task | Status | What Was Implemented |
-|------|--------|---------------------|
-| TASK-HOOKS-001 | DONE | `HookEventType` enum in `types.rs` with 5 variants, timeouts, serialization |
-| TASK-HOOKS-002 | DONE | `HookInput`, `HookOutput` structs in `types.rs` with full JSON schema |
-| TASK-HOOKS-003 | DONE | `HookPayload` enum with typed variants for all 5 hook types |
-| TASK-HOOKS-004 | DONE | `HookError` enum in `error.rs` with 8 variants, exit codes, recovery logic |
-
-### Existing Files (DO NOT CREATE - EXTEND)
-
-| File | Contains | Notes |
-|------|----------|-------|
-| `crates/context-graph-cli/src/commands/hooks/types.rs` | HookEventType, HookInput, HookOutput, HookPayload, ConsciousnessState, ICClassification, ICLevel, JohariQuadrant | Types are DEFINED but currently UNUSED (compiler warnings) |
-| `crates/context-graph-cli/src/commands/hooks/args.rs` | SessionStartArgs, OutputFormat, HookType | Has 17 tests passing |
-| `crates/context-graph-cli/src/commands/hooks/error.rs` | HookError, HookResult | Has 25+ tests passing |
-| `crates/context-graph-cli/src/commands/hooks/mod.rs` | Module exports (currently empty usage) | Needs to register session_start subcommand |
-
-### Source of Truth: Import Paths
-
-```rust
-// Core types - EXACT paths verified
-use context_graph_core::gwt::{
-    SessionIdentitySnapshot,    // Types at gwt/session_identity/types.rs
-    SessionIdentityManager,     // Trait at gwt/session_identity/manager.rs
-    compute_ic,                 // IC formula IDENTITY-001
-    update_cache,               // IdentityCache update
-    IdentityCache,              // In-memory cache
-    IC_HEALTHY_THRESHOLD,       // 0.9
-    IC_WARNING_THRESHOLD,       // 0.7
-    IC_CRITICAL_THRESHOLD,      // 0.5
-};
-
-// Storage concrete implementation
-use context_graph_storage::rocksdb_backend::{
-    session_identity_manager::StandaloneSessionIdentityManager,
-    core::RocksDbMemex,  // Has save_snapshot(), load_snapshot() directly
-};
-
-// CLI types - already in hooks module
-use super::args::SessionStartArgs;
-use super::error::{HookError, HookResult};
-use super::types::{
-    HookInput, HookOutput, HookPayload,
-    ConsciousnessState, ICClassification, ICLevel, JohariQuadrant,
-};
-```
-
-### SessionIdentitySnapshot Fields (from types.rs)
-```rust
-pub struct SessionIdentitySnapshot {
-    pub session_id: String,
-    pub timestamp_ms: i64,
-    pub previous_session_id: Option<String>,
-    pub cross_session_ic: f32,
-    pub kuramoto_phases: [f64; 13],  // KURAMOTO_N = 13
-    pub coupling: f64,
-    pub purpose_vector: [f32; 13],
-    pub trajectory: Vec<[f32; 13]>,
-    pub last_ic: f32,
-    pub crisis_threshold: f32,  // Default 0.5
-    pub consciousness: f32,
-    pub integration: f32,
-    pub reflection: f32,
-    pub differentiation: f32,
-}
-```
-
-### Exit Codes (from error.rs - DO NOT CHANGE)
-| Code | Constant | Meaning |
-|------|----------|---------|
-| 0 | - | Success |
-| 2 | EXIT_TIMEOUT | Operation timed out |
-| 3 | EXIT_DATABASE | Database/storage error |
-| 4 | EXIT_INVALID_INPUT | Invalid input |
-| 5 | EXIT_SESSION_NOT_FOUND | Session not found |
-| 6 | EXIT_CRISIS | IC crisis detected |
-
----
-
-## Files to Create
-
-### 1. `crates/context-graph-cli/src/commands/hooks/session_start.rs`
-
-```rust
 //! Session start hook handler for Claude Code native hooks.
 //!
 //! # Timeout Budget: 5000ms
@@ -126,23 +13,16 @@ pub struct SessionIdentitySnapshot {
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use tracing::{debug, error, info, warn};
-use uuid::Uuid;
 
-use context_graph_core::gwt::{
-    compute_ic, update_cache, IdentityCache, SessionIdentitySnapshot,
-    IC_CRITICAL_THRESHOLD, IC_HEALTHY_THRESHOLD, IC_WARNING_THRESHOLD,
-};
-use context_graph_storage::rocksdb_backend::core::RocksDbMemex;
+use context_graph_core::gwt::{compute_ic, SessionIdentitySnapshot};
+use context_graph_storage::rocksdb_backend::RocksDbMemex;
 
 use super::args::{OutputFormat, SessionStartArgs};
 use super::error::{HookError, HookResult};
-use super::types::{
-    ConsciousnessState, HookInput, HookOutput, HookPayload,
-    ICClassification, ICLevel, JohariQuadrant,
-};
+use super::types::{ConsciousnessState, HookInput, HookOutput, HookPayload, ICClassification};
 
 /// Execute session-start hook.
 ///
@@ -183,7 +63,11 @@ pub async fn execute(args: SessionStartArgs) -> HookResult<HookOutput> {
 
     // 2. Generate session_id if not provided
     let session_id = session_id.unwrap_or_else(|| {
-        let id = format!("session-{}", chrono::Utc::now().timestamp_millis());
+        let timestamp_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let id = format!("session-{}", timestamp_ms);
         info!(generated_session_id = %id, "SESSION_START: generated new session_id");
         id
     });
@@ -193,11 +77,7 @@ pub async fn execute(args: SessionStartArgs) -> HookResult<HookOutput> {
 
     // 4. Open storage and load/create snapshot
     let memex = open_storage(&db_path)?;
-    let snapshot = load_or_create_snapshot(
-        &memex,
-        &session_id,
-        previous_session_id.as_deref(),
-    )?;
+    let snapshot = load_or_create_snapshot(&memex, &session_id, previous_session_id.as_deref())?;
 
     // 5. Build output structures
     let consciousness_state = build_consciousness_state(&snapshot);
@@ -256,11 +136,14 @@ fn extract_session_ids(input: &HookInput) -> HookResult<(Option<String>, Option<
     let session_id = Some(input.session_id.clone());
 
     let previous_session_id = match &input.payload {
-        HookPayload::SessionStart { previous_session_id, .. } => previous_session_id.clone(),
+        HookPayload::SessionStart {
+            previous_session_id,
+            ..
+        } => previous_session_id.clone(),
         other => {
-            error!(payload_type = ?other, "SESSION_START: unexpected payload type");
+            error!(payload_type = ?std::mem::discriminant(other), "SESSION_START: unexpected payload type");
             return Err(HookError::invalid_input(
-                "Expected SessionStart payload, got different type"
+                "Expected SessionStart payload, got different type",
             ));
         }
     };
@@ -283,15 +166,20 @@ fn resolve_db_path(arg_path: Option<PathBuf>) -> HookResult<PathBuf> {
     }
 
     // Default: ~/.local/share/context-graph/db (XDG compliant)
-    if let Some(data_dir) = dirs::data_local_dir() {
-        let default_path = data_dir.join("context-graph").join("db");
+    // Use HOME env var as fallback
+    if let Ok(home) = std::env::var("HOME") {
+        let default_path = PathBuf::from(home)
+            .join(".local")
+            .join("share")
+            .join("context-graph")
+            .join("db");
         debug!(path = ?default_path, "SESSION_START: using default db path");
         return Ok(default_path);
     }
 
     error!("SESSION_START: No database path available");
     Err(HookError::invalid_input(
-        "Database path required. Set CONTEXT_GRAPH_DB_PATH or pass --db-path"
+        "Database path required. Set CONTEXT_GRAPH_DB_PATH or pass --db-path",
     ))
 }
 
@@ -299,12 +187,10 @@ fn resolve_db_path(arg_path: Option<PathBuf>) -> HookResult<PathBuf> {
 fn open_storage(db_path: &Path) -> HookResult<Arc<RocksDbMemex>> {
     info!(path = ?db_path, "SESSION_START: opening storage");
 
-    RocksDbMemex::open(db_path)
-        .map(Arc::new)
-        .map_err(|e| {
-            error!(path = ?db_path, error = %e, "SESSION_START: storage open failed");
-            HookError::storage(format!("Failed to open database at {:?}: {}", db_path, e))
-        })
+    RocksDbMemex::open(db_path).map(Arc::new).map_err(|e| {
+        error!(path = ?db_path, error = %e, "SESSION_START: storage open failed");
+        HookError::storage(format!("Failed to open database at {:?}: {}", db_path, e))
+    })
 }
 
 /// Load existing snapshot or create new one.
@@ -345,11 +231,8 @@ fn load_or_create_snapshot(
                 snapshot.previous_session_id = Some(prev_id.to_string());
 
                 // Compute cross-session IC using formula IDENTITY-001
-                let cross_ic = compute_ic(
-                    &snapshot.purpose_vector,
-                    &prev_snapshot.purpose_vector,
-                    snapshot.integration,
-                );
+                // compute_ic takes two SessionIdentitySnapshot references
+                let cross_ic = compute_ic(&snapshot, &prev_snapshot);
                 snapshot.cross_session_ic = cross_ic;
                 snapshot.last_ic = cross_ic;
             }
@@ -403,6 +286,7 @@ fn build_consciousness_state(snapshot: &SessionIdentitySnapshot) -> Consciousnes
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::hooks::args::OutputFormat;
     use tempfile::TempDir;
 
     /// Create temporary database for testing
@@ -438,8 +322,14 @@ mod tests {
         assert!(result.is_ok(), "Execute must succeed");
         let output = result.unwrap();
         assert!(output.success, "Output.success must be true");
-        assert!(output.consciousness_state.is_some(), "Must have consciousness_state");
-        assert!(output.ic_classification.is_some(), "Must have ic_classification");
+        assert!(
+            output.consciousness_state.is_some(),
+            "Must have consciousness_state"
+        );
+        assert!(
+            output.ic_classification.is_some(),
+            "Must have ic_classification"
+        );
 
         // Verify: Data persisted to database
         let memex = RocksDbMemex::open(&db_path).expect("DB must open");
@@ -469,7 +359,9 @@ mod tests {
             let mut prev_snapshot = SessionIdentitySnapshot::new(prev_id);
             prev_snapshot.last_ic = 0.95;
             prev_snapshot.purpose_vector = [0.5; 13];
-            memex.save_snapshot(&prev_snapshot).expect("Save must succeed");
+            memex
+                .save_snapshot(&prev_snapshot)
+                .expect("Save must succeed");
         }
 
         // Execute: Create new session linked to previous
@@ -486,7 +378,10 @@ mod tests {
 
         // Verify: Link established in database
         let memex = RocksDbMemex::open(&db_path).expect("DB must open");
-        let loaded = memex.load_snapshot(new_id).expect("Load must succeed").unwrap();
+        let loaded = memex
+            .load_snapshot(new_id)
+            .expect("Load must succeed")
+            .unwrap();
         assert_eq!(
             loaded.previous_session_id.as_deref(),
             Some(prev_id),
@@ -508,7 +403,7 @@ mod tests {
 
         let args = SessionStartArgs {
             db_path: Some(db_path.clone()),
-            session_id: None,  // Should auto-generate
+            session_id: None, // Should auto-generate
             previous_session_id: None,
             stdin: false,
             format: OutputFormat::Json,
@@ -551,11 +446,17 @@ mod tests {
 
         // Should succeed despite missing previous session
         let result = execute(args).await;
-        assert!(result.is_ok(), "Execute must succeed despite missing previous");
+        assert!(
+            result.is_ok(),
+            "Execute must succeed despite missing previous"
+        );
 
         // Verify: New session created without link
         let memex = RocksDbMemex::open(&db_path).expect("DB must open");
-        let loaded = memex.load_snapshot("new-session").expect("Load must succeed").unwrap();
+        let _loaded = memex
+            .load_snapshot("new-session")
+            .expect("Load must succeed")
+            .unwrap();
         // Note: We log a warning but don't fail
 
         println!("PASS: Handled missing previous session gracefully");
@@ -580,7 +481,11 @@ mod tests {
         // Test 2: Env var used when no arg
         std::env::set_var("CONTEXT_GRAPH_DB_PATH", "/env/path");
         let result = resolve_db_path(None);
-        assert_eq!(result.unwrap(), PathBuf::from("/env/path"), "Env var should be used");
+        assert_eq!(
+            result.unwrap(),
+            PathBuf::from("/env/path"),
+            "Env var should be used"
+        );
 
         // Cleanup
         std::env::remove_var("CONTEXT_GRAPH_DB_PATH");
@@ -614,12 +519,24 @@ mod tests {
 
         // Verify required fields
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-        assert!(parsed.get("success").is_some(), "Must have 'success' field");
-        assert!(parsed.get("execution_time_ms").is_some(), "Must have 'execution_time_ms' field");
+        assert!(
+            parsed.get("success").is_some(),
+            "Must have 'success' field"
+        );
+        assert!(
+            parsed.get("execution_time_ms").is_some(),
+            "Must have 'execution_time_ms' field"
+        );
 
         // Verify optional fields present when data available
-        assert!(parsed.get("consciousness_state").is_some(), "Should have consciousness_state");
-        assert!(parsed.get("ic_classification").is_some(), "Should have ic_classification");
+        assert!(
+            parsed.get("consciousness_state").is_some(),
+            "Should have consciousness_state"
+        );
+        assert!(
+            parsed.get("ic_classification").is_some(),
+            "Should have ic_classification"
+        );
 
         println!("PASS: JSON output matches schema");
     }
@@ -647,7 +564,10 @@ mod tests {
         let actual_elapsed = start.elapsed().as_millis() as u64;
 
         // Verify timing is reasonable
-        assert!(result.execution_time_ms > 0, "Must have positive execution time");
+        assert!(
+            result.execution_time_ms > 0,
+            "Must have positive execution time"
+        );
         assert!(
             result.execution_time_ms <= actual_elapsed + 10, // Allow small margin
             "Reported time {} should not exceed actual elapsed {}",
@@ -662,220 +582,9 @@ mod tests {
             result.execution_time_ms
         );
 
-        println!("PASS: Execution time {} ms (actual: {} ms)", result.execution_time_ms, actual_elapsed);
+        println!(
+            "PASS: Execution time {} ms (actual: {} ms)",
+            result.execution_time_ms, actual_elapsed
+        );
     }
 }
-```
-
-### 2. `.claude/hooks/session_start.sh`
-
-```bash
-#!/bin/bash
-# Claude Code Hook: SessionStart
-# Timeout: 5000ms
-#
-# Constitution References:
-# - AP-50: Shell scripts call CLI (NO internal hooks)
-# - IDENTITY-002: IC thresholds
-# - GWT-003: Identity continuity tracking
-#
-# Exit Codes:
-# - 0: Success
-# - 2: Timeout
-# - 3: Database error
-# - 4: Invalid input
-# - 5: Session not found
-# - 6: IC crisis
-
-set -euo pipefail
-
-# Read JSON from stdin
-INPUT=$(cat)
-
-# Validate input exists
-if [ -z "$INPUT" ]; then
-    echo '{"success":false,"error":"Empty stdin","execution_time_ms":0}' >&2
-    exit 4
-fi
-
-# Extract fields using jq (required dependency)
-if ! command -v jq &>/dev/null; then
-    echo '{"success":false,"error":"jq not installed","execution_time_ms":0}' >&2
-    exit 4
-fi
-
-SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
-PREVIOUS_SESSION=$(echo "$INPUT" | jq -r '.payload.previous_session_id // empty')
-
-# Find CLI binary
-CONTEXT_GRAPH_CLI="${CONTEXT_GRAPH_CLI:-context-graph-cli}"
-if ! command -v "$CONTEXT_GRAPH_CLI" &>/dev/null; then
-    # Try common locations
-    for candidate in \
-        "./target/release/context-graph-cli" \
-        "./target/debug/context-graph-cli" \
-        "$HOME/.cargo/bin/context-graph-cli" \
-    ; do
-        if [ -x "$candidate" ]; then
-            CONTEXT_GRAPH_CLI="$candidate"
-            break
-        fi
-    done
-fi
-
-# Build CLI command
-CLI_ARGS=(hooks session-start --stdin --format json)
-
-if [ -n "$SESSION_ID" ]; then
-    CLI_ARGS+=(--session-id "$SESSION_ID")
-fi
-
-if [ -n "$PREVIOUS_SESSION" ]; then
-    CLI_ARGS+=(--previous-session-id "$PREVIOUS_SESSION")
-fi
-
-# Execute CLI with stdin passthrough
-echo "$INPUT" | "$CONTEXT_GRAPH_CLI" "${CLI_ARGS[@]}"
-```
-
----
-
-## Module Registration
-
-In `crates/context-graph-cli/src/commands/hooks/mod.rs`, add:
-
-```rust
-pub mod session_start;
-
-// In HooksCommands enum, add subcommand variant (if using clap derive)
-// This is handled by TASK-HOOKS-011 but shown here for context
-```
-
----
-
-## Full State Verification Requirements
-
-### Source of Truth
-
-| Data | Source | Verification Method |
-|------|--------|---------------------|
-| SessionIdentitySnapshot | `CF_SESSION_IDENTITY` column family | `memex.load_snapshot(session_id)` |
-| Latest session pointer | `latest` key in CF_SESSION_IDENTITY | `memex.load_latest()` |
-| IC thresholds | `gwt.self_ego_node.thresholds` in constitution | Hardcoded constants |
-| Exit codes | `HookError::exit_code()` method | Test against spec |
-
-### Execute & Inspect Pattern
-
-After each operation, verify state in database:
-
-```rust
-// After save_snapshot
-let loaded = memex.load_snapshot(session_id)?;
-assert!(loaded.is_some(), "Snapshot must persist");
-assert_eq!(loaded.unwrap().session_id, session_id);
-
-// After linking
-assert_eq!(snapshot.previous_session_id, Some(prev_id.to_string()));
-```
-
-### Edge Cases to Test
-
-1. **Empty stdin** - Must return exit 4 with error JSON
-2. **Malformed JSON** - Must return exit 4 with parse error
-3. **Missing DB path** - Must return exit 4 (or use default)
-4. **DB corruption** - Must return exit 3
-5. **Previous session missing** - Log warning, continue without link
-6. **Duplicate session_id** - Load existing, don't create new
-
-### Evidence of Success Logging
-
-All operations must log with tracing:
-- `info!` for successful operations
-- `warn!` for recoverable issues
-- `error!` for failures (before returning Err)
-
-Example log output:
-```
-INFO SESSION_START: execute starting stdin=false session_id=Some("test-123")
-INFO SESSION_START: opening storage path="/path/to/db"
-INFO SESSION_START: created and saved new snapshot session_id="test-123" ic=1.0
-INFO SESSION_START: execute complete session_id="test-123" execution_time_ms=15
-```
-
----
-
-## Manual Testing with Synthetic Data
-
-### Test 1: New Session
-```bash
-echo '{"hook_type":"session_start","session_id":"manual-test-001","timestamp_ms":1705312345678,"payload":{"type":"session_start","working_directory":"/tmp"}}' | \
-  ./target/debug/context-graph-cli hooks session-start --stdin --format json
-```
-
-Expected output:
-```json
-{
-  "success": true,
-  "consciousness_state": {
-    "consciousness": 0.0,
-    "integration": 0.0,
-    "reflection": 0.0,
-    "differentiation": 0.0,
-    "identity_continuity": 1.0,
-    "johari_quadrant": "unknown"
-  },
-  "ic_classification": {
-    "level": "healthy",
-    "value": 1.0,
-    "is_crisis": false
-  },
-  "execution_time_ms": 15
-}
-```
-
-### Test 2: Session Linking
-```bash
-# First create previous session
-echo '{"hook_type":"session_start","session_id":"prev-001","timestamp_ms":1705312345678,"payload":{"type":"session_start","working_directory":"/tmp"}}' | \
-  ./target/debug/context-graph-cli hooks session-start --stdin --format json
-
-# Then create new session linked to it
-echo '{"hook_type":"session_start","session_id":"new-001","timestamp_ms":1705312346678,"payload":{"type":"session_start","working_directory":"/tmp","previous_session_id":"prev-001"}}' | \
-  ./target/debug/context-graph-cli hooks session-start --stdin --format json
-```
-
-### Database Verification
-```bash
-# Use RocksDB ldb tool to inspect
-ldb --db=$CONTEXT_GRAPH_DB_PATH scan --column_family=session_identity
-```
-
----
-
-## Verification Checklist
-
-- [ ] `session_start.rs` compiles without errors
-- [ ] `session_start.rs` compiles without warnings (unused code)
-- [ ] All 7 test cases pass: `cargo test --package context-graph-cli session_start`
-- [ ] Shell script is executable: `chmod +x .claude/hooks/session_start.sh`
-- [ ] Shell script passes shellcheck: `shellcheck .claude/hooks/session_start.sh`
-- [ ] Manual test 1 (new session) produces valid JSON
-- [ ] Manual test 2 (session linking) establishes previous_session_id
-- [ ] Database contains snapshot after manual tests
-- [ ] Execution time < 5000ms in all tests
-- [ ] Tracing logs appear at appropriate levels
-
----
-
-## Implementation Order
-
-1. Create `session_start.rs` with execute function
-2. Add `parse_stdin()` and `extract_session_ids()`
-3. Add `resolve_db_path()` and `open_storage()`
-4. Add `load_or_create_snapshot()` with linking logic
-5. Add `build_consciousness_state()`
-6. Write all 7 test cases
-7. Run tests until all pass
-8. Create `.claude/hooks/session_start.sh`
-9. Run manual tests with synthetic data
-10. Verify database state after tests

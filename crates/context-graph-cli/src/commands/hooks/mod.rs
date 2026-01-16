@@ -16,6 +16,7 @@
 
 mod args;
 mod error;
+pub mod session_start;
 mod types;
 
 pub use args::{
@@ -45,3 +46,61 @@ pub use types::{
     JohariQuadrant,
     SessionEndStatus,
 };
+
+use tracing::error;
+
+/// Handle hooks subcommand dispatch
+///
+/// # Exit Codes
+/// - 0: Success
+/// - 1: General error
+/// - 2: Timeout
+/// - 3: Database error
+/// - 4: Invalid input
+pub async fn handle_hooks_command(cmd: HooksCommands) -> i32 {
+    match cmd {
+        HooksCommands::SessionStart(args) => {
+            match session_start::execute(args).await {
+                Ok(output) => {
+                    // Output JSON to stdout
+                    match serde_json::to_string(&output) {
+                        Ok(json) => {
+                            println!("{}", json);
+                            0
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Failed to serialize output");
+                            1
+                        }
+                    }
+                }
+                Err(e) => {
+                    // Output error JSON to stderr
+                    let error_json = e.to_json_error();
+                    eprintln!("{}", error_json);
+                    e.exit_code()
+                }
+            }
+        }
+        HooksCommands::PreTool(_args) => {
+            error!("PreTool hook not yet implemented");
+            1
+        }
+        HooksCommands::PostTool(_args) => {
+            error!("PostTool hook not yet implemented");
+            1
+        }
+        HooksCommands::PromptSubmit(_args) => {
+            error!("PromptSubmit hook not yet implemented");
+            1
+        }
+        HooksCommands::SessionEnd(_args) => {
+            error!("SessionEnd hook not yet implemented");
+            1
+        }
+        HooksCommands::GenerateConfig(_args) => {
+            error!("GenerateConfig not yet implemented");
+            1
+        }
+    }
+}
