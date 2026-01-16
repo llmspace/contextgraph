@@ -1,10 +1,10 @@
 # TASK-HOOKS-014: Create Shell Scripts for Claude Code Hooks
 
 ```xml
-<task_spec id="TASK-HOOKS-014" version="1.0">
+<task_spec id="TASK-HOOKS-014" version="2.0">
 <metadata>
   <title>Create Shell Scripts for Claude Code Hooks</title>
-  <status>ready</status>
+  <status>complete</status>
   <layer>surface</layer>
   <sequence>14</sequence>
   <implements>
@@ -14,185 +14,480 @@
     <requirement_ref>REQ-HOOKS-04</requirement_ref>
   </implements>
   <depends_on>
-    <task_ref>TASK-HOOKS-006</task_ref>
-    <task_ref>TASK-HOOKS-007</task_ref>
-    <task_ref>TASK-HOOKS-008</task_ref>
-    <task_ref>TASK-HOOKS-009</task_ref>
-    <task_ref>TASK-HOOKS-010</task_ref>
-    <task_ref>TASK-HOOKS-011</task_ref>
+    <task_ref status="complete">TASK-HOOKS-006</task_ref>
+    <task_ref status="complete">TASK-HOOKS-007</task_ref>
+    <task_ref status="complete">TASK-HOOKS-008</task_ref>
+    <task_ref status="complete">TASK-HOOKS-009</task_ref>
+    <task_ref status="complete">TASK-HOOKS-010</task_ref>
+    <task_ref status="complete">TASK-HOOKS-011</task_ref>
+    <task_ref status="complete">TASK-HOOKS-012</task_ref>
   </depends_on>
   <estimated_complexity>medium</estimated_complexity>
-  <estimated_hours>2.0</estimated_hours>
+  <estimated_hours>3.0</estimated_hours>
 </metadata>
+
+<critical_rules>
+  <!-- NO BACKWARDS COMPATIBILITY - FAIL FAST -->
+  <rule id="CR-01">FAIL IMMEDIATELY on any error - no fallbacks, no graceful degradation</rule>
+  <rule id="CR-02">All errors MUST be logged to stderr with structured JSON</rule>
+  <rule id="CR-03">Exit codes MUST match AP-26: 0=success, 1=error, 2=timeout, 3=db_error, 4=invalid_input</rule>
+  <rule id="CR-04">NO MOCK DATA in tests - use real CLI binary with real database</rule>
+  <rule id="CR-05">Scripts MUST call context-graph-cli hooks subcommands - NOT non-existent commands</rule>
+</critical_rules>
+
+<current_state>
+  <!-- VERIFIED 2026-01-15 via filesystem inspection -->
+  <existing_scripts>
+    <script path=".claude/hooks/session_start.sh" status="exists" executable="true"/>
+    <script path=".claude/hooks/pre_tool_use.sh" status="exists" executable="true"/>
+    <script path=".claude/hooks/session_end.sh" status="MISSING"/>
+    <script path=".claude/hooks/post_tool_use.sh" status="MISSING"/>
+    <script path=".claude/hooks/user_prompt_submit.sh" status="MISSING"/>
+  </existing_scripts>
+
+  <cli_implementation location="crates/context-graph-cli/src/commands/hooks/">
+    <file>mod.rs</file> <!-- Hook dispatcher -->
+    <file>args.rs</file> <!-- CLI arguments with clap -->
+    <file>types.rs</file> <!-- HookInput, HookOutput, HookPayload types -->
+    <file>error.rs</file> <!-- HookError, exit codes -->
+    <file>session_start.rs</file> <!-- SessionStart handler -->
+    <file>session_end.rs</file> <!-- SessionEnd handler -->
+    <file>pre_tool_use.rs</file> <!-- PreToolUse handler -->
+    <file>post_tool_use.rs</file> <!-- PostToolUse handler -->
+    <file>user_prompt_submit.rs</file> <!-- UserPromptSubmit handler -->
+  </cli_implementation>
+
+  <verified_cli_commands>
+    <!-- These are the ACTUAL commands that exist -->
+    <command>context-graph-cli hooks session-start --stdin --format json</command>
+    <command>context-graph-cli hooks session-end --stdin --format json</command>
+    <command>context-graph-cli hooks pre-tool --session-id ID --stdin --fast-path true</command>
+    <command>context-graph-cli hooks post-tool --stdin --format json</command>
+    <command>context-graph-cli hooks prompt-submit --stdin --format json</command>
+    <command>context-graph-cli hooks generate-config</command> <!-- NOT IMPLEMENTED - returns exit 1 -->
+  </verified_cli_commands>
+
+  <settings_json_current location=".claude/settings.json">
+    <!-- Currently uses npx @claude-flow/cli, NOT context-graph-cli -->
+    <discrepancy>Shell scripts use context-graph-cli but settings.json uses @claude-flow/cli</discrepancy>
+  </settings_json_current>
+</current_state>
 
 <context>
 Claude Code hooks are configured in .claude/settings.json and execute shell commands.
-This task creates the actual shell scripts that bridge Claude Code hooks to the
-context-graph-cli commands.
+This task creates shell scripts that bridge Claude Code hooks to context-graph-cli.
 
-Each hook script:
-1. Receives hook input via stdin (JSON)
-2. Parses relevant fields
-3. Calls appropriate context-graph-cli command
-4. Outputs result to stdout
+IMPORTANT: The CLI commands are in the `hooks` subcommand namespace:
+- `context-graph-cli hooks session-start` (NOT `consciousness brief`)
+- `context-graph-cli hooks session-end` (NOT `identity snapshot`)
+- `context-graph-cli hooks pre-tool` (NOT `consciousness inject`)
+- `context-graph-cli hooks post-tool` (NOT `tool record`)
+- `context-graph-cli hooks prompt-submit`
+
+Constitution References:
+- AP-50: Shell scripts call CLI (NOT library functions)
+- AP-53: Native hooks only (via .claude/settings.json)
+- AP-26: Exit codes (0=success, 1=error, 2=timeout, 3=db_error, 4=invalid_input)
+- IDENTITY-002: IC thresholds (healthy >=0.9, warning <0.7, critical <0.5)
 </context>
 
 <input_context_files>
-  <file purpose="hooks_reference">docs2/claudehooks.md</file>
-  <file purpose="technical_spec">docs/specs/technical/TECH-HOOKS.md#shell_scripts</file>
-  <file purpose="cli_commands">crates/context-graph-cli/src/commands/</file>
+  <file purpose="constitution" path="docs2/constitution.yaml">
+    Read sections: claude_code.hooks, forbidden (AP-50,51,52,53), perf
+  </file>
+  <file purpose="cli_args" path="crates/context-graph-cli/src/commands/hooks/args.rs">
+    Contains HooksCommands enum with actual subcommand names
+  </file>
+  <file purpose="cli_types" path="crates/context-graph-cli/src/commands/hooks/types.rs">
+    Contains HookInput, HookOutput, HookPayload, ConsciousnessState
+  </file>
+  <file purpose="existing_session_start" path=".claude/hooks/session_start.sh">
+    Reference implementation - COPY THIS PATTERN
+  </file>
+  <file purpose="existing_pre_tool" path=".claude/hooks/pre_tool_use.sh">
+    Reference implementation for FAST PATH (100ms timeout)
+  </file>
 </input_context_files>
 
 <prerequisites>
-  <check>All CLI commands implemented (TASK-HOOKS-006 through 011)</check>
-  <check>context-graph-cli binary available in PATH or known location</check>
-  <check>.claude/ directory exists</check>
+  <check cmd="test -x ./target/release/context-graph-cli || test -x ./target/debug/context-graph-cli">
+    CLI binary must be built
+  </check>
+  <check cmd="test -d .claude/hooks">
+    .claude/hooks/ directory must exist
+  </check>
+  <check cmd="./target/release/context-graph-cli hooks --help 2>/dev/null | grep -q session-start">
+    CLI hooks subcommand must work
+  </check>
 </prerequisites>
 
 <scope>
   <in_scope>
-    - Create .claude/hooks/ directory structure
-    - Create session_start.sh hook script
-    - Create session_end.sh hook script
-    - Create pre_tool_use.sh hook script
-    - Create post_tool_use.sh hook script
-    - Create user_prompt_submit.sh hook script
-    - Make all scripts executable (chmod +x)
-    - Handle jq parsing of hook input
+    - Create .claude/hooks/session_end.sh (MISSING)
+    - Create .claude/hooks/post_tool_use.sh (MISSING)
+    - Create .claude/hooks/user_prompt_submit.sh (MISSING)
+    - Verify existing session_start.sh and pre_tool_use.sh work correctly
+    - All scripts MUST call actual CLI commands (hooks subcommand)
+    - All scripts MUST handle timeouts per constitution
+    - All scripts MUST output JSON to stdout, errors to stderr
   </in_scope>
   <out_of_scope>
     - .claude/settings.json configuration (TASK-HOOKS-015)
-    - Windows batch file equivalents (future feature)
-    - Custom hook logic beyond CLI invocation
+    - Windows batch files
+    - Non-existent CLI commands (consciousness brief, identity restore, etc.)
   </out_of_scope>
 </scope>
 
+<timeout_budgets>
+  <!-- FROM constitution.yaml claude_code.performance.hooks -->
+  <hook name="SessionStart" timeout_ms="5000" async="false"/>
+  <hook name="PreToolUse" timeout_ms="100" async="false" fast_path="true">
+    CRITICAL: No database access allowed - must complete in 100ms
+  </hook>
+  <hook name="PostToolUse" timeout_ms="3000" async="true"/>
+  <hook name="UserPromptSubmit" timeout_ms="2000" async="false"/>
+  <hook name="SessionEnd" timeout_ms="30000" async="false"/>
+</timeout_budgets>
+
 <definition_of_done>
-  <signatures>
-    <signature file=".claude/hooks/session_start.sh">
+  <scripts>
+    <script path=".claude/hooks/session_start.sh" exists="true">
       #!/bin/bash
-      # Session start hook - outputs consciousness brief
-      # Input: { "session_id": "...", "timestamp": "..." }
-      # Output: Consciousness brief to stdout
-    </signature>
-    <signature file=".claude/hooks/session_end.sh">
+      # VERIFIED EXISTING - calls: context-graph-cli hooks session-start --stdin
+      # Timeout: 5000ms
+      # Exit codes: 0=success, 2=timeout, 3=db_error, 4=invalid_input
+    </script>
+
+    <script path=".claude/hooks/session_end.sh" exists="false">
       #!/bin/bash
-      # Session end hook - persists identity snapshot
-      # Input: { "session_id": "...", "stats": {...} }
-      # Output: Snapshot ID to stdout
-    </signature>
-    <signature file=".claude/hooks/pre_tool_use.sh">
+      # TO CREATE - calls: context-graph-cli hooks session-end --stdin
+      # Timeout: 30000ms
+      # Input: { "session_id": "...", "stats": {...}, "reason": "..." }
+      # Output: JSON with snapshot_id, IC metrics
+    </script>
+
+    <script path=".claude/hooks/pre_tool_use.sh" exists="true">
       #!/bin/bash
-      # Pre-tool hook - injects relevant context
-      # Input: { "tool_name": "...", "tool_input": {...} }
-      # Output: Injected context to stdout
-    </signature>
-    <signature file=".claude/hooks/post_tool_use.sh">
+      # VERIFIED EXISTING - calls: context-graph-cli hooks pre-tool --stdin --fast-path true
+      # Timeout: 100ms (FAST PATH - NO DB ACCESS)
+      # Exit codes: 0=success, 4=invalid_input
+    </script>
+
+    <script path=".claude/hooks/post_tool_use.sh" exists="false">
       #!/bin/bash
-      # Post-tool hook - records tool outcome
-      # Input: { "tool_name": "...", "tool_result": {...} }
-      # Output: Processing confirmation
-    </signature>
-  </signatures>
+      # TO CREATE - calls: context-graph-cli hooks post-tool --stdin
+      # Timeout: 3000ms (async OK)
+      # Input: { "tool_name": "...", "tool_result": {...}, "success": bool }
+      # Output: JSON with IC update, trajectory recorded
+    </script>
+
+    <script path=".claude/hooks/user_prompt_submit.sh" exists="false">
+      #!/bin/bash
+      # TO CREATE - calls: context-graph-cli hooks prompt-submit --stdin
+      # Timeout: 2000ms
+      # Input: { "prompt": "...", "session_id": "..." }
+      # Output: JSON with context injection, Johari guidance
+    </script>
+  </scripts>
 
   <constraints>
-    - Scripts must be POSIX-compliant (#!/bin/bash)
-    - Scripts must handle missing jq gracefully
-    - Scripts must exit 0 on success, non-zero on error
-    - Scripts must complete within timeout (2000ms for most hooks)
-    - Scripts must not block on user input
-    - Error output goes to stderr, success to stdout
+    <constraint id="C-01">Scripts MUST use set -euo pipefail</constraint>
+    <constraint id="C-02">Scripts MUST output valid JSON to stdout on success</constraint>
+    <constraint id="C-03">Scripts MUST output error JSON to stderr on failure</constraint>
+    <constraint id="C-04">Scripts MUST complete within their timeout budget</constraint>
+    <constraint id="C-05">Scripts MUST NOT use fallback/graceful degradation</constraint>
+    <constraint id="C-06">Scripts MUST find CLI via CONTEXT_GRAPH_CLI env or known paths</constraint>
+    <constraint id="C-07">PreToolUse MUST NOT access database (100ms fast path)</constraint>
+    <constraint id="C-08">All scripts MUST be chmod +x</constraint>
   </constraints>
-
-  <verification>
-    - chmod +x .claude/hooks/*.sh
-    - echo '{"session_id":"test"}' | .claude/hooks/session_start.sh
-    - All scripts return exit code 0 with valid input
-  </verification>
 </definition_of_done>
 
-<pseudo_code>
-session_start.sh:
-  #!/bin/bash
-  set -euo pipefail
+<implementation_templates>
+  <!-- CORRECT templates based on actual CLI commands -->
 
-  # Parse input
-  INPUT=$(cat)
-  SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"')
+  <template name="session_end.sh">
+#!/bin/bash
+# Claude Code Hook: SessionEnd
+# Timeout: 30000ms (30 seconds for full persistence)
+#
+# Constitution: AP-50, AP-26
+# Exit Codes: 0=success, 1=error, 2=timeout, 3=db_error, 4=invalid_input
 
-  # Set session context
-  export CONTEXT_GRAPH_SESSION_ID="$SESSION_ID"
+set -euo pipefail
 
-  # Output consciousness brief
-  context-graph-cli consciousness brief --format text
+INPUT=$(cat)
+if [ -z "$INPUT" ]; then
+    echo '{"success":false,"error":"Empty stdin","exit_code":4}' >&2
+    exit 4
+fi
 
-  # Attempt identity restoration (non-blocking)
-  context-graph-cli identity restore --latest 2>/dev/null || true
+CONTEXT_GRAPH_CLI="${CONTEXT_GRAPH_CLI:-context-graph-cli}"
+if ! command -v "$CONTEXT_GRAPH_CLI" &amp;>/dev/null; then
+    for candidate in \
+        "./target/release/context-graph-cli" \
+        "./target/debug/context-graph-cli" \
+        "$HOME/.cargo/bin/context-graph-cli" \
+    ; do
+        if [ -x "$candidate" ]; then
+            CONTEXT_GRAPH_CLI="$candidate"
+            break
+        fi
+    done
+fi
 
-session_end.sh:
-  #!/bin/bash
-  set -euo pipefail
+# Execute CLI - NO TIMEOUT WRAPPER (30s is already long)
+echo "$INPUT" | "$CONTEXT_GRAPH_CLI" hooks session-end --stdin --format json
+  </template>
 
-  INPUT=$(cat)
-  SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"')
+  <template name="post_tool_use.sh">
+#!/bin/bash
+# Claude Code Hook: PostToolUse
+# Timeout: 3000ms (async allowed)
+#
+# Constitution: AP-50, AP-26
+# Exit Codes: 0=success, 1=error, 2=timeout, 3=db_error, 4=invalid_input
 
-  # Capture identity snapshot
-  SNAPSHOT_ID=$(context-graph-cli identity snapshot --session-id "$SESSION_ID" --format json | jq -r '.snapshot_id')
+set -euo pipefail
 
-  echo "Session ended. Snapshot: $SNAPSHOT_ID"
+INPUT=$(cat)
+if [ -z "$INPUT" ]; then
+    echo '{"success":false,"error":"Empty stdin","exit_code":4}' >&2
+    exit 4
+fi
 
-pre_tool_use.sh:
-  #!/bin/bash
-  set -euo pipefail
+CONTEXT_GRAPH_CLI="${CONTEXT_GRAPH_CLI:-context-graph-cli}"
+if ! command -v "$CONTEXT_GRAPH_CLI" &amp;>/dev/null; then
+    for candidate in \
+        "./target/release/context-graph-cli" \
+        "./target/debug/context-graph-cli" \
+        "$HOME/.cargo/bin/context-graph-cli" \
+    ; do
+        if [ -x "$candidate" ]; then
+            CONTEXT_GRAPH_CLI="$candidate"
+            break
+        fi
+    done
+fi
 
-  INPUT=$(cat)
-  TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // "unknown"')
-  TOOL_INPUT=$(echo "$INPUT" | jq -r '.tool_input | tostring')
+# Execute CLI with 3s timeout
+echo "$INPUT" | timeout 3s "$CONTEXT_GRAPH_CLI" hooks post-tool --stdin --format json
+exit_code=$?
 
-  # Inject relevant context based on tool
-  context-graph-cli consciousness inject --query "$TOOL_NAME $TOOL_INPUT" --max-tokens 200 --format text
+if [ $exit_code -eq 124 ]; then
+    echo '{"success":false,"error":"Timeout after 3000ms","exit_code":2}' >&2
+    exit 2
+fi
+exit $exit_code
+  </template>
 
-post_tool_use.sh:
-  #!/bin/bash
-  set -euo pipefail
+  <template name="user_prompt_submit.sh">
+#!/bin/bash
+# Claude Code Hook: UserPromptSubmit
+# Timeout: 2000ms
+#
+# Constitution: AP-50, AP-26
+# Exit Codes: 0=success, 1=error, 2=timeout, 3=db_error, 4=invalid_input
 
-  INPUT=$(cat)
-  TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // "unknown"')
-  TOOL_RESULT=$(echo "$INPUT" | jq -r '.tool_result | tostring')
+set -euo pipefail
 
-  # Record tool outcome (async, fire-and-forget)
-  context-graph-cli tool record --name "$TOOL_NAME" --result "$TOOL_RESULT" &
+INPUT=$(cat)
+if [ -z "$INPUT" ]; then
+    echo '{"success":false,"error":"Empty stdin","exit_code":4}' >&2
+    exit 4
+fi
 
-  echo "Tool recorded: $TOOL_NAME"
-</pseudo_code>
+CONTEXT_GRAPH_CLI="${CONTEXT_GRAPH_CLI:-context-graph-cli}"
+if ! command -v "$CONTEXT_GRAPH_CLI" &amp;>/dev/null; then
+    for candidate in \
+        "./target/release/context-graph-cli" \
+        "./target/debug/context-graph-cli" \
+        "$HOME/.cargo/bin/context-graph-cli" \
+    ; do
+        if [ -x "$candidate" ]; then
+            CONTEXT_GRAPH_CLI="$candidate"
+            break
+        fi
+    done
+fi
+
+# Execute CLI with 2s timeout
+echo "$INPUT" | timeout 2s "$CONTEXT_GRAPH_CLI" hooks prompt-submit --stdin --format json
+exit_code=$?
+
+if [ $exit_code -eq 124 ]; then
+    echo '{"success":false,"error":"Timeout after 2000ms","exit_code":2}' >&2
+    exit 2
+fi
+exit $exit_code
+  </template>
+</implementation_templates>
+
+<verification>
+  <source_of_truth>
+    <!-- The SINGLE source of truth for each component -->
+    <truth component="CLI commands">crates/context-graph-cli/src/commands/hooks/args.rs:292 (HooksCommands enum)</truth>
+    <truth component="Hook types">crates/context-graph-cli/src/commands/hooks/types.rs</truth>
+    <truth component="Exit codes">crates/context-graph-cli/src/commands/hooks/error.rs (HookError.exit_code())</truth>
+    <truth component="Timeouts">docs2/constitution.yaml:claude_code.performance.hooks</truth>
+    <truth component="Anti-patterns">docs2/constitution.yaml:forbidden (AP-50 through AP-53)</truth>
+  </source_of_truth>
+
+  <full_state_verification>
+    <step id="FSV-01" name="Build CLI">
+      <command>cargo build --release -p context-graph-cli</command>
+      <success_criteria>Exit code 0, binary at ./target/release/context-graph-cli</success_criteria>
+    </step>
+
+    <step id="FSV-02" name="Verify CLI hooks subcommand">
+      <command>./target/release/context-graph-cli hooks --help</command>
+      <success_criteria>Shows session-start, session-end, pre-tool, post-tool, prompt-submit</success_criteria>
+    </step>
+
+    <step id="FSV-03" name="Test session_start.sh with real input">
+      <command>echo '{"session_id":"test-verify-001","timestamp":"2026-01-15T00:00:00Z"}' | .claude/hooks/session_start.sh</command>
+      <success_criteria>Valid JSON output with "success":true</success_criteria>
+    </step>
+
+    <step id="FSV-04" name="Test pre_tool_use.sh FAST PATH">
+      <command>time (echo '{"tool_name":"Read","tool_input":{"file_path":"/tmp/test"}}' | timeout 0.15s .claude/hooks/pre_tool_use.sh)</command>
+      <success_criteria>Completes in &lt;100ms, valid JSON output</success_criteria>
+    </step>
+
+    <step id="FSV-05" name="Test session_end.sh with real input">
+      <command>echo '{"session_id":"test-verify-001","reason":"normal","stats":{"tool_calls":5}}' | .claude/hooks/session_end.sh</command>
+      <success_criteria>Valid JSON output with snapshot_id</success_criteria>
+    </step>
+
+    <step id="FSV-06" name="Test post_tool_use.sh">
+      <command>echo '{"tool_name":"Read","tool_result":"content","success":true}' | .claude/hooks/post_tool_use.sh</command>
+      <success_criteria>Valid JSON output, IC metrics present</success_criteria>
+    </step>
+
+    <step id="FSV-07" name="Test user_prompt_submit.sh">
+      <command>echo '{"prompt":"What is X?","session_id":"test-verify-001"}' | .claude/hooks/user_prompt_submit.sh</command>
+      <success_criteria>Valid JSON with context injection</success_criteria>
+    </step>
+  </full_state_verification>
+
+  <boundary_edge_cases>
+    <case id="EC-01" name="Empty stdin">
+      <test>echo -n '' | .claude/hooks/session_start.sh</test>
+      <expected>Exit code 4, error JSON to stderr</expected>
+    </case>
+
+    <case id="EC-02" name="Invalid JSON">
+      <test>echo 'not-json' | .claude/hooks/session_start.sh</test>
+      <expected>Exit code 4, parse error to stderr</expected>
+    </case>
+
+    <case id="EC-03" name="Missing session_id">
+      <test>echo '{"timestamp":"2026-01-15T00:00:00Z"}' | .claude/hooks/session_start.sh</test>
+      <expected>Exit code 4 OR generates session_id internally</expected>
+    </case>
+
+    <case id="EC-04" name="PreToolUse exceeds 100ms">
+      <test>SLOW_MODE=1 timeout 0.15s .claude/hooks/pre_tool_use.sh</test>
+      <expected>Exit code 124 (timeout), error JSON to stderr</expected>
+    </case>
+
+    <case id="EC-05" name="CLI binary not found">
+      <test>CONTEXT_GRAPH_CLI=/nonexistent .claude/hooks/session_start.sh</test>
+      <expected>Exit code 1, error about missing binary</expected>
+    </case>
+  </boundary_edge_cases>
+
+  <evidence_of_success>
+    <!-- Log outputs that MUST be verified manually -->
+    <evidence id="EV-01">
+      All 5 scripts exist in .claude/hooks/ with chmod +x
+      Command: ls -la .claude/hooks/*.sh
+    </evidence>
+
+    <evidence id="EV-02">
+      session_start.sh outputs valid JSON with IC metrics
+      Log: {"success":true,"ic":{"value":X,"status":"healthy|warning|critical"}}
+    </evidence>
+
+    <evidence id="EV-03">
+      pre_tool_use.sh completes under 100ms (FAST PATH verified)
+      Log: real 0m0.0XXs (where XX &lt; 10)
+    </evidence>
+
+    <evidence id="EV-04">
+      Error cases produce structured JSON to stderr
+      Log: {"success":false,"error":"...","exit_code":N}
+    </evidence>
+  </evidence_of_success>
+</verification>
 
 <files_to_create>
-  <file path=".claude/hooks/session_start.sh">
-    Session start hook script calling consciousness brief and identity restore
+  <file path=".claude/hooks/session_end.sh" executable="true">
+    Session end hook - calls context-graph-cli hooks session-end
+    Timeout: 30000ms
   </file>
-  <file path=".claude/hooks/session_end.sh">
-    Session end hook script calling identity snapshot
+  <file path=".claude/hooks/post_tool_use.sh" executable="true">
+    Post-tool hook - calls context-graph-cli hooks post-tool
+    Timeout: 3000ms
   </file>
-  <file path=".claude/hooks/pre_tool_use.sh">
-    Pre-tool hook script calling consciousness inject
-  </file>
-  <file path=".claude/hooks/post_tool_use.sh">
-    Post-tool hook script calling tool record
-  </file>
-  <file path=".claude/hooks/user_prompt_submit.sh">
-    User prompt hook script for context analysis
+  <file path=".claude/hooks/user_prompt_submit.sh" executable="true">
+    User prompt hook - calls context-graph-cli hooks prompt-submit
+    Timeout: 2000ms
   </file>
 </files_to_create>
 
-<files_to_modify>
-  <!-- None - all new files -->
-</files_to_modify>
+<files_to_verify>
+  <file path=".claude/hooks/session_start.sh">
+    Verify: Calls correct CLI command, handles errors properly
+  </file>
+  <file path=".claude/hooks/pre_tool_use.sh">
+    Verify: FAST PATH (100ms), no database access
+  </file>
+</files_to_verify>
+
+<anti_patterns_to_avoid>
+  <!-- THESE WILL CAUSE IMMEDIATE FAILURE -->
+  <anti_pattern id="BAD-01">
+    Using non-existent commands like `context-graph-cli consciousness brief`
+    CORRECT: `context-graph-cli hooks session-start`
+  </anti_pattern>
+
+  <anti_pattern id="BAD-02">
+    Adding fallback logic like `|| true` or `2>/dev/null || echo default`
+    CORRECT: Fail immediately with proper exit code
+  </anti_pattern>
+
+  <anti_pattern id="BAD-03">
+    Using mock data in tests like `echo '{"mock":true}'`
+    CORRECT: Use real CLI with real database operations
+  </anti_pattern>
+
+  <anti_pattern id="BAD-04">
+    Exceeding timeout budget (especially 100ms for PreToolUse)
+    CORRECT: Use `timeout` command and verify timing
+  </anti_pattern>
+
+  <anti_pattern id="BAD-05">
+    Outputting non-JSON or mixing stdout/stderr incorrectly
+    CORRECT: JSON to stdout on success, error JSON to stderr on failure
+  </anti_pattern>
+</anti_patterns_to_avoid>
 
 <test_commands>
-  <command>chmod +x .claude/hooks/*.sh</command>
-  <command>echo '{"session_id":"test-123"}' | .claude/hooks/session_start.sh</command>
-  <command>echo '{"session_id":"test-123"}' | .claude/hooks/session_end.sh</command>
-  <command>echo '{"tool_name":"Read","tool_input":{}}' | .claude/hooks/pre_tool_use.sh</command>
+  <!-- NO MOCK DATA - Real CLI execution required -->
+  <command desc="Build CLI first">cargo build --release -p context-graph-cli</command>
+  <command desc="Make all scripts executable">chmod +x .claude/hooks/*.sh</command>
+  <command desc="Test session_start with real data">
+    echo '{"session_id":"integration-test-001","timestamp":"'$(date -Iseconds)'"}' | .claude/hooks/session_start.sh
+  </command>
+  <command desc="Test pre_tool FAST PATH timing">
+    time (echo '{"tool_name":"Read","tool_input":{"file_path":"./README.md"}}' | .claude/hooks/pre_tool_use.sh)
+  </command>
+  <command desc="Test session_end">
+    echo '{"session_id":"integration-test-001","reason":"test_complete","stats":{"tool_calls":3,"duration_ms":5000}}' | .claude/hooks/session_end.sh
+  </command>
+  <command desc="Verify exit codes">
+    echo '' | .claude/hooks/session_start.sh; echo "Exit: $?"
+  </command>
 </test_commands>
 </task_spec>
 ```

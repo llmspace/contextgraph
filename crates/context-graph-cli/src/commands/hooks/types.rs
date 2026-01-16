@@ -971,6 +971,87 @@ impl HookInput {
 }
 
 // =============================================================================
+// Drift Metrics (session identity drift measurement)
+// Technical Reference: TASK-HOOKS-013
+// Constitution Reference: IDENTITY-002, gwt.self_ego_node.thresholds
+// =============================================================================
+
+/// Drift metrics for session identity restoration
+/// Measures deviation between current and previous session identity state
+///
+/// # Fields
+/// - `ic_delta`: Change in identity continuity (current - previous)
+/// - `purpose_drift`: Cosine distance between purpose vectors [0.0, 2.0]
+/// - `time_since_snapshot_ms`: Time elapsed since previous snapshot
+/// - `kuramoto_phase_drift`: Mean absolute phase difference [0.0, π]
+///
+/// # Thresholds (per TASK-HOOKS-013)
+/// - Warning: ic_delta < -0.1
+/// - Crisis: ic_delta < -0.3
+///
+/// # Example
+/// ```
+/// use context_graph_cli::commands::hooks::DriftMetrics;
+///
+/// let metrics = DriftMetrics {
+///     ic_delta: -0.15,
+///     purpose_drift: 0.25,
+///     time_since_snapshot_ms: 3600000,
+///     kuramoto_phase_drift: 0.3,
+/// };
+///
+/// assert!(metrics.is_warning_drift());
+/// assert!(!metrics.is_crisis_drift());
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DriftMetrics {
+    /// Change in identity continuity (current IC - previous IC)
+    /// Range: [-1.0, 1.0]
+    /// Negative = identity degradation, Positive = identity improvement
+    pub ic_delta: f32,
+
+    /// Cosine distance between current and previous purpose vectors
+    /// Range: [0.0, 2.0] where 0.0 = identical, 2.0 = opposite
+    pub purpose_drift: f32,
+
+    /// Time elapsed since the previous session snapshot in milliseconds
+    pub time_since_snapshot_ms: i64,
+
+    /// Mean absolute phase difference across Kuramoto oscillators
+    /// Range: [0.0, π] where 0.0 = perfect sync, π = opposite phases
+    pub kuramoto_phase_drift: f64,
+}
+
+impl DriftMetrics {
+    /// Crisis drift threshold for ic_delta
+    /// Constitution Reference: IDENTITY-002
+    pub const CRISIS_THRESHOLD: f32 = -0.3;
+
+    /// Warning drift threshold for ic_delta
+    pub const WARNING_THRESHOLD: f32 = -0.1;
+
+    /// Check if drift indicates a crisis state
+    /// Crisis = ic_delta < -0.3 (severe identity degradation)
+    ///
+    /// # Returns
+    /// `true` if ic_delta is below the crisis threshold
+    #[inline]
+    pub fn is_crisis_drift(&self) -> bool {
+        self.ic_delta < Self::CRISIS_THRESHOLD
+    }
+
+    /// Check if drift indicates a warning state
+    /// Warning = ic_delta < -0.1 (moderate identity degradation)
+    ///
+    /// # Returns
+    /// `true` if ic_delta is below the warning threshold (but not necessarily crisis)
+    #[inline]
+    pub fn is_warning_drift(&self) -> bool {
+        self.ic_delta < Self::WARNING_THRESHOLD
+    }
+}
+
+// =============================================================================
 // Hook Output (stdout contract)
 // Technical Reference: TECH-HOOKS.md Section 2.2, 3.3
 // =============================================================================
@@ -1013,6 +1094,11 @@ pub struct HookOutput {
     /// Content to inject into context (omit if None)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_injection: Option<String>,
+    /// Drift metrics for session identity restoration (omit if None)
+    /// Only present when linking to a previous session
+    /// Technical Reference: TASK-HOOKS-013
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub drift_metrics: Option<DriftMetrics>,
     /// Execution time in milliseconds (REQUIRED)
     pub execution_time_ms: u64,
 }
@@ -1025,6 +1111,7 @@ impl Default for HookOutput {
             consciousness_state: None,
             ic_classification: None,
             context_injection: None,
+            drift_metrics: None,
             execution_time_ms: 0,
         }
     }
@@ -1066,6 +1153,33 @@ impl HookOutput {
     /// Add context injection to output (builder pattern)
     pub fn with_context_injection(mut self, content: impl Into<String>) -> Self {
         self.context_injection = Some(content.into());
+        self
+    }
+
+    /// Add drift metrics to output (builder pattern)
+    /// Technical Reference: TASK-HOOKS-013
+    ///
+    /// # Arguments
+    /// * `metrics` - DriftMetrics computed from session identity comparison
+    ///
+    /// # Example
+    /// ```
+    /// use context_graph_cli::commands::hooks::{HookOutput, DriftMetrics};
+    ///
+    /// let metrics = DriftMetrics {
+    ///     ic_delta: -0.05,
+    ///     purpose_drift: 0.1,
+    ///     time_since_snapshot_ms: 60000,
+    ///     kuramoto_phase_drift: 0.2,
+    /// };
+    ///
+    /// let output = HookOutput::success(50)
+    ///     .with_drift_metrics(metrics);
+    ///
+    /// assert!(output.drift_metrics.is_some());
+    /// ```
+    pub fn with_drift_metrics(mut self, metrics: DriftMetrics) -> Self {
+        self.drift_metrics = Some(metrics);
         self
     }
 }
@@ -1414,6 +1528,7 @@ mod hook_io_tests {
                 crisis_triggered: false,
             }),
             context_injection: None,
+            drift_metrics: None,
             execution_time_ms: 15,
         };
 
