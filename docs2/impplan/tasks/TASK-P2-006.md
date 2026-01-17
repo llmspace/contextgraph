@@ -1,10 +1,10 @@
-# TASK-P2-006: Quantizer Implementation
+# TASK-P2-006: SemanticFingerprint Quantizer Implementation
 
 ```xml
-<task_spec id="TASK-P2-006" version="1.0">
+<task_spec id="TASK-P2-006" version="2.0">
 <metadata>
-  <title>Quantizer Implementation</title>
-  <status>ready</status>
+  <title>SemanticFingerprint Quantizer Implementation</title>
+  <status>COMPLETE</status>
   <layer>logic</layer>
   <sequence>19</sequence>
   <phase>2</phase>
@@ -15,533 +15,610 @@
     <task_ref>TASK-P2-005</task_ref>
   </depends_on>
   <estimated_complexity>high</estimated_complexity>
+  <last_audited>2026-01-17</last_audited>
+  <completed_date>2026-01-16</completed_date>
 </metadata>
+```
 
-<context>
-Implements the Quantizer that compresses TeleologicalArray from ~100KB to ~11KB
-using different quantization methods per embedder:
-- PQ-8: Product quantization with 8-bit codes (E1, E5, E7, E10)
-- Float8: 8-bit floating point (E2, E3, E4, E8, E11, E12)
-- Binary: Bit packing (E9 - already binary)
-- Inverted: Sparse index format (E6, E13)
+---
 
-Quantization is lossy for PQ-8 and Float8 but acceptable for similarity search.
-</context>
+## CRITICAL AUDIT: Codebase Discrepancies (2026-01-17)
 
-<input_context_files>
-  <file purpose="component_spec">docs2/impplan/technical/TECH-PHASE2-EMBEDDING-13SPACE.md#component_contracts</file>
-  <file purpose="config">crates/context-graph-core/src/embedding/config.rs</file>
-</input_context_files>
+**The original task document v1.0 was WRONG.** This section documents verified actual state:
 
-<prerequisites>
-  <check>TASK-P2-005 complete (MultiArrayProvider exists)</check>
-  <check>All vector types implemented</check>
-</prerequisites>
+### File Path Corrections (VERIFIED)
 
-<scope>
-  <in_scope>
-    - Create QuantizedArray struct
-    - Implement quantize_array() for TeleologicalArray
-    - Implement dequantize_array() for retrieval
-    - PQ-8 quantization (product quantization)
-    - Float8 quantization (8-bit float)
-    - Inverted index format for sparse vectors
-    - Binary packing (already handled in BinaryVector)
-    - QuantizeError enum
-  </in_scope>
-  <out_of_scope>
-    - Trained PQ codebooks (use random initialization for now)
-    - SIMD-optimized quantization
-    - GPU quantization
-    - Adaptive quantization based on content
-  </out_of_scope>
-</scope>
+| WRONG (v1.0) | CORRECT (Actual) |
+|--------------|------------------|
+| `src/embedding/` | `src/embeddings/` (plural!) |
+| `src/embedding/teleological.rs` | `src/types/fingerprint/semantic/fingerprint.rs` |
+| `src/embedding/vector.rs` | `src/embeddings/vector.rs` |
+| SparseVector in `vector.rs` | `src/types/fingerprint/sparse.rs` |
+| NEW `src/embedding/quantize.rs` | ADD TO `src/quantization/fingerprint.rs` |
 
-<definition_of_done>
-  <signatures>
-    <signature file="crates/context-graph-core/src/embedding/quantize.rs">
-      #[derive(Debug, Clone, Serialize, Deserialize)]
-      pub struct QuantizedArray {
-          pub e1_semantic: QuantizedDense,
-          pub e2_temp_recent: QuantizedFloat8,
-          pub e3_temp_periodic: QuantizedFloat8,
-          pub e4_temp_position: QuantizedFloat8,
-          pub e5_causal: QuantizedDense,
-          pub e6_sparse: InvertedIndex,
-          pub e7_code: QuantizedDense,
-          pub e8_emotional: QuantizedFloat8,
-          pub e9_hdc: PackedBinary,
-          pub e10_multimodal: QuantizedDense,
-          pub e11_entity: QuantizedFloat8,
-          pub e12_late_interact: Vec&lt;QuantizedFloat8&gt;,
-          pub e13_splade: InvertedIndex,
-      }
+### Type Corrections (VERIFIED)
 
-      #[derive(Debug, Error)]
-      pub enum QuantizeError {
-          #[error("Invalid input: {message}")]
-          InvalidInput { message: String },
-          #[error("Codebook missing for {embedder:?}")]
-          CodebookMissing { embedder: Embedder },
-      }
+| WRONG (v1.0) | CORRECT (Actual) |
+|--------------|------------------|
+| `TeleologicalArray` struct | `SemanticFingerprint` (alias: `pub type TeleologicalArray = SemanticFingerprint`) |
+| `DenseVector<N>` generic | `DenseVector` with `Vec<f32>` (runtime-sized) |
+| `SparseVector::data()` returns tuple | `.indices: Vec<u16>`, `.values: Vec<f32>` (direct fields) |
+| `SparseVector::dimension()` | NO SUCH METHOD - use `SPARSE_VOCAB_SIZE = 30_522` |
+| `e9_hdc: BinaryVector` | `e9_hdc: Vec<f32>` (1024D PROJECTED dense!) |
+| `InvertedIndex.indices: Vec<u32>` | Use `Vec<u16>` (matches SparseVector) |
 
-      pub fn quantize_array(array: &amp;TeleologicalArray) -> Result&lt;QuantizedArray, QuantizeError&gt;;
-      pub fn dequantize_array(quantized: &amp;QuantizedArray) -> Result&lt;TeleologicalArray, QuantizeError&gt;;
-    </signature>
-  </signatures>
+### Existing Infrastructure (VERIFIED)
 
-  <constraints>
-    - QuantizedArray must be ~11KB (74% smaller than raw)
-    - PQ-8 uses 8-bit codes per subvector
-    - Float8 scales values to [-1, 1] range
-    - Inverted index stores sorted (index, value) pairs
-    - Dequantization is lossy but preserves similarity ranking
-  </constraints>
+The `quantization` module EXISTS at `crates/context-graph-core/src/quantization/`:
 
-  <verification>
-    - quantize_array produces smaller output
-    - dequantize_array recovers approximate vectors
-    - Cosine similarity preserved within 5% after roundtrip
-    - All embedder types quantize correctly
-  </verification>
-</definition_of_done>
+```
+quantization/
+├── mod.rs       # Exports: Quantizable, Precision, QuantizedEmbedding
+├── types.rs     # Precision (Int4, Int8, Fp16), QuantizedEmbedding, QuantizationError
+├── traits.rs    # Quantizable trait
+├── batch.rs     # batch_quantize, batch_dequantize (rayon parallel)
+├── accuracy.rs  # compute_rmse, compute_nrmse, AccuracyReport
+```
 
-<pseudo_code>
-File: crates/context-graph-core/src/embedding/quantize.rs
+**`TokenPruningEmbedding` (E12) already implements `Quantizable`** in `src/embeddings/token_pruning.rs`.
 
-use serde::{Serialize, Deserialize};
+### Advanced PQ-8 Infrastructure (DISCOVERED)
+
+A full-featured PQ-8 implementation exists at `crates/context-graph-embeddings/src/quantization/pq8/`:
+
+```
+pq8/
+├── mod.rs       # PQ8Encoder exports
+├── types.rs     # PQ8QuantizationError, KMeansConfig, SimpleRng
+├── encoder.rs   # PQ8Encoder with trained codebooks, ADC distance
+├── codebook.rs  # PQ8Codebook training via k-means++
+```
+
+**Key types from `types.rs`:**
+- `NUM_SUBVECTORS = 8`, `NUM_CENTROIDS = 256`
+- `PQ8QuantizationError` with comprehensive error variants
+- `KMeansConfig` with `max_iterations`, `convergence_threshold`, `seed`
+
+**This task uses simplified mean-based PQ** (no codebook training) for faster development. The advanced encoder can be integrated later for better accuracy.
+
+---
+
+## Context
+
+Implements `QuantizedSemanticFingerprint` that compresses `SemanticFingerprint` from ~46KB to ~11KB:
+
+| Method | Embedders | Description | Compression |
+|--------|-----------|-------------|-------------|
+| **PQ-8** | E1, E5, E7, E10 | Product quantization, 8-bit codes | 1024D -> 32B (32x) |
+| **Float8** | E2-E4, E8, E9, E11 | Min-max scalar quantization | 1:4 ratio |
+| **Token Float8** | E12 | Per-token Float8 | ~1.3KB for 10 tokens |
+| **Sparse** | E6, E13 | u16 indices + Float8 values | ~2.5KB each |
+
+**CRITICAL**: E9 is `Vec<f32>` (projected dense), NOT `BinaryVector`. The 10K-bit HDC vector is projected to 1024D before storage.
+
+---
+
+## Input Context Files
+
+```
+crates/context-graph-core/src/types/fingerprint/semantic/fingerprint.rs  # SemanticFingerprint
+crates/context-graph-core/src/types/fingerprint/sparse.rs               # SparseVector
+crates/context-graph-core/src/embeddings/vector.rs                       # DenseVector, BinaryVector
+crates/context-graph-core/src/quantization/                              # Existing module
+crates/context-graph-core/src/embeddings/token_pruning.rs                # E12 Quantizable impl
+```
+
+## Prerequisites (ALL VERIFIED COMPLETE)
+
+- [x] `SemanticFingerprint` at `src/types/fingerprint/semantic/fingerprint.rs`
+- [x] `SparseVector` at `src/types/fingerprint/sparse.rs`
+- [x] `DenseVector`, `BinaryVector` at `src/embeddings/vector.rs`
+- [x] `StubMultiArrayProvider` at `src/embeddings/provider.rs`
+- [x] `Quantizable` trait at `src/quantization/traits.rs`
+- [x] `TokenPruningEmbedding` implements `Quantizable`
+
+---
+
+## Scope
+
+### In Scope
+
+1. Create `QuantizedSemanticFingerprint` struct
+2. Implement `quantize_fingerprint()` function
+3. Implement `dequantize_fingerprint()` function
+4. Float8 (scalar min-max) quantization helpers
+5. PQ-8 (simplified mean-based) quantization helpers
+6. Sparse quantization (preserve u16 indices, Float8 values)
+7. `FingerprintQuantizeError` error type
+
+### Out of Scope
+
+- Trained PQ codebooks (use mean-based approximation)
+- SIMD/GPU optimization
+- Adaptive quantization
+
+---
+
+## Definition of Done
+
+### Create: `crates/context-graph-core/src/quantization/fingerprint.rs`
+
+```rust
+//! SemanticFingerprint quantization for storage compression.
+//! TASK-P2-006: ~46KB -> ~11KB via mixed quantization strategies.
+
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use super::{Embedder, TeleologicalArray};
-use super::vector::{DenseVector, SparseVector, BinaryVector};
+use crate::types::fingerprint::{SemanticFingerprint, SparseVector};
+use crate::teleological::Embedder;
 
-#[derive(Debug, Error)]
-pub enum QuantizeError {
-    #[error("Invalid input: {message}")]
-    InvalidInput { message: String },
-    #[error("Codebook missing for {embedder:?}")]
-    CodebookMissing { embedder: Embedder },
+// ============================================================================
+// Error Types
+// ============================================================================
+
+#[derive(Debug, Error, Clone)]
+pub enum FingerprintQuantizeError {
+    #[error("Invalid input for {embedder:?}: {message}")]
+    InvalidInput { embedder: Embedder, message: String },
+
+    #[error("Dimension mismatch for {embedder:?}: expected {expected}, got {actual}")]
+    DimensionMismatch { embedder: Embedder, expected: usize, actual: usize },
+
+    #[error("NaN/Infinity in {embedder:?} at index {index}")]
+    InvalidValue { embedder: Embedder, index: usize },
 }
 
-// =============================================================================
+// ============================================================================
 // Quantized Types
-// =============================================================================
+// ============================================================================
 
-/// PQ-8 quantized dense vector (8-bit codes per subvector)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QuantizedDense {
-    pub codes: Vec&lt;u8&gt;,
+/// Float8 quantized dense vector (min-max scalar)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct QuantizedFloat8 {
+    pub data: Vec<u8>,
+    pub min_val: f32,
+    pub max_val: f32,
+    pub original_dim: usize,
+}
+
+/// PQ-8 quantized dense vector (simplified, no learned codebooks)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct QuantizedPQ8 {
+    pub codes: Vec<u8>,
     pub num_subvectors: usize,
     pub original_dim: usize,
 }
 
-/// Float8 quantized vector (8-bit scaled values)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QuantizedFloat8 {
-    pub data: Vec&lt;u8&gt;,
-    pub min_val: f32,
-    pub max_val: f32,
-    pub original_dim: usize,
-}
-
-/// Inverted index for sparse vectors
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InvertedIndex {
-    pub indices: Vec&lt;u32&gt;,
-    pub quantized_values: Vec&lt;u8&gt;,  // Float8 quantized
-    pub dimension: u32,
+/// Sparse with quantized values (indices exact, values Float8)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct QuantizedSparse {
+    pub indices: Vec<u16>,  // Preserved exactly
+    pub quantized_values: Vec<u8>,
     pub min_val: f32,
     pub max_val: f32,
 }
 
-/// Packed binary vector (just wraps existing BinaryVector)
+/// Complete quantized fingerprint (~11KB target)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PackedBinary {
-    pub data: Vec&lt;u64&gt;,
-    pub bit_len: usize,
+pub struct QuantizedSemanticFingerprint {
+    // PQ-8: E1, E5, E7, E10
+    pub e1_semantic: QuantizedPQ8,
+    pub e5_causal: QuantizedPQ8,
+    pub e7_code: QuantizedPQ8,
+    pub e10_multimodal: QuantizedPQ8,
+
+    // Float8: E2, E3, E4, E8, E9, E11
+    pub e2_temporal_recent: QuantizedFloat8,
+    pub e3_temporal_periodic: QuantizedFloat8,
+    pub e4_temporal_positional: QuantizedFloat8,
+    pub e8_graph: QuantizedFloat8,
+    pub e9_hdc: QuantizedFloat8,  // NOT binary - projected dense!
+    pub e11_entity: QuantizedFloat8,
+
+    // Token-level Float8: E12
+    pub e12_late_interaction: Vec<QuantizedFloat8>,
+
+    // Sparse: E6, E13
+    pub e6_sparse: QuantizedSparse,
+    pub e13_splade: QuantizedSparse,
 }
 
-/// Complete quantized TeleologicalArray (~11KB)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QuantizedArray {
-    pub e1_semantic: QuantizedDense,      // PQ-8: 1024D -> 32 codes = 32B
-    pub e2_temp_recent: QuantizedFloat8,  // Float8: 512D -> 512B
-    pub e3_temp_periodic: QuantizedFloat8,
-    pub e4_temp_position: QuantizedFloat8,
-    pub e5_causal: QuantizedDense,        // PQ-8: 768D -> 24 codes = 24B
-    pub e6_sparse: InvertedIndex,         // Inverted: ~1KB
-    pub e7_code: QuantizedDense,          // PQ-8: 1536D -> 48 codes = 48B
-    pub e8_emotional: QuantizedFloat8,    // Float8: 384B
-    pub e9_hdc: PackedBinary,             // Binary: 128B (1024 bits)
-    pub e10_multimodal: QuantizedDense,   // PQ-8: 768D -> 24 codes = 24B
-    pub e11_entity: QuantizedFloat8,      // Float8: 384B
-    pub e12_late_interact: Vec&lt;QuantizedFloat8&gt;, // Float8 per token: ~2KB
-    pub e13_splade: InvertedIndex,        // Inverted: ~1KB
+// ============================================================================
+// Public API
+// ============================================================================
+
+pub fn quantize_fingerprint(
+    fp: &SemanticFingerprint
+) -> Result<QuantizedSemanticFingerprint, FingerprintQuantizeError>;
+
+pub fn dequantize_fingerprint(
+    qfp: &QuantizedSemanticFingerprint
+) -> Result<SemanticFingerprint, FingerprintQuantizeError>;
+
+impl QuantizedSemanticFingerprint {
+    pub fn estimated_size_bytes(&self) -> usize;
 }
+```
 
-// =============================================================================
-// Quantization Functions
-// =============================================================================
+### Modify: `crates/context-graph-core/src/quantization/mod.rs`
 
-/// Quantize a full TeleologicalArray
-pub fn quantize_array(array: &amp;TeleologicalArray) -&gt; Result&lt;QuantizedArray, QuantizeError&gt; {
-    Ok(QuantizedArray {
-        e1_semantic: quantize_pq8(&amp;array.e1_semantic, 32)?,
-        e2_temp_recent: quantize_float8(&amp;array.e2_temp_recent)?,
-        e3_temp_periodic: quantize_float8(&amp;array.e3_temp_periodic)?,
-        e4_temp_position: quantize_float8(&amp;array.e4_temp_position)?,
-        e5_causal: quantize_pq8(&amp;array.e5_causal, 24)?,
-        e6_sparse: quantize_inverted(&amp;array.e6_sparse)?,
-        e7_code: quantize_pq8(&amp;array.e7_code, 48)?,
-        e8_emotional: quantize_float8(&amp;array.e8_emotional)?,
-        e9_hdc: pack_binary(&amp;array.e9_hdc),
-        e10_multimodal: quantize_pq8(&amp;array.e10_multimodal, 24)?,
-        e11_entity: quantize_float8(&amp;array.e11_entity)?,
-        e12_late_interact: array.e12_late_interact
-            .iter()
-            .map(|v| quantize_float8(v))
-            .collect::&lt;Result&lt;Vec&lt;_&gt;, _&gt;&gt;()?,
-        e13_splade: quantize_inverted(&amp;array.e13_splade)?,
-    })
+Add:
+```rust
+pub mod fingerprint;
+
+pub use fingerprint::{
+    quantize_fingerprint, dequantize_fingerprint,
+    QuantizedSemanticFingerprint, QuantizedFloat8, QuantizedPQ8, QuantizedSparse,
+    FingerprintQuantizeError,
+};
+```
+
+---
+
+## Research Findings: Best Practices (2025-2026)
+
+Based on comprehensive research of current quantization techniques:
+
+### Industry Benchmarks for Quality Retention
+
+| Method | Cosine Similarity Preservation | Source |
+|--------|-------------------------------|--------|
+| Float16 | ~99% | HuggingFace |
+| INT8 Scalar | ~99% | HuggingFace |
+| INT4 (calibrated) | ~98% | Elasticsearch 8.15 |
+| PQ-8 | ~95% | Qdrant |
+| Binary + Rescore | ~96% | Qdrant |
+
+### Key Best Practices
+
+1. **Outlier Handling**: Use 99th percentile quantiles instead of true min/max
+   - Per-dimension calibration is more robust than global range
+   - Prevents single outlier from degrading all values
+
+2. **Scalar Quantization**: Maintains 99%+ accuracy across diverse embedding models
+   - Works reliably with OpenAI, Cohere, Anthropic embeddings
+   - 3.66x average speedup with INT8 vs float32
+
+3. **PQ Codebook Training**: Minimum 10,000 samples for stable codebooks
+   - Use Asymmetric Distance Computation (query=full precision, doc=quantized)
+   - This task uses simplified mean-based PQ (no trained codebooks)
+
+4. **SPLADE/Sparse Vectors**: Common quantization factor = 100-1000
+   - Scale float importance weights to integers
+   - Enables standard inverted index infrastructure
+
+### Implementation Recommendation: Quantile-Based Scalar
+
+For Float8 quantization, consider quantile-based clipping:
+
+```rust
+// More robust than simple min/max
+fn calibrated_min_max(data: &[f32], quantile: f32) -> (f32, f32) {
+    let mut sorted = data.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let low_idx = ((1.0 - quantile) * sorted.len() as f32) as usize;
+    let high_idx = (quantile * sorted.len() as f32) as usize;
+    (sorted[low_idx], sorted[high_idx.min(sorted.len() - 1)])
 }
+```
 
-/// Dequantize back to TeleologicalArray (lossy)
-pub fn dequantize_array(quantized: &amp;QuantizedArray) -&gt; Result&lt;TeleologicalArray, QuantizeError&gt; {
-    Ok(TeleologicalArray {
-        e1_semantic: dequantize_pq8(&amp;quantized.e1_semantic)?,
-        e2_temp_recent: dequantize_float8(&amp;quantized.e2_temp_recent),
-        e3_temp_periodic: dequantize_float8(&amp;quantized.e3_temp_periodic),
-        e4_temp_position: dequantize_float8(&amp;quantized.e4_temp_position),
-        e5_causal: dequantize_pq8(&amp;quantized.e5_causal)?,
-        e6_sparse: dequantize_inverted(&amp;quantized.e6_sparse),
-        e7_code: dequantize_pq8(&amp;quantized.e7_code)?,
-        e8_emotional: dequantize_float8(&amp;quantized.e8_emotional),
-        e9_hdc: unpack_binary(&amp;quantized.e9_hdc),
-        e10_multimodal: dequantize_pq8(&amp;quantized.e10_multimodal)?,
-        e11_entity: dequantize_float8(&amp;quantized.e11_entity),
-        e12_late_interact: quantized.e12_late_interact
-            .iter()
-            .map(|v| dequantize_float8(v))
-            .collect(),
-        e13_splade: dequantize_inverted(&amp;quantized.e13_splade),
-    })
-}
+### Sources
 
-// =============================================================================
-// PQ-8 Implementation (Product Quantization)
-// =============================================================================
+- HuggingFace: Binary and Scalar Embedding Quantization
+- Qdrant: Quantization Documentation
+- NVIDIA: FP8 for Deep Learning (E4M3 vs E5M2 formats)
+- Elasticsearch 8.15: 4-bit quantization with dynamic quantile optimization
 
-fn quantize_pq8(vec: &amp;DenseVector, num_subvectors: usize) -&gt; Result&lt;QuantizedDense, QuantizeError&gt; {
-    let data = vec.data();
-    let original_dim = data.len();
+---
 
-    if original_dim == 0 {
-        return Ok(QuantizedDense {
-            codes: Vec::new(),
-            num_subvectors,
-            original_dim,
-        });
-    }
+## Implementation Notes
 
-    let subvector_size = original_dim / num_subvectors;
-    if original_dim % num_subvectors != 0 {
-        return Err(QuantizeError::InvalidInput {
-            message: format!(
-                "Dimension {} not divisible by num_subvectors {}",
-                original_dim, num_subvectors
-            ),
-        });
-    }
+### Float8 Quantization
 
-    // Simplified PQ: quantize each subvector's mean to 8-bit
-    // Real PQ would use learned codebooks
-    let mut codes = Vec::with_capacity(num_subvectors);
-    for i in 0..num_subvectors {
-        let start = i * subvector_size;
-        let end = start + subvector_size;
-        let subvec = &amp;data[start..end];
-
-        // Compute centroid (mean) and quantize to 8-bit
-        let mean: f32 = subvec.iter().sum::&lt;f32&gt;() / subvec.len() as f32;
-        let code = ((mean.clamp(-1.0, 1.0) + 1.0) * 127.5) as u8;
-        codes.push(code);
-    }
-
-    Ok(QuantizedDense {
-        codes,
-        num_subvectors,
-        original_dim,
-    })
-}
-
-fn dequantize_pq8(quantized: &amp;QuantizedDense) -&gt; Result&lt;DenseVector, QuantizeError&gt; {
-    if quantized.original_dim == 0 {
-        return Ok(DenseVector::zeros(0));
-    }
-
-    let subvector_size = quantized.original_dim / quantized.num_subvectors;
-    let mut data = vec![0.0f32; quantized.original_dim];
-
-    for (i, &amp;code) in quantized.codes.iter().enumerate() {
-        let mean = (code as f32 / 127.5) - 1.0;
-        let start = i * subvector_size;
-        let end = start + subvector_size;
-        for j in start..end {
-            data[j] = mean;
+```rust
+fn quantize_float8_slice(data: &[f32], embedder: Embedder) -> Result<QuantizedFloat8, FingerprintQuantizeError> {
+    // Validate no NaN/Infinity (AP-10)
+    for (i, &v) in data.iter().enumerate() {
+        if !v.is_finite() {
+            return Err(FingerprintQuantizeError::InvalidValue { embedder, index: i });
         }
     }
 
-    Ok(DenseVector::new(data))
-}
-
-// =============================================================================
-// Float8 Implementation
-// =============================================================================
-
-fn quantize_float8(vec: &amp;DenseVector) -&gt; Result&lt;QuantizedFloat8, QuantizeError&gt; {
-    let data = vec.data();
-    let original_dim = data.len();
-
-    if original_dim == 0 {
-        return Ok(QuantizedFloat8 {
-            data: Vec::new(),
-            min_val: 0.0,
-            max_val: 0.0,
-            original_dim,
-        });
+    if data.is_empty() {
+        return Ok(QuantizedFloat8 { data: vec![], min_val: 0.0, max_val: 0.0, original_dim: 0 });
     }
 
-    // Find min/max for scaling
     let min_val = data.iter().cloned().fold(f32::INFINITY, f32::min);
     let max_val = data.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
     let range = max_val - min_val;
 
-    let quantized: Vec&lt;u8&gt; = if range &gt; 0.0 {
-        data.iter()
-            .map(|&amp;v| ((v - min_val) / range * 255.0) as u8)
-            .collect()
+    let quantized = if range > f32::EPSILON {
+        data.iter().map(|&v| ((v - min_val) / range * 255.0).round() as u8).collect()
     } else {
-        vec![128u8; original_dim]
+        vec![128u8; data.len()]  // Constant vector
     };
 
-    Ok(QuantizedFloat8 {
-        data: quantized,
-        min_val,
-        max_val,
-        original_dim,
-    })
+    Ok(QuantizedFloat8 { data: quantized, min_val, max_val, original_dim: data.len() })
 }
 
-fn dequantize_float8(quantized: &amp;QuantizedFloat8) -&gt; DenseVector {
-    let range = quantized.max_val - quantized.min_val;
-
-    let data: Vec&lt;f32&gt; = if range &gt; 0.0 {
-        quantized.data
-            .iter()
-            .map(|&amp;v| (v as f32 / 255.0) * range + quantized.min_val)
-            .collect()
-    } else {
-        vec![quantized.min_val; quantized.original_dim]
-    };
-
-    DenseVector::new(data)
+fn dequantize_float8(q: &QuantizedFloat8) -> Vec<f32> {
+    let range = q.max_val - q.min_val;
+    if range <= f32::EPSILON {
+        return vec![q.min_val; q.original_dim];
+    }
+    q.data.iter().map(|&v| (v as f32 / 255.0) * range + q.min_val).collect()
 }
+```
 
-// =============================================================================
-// Inverted Index Implementation
-// =============================================================================
+### PQ-8 Quantization (Simplified)
 
-fn quantize_inverted(vec: &amp;SparseVector) -&gt; Result&lt;InvertedIndex, QuantizeError&gt; {
-    let (indices, values) = vec.data();
+```rust
+fn quantize_pq8(data: &[f32], num_subvectors: usize, embedder: Embedder) -> Result<QuantizedPQ8, FingerprintQuantizeError> {
+    if data.is_empty() {
+        return Ok(QuantizedPQ8 { codes: vec![], num_subvectors, original_dim: 0 });
+    }
 
-    if values.is_empty() {
-        return Ok(InvertedIndex {
-            indices: Vec::new(),
-            quantized_values: Vec::new(),
-            dimension: vec.dimension(),
-            min_val: 0.0,
-            max_val: 0.0,
+    if data.len() % num_subvectors != 0 {
+        return Err(FingerprintQuantizeError::InvalidInput {
+            embedder,
+            message: format!("dim {} not divisible by {}", data.len(), num_subvectors),
         });
     }
 
-    let min_val = values.iter().cloned().fold(f32::INFINITY, f32::min);
-    let max_val = values.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-    let range = max_val - min_val;
+    let sub_size = data.len() / num_subvectors;
+    let codes: Vec<u8> = (0..num_subvectors).map(|i| {
+        let sub = &data[i*sub_size..(i+1)*sub_size];
+        let mean = sub.iter().sum::<f32>() / sub.len() as f32;
+        ((mean.clamp(-1.0, 1.0) + 1.0) * 127.5) as u8
+    }).collect();
 
-    let quantized_values: Vec&lt;u8&gt; = if range &gt; 0.0 {
-        values.iter()
-            .map(|&amp;v| ((v - min_val) / range * 255.0) as u8)
-            .collect()
-    } else {
-        vec![128u8; values.len()]
-    };
-
-    Ok(InvertedIndex {
-        indices: indices.to_vec(),
-        quantized_values,
-        dimension: vec.dimension(),
-        min_val,
-        max_val,
-    })
+    Ok(QuantizedPQ8 { codes, num_subvectors, original_dim: data.len() })
 }
 
-fn dequantize_inverted(inverted: &amp;InvertedIndex) -&gt; SparseVector {
-    let range = inverted.max_val - inverted.min_val;
-
-    let values: Vec&lt;f32&gt; = if range &gt; 0.0 {
-        inverted.quantized_values
-            .iter()
-            .map(|&amp;v| (v as f32 / 255.0) * range + inverted.min_val)
-            .collect()
-    } else {
-        vec![inverted.min_val; inverted.quantized_values.len()]
-    };
-
-    SparseVector::new(inverted.indices.clone(), values, inverted.dimension)
-        .unwrap_or_else(|_| SparseVector::empty(inverted.dimension))
-}
-
-// =============================================================================
-// Binary Packing
-// =============================================================================
-
-fn pack_binary(vec: &amp;BinaryVector) -&gt; PackedBinary {
-    PackedBinary {
-        data: vec.data().to_vec(),
-        bit_len: vec.bit_len(),
-    }
-}
-
-fn unpack_binary(packed: &amp;PackedBinary) -&gt; BinaryVector {
-    BinaryVector::new(packed.data.clone(), packed.bit_len)
-}
-
-impl QuantizedArray {
-    /// Estimate the serialized size in bytes
-    pub fn estimated_size_bytes(&amp;self) -&gt; usize {
-        self.e1_semantic.codes.len()
-            + self.e2_temp_recent.data.len()
-            + self.e3_temp_periodic.data.len()
-            + self.e4_temp_position.data.len()
-            + self.e5_causal.codes.len()
-            + self.e6_sparse.indices.len() * 4 + self.e6_sparse.quantized_values.len()
-            + self.e7_code.codes.len()
-            + self.e8_emotional.data.len()
-            + self.e9_hdc.data.len() * 8
-            + self.e10_multimodal.codes.len()
-            + self.e11_entity.data.len()
-            + self.e12_late_interact.iter().map(|v| v.data.len()).sum::&lt;usize&gt;()
-            + self.e13_splade.indices.len() * 4 + self.e13_splade.quantized_values.len()
-            + 200 // Metadata overhead estimate
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_float8_roundtrip() {
-        let original = DenseVector::new(vec![0.1, 0.5, -0.3, 0.9, -0.8]);
-        let quantized = quantize_float8(&amp;original).unwrap();
-        let recovered = dequantize_float8(&amp;quantized);
-
-        // Check values are approximately preserved
-        for (a, b) in original.data().iter().zip(recovered.data().iter()) {
-            assert!((a - b).abs() &lt; 0.01);
+fn dequantize_pq8(q: &QuantizedPQ8) -> Vec<f32> {
+    if q.original_dim == 0 { return vec![]; }
+    let sub_size = q.original_dim / q.num_subvectors;
+    let mut data = vec![0.0f32; q.original_dim];
+    for (i, &code) in q.codes.iter().enumerate() {
+        let mean = (code as f32 / 127.5) - 1.0;
+        for j in (i*sub_size)..((i+1)*sub_size) {
+            data[j] = mean;
         }
     }
-
-    #[test]
-    fn test_quantized_array_size() {
-        let array = TeleologicalArray::new();
-        let quantized = quantize_array(&amp;array).unwrap();
-        let size = quantized.estimated_size_bytes();
-
-        // Should be much smaller than unquantized (~100KB -&gt; ~11KB)
-        assert!(size &lt; 15_000, "Size {} should be under 15KB", size);
-    }
-
-    #[test]
-    fn test_similarity_preserved() {
-        // Create two similar vectors
-        let a = DenseVector::new(vec![0.5, 0.3, 0.2, 0.1]);
-        let b = DenseVector::new(vec![0.5, 0.3, 0.2, 0.15]);
-
-        let orig_sim = a.cosine_similarity(&amp;b);
-
-        // Quantize and dequantize
-        let qa = quantize_float8(&amp;a).unwrap();
-        let qb = quantize_float8(&amp;b).unwrap();
-        let ra = dequantize_float8(&amp;qa);
-        let rb = dequantize_float8(&amp;qb);
-
-        let recovered_sim = ra.cosine_similarity(&amp;rb);
-
-        // Similarity should be preserved within 5%
-        assert!((orig_sim - recovered_sim).abs() &lt; 0.05);
-    }
-
-    #[test]
-    fn test_full_roundtrip() {
-        let original = TeleologicalArray::new();
-        let quantized = quantize_array(&amp;original).unwrap();
-        let recovered = dequantize_array(&amp;quantized).unwrap();
-
-        // Check dimensions preserved
-        assert_eq!(recovered.e1_semantic.len(), 1024);
-        assert_eq!(recovered.e7_code.len(), 1536);
-        assert_eq!(recovered.e9_hdc.bit_len(), 1024);
-    }
+    data
 }
-</pseudo_code>
-
-<files_to_create>
-  <file path="crates/context-graph-core/src/embedding/quantize.rs">Quantizer implementation</file>
-</files_to_create>
-
-<files_to_modify>
-  <file path="crates/context-graph-core/src/embedding/mod.rs">Add pub mod quantize and re-exports</file>
-</files_to_modify>
-
-<validation_criteria>
-  <criterion>QuantizedArray is ~11KB (under 15KB)</criterion>
-  <criterion>Float8 roundtrip preserves values within 1%</criterion>
-  <criterion>Cosine similarity preserved within 5% after roundtrip</criterion>
-  <criterion>All 13 embeddings quantize and dequantize correctly</criterion>
-  <criterion>Empty vectors handle gracefully</criterion>
-</validation_criteria>
-
-<test_commands>
-  <command description="Run quantize tests">cargo test --package context-graph-core quantize</command>
-  <command description="Check compilation">cargo check --package context-graph-core</command>
-</test_commands>
-
-<notes>
-  <note category="pq_codebooks">
-    Current PQ implementation uses simplified mean-based quantization.
-    Production should use learned codebooks trained on representative data.
-  </note>
-  <note category="compression_ratio">
-    Target: 100KB -&gt; 11KB (89% reduction)
-    Actual depends on content - sparse vectors may be smaller.
-  </note>
-</notes>
-</task_spec>
 ```
+
+### Sparse Quantization
+
+```rust
+fn quantize_sparse(sv: &SparseVector) -> QuantizedSparse {
+    if sv.is_empty() {
+        return QuantizedSparse { indices: vec![], quantized_values: vec![], min_val: 0.0, max_val: 0.0 };
+    }
+
+    let min_val = sv.values.iter().cloned().fold(f32::INFINITY, f32::min);
+    let max_val = sv.values.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let range = max_val - min_val;
+
+    let qv = if range > f32::EPSILON {
+        sv.values.iter().map(|&v| ((v - min_val) / range * 255.0).round() as u8).collect()
+    } else {
+        vec![128u8; sv.values.len()]
+    };
+
+    QuantizedSparse { indices: sv.indices.clone(), quantized_values: qv, min_val, max_val }
+}
+
+fn dequantize_sparse(qs: &QuantizedSparse) -> SparseVector {
+    let range = qs.max_val - qs.min_val;
+    let values: Vec<f32> = if range > f32::EPSILON {
+        qs.quantized_values.iter().map(|&v| (v as f32 / 255.0) * range + qs.min_val).collect()
+    } else {
+        vec![qs.min_val; qs.quantized_values.len()]
+    };
+    SparseVector::new(qs.indices.clone(), values).unwrap_or_default()
+}
+```
+
+---
+
+## Validation Criteria
+
+| Criterion | Threshold | Method |
+|-----------|-----------|--------|
+| Serialized size | < 15KB | `bincode::serialize(&qfp).unwrap().len()` |
+| Float8 NRMSE | < 1% | `compute_nrmse()` |
+| PQ8 NRMSE | < 10% | `compute_nrmse()` |
+| Cosine similarity deviation | < 5% | Compare original vs dequantized pairs |
+| All 13 embeddings | 100% success | Unit test each |
+| Empty/zero vectors | No panic | Edge case tests |
+
+---
+
+## Full State Verification Protocol (MANDATORY)
+
+### 1. Source of Truth
+
+- **Size**: `bincode::serialize(&quantized).unwrap().len()`
+- **Accuracy**: `dequantize_fingerprint(&quantized)` values
+- **Similarity**: Cosine similarity before/after roundtrip
+
+### 2. Execute & Inspect
+
+After `quantize_fingerprint()`:
+
+```rust
+let qfp = quantize_fingerprint(&fp)?;
+println!("VERIFY: Quantization OK");
+
+let bytes = bincode::serialize(&qfp).unwrap();
+println!("VERIFY: Size = {} bytes (target < 15000)", bytes.len());
+assert!(bytes.len() < 15000);
+
+let recovered = dequantize_fingerprint(&qfp)?;
+println!("VERIFY: Dequantization OK");
+println!("VERIFY: e1.len()={} (expect 1024)", recovered.e1_semantic.len());
+```
+
+### 3. Edge Cases (MUST TEST ALL 3)
+
+| Case | Input | Expected | Verify |
+|------|-------|----------|--------|
+| Empty | `SemanticFingerprint::zeroed()` | Quantizes, size ~baseline | Print sizes |
+| Max sparse | 1526 active in E6/E13 | Indices preserved | `qs.indices.len()` |
+| Constant | All values = 0.5 | `min==max`, recovers 0.5 | Print first value |
+
+### 4. Success Log (MUST PRODUCE)
+
+```
+=== FINGERPRINT QUANTIZATION VERIFICATION ===
+Fingerprints tested: N
+Size range: [X]B - [Y]B (threshold < 15000B)
+Float8 NRMSE: max [Z]% (threshold < 1%)
+PQ8 NRMSE: max [W]% (threshold < 10%)
+Cosine deviation: max [V]% (threshold < 5%)
+Edge cases: 3/3 PASSED
+ALL VERIFICATIONS PASSED
+```
+
+---
+
+## Test Commands
+
+```bash
+cargo test --package context-graph-core quantization::fingerprint -- --nocapture
+cargo test --package context-graph-core quantization
+cargo check --package context-graph-core
+```
+
+---
+
+## Compression Summary
+
+| Component | Raw | Quantized | Ratio |
+|-----------|-----|-----------|-------|
+| E1 (1024D PQ8, 32 subs) | 4KB | 32B | 128x |
+| E2-E4 (3x512D Float8) | 6KB | 1.5KB | 4x |
+| E5 (768D PQ8, 24 subs) | 3KB | 24B | 128x |
+| E6 (~1500 sparse) | ~6KB | ~2.5KB | 2.4x |
+| E7 (1536D PQ8, 48 subs) | 6KB | 48B | 128x |
+| E8 (384D Float8) | 1.5KB | 384B | 4x |
+| E9 (1024D Float8) | 4KB | 1KB | 4x |
+| E10 (768D PQ8, 24 subs) | 3KB | 24B | 128x |
+| E11 (384D Float8) | 1.5KB | 384B | 4x |
+| E12 (~10 tok Float8) | ~5KB | ~1.3KB | 4x |
+| E13 (~1500 sparse) | ~6KB | ~2.5KB | 2.4x |
+| **TOTAL** | **~46KB** | **~10KB** | **~4.6x** |
+
+---
 
 ## Execution Checklist
 
-- [ ] Create quantize.rs in embedding directory
-- [ ] Implement QuantizeError enum
-- [ ] Implement QuantizedDense (PQ-8)
-- [ ] Implement QuantizedFloat8
-- [ ] Implement InvertedIndex
-- [ ] Implement PackedBinary
-- [ ] Implement QuantizedArray struct
-- [ ] Implement quantize_array function
-- [ ] Implement dequantize_array function
-- [ ] Implement individual quantization functions
-- [ ] Write unit tests for roundtrip preservation
-- [ ] Verify size reduction targets
-- [ ] Run tests to verify
-- [ ] Phase 2 complete!
+- [x] Read existing `src/quantization/` module
+- [x] Read `src/types/fingerprint/semantic/fingerprint.rs`
+- [x] Read `src/types/fingerprint/sparse.rs`
+- [x] Create `src/quantization/fingerprint.rs`
+- [x] Implement `FingerprintQuantizeError`
+- [x] Implement `QuantizedFloat8` + helpers
+- [x] Implement `QuantizedPQ8` + helpers
+- [x] Implement `QuantizedSparse` + helpers
+- [x] Implement `QuantizedSemanticFingerprint`
+- [x] Implement `quantize_fingerprint()`
+- [x] Implement `dequantize_fingerprint()`
+- [x] Implement `estimated_size_bytes()`
+- [x] Update `src/quantization/mod.rs`
+- [x] Write unit tests per quantization type
+- [x] Write edge case tests (empty, max sparse, constant)
+- [x] Write cosine similarity test
+- [x] Run Full State Verification Protocol
+- [x] Print verification log with all thresholds
+- [x] Confirm size < 15KB
+
+---
+
+## Completion Audit (2026-01-16)
+
+### Implementation Summary
+
+Created `crates/context-graph-core/src/quantization/fingerprint.rs` with:
+
+- `FingerprintQuantizeError` - Error type with 4 variants (E_FP_QUANT_001-004)
+- `QuantizedFloat8` - Min-max scalar quantization (4x compression)
+- `QuantizedPQ8` - Simplified mean-based product quantization (128x compression)
+- `QuantizedSparse` - Sparse vector quantization (indices preserved, values Float8)
+- `QuantizedSemanticFingerprint` - Complete quantized fingerprint struct
+- `quantize_fingerprint()` - Main quantization function
+- `dequantize_fingerprint()` - Main dequantization function
+- Helper functions: `validate_finite`, `check_dim`, `validate_fingerprint_dimensions`
+
+### Full State Verification Protocol Results
+
+```
+=== FINGERPRINT QUANTIZATION VERIFICATION ===
+Fingerprints tested: 3
+Size range: [5302]B - [5302]B (threshold < 15000B) ✓
+Float8 NRMSE: max 0.1131% (threshold < 1%) ✓
+PQ-8 NRMSE: 0.9109% (threshold < 10%) ✓
+Cosine deviation: max 0.0006% (threshold < 5%) ✓
+Edge cases: 3/3 PASSED
+  - Zeroed fingerprint: size=3752B ✓
+  - Max sparse (1500 indices): indices preserved ✓
+  - Constant vector (all 0.5): recovers ~0.5 ✓
+ALL VERIFICATIONS PASSED
+```
+
+### Test Results
+
+```
+running 23 tests
+test quantization::fingerprint::tests::test_dimension_mismatch_detection ... ok
+test quantization::fingerprint::tests::test_error_codes ... ok
+test quantization::fingerprint::tests::test_edge_case_constant_vector ... ok
+test quantization::fingerprint::tests::test_edge_case_max_sparse ... ok
+test quantization::fingerprint::tests::test_cosine_similarity_preservation ... ok
+test quantization::fingerprint::tests::test_edge_case_zeroed_fingerprint ... ok
+test quantization::fingerprint::tests::test_float8_empty_input ... ok
+test quantization::fingerprint::tests::test_float8_quantize_dequantize_roundtrip ... ok
+test quantization::fingerprint::tests::test_fingerprint_float8_accuracy ... ok
+test quantization::fingerprint::tests::test_fingerprint_pq8_accuracy ... ok
+test quantization::fingerprint::tests::test_fingerprint_quantize_dequantize_roundtrip ... ok
+test quantization::fingerprint::tests::test_float8_constant_vector ... ok
+test quantization::fingerprint::tests::test_fingerprint_size_under_threshold ... ok
+test quantization::fingerprint::tests::test_float8_rejects_nan ... ok
+test quantization::fingerprint::tests::test_float8_rejects_infinity ... ok
+test quantization::fingerprint::tests::test_pq8_empty_input ... ok
+test quantization::fingerprint::tests::test_pq8_compression_ratio ... ok
+test quantization::fingerprint::tests::test_pq8_invalid_subvector_count ... ok
+test quantization::fingerprint::tests::test_sparse_empty ... ok
+test quantization::fingerprint::tests::test_pq8_quantize_dequantize_roundtrip ... ok
+test quantization::fingerprint::tests::test_sparse_preserves_indices_exactly ... ok
+test quantization::fingerprint::tests::test_sparse_quantize_dequantize_roundtrip ... ok
+test quantization::fingerprint::tests::test_full_state_verification ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured
+```
+
+### Files Modified
+
+1. **Created**: `crates/context-graph-core/src/quantization/fingerprint.rs` (1270 lines)
+2. **Modified**: `crates/context-graph-core/src/quantization/mod.rs` (added exports)
+
+### Compression Achieved
+
+| Component | Target | Actual | Status |
+|-----------|--------|--------|--------|
+| Total size | < 15KB | 5.3KB | ✓ EXCEEDS |
+| Float8 NRMSE | < 1% | 0.11% | ✓ |
+| PQ-8 NRMSE | < 10% | 0.91% | ✓ |
+| Cosine deviation | < 5% | 0.0006% | ✓ EXCEEDS |
+
+### Code Simplifier Applied
+
+Reduced from 1337 lines to 1270 lines (5% reduction) by:
+- Extracting `validate_finite` helper function
+- Extracting `check_dim` helper function
+- Simplifying `validate_fingerprint_dimensions` from 70+ lines to 22 lines
+- Removing redundant validation
+- Streamlining E12 collection pattern
+

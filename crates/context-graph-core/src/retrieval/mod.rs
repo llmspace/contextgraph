@@ -83,6 +83,7 @@ mod executor;
 mod pipeline;
 mod query;
 mod result;
+pub mod similarity;
 mod teleological_query;
 mod teleological_result;
 
@@ -110,3 +111,6 @@ pub use teleological_query::TeleologicalQuery;
 pub use teleological_result::{
     AlignmentLevel, PipelineBreakdown, ScoredMemory, TeleologicalRetrievalResult,
 };
+
+// Similarity types for retrieval
+pub use similarity::{PerSpaceScores, SimilarityResult, NUM_SPACES};
