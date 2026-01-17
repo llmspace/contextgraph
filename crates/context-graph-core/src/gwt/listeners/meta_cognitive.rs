@@ -42,7 +42,8 @@ impl MetaCognitiveEventListener {
 
     /// Reset the epistemic action flag
     pub fn reset_epistemic_action(&self) {
-        self.epistemic_action_triggered.store(false, Ordering::SeqCst);
+        self.epistemic_action_triggered
+            .store(false, Ordering::SeqCst);
     }
 
     /// Get a reference to the meta-cognitive loop arc
@@ -60,7 +61,8 @@ impl WorkspaceEventListener for MetaCognitiveEventListener {
             } => {
                 if *duration_ms >= WORKSPACE_EMPTY_THRESHOLD_MS {
                     // Threshold met - trigger epistemic action
-                    self.epistemic_action_triggered.store(true, Ordering::SeqCst);
+                    self.epistemic_action_triggered
+                        .store(true, Ordering::SeqCst);
                     tracing::info!(
                         "GWT: Workspace empty for {}ms >= {}ms threshold - epistemic action triggered",
                         duration_ms,

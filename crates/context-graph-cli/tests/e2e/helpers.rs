@@ -237,11 +237,7 @@ pub fn execute_hook_script(
     let mut child = cmd.spawn().map_err(|e| {
         E2EError::IoError(std::io::Error::new(
             std::io::ErrorKind::Other,
-            format!(
-                "Failed to spawn bash for {}: {}",
-                script_path.display(),
-                e
-            ),
+            format!("Failed to spawn bash for {}: {}", script_path.display(), e),
         ))
     })?;
 
@@ -420,11 +416,7 @@ pub fn verify_snapshot_ic(
 }
 
 /// Verify snapshot previous_session_id link
-pub fn verify_snapshot_link(
-    db_path: &Path,
-    session_id: &str,
-    expected_prev: Option<&str>,
-) -> bool {
+pub fn verify_snapshot_link(db_path: &Path, session_id: &str, expected_prev: Option<&str>) -> bool {
     if let Some(snapshot) = load_snapshot_for_verification(db_path, session_id) {
         match (snapshot.previous_session_id.as_deref(), expected_prev) {
             (Some(actual), Some(expected)) => actual == expected,

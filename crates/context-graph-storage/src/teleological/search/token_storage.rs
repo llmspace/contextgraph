@@ -239,7 +239,10 @@ impl RocksDbTokenStorage {
         }
 
         let cf = self.get_cf();
-        let keys: Vec<_> = ids.iter().map(|id| (cf, id.as_bytes().as_slice())).collect();
+        let keys: Vec<_> = ids
+            .iter()
+            .map(|id| (cf, id.as_bytes().as_slice()))
+            .collect();
 
         let results = self.db.multi_get_cf(keys);
         let mut output = Vec::with_capacity(ids.len());
@@ -436,7 +439,10 @@ mod tests {
         // Retrieve
         let retrieved = storage.get(id).expect("Get failed");
 
-        println!("[AFTER] Retrieved {:?} tokens", retrieved.as_ref().map(|t| t.len()));
+        println!(
+            "[AFTER] Retrieved {:?} tokens",
+            retrieved.as_ref().map(|t| t.len())
+        );
 
         assert!(retrieved.is_some());
         let retrieved = retrieved.unwrap();
@@ -517,7 +523,10 @@ mod tests {
         // Add a non-existent ID
         ids.push(Uuid::new_v4());
 
-        println!("[BEFORE] Batch getting {} IDs (5 exist, 1 missing)", ids.len());
+        println!(
+            "[BEFORE] Batch getting {} IDs (5 exist, 1 missing)",
+            ids.len()
+        );
 
         // Batch get
         let results = storage.get_batch(&ids).expect("Batch get failed");

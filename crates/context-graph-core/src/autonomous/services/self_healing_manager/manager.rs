@@ -7,8 +7,8 @@ use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
 use super::types::{
-    HealingAction, HealingResult, HealthIssue, IssueSeverity, SelfHealingConfig,
-    SystemHealthState, SystemOperationalStatus,
+    HealingAction, HealingResult, HealthIssue, IssueSeverity, SelfHealingConfig, SystemHealthState,
+    SystemOperationalStatus,
 };
 
 /// Self-healing manager service

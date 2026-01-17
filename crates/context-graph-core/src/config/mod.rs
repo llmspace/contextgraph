@@ -20,8 +20,8 @@ pub use sub_configs::{
 
 // Re-export embedder configuration types (TASK-L04)
 pub use embedder_config::{
-    check_deprecated_names, deserialize_embedder, deserialize_embedder_opt,
-    DeprecatedNameUsage, EmbedderConfig, EmbedderWeightsConfig,
+    check_deprecated_names, deserialize_embedder, deserialize_embedder_opt, DeprecatedNameUsage,
+    EmbedderConfig, EmbedderWeightsConfig,
 };
 
 /// System development phase.

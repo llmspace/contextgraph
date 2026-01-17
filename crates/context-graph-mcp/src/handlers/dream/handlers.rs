@@ -32,8 +32,8 @@ use tracing::{debug, error, info, warn};
 
 use crate::protocol::{error_codes, JsonRpcId, JsonRpcResponse};
 
-use crate::handlers::Handlers;
 use super::types::{TriggerConfigDto, TriggerHistoryEntry, TriggerMcpError};
+use crate::handlers::Handlers;
 
 impl Handlers {
     /// trigger_dream tool implementation.
@@ -100,11 +100,17 @@ impl Handlers {
             Some("rem") => DreamPhase::Rem,
             Some("full_cycle") | None => DreamPhase::FullCycle,
             Some(invalid) => {
-                warn!("trigger_dream: invalid phase '{}', must be nrem/rem/full_cycle", invalid);
+                warn!(
+                    "trigger_dream: invalid phase '{}', must be nrem/rem/full_cycle",
+                    invalid
+                );
                 return JsonRpcResponse::error(
                     id,
                     error_codes::INVALID_PARAMS,
-                    format!("Invalid phase '{}'. Must be 'nrem', 'rem', or 'full_cycle'", invalid),
+                    format!(
+                        "Invalid phase '{}'. Must be 'nrem', 'rem', or 'full_cycle'",
+                        invalid
+                    ),
                 );
             }
         };
@@ -583,7 +589,10 @@ impl Handlers {
                 let should_abort = match should_abort_result {
                     Ok(v) => v,
                     Err(ref e) => {
-                        warn!("get_gpu_status: should_abort_dream() failed: {} - defaulting to true", e);
+                        warn!(
+                            "get_gpu_status: should_abort_dream() failed: {} - defaulting to true",
+                            e
+                        );
                         true
                     }
                 };
@@ -694,7 +703,9 @@ impl Handlers {
         id: Option<JsonRpcId>,
         args: serde_json::Value,
     ) -> JsonRpcResponse {
-        use super::types::{TriggerMentalCheckRequest, TriggerMentalCheckResponse, TriggerReasonDto};
+        use super::types::{
+            TriggerMentalCheckRequest, TriggerMentalCheckResponse, TriggerReasonDto,
+        };
 
         debug!("Handling trigger_mental_check tool call");
 
@@ -702,7 +713,9 @@ impl Handlers {
         let trigger_manager = match &self.trigger_manager {
             Some(tm) => tm,
             None => {
-                error!("trigger_mental_check: TriggerManager not initialized - FAIL FAST per AP-26");
+                error!(
+                    "trigger_mental_check: TriggerManager not initialized - FAIL FAST per AP-26"
+                );
                 return JsonRpcResponse::error(
                     id,
                     error_codes::DREAM_NOT_INITIALIZED,
@@ -719,7 +732,10 @@ impl Handlers {
                 return JsonRpcResponse::error(
                     id,
                     error_codes::INVALID_PARAMS,
-                    format!("Invalid request: {}. Required: entropy (f32 in [0.0, 1.0])", e),
+                    format!(
+                        "Invalid request: {}. Required: entropy (f32 in [0.0, 1.0])",
+                        e
+                    ),
                 );
             }
         };
@@ -756,7 +772,10 @@ impl Handlers {
         // Determine trigger reason
         let trigger_reason = if request.force {
             TriggerReasonDto::Manual {
-                phase: request.phase.clone().unwrap_or_else(|| "full_cycle".to_string()),
+                phase: request
+                    .phase
+                    .clone()
+                    .unwrap_or_else(|| "full_cycle".to_string()),
             }
         } else {
             TriggerReasonDto::HighEntropy
@@ -775,7 +794,10 @@ impl Handlers {
                 return JsonRpcResponse::error(
                     id,
                     error_codes::INVALID_PARAMS,
-                    format!("Invalid phase '{}'. Must be 'nrem', 'rem', or 'full_cycle'", invalid),
+                    format!(
+                        "Invalid phase '{}'. Must be 'nrem', 'rem', or 'full_cycle'",
+                        invalid
+                    ),
                 );
             }
         };
@@ -807,7 +829,11 @@ impl Handlers {
         let workflow_id = format!(
             "mental_check_{}_{}",
             chrono::Utc::now().format("%Y%m%d_%H%M%S"),
-            uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("0000")
+            uuid::Uuid::new_v4()
+                .to_string()
+                .split('-')
+                .next()
+                .unwrap_or("0000")
         );
 
         info!(
@@ -845,10 +871,7 @@ impl Handlers {
     /// # Returns
     /// - `TriggerConfigDto` with entropy_threshold, ic_threshold, cooldown_ms,
     ///   last_trigger_timestamp, trigger_count, enabled
-    pub(crate) async fn call_get_trigger_config(
-        &self,
-        id: Option<JsonRpcId>,
-    ) -> JsonRpcResponse {
+    pub(crate) async fn call_get_trigger_config(&self, id: Option<JsonRpcId>) -> JsonRpcResponse {
         debug!("call_get_trigger_config: TASK-S02");
 
         // FAIL FAST if TriggerManager not initialized (AP-26)
@@ -861,11 +884,7 @@ impl Handlers {
                     guidance = "Call initialize_trigger_manager() first",
                     "E_TRIGGER_MCP_004: TriggerManager not initialized"
                 );
-                return JsonRpcResponse::error(
-                    id,
-                    error_codes::INTERNAL_ERROR,
-                    format!("{}", err),
-                );
+                return JsonRpcResponse::error(id, error_codes::INTERNAL_ERROR, format!("{}", err));
             }
         };
 
@@ -917,11 +936,7 @@ impl Handlers {
                     guidance = "Call initialize_trigger_manager() first",
                     "E_TRIGGER_MCP_004: TriggerManager not initialized"
                 );
-                return JsonRpcResponse::error(
-                    id,
-                    error_codes::INTERNAL_ERROR,
-                    format!("{}", err),
-                );
+                return JsonRpcResponse::error(id, error_codes::INTERNAL_ERROR, format!("{}", err));
             }
         };
 

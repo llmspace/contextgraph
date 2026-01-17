@@ -1,6 +1,8 @@
 //! HNSW Index Tests - Insert/remove/search cycle
 
-use super::helpers::{create_clustered_entries, create_entry, create_purpose_vector, purpose_config};
+use super::helpers::{
+    create_clustered_entries, create_entry, create_purpose_vector, purpose_config,
+};
 use crate::index::purpose::entry::GoalId;
 use crate::index::purpose::hnsw_purpose::{HnswPurposeIndex, PurposeIndexOps};
 use crate::index::purpose::query::{PurposeQuery, PurposeQueryTarget};
@@ -246,9 +248,7 @@ fn test_hnsw_search_empty_index() {
         "Empty index should return empty results"
     );
 
-    println!(
-        "[VERIFIED] Search on empty index returns empty results (correct database semantics)"
-    );
+    println!("[VERIFIED] Search on empty index returns empty results (correct database semantics)");
 }
 
 #[test]
@@ -320,8 +320,7 @@ fn test_hnsw_search_from_memory_non_existent_fails() {
     let index = HnswPurposeIndex::new(purpose_config()).unwrap();
     let non_existent = Uuid::new_v4();
 
-    let query =
-        PurposeQuery::new(PurposeQueryTarget::from_memory(non_existent), 10, 0.0).unwrap();
+    let query = PurposeQuery::new(PurposeQueryTarget::from_memory(non_existent), 10, 0.0).unwrap();
     let result = index.search(&query);
 
     assert!(result.is_err());

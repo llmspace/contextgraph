@@ -49,9 +49,9 @@ mod search_matrix;
 mod strategy_search;
 
 #[cfg(test)]
-mod tests_unit;
-#[cfg(test)]
 mod tests_boundary;
+#[cfg(test)]
+mod tests_unit;
 
 // Re-export all public items for backwards compatibility
 pub use analysis::{CorrelationAnalysis, CorrelationPattern, MatrixAnalysis};

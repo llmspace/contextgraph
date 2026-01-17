@@ -370,7 +370,9 @@ impl NeuromodulationManager {
     pub fn on_goal_progress_with_cascades(&mut self, delta: f32) -> CascadeReport {
         // Guard against NaN - FAIL FAST
         if delta.is_nan() {
-            tracing::warn!("on_goal_progress_with_cascades received NaN delta - returning empty report");
+            tracing::warn!(
+                "on_goal_progress_with_cascades received NaN delta - returning empty report"
+            );
             return CascadeReport {
                 da_new: self.dopamine.value(),
                 serotonin_new: self.serotonin.value(),
@@ -743,17 +745,26 @@ mod tests {
         // Verify Source of Truth
         println!("=== HIGH DA -> 5HT CASCADE ===");
         println!("  DA before: 3.95, DA after: {}", manager.dopamine.value());
-        println!("  5HT before: {}, 5HT after: {}", initial_5ht, manager.serotonin.value());
+        println!(
+            "  5HT before: {}, 5HT after: {}",
+            initial_5ht,
+            manager.serotonin.value()
+        );
         println!("  Report: {:?}", report);
 
-        assert!(report.da_new > cascade::DA_HIGH_THRESHOLD, "DA should exceed 4.0");
+        assert!(
+            report.da_new > cascade::DA_HIGH_THRESHOLD,
+            "DA should exceed 4.0"
+        );
         assert!(report.mood_cascade_triggered, "Mood cascade should trigger");
         assert!(
             (report.serotonin_delta - cascade::SEROTONIN_CASCADE_DELTA).abs() < f32::EPSILON,
-            "5HT should increase by {}", cascade::SEROTONIN_CASCADE_DELTA
+            "5HT should increase by {}",
+            cascade::SEROTONIN_CASCADE_DELTA
         );
         assert!(
-            (manager.serotonin.value() - (initial_5ht + cascade::SEROTONIN_CASCADE_DELTA)).abs() < f32::EPSILON,
+            (manager.serotonin.value() - (initial_5ht + cascade::SEROTONIN_CASCADE_DELTA)).abs()
+                < f32::EPSILON,
             "Source of Truth: 5HT actual value should be increased"
         );
     }
@@ -773,16 +784,25 @@ mod tests {
 
         println!("=== LOW DA -> 5HT CASCADE ===");
         println!("  DA before: 2.05, DA after: {}", manager.dopamine.value());
-        println!("  5HT before: {}, 5HT after: {}", initial_5ht, manager.serotonin.value());
+        println!(
+            "  5HT before: {}, 5HT after: {}",
+            initial_5ht,
+            manager.serotonin.value()
+        );
 
-        assert!(report.da_new < cascade::DA_LOW_THRESHOLD, "DA should be below 2.0");
+        assert!(
+            report.da_new < cascade::DA_LOW_THRESHOLD,
+            "DA should be below 2.0"
+        );
         assert!(report.mood_cascade_triggered, "Mood cascade should trigger");
         assert!(
             (report.serotonin_delta + cascade::SEROTONIN_CASCADE_DELTA).abs() < f32::EPSILON,
-            "5HT should decrease by {}", cascade::SEROTONIN_CASCADE_DELTA
+            "5HT should decrease by {}",
+            cascade::SEROTONIN_CASCADE_DELTA
         );
         assert!(
-            (manager.serotonin.value() - (initial_5ht - cascade::SEROTONIN_CASCADE_DELTA)).abs() < f32::EPSILON,
+            (manager.serotonin.value() - (initial_5ht - cascade::SEROTONIN_CASCADE_DELTA)).abs()
+                < f32::EPSILON,
             "Source of Truth: 5HT actual value should be decreased"
         );
     }
@@ -802,13 +822,21 @@ mod tests {
 
         println!("=== ALERTNESS CASCADE (direct) ===");
         println!("  Simulated DA change: 0.5");
-        println!("  NE before: {}, NE after: {}", initial_ne, manager.noradrenaline.value());
+        println!(
+            "  NE before: {}, NE after: {}",
+            initial_ne,
+            manager.noradrenaline.value()
+        );
         println!("  NE delta: {}, triggered: {}", ne_delta, triggered);
 
-        assert!(triggered, "Alertness cascade should trigger for |delta|=0.5 > 0.3");
+        assert!(
+            triggered,
+            "Alertness cascade should trigger for |delta|=0.5 > 0.3"
+        );
         assert!(
             (ne_delta - cascade::NE_ALERTNESS_DELTA).abs() < f32::EPSILON,
-            "NE should increase by {}", cascade::NE_ALERTNESS_DELTA
+            "NE should increase by {}",
+            cascade::NE_ALERTNESS_DELTA
         );
         assert!(
             manager.noradrenaline.value() > initial_ne,
@@ -832,8 +860,14 @@ mod tests {
 
         // DA change = 0.01 (below 0.3 threshold)
         // DA new = 3.01 (between 2.0 and 4.0)
-        assert!(!report.mood_cascade_triggered, "Mood cascade should NOT trigger");
-        assert!(!report.alertness_cascade_triggered, "Alertness cascade should NOT trigger");
+        assert!(
+            !report.mood_cascade_triggered,
+            "Mood cascade should NOT trigger"
+        );
+        assert!(
+            !report.alertness_cascade_triggered,
+            "Alertness cascade should NOT trigger"
+        );
         assert!(
             (manager.serotonin.value() - initial_5ht).abs() < f32::EPSILON,
             "5HT should be unchanged"
@@ -855,8 +889,14 @@ mod tests {
         let report = manager.on_goal_progress_with_cascades(0.5);
 
         println!("=== REPORT ACCURACY ===");
-        println!("  Report DA: new={}, delta={}", report.da_new, report.da_delta);
-        println!("  Report 5HT: delta={}, new={}", report.serotonin_delta, report.serotonin_new);
+        println!(
+            "  Report DA: new={}, delta={}",
+            report.da_new, report.da_delta
+        );
+        println!(
+            "  Report 5HT: delta={}, new={}",
+            report.serotonin_delta, report.serotonin_new
+        );
         println!("  Actual DA: {}", manager.dopamine.value());
         println!("  Actual 5HT: {}", manager.serotonin.value());
 
@@ -876,9 +916,7 @@ mod tests {
 
         // DA > 4.0, so mood cascade should trigger
         assert!(report.mood_cascade_triggered);
-        assert!(
-            (report.serotonin_delta - cascade::SEROTONIN_CASCADE_DELTA).abs() < f32::EPSILON
-        );
+        assert!((report.serotonin_delta - cascade::SEROTONIN_CASCADE_DELTA).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -913,7 +951,11 @@ mod tests {
         let _report = manager.on_goal_progress_with_cascades(0.1);
 
         println!("=== 5HT CEILING CLAMP ===");
-        println!("  5HT after cascade: {} (max={})", manager.serotonin.value(), SEROTONIN_MAX);
+        println!(
+            "  5HT after cascade: {} (max={})",
+            manager.serotonin.value(),
+            SEROTONIN_MAX
+        );
 
         assert!(
             manager.serotonin.value() <= SEROTONIN_MAX,
@@ -926,7 +968,11 @@ mod tests {
         let _report = manager.on_goal_progress_with_cascades(-0.1);
 
         println!("=== 5HT FLOOR CLAMP ===");
-        println!("  5HT after cascade: {} (min={})", manager.serotonin.value(), SEROTONIN_MIN);
+        println!(
+            "  5HT after cascade: {} (min={})",
+            manager.serotonin.value(),
+            SEROTONIN_MIN
+        );
 
         assert!(
             manager.serotonin.value() >= SEROTONIN_MIN,
@@ -971,10 +1017,26 @@ mod tests {
 
         // === STEP 4: Verify changes match expectations ===
         println!("=== VERIFICATION ===");
-        println!("  DA change: {} -> {} (delta={})", before_da, after_da, after_da - before_da);
-        println!("  5HT change: {} -> {} (delta={})", before_5ht, after_5ht, after_5ht - before_5ht);
-        println!("  NE change: {} -> {} (delta={})", before_ne, after_ne, after_ne - before_ne);
-        println!("  Report matches actual: DA={}, 5HT={}, NE={}",
+        println!(
+            "  DA change: {} -> {} (delta={})",
+            before_da,
+            after_da,
+            after_da - before_da
+        );
+        println!(
+            "  5HT change: {} -> {} (delta={})",
+            before_5ht,
+            after_5ht,
+            after_5ht - before_5ht
+        );
+        println!(
+            "  NE change: {} -> {} (delta={})",
+            before_ne,
+            after_ne,
+            after_ne - before_ne
+        );
+        println!(
+            "  Report matches actual: DA={}, 5HT={}, NE={}",
             (report.da_new - after_da).abs() < f32::EPSILON,
             (report.serotonin_new - after_5ht).abs() < f32::EPSILON,
             (report.ne_new - after_ne).abs() < f32::EPSILON
@@ -983,7 +1045,10 @@ mod tests {
         // DA should have increased
         assert!(after_da > before_da, "DA should increase");
         // DA > 4.0, so 5HT should increase
-        assert!(after_da > cascade::DA_HIGH_THRESHOLD, "DA should exceed threshold");
+        assert!(
+            after_da > cascade::DA_HIGH_THRESHOLD,
+            "DA should exceed threshold"
+        );
         assert!(
             (after_5ht - before_5ht - cascade::SEROTONIN_CASCADE_DELTA).abs() < f32::EPSILON,
             "5HT should increase by cascade delta"
@@ -1000,13 +1065,21 @@ mod tests {
         let sht_before = manager.serotonin.value();
         let ne_before = manager.noradrenaline.value();
 
-        println!("BEFORE: DA={}, 5HT={}, NE={}",
-            manager.dopamine.value(), manager.serotonin.value(), manager.noradrenaline.value());
+        println!(
+            "BEFORE: DA={}, 5HT={}, NE={}",
+            manager.dopamine.value(),
+            manager.serotonin.value(),
+            manager.noradrenaline.value()
+        );
 
         let report = manager.on_goal_progress_with_cascades(0.0);
 
-        println!("AFTER: DA={}, 5HT={}, NE={}",
-            manager.dopamine.value(), manager.serotonin.value(), manager.noradrenaline.value());
+        println!(
+            "AFTER: DA={}, 5HT={}, NE={}",
+            manager.dopamine.value(),
+            manager.serotonin.value(),
+            manager.noradrenaline.value()
+        );
 
         // Verify: nothing changes with zero delta
         assert!(!report.mood_cascade_triggered);
@@ -1023,11 +1096,19 @@ mod tests {
         manager.dopamine.set_value(DA_MAX);
         let initial_5ht = manager.serotonin.value();
 
-        println!("BEFORE: DA={} (max), 5HT={}", manager.dopamine.value(), initial_5ht);
+        println!(
+            "BEFORE: DA={} (max), 5HT={}",
+            manager.dopamine.value(),
+            initial_5ht
+        );
 
         let report = manager.on_goal_progress_with_cascades(1.0);
 
-        println!("AFTER: DA={}, 5HT={}", manager.dopamine.value(), manager.serotonin.value());
+        println!(
+            "AFTER: DA={}, 5HT={}",
+            manager.dopamine.value(),
+            manager.serotonin.value()
+        );
 
         // DA stays at max, 5HT still increases (DA > 4.0)
         assert!((manager.dopamine.value() - DA_MAX).abs() < f32::EPSILON);
@@ -1041,22 +1122,38 @@ mod tests {
         manager.dopamine.set_value(3.95);
 
         println!("=== SEQUENTIAL CASCADE TEST ===");
-        println!("Initial: DA={}, 5HT={}", manager.dopamine.value(), manager.serotonin.value());
+        println!(
+            "Initial: DA={}, 5HT={}",
+            manager.dopamine.value(),
+            manager.serotonin.value()
+        );
 
         // First cascade
         let report1 = manager.on_goal_progress_with_cascades(1.0);
-        println!("After 1st: DA={}, 5HT={}, mood_triggered={}",
-            manager.dopamine.value(), manager.serotonin.value(), report1.mood_cascade_triggered);
+        println!(
+            "After 1st: DA={}, 5HT={}, mood_triggered={}",
+            manager.dopamine.value(),
+            manager.serotonin.value(),
+            report1.mood_cascade_triggered
+        );
 
         // Second cascade
         let report2 = manager.on_goal_progress_with_cascades(1.0);
-        println!("After 2nd: DA={}, 5HT={}, mood_triggered={}",
-            manager.dopamine.value(), manager.serotonin.value(), report2.mood_cascade_triggered);
+        println!(
+            "After 2nd: DA={}, 5HT={}, mood_triggered={}",
+            manager.dopamine.value(),
+            manager.serotonin.value(),
+            report2.mood_cascade_triggered
+        );
 
         // Third cascade
         let report3 = manager.on_goal_progress_with_cascades(1.0);
-        println!("After 3rd: DA={}, 5HT={}, mood_triggered={}",
-            manager.dopamine.value(), manager.serotonin.value(), report3.mood_cascade_triggered);
+        println!(
+            "After 3rd: DA={}, 5HT={}, mood_triggered={}",
+            manager.dopamine.value(),
+            manager.serotonin.value(),
+            report3.mood_cascade_triggered
+        );
 
         // Each should trigger mood cascade if DA > 4.0
         // First call: DA=3.95+0.1=4.05 > 4.0 -> 5HT increases

@@ -8,15 +8,31 @@
 //! - ARCH-06: CUDA FFI only in context-graph-cuda
 
 pub use context_graph_cuda::ffi::faiss::{
-    // Types
-    FaissGpuResourcesProvider, FaissIndex, FaissStandardGpuResources, MetricType,
-    // FFI functions
-    faiss_IndexIVF_set_nprobe, faiss_Index_add_with_ids, faiss_Index_free,
-    faiss_Index_is_trained, faiss_Index_ntotal, faiss_Index_search, faiss_Index_train,
-    faiss_StandardGpuResources_free, faiss_StandardGpuResources_new, faiss_get_num_gpus,
-    faiss_index_cpu_to_gpu, faiss_index_factory, faiss_read_index, faiss_write_index,
     // Helpers
-    check_faiss_result, gpu_available, GpuResources, FAISS_OK,
+    check_faiss_result,
+    // FFI functions
+    faiss_IndexIVF_set_nprobe,
+    faiss_Index_add_with_ids,
+    faiss_Index_free,
+    faiss_Index_is_trained,
+    faiss_Index_ntotal,
+    faiss_Index_search,
+    faiss_Index_train,
+    faiss_StandardGpuResources_free,
+    faiss_StandardGpuResources_new,
+    faiss_get_num_gpus,
+    faiss_index_cpu_to_gpu,
+    faiss_index_factory,
+    faiss_read_index,
+    faiss_write_index,
+    gpu_available,
+    // Types
+    FaissGpuResourcesProvider,
+    FaissIndex,
+    FaissStandardGpuResources,
+    GpuResources,
+    MetricType,
+    FAISS_OK,
 };
 
 #[cfg(feature = "faiss-gpu")]

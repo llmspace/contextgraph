@@ -85,12 +85,7 @@ pub struct AccuracyReport {
 
 impl AccuracyReport {
     /// Create a new accuracy report from measurement.
-    pub fn new(
-        rmse: f32,
-        nrmse: f32,
-        precision: Precision,
-        compression_ratio: f32,
-    ) -> Self {
+    pub fn new(rmse: f32, nrmse: f32, precision: Precision, compression_ratio: f32) -> Self {
         let threshold = precision.rmse_threshold();
         Self {
             rmse,
@@ -125,7 +120,10 @@ mod tests {
     fn test_compute_rmse_identical() {
         let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let rmse = compute_rmse(&values, &values);
-        assert!(rmse.abs() < f32::EPSILON, "RMSE of identical values should be 0");
+        assert!(
+            rmse.abs() < f32::EPSILON,
+            "RMSE of identical values should be 0"
+        );
     }
 
     #[test]

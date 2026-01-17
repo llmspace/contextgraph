@@ -44,6 +44,6 @@ mod tests;
 // Re-export all public types and constants
 pub use cache::ModernHopfieldCache;
 pub use layer::ReflexLayer;
-pub use types::{CacheStats, CachedResponse, DEFAULT_BETA, DEFAULT_CACHE_CAPACITY, PATTERN_DIM};
 #[allow(deprecated)]
 pub use types::MIN_HIT_SIMILARITY;
+pub use types::{CacheStats, CachedResponse, DEFAULT_BETA, DEFAULT_CACHE_CAPACITY, PATTERN_DIM};

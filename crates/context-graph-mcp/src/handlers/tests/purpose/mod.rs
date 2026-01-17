@@ -25,10 +25,9 @@
 //! - `drift_check` - Tests for purpose/drift_check endpoint
 //! - `full_state_verification` - End-to-end purpose workflow test
 
-mod helpers;
-mod purpose_query;
-mod goal_hierarchy;
-mod goal_aligned_memories;
 mod drift_check;
 mod full_state_verification;
-
+mod goal_aligned_memories;
+mod goal_hierarchy;
+mod helpers;
+mod purpose_query;

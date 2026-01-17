@@ -62,11 +62,7 @@ pub(crate) fn euclidean_distance(a: &[f32], b: &[f32]) -> f32 {
         return 0.0;
     }
 
-    let sum_sq: f32 = a
-        .iter()
-        .zip(b.iter())
-        .map(|(x, y)| (x - y).powi(2))
-        .sum();
+    let sum_sq: f32 = a.iter().zip(b.iter()).map(|(x, y)| (x - y).powi(2)).sum();
 
     let distance = sum_sq.sqrt();
 
@@ -134,7 +130,11 @@ pub(crate) fn mean_distance_to_cluster(
     let members: Vec<&Vec<f32>> = if cluster.len() > max_sample {
         // Simple deterministic sampling: take evenly spaced members
         let step = cluster.len() / max_sample;
-        cluster.iter().step_by(step.max(1)).take(max_sample).collect()
+        cluster
+            .iter()
+            .step_by(step.max(1))
+            .take(max_sample)
+            .collect()
     } else {
         cluster.iter().collect()
     };

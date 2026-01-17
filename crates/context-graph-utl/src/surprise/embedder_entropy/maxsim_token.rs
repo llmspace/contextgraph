@@ -224,12 +224,7 @@ impl MaxSimTokenEntropy {
 }
 
 impl EmbedderEntropy for MaxSimTokenEntropy {
-    fn compute_delta_s(
-        &self,
-        current: &[f32],
-        history: &[Vec<f32>],
-        k: usize,
-    ) -> UtlResult<f32> {
+    fn compute_delta_s(&self, current: &[f32], history: &[Vec<f32>], k: usize) -> UtlResult<f32> {
         // Validate input: empty current is an error per spec
         if current.is_empty() {
             return Err(UtlError::EmptyInput);
@@ -352,7 +347,10 @@ mod tests {
         assert!(result.is_ok());
         let delta_s = result.unwrap();
 
-        println!("AFTER: delta_s = {} (expected < 0.5 for identical)", delta_s);
+        println!(
+            "AFTER: delta_s = {} (expected < 0.5 for identical)",
+            delta_s
+        );
         assert!(
             delta_s < 0.5,
             "Identical tokens should have low surprise, got {}",
@@ -683,10 +681,7 @@ mod tests {
             calculator.running_variance, 0.1,
             "running_variance should reset to 0.1"
         );
-        assert_eq!(
-            calculator.sample_count, 0,
-            "sample_count should reset to 0"
-        );
+        assert_eq!(calculator.sample_count, 0, "sample_count should reset to 0");
 
         println!("[PASS] test_maxsim_reset - State cleared properly");
     }

@@ -12,9 +12,9 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::handlers::tests::create_test_handlers_with_warm_gwt;
-use super::helpers::{make_tool_call, assert_success, assert_tool_error, get_tool_data};
+use super::helpers::{assert_success, assert_tool_error, get_tool_data, make_tool_call};
 use super::synthetic_data;
+use crate::handlers::tests::create_test_handlers_with_warm_gwt;
 
 // -------------------------------------------------------------------------
 // get_consciousness_state
@@ -87,7 +87,10 @@ async fn test_get_kuramoto_sync_basic() {
 
     let data = get_tool_data(&response);
     assert!(data.get("r").is_some(), "Must have order parameter r");
-    assert!(data.get("psi").is_some() || data.get("mean_phase").is_some(), "Must have mean phase");
+    assert!(
+        data.get("psi").is_some() || data.get("mean_phase").is_some(),
+        "Must have mean phase"
+    );
 }
 
 #[tokio::test]
@@ -244,10 +247,7 @@ async fn test_trigger_workspace_broadcast_basic() {
 
     let response = handlers.dispatch(request).await;
     // May fail if memory doesn't exist, but should not be JSON-RPC error
-    assert!(
-        response.error.is_none(),
-        "Should not be JSON-RPC error"
-    );
+    assert!(response.error.is_none(), "Should not be JSON-RPC error");
 }
 
 #[tokio::test]

@@ -52,11 +52,7 @@ impl LevelWeights {
     ///
     /// # Errors
     /// Returns error if weights don't sum to 1.0 (within epsilon tolerance).
-    pub fn new(
-        strategic: f32,
-        tactical: f32,
-        immediate: f32,
-    ) -> Result<Self, &'static str> {
+    pub fn new(strategic: f32, tactical: f32, immediate: f32) -> Result<Self, &'static str> {
         let weights = Self {
             strategic,
             tactical,

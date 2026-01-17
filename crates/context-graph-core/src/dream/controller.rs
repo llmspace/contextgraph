@@ -336,7 +336,10 @@ impl DreamController {
         // Quality: ratio of pruned edges to total processed (approximated by memories_replayed * edges per memory)
         // Coherence: placeholder computed from shortcuts ratio (will be replaced with Kuramoto order parameter)
         let quality = {
-            let memories = nrem_report.as_ref().map(|r| r.memories_replayed).unwrap_or(0);
+            let memories = nrem_report
+                .as_ref()
+                .map(|r| r.memories_replayed)
+                .unwrap_or(0);
             if memories > 0 {
                 // Approximate: each memory ~10 edges, quality = edges_pruned / estimated_total
                 let estimated_edges = memories * 10;

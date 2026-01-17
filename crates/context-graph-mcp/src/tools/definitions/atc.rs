@@ -1,8 +1,8 @@
 //! ATC (Adaptive Threshold Calibration) tool definitions.
 //! TASK-ATC-001: Threshold status, calibration metrics, recalibration.
 
-use serde_json::json;
 use crate::tools::types::ToolDefinition;
+use serde_json::json;
 
 /// Returns ATC tool definitions (3 tools).
 pub fn definitions() -> Vec<ToolDefinition> {
@@ -32,7 +32,6 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "required": []
             }),
         ),
-
         // get_calibration_metrics - Get calibration quality metrics (TASK-ATC-001)
         ToolDefinition::new(
             "get_calibration_metrics",
@@ -52,7 +51,6 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "required": []
             }),
         ),
-
         // trigger_recalibration - Manually trigger recalibration (TASK-ATC-001)
         ToolDefinition::new(
             "trigger_recalibration",

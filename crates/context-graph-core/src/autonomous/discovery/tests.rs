@@ -9,8 +9,8 @@ mod tests {
     use crate::teleological::comparator::TeleologicalComparator;
     use crate::teleological::Embedder;
     use crate::types::fingerprint::{
-        SemanticFingerprint, SparseVector, TeleologicalArray, E1_DIM, E2_DIM, E3_DIM, E4_DIM,
-        E5_DIM, E7_DIM, E8_DIM, E9_DIM, E10_DIM, E11_DIM, E12_TOKEN_DIM,
+        SemanticFingerprint, SparseVector, TeleologicalArray, E10_DIM, E11_DIM, E12_TOKEN_DIM,
+        E1_DIM, E2_DIM, E3_DIM, E4_DIM, E5_DIM, E7_DIM, E8_DIM, E9_DIM,
     };
 
     /// Create a test fingerprint with specific patterns for deterministic testing.
@@ -205,7 +205,10 @@ mod tests {
             coherence_score: 0.80,
             ..candidate_ns.clone()
         };
-        assert_eq!(pipeline.assign_level(&candidate_strat), GoalLevel::Strategic);
+        assert_eq!(
+            pipeline.assign_level(&candidate_strat),
+            GoalLevel::Strategic
+        );
 
         // Test Tactical: size=10, coherence=0.75
         let candidate_tact = GoalCandidate {
@@ -221,10 +224,7 @@ mod tests {
             coherence_score: 0.70,
             ..candidate_ns.clone()
         };
-        assert_eq!(
-            pipeline.assign_level(&candidate_op),
-            GoalLevel::Operational
-        );
+        assert_eq!(pipeline.assign_level(&candidate_op), GoalLevel::Operational);
 
         println!("[PASS] test_goal_level_assignment");
     }
@@ -309,9 +309,8 @@ mod tests {
         };
 
         // Only 3 arrays with min_cluster_size=5
-        let arrays: Vec<TeleologicalArray> = (0..3)
-            .map(|i| create_test_fingerprint(i, 0.01))
-            .collect();
+        let arrays: Vec<TeleologicalArray> =
+            (0..3).map(|i| create_test_fingerprint(i, 0.01)).collect();
 
         let _ = pipeline.discover(&arrays, &config);
     }

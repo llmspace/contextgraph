@@ -20,14 +20,14 @@
 //! - **Dream Consolidation**: Verifies dream cycle and amortized learning
 //! - **Neuromodulation**: Verifies 4-modulator control system
 
-mod kuramoto_tests;
-mod consciousness_tests;
-mod workspace_tests;
-mod ego_tests;
 mod atc_tests;
+mod consciousness_tests;
 mod dream_tests;
-mod neuromodulation_tests;
+mod ego_tests;
 mod integration_tests;
+mod kuramoto_tests;
+mod neuromodulation_tests;
+mod workspace_tests;
 
 use std::sync::Arc;
 

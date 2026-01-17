@@ -55,11 +55,16 @@ async fn phase6_agent_a_stores_ml_knowledge() {
 
     let (handlers, store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
 
-    let agent_a_memories = ["Deep learning architectures for image classification including ResNet and EfficientNet",
+    let agent_a_memories = [
+        "Deep learning architectures for image classification including ResNet and EfficientNet",
         "Transformer models for natural language processing with attention mechanisms",
-        "Reinforcement learning algorithms like PPO and DQN for game playing"];
+        "Reinforcement learning algorithms like PPO and DQN for game playing",
+    ];
 
-    println!("\n[AGENT A] Storing {} ML-focused memories:", agent_a_memories.len());
+    println!(
+        "\n[AGENT A] Storing {} ML-focused memories:",
+        agent_a_memories.len()
+    );
 
     let mut stored_ids: Vec<String> = Vec::new();
 
@@ -89,10 +94,17 @@ async fn phase6_agent_a_stores_ml_knowledge() {
 
     // FSV: Verify count
     let count = store.count().await.expect("count() works");
-    assert_eq!(count, agent_a_memories.len(), "All memories should be stored");
+    assert_eq!(
+        count,
+        agent_a_memories.len(),
+        "All memories should be stored"
+    );
 
     println!("\n[FSV] Store count verified: {}", count);
-    println!("\n[PHASE 6 TEST 1 PASSED] Agent A stored {} memories", count);
+    println!(
+        "\n[PHASE 6 TEST 1 PASSED] Agent A stored {} memories",
+        count
+    );
     println!("================================================================================\n");
 }
 
@@ -105,11 +117,16 @@ async fn phase6_agent_b_stores_systems_knowledge() {
 
     let (handlers, store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
 
-    let agent_b_memories = ["Distributed consensus protocols including Raft and Paxos for fault tolerance",
+    let agent_b_memories = [
+        "Distributed consensus protocols including Raft and Paxos for fault tolerance",
         "Database sharding strategies for horizontal scaling of large datasets",
-        "Microservices architecture patterns with service mesh and API gateway"];
+        "Microservices architecture patterns with service mesh and API gateway",
+    ];
 
-    println!("\n[AGENT B] Storing {} systems-focused memories:", agent_b_memories.len());
+    println!(
+        "\n[AGENT B] Storing {} systems-focused memories:",
+        agent_b_memories.len()
+    );
 
     for (i, content) in agent_b_memories.iter().enumerate() {
         let request = make_request(
@@ -125,13 +142,19 @@ async fn phase6_agent_b_stores_systems_knowledge() {
         assert!(response.error.is_none(), "Store should succeed");
 
         let result = response.result.expect("Should have result");
-        let fp_id = result.get("fingerprintId").and_then(|v| v.as_str()).unwrap();
+        let fp_id = result
+            .get("fingerprintId")
+            .and_then(|v| v.as_str())
+            .unwrap();
         println!("  [{}] Stored: {} -> {}", i + 1, &content[..40], fp_id);
     }
 
     let count = store.count().await.expect("count() works");
     println!("\n[FSV] Store count verified: {}", count);
-    println!("\n[PHASE 6 TEST 2 PASSED] Agent B stored {} memories", count);
+    println!(
+        "\n[PHASE 6 TEST 2 PASSED] Agent B stored {} memories",
+        count
+    );
     println!("================================================================================\n");
 }
 
@@ -149,10 +172,18 @@ async fn phase6_cross_agent_memory_search() {
     let (handlers, _store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
 
     // Setup: Store mixed memories
-    let memories = [("ML", "Neural network optimization using gradient descent and Adam"),
-        ("Systems", "Load balancing algorithms for distributed web servers"),
+    let memories = [
+        (
+            "ML",
+            "Neural network optimization using gradient descent and Adam",
+        ),
+        (
+            "Systems",
+            "Load balancing algorithms for distributed web servers",
+        ),
         ("ML", "Computer vision techniques for object detection"),
-        ("Systems", "Message queue patterns with Kafka and RabbitMQ")];
+        ("Systems", "Message queue patterns with Kafka and RabbitMQ"),
+    ];
 
     println!("\n[SETUP] Storing mixed agent memories:");
     for (i, (domain, content)) in memories.iter().enumerate() {
@@ -186,7 +217,10 @@ async fn phase6_cross_agent_memory_search() {
     } else {
         let result = search_response.result.expect("Should have result");
         if let Some(results) = result.get("results").and_then(|r| r.as_array()) {
-            println!("  - Found {} results from other agents' knowledge", results.len());
+            println!(
+                "  - Found {} results from other agents' knowledge",
+                results.len()
+            );
             for (i, r) in results.iter().take(2).enumerate() {
                 if let Some(sim) = r.get("similarity") {
                     println!("    [{}] Similarity: {:.4}", i + 1, sim);
@@ -212,7 +246,10 @@ async fn phase6_cross_agent_memory_search() {
     } else {
         let result = search_response2.result.expect("Should have result");
         if let Some(results) = result.get("results").and_then(|r| r.as_array()) {
-            println!("  - Found {} results from other agents' knowledge", results.len());
+            println!(
+                "  - Found {} results from other agents' knowledge",
+                results.len()
+            );
         }
     }
 
@@ -245,10 +282,7 @@ async fn phase6_johari_inter_agent_awareness() {
     handlers.dispatch(store_request).await;
 
     // Get Johari status
-    let johari_request = make_tool_call(
-        "get_johari_status",
-        json!({}),
-    );
+    let johari_request = make_tool_call("get_johari_status", json!({}));
 
     println!("\n[REQUEST] Getting Johari window status");
     let johari_response = handlers.dispatch(johari_request).await;
@@ -262,7 +296,11 @@ async fn phase6_johari_inter_agent_awareness() {
         // Check quadrant sizes
         let quadrants = ["open", "blind", "hidden", "unknown"];
         for q in quadrants {
-            if let Some(size) = result.get(q).and_then(|v| v.get("size")).and_then(|s| s.as_i64()) {
+            if let Some(size) = result
+                .get(q)
+                .and_then(|v| v.get("size"))
+                .and_then(|s| s.as_i64())
+            {
                 println!("  - {} quadrant size: {}", q, size);
             }
         }
@@ -294,10 +332,7 @@ async fn phase6_steering_vectors_agent_guidance() {
     let (handlers, _store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
 
     // Get current steering vector
-    let get_request = make_tool_call(
-        "get_steering_vector",
-        json!({}),
-    );
+    let get_request = make_tool_call("get_steering_vector", json!({}));
 
     println!("\n[REQUEST] Getting current steering vector");
     let get_response = handlers.dispatch(get_request).await;
@@ -414,7 +449,10 @@ async fn phase6_full_multi_agent_coordination() {
         })),
     );
     let agent_a_response = handlers.dispatch(agent_a_request).await;
-    assert!(agent_a_response.error.is_none(), "Agent A store must succeed");
+    assert!(
+        agent_a_response.error.is_none(),
+        "Agent A store must succeed"
+    );
 
     let agent_a_fp = agent_a_response
         .result
@@ -435,7 +473,10 @@ async fn phase6_full_multi_agent_coordination() {
         })),
     );
     let agent_b_response = handlers.dispatch(agent_b_request).await;
-    assert!(agent_b_response.error.is_none(), "Agent B store must succeed");
+    assert!(
+        agent_b_response.error.is_none(),
+        "Agent B store must succeed"
+    );
 
     let agent_b_fp = agent_b_response
         .result

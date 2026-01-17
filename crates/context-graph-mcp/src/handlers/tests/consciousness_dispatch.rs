@@ -262,7 +262,14 @@ async fn test_consciousness_get_state_returns_real_data() {
         .and_then(|v| v.as_str())
         .expect("state must exist");
     assert!(
-        ["DORMANT", "FRAGMENTED", "EMERGING", "CONSCIOUS", "HYPERSYNC"].contains(&state),
+        [
+            "DORMANT",
+            "FRAGMENTED",
+            "EMERGING",
+            "CONSCIOUS",
+            "HYPERSYNC"
+        ]
+        .contains(&state),
         "[FSV] Invalid state: {}",
         state
     );
@@ -349,7 +356,10 @@ async fn test_consciousness_get_state_fails_without_gwt() {
     );
 
     println!("[FSV] consciousness/get_state FAIL FAST verification PASSED");
-    println!("[FSV]   error.code={}, error.message={}", error.code, error.message);
+    println!(
+        "[FSV]   error.code={}, error.message={}",
+        error.code, error.message
+    );
 }
 
 // =============================================================================
@@ -427,7 +437,11 @@ async fn test_consciousness_sync_level_lightweight_check() {
         2.37, // E12_LateInteract (60/25.3)
         0.16, // E13_SPLADE (4/25.3)
     ];
-    for (i, (actual, expected)) in freqs.iter().zip(expected_normalized_freqs.iter()).enumerate() {
+    for (i, (actual, expected)) in freqs
+        .iter()
+        .zip(expected_normalized_freqs.iter())
+        .enumerate()
+    {
         let actual_val = actual.as_f64().expect("freq must be f64");
         assert!(
             (actual_val - expected).abs() < 0.01,
@@ -470,7 +484,12 @@ async fn test_consciousness_sync_level_lightweight_check() {
     );
 
     println!("[FSV] consciousness/sync_level verification PASSED");
-    println!("[FSV]   r={}, phases.len={}, natural_freqs.len={}", r, phases.len(), freqs.len());
+    println!(
+        "[FSV]   r={}, phases.len={}, natural_freqs.len={}",
+        r,
+        phases.len(),
+        freqs.len()
+    );
 }
 
 /// FSV Test: consciousness/sync_level FAIL FAST without GWT initialization.
@@ -847,7 +866,10 @@ async fn test_get_coherence_state_fails_without_gwt() {
     );
 
     println!("[FSV] get_coherence_state FAIL FAST verification PASSED");
-    println!("[FSV]   error.code={}, error.message={}", error.code, error.message);
+    println!(
+        "[FSV]   error.code={}, error.message={}",
+        error.code, error.message
+    );
 }
 
 /// Edge case: Incoherent network returns Low coherence.
@@ -965,5 +987,8 @@ async fn test_get_coherence_state_with_phases() {
         );
     }
 
-    println!("[FSV] get_coherence_state with phases PASSED: phases.len={}", phases.len());
+    println!(
+        "[FSV] get_coherence_state with phases PASSED: phases.len={}",
+        phases.len()
+    );
 }

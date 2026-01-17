@@ -33,15 +33,26 @@ async fn test_stubfix_steering_feedback_happy_path() {
     println!("  Stored {} memories", count);
 
     // Call get_steering_feedback
-    let request = make_request("tools/call", 10, Some(json!({
-        "name": "get_steering_feedback",
-        "arguments": {}
-    })));
+    let request = make_request(
+        "tools/call",
+        10,
+        Some(json!({
+            "name": "get_steering_feedback",
+            "arguments": {}
+        })),
+    );
     let response = handlers.dispatch(request).await;
 
-    println!("\nResponse: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "\nResponse: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Handler must succeed: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Handler must succeed: {:?}",
+        response.error
+    );
 
     let result = response.result.expect("Should have result");
     let content = result.get("content").and_then(|c| c.as_array());
@@ -55,28 +66,52 @@ async fn test_stubfix_steering_feedback_happy_path() {
 
                 // Verify reward
                 if let Some(reward) = data.get("reward") {
-                    let value = reward.get("value").and_then(|v| v.as_f64()).unwrap_or(-999.0);
-                    let gardener_score = reward.get("gardener_score").and_then(|v| v.as_f64()).unwrap_or(-999.0);
-                    let curator_score = reward.get("curator_score").and_then(|v| v.as_f64()).unwrap_or(-999.0);
-                    let assessor_score = reward.get("assessor_score").and_then(|v| v.as_f64()).unwrap_or(-999.0);
+                    let value = reward
+                        .get("value")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(-999.0);
+                    let gardener_score = reward
+                        .get("gardener_score")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(-999.0);
+                    let curator_score = reward
+                        .get("curator_score")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(-999.0);
+                    let assessor_score = reward
+                        .get("assessor_score")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(-999.0);
 
                     println!("  reward.value: {:.4}", value);
                     println!("  reward.gardener_score: {:.4}", gardener_score);
                     println!("  reward.curator_score: {:.4}", curator_score);
                     println!("  reward.assessor_score: {:.4}", assessor_score);
 
-                    assert!((-1.0..=1.0).contains(&value), "Reward value should be in [-1, 1]");
+                    assert!(
+                        (-1.0..=1.0).contains(&value),
+                        "Reward value should be in [-1, 1]"
+                    );
                 }
 
                 // Verify gardener details
                 if let Some(gardener) = data.get("gardener_details") {
-                    let connectivity = gardener.get("connectivity").and_then(|v| v.as_f64()).unwrap_or(-1.0);
-                    let dead_ends = gardener.get("dead_ends_removed").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let connectivity = gardener
+                        .get("connectivity")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(-1.0);
+                    let dead_ends = gardener
+                        .get("dead_ends_removed")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
 
                     println!("  gardener.connectivity: {:.4}", connectivity);
                     println!("  gardener.dead_ends_removed: {}", dead_ends);
 
-                    assert!((0.0..=1.0).contains(&connectivity), "Connectivity should be in [0, 1]");
+                    assert!(
+                        (0.0..=1.0).contains(&connectivity),
+                        "Connectivity should be in [0, 1]"
+                    );
                 }
 
                 println!("\n[PASSED] get_steering_feedback returns REAL computed data");
@@ -109,19 +144,30 @@ async fn test_stubfix_pruning_candidates_happy_path() {
     println!("  Stored {} memories", count);
 
     // Call get_pruning_candidates
-    let request = make_request("tools/call", 10, Some(json!({
-        "name": "get_pruning_candidates",
-        "arguments": {
-            "limit": 10,
-            "min_staleness_days": 0,
-            "min_alignment": 0.9
-        }
-    })));
+    let request = make_request(
+        "tools/call",
+        10,
+        Some(json!({
+            "name": "get_pruning_candidates",
+            "arguments": {
+                "limit": 10,
+                "min_staleness_days": 0,
+                "min_alignment": 0.9
+            }
+        })),
+    );
     let response = handlers.dispatch(request).await;
 
-    println!("\nResponse: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "\nResponse: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Handler must succeed: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Handler must succeed: {:?}",
+        response.error
+    );
 
     let result = response.result.expect("Should have result");
     let content = result.get("content").and_then(|c| c.as_array());
@@ -135,7 +181,10 @@ async fn test_stubfix_pruning_candidates_happy_path() {
 
                 // Verify summary
                 if let Some(summary) = data.get("summary") {
-                    let total = summary.get("total_candidates").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let total = summary
+                        .get("total_candidates")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
                     println!("  summary.total_candidates: {}", total);
                 }
 
@@ -144,11 +193,26 @@ async fn test_stubfix_pruning_candidates_happy_path() {
                     println!("  candidates count: {}", candidates.len());
 
                     for (i, candidate) in candidates.iter().enumerate().take(3) {
-                        let memory_id = candidate.get("memory_id").and_then(|v| v.as_str()).unwrap_or("?");
-                        let reason = candidate.get("reason").and_then(|v| v.as_str()).unwrap_or("?");
-                        let alignment = candidate.get("alignment").and_then(|v| v.as_f64()).unwrap_or(-1.0);
+                        let memory_id = candidate
+                            .get("memory_id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("?");
+                        let reason = candidate
+                            .get("reason")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("?");
+                        let alignment = candidate
+                            .get("alignment")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(-1.0);
 
-                        println!("    [{}] {} - reason: {}, alignment: {:.4}", i+1, memory_id, reason, alignment);
+                        println!(
+                            "    [{}] {} - reason: {}, alignment: {:.4}",
+                            i + 1,
+                            memory_id,
+                            reason,
+                            alignment
+                        );
                     }
                 }
 
@@ -184,19 +248,30 @@ async fn test_stubfix_trigger_consolidation_happy_path() {
     println!("  Stored {} memories", count);
 
     // Call trigger_consolidation
-    let request = make_request("tools/call", 10, Some(json!({
-        "name": "trigger_consolidation",
-        "arguments": {
-            "strategy": "similarity",
-            "min_similarity": 0.5,
-            "max_memories": 10
-        }
-    })));
+    let request = make_request(
+        "tools/call",
+        10,
+        Some(json!({
+            "name": "trigger_consolidation",
+            "arguments": {
+                "strategy": "similarity",
+                "min_similarity": 0.5,
+                "max_memories": 10
+            }
+        })),
+    );
     let response = handlers.dispatch(request).await;
 
-    println!("\nResponse: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "\nResponse: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Handler must succeed: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Handler must succeed: {:?}",
+        response.error
+    );
 
     let result = response.result.expect("Should have result");
     let content = result.get("content").and_then(|c| c.as_array());
@@ -210,33 +285,52 @@ async fn test_stubfix_trigger_consolidation_happy_path() {
 
                 // Verify statistics
                 if let Some(stats) = data.get("statistics") {
-                    let pairs_evaluated = stats.get("pairs_evaluated").and_then(|v| v.as_u64()).unwrap_or(0);
-                    let strategy = stats.get("strategy").and_then(|v| v.as_str()).unwrap_or("?");
-                    let threshold = stats.get("similarity_threshold").and_then(|v| v.as_f64()).unwrap_or(-1.0);
+                    let pairs_evaluated = stats
+                        .get("pairs_evaluated")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
+                    let strategy = stats
+                        .get("strategy")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?");
+                    let threshold = stats
+                        .get("similarity_threshold")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(-1.0);
 
                     println!("  statistics.pairs_evaluated: {}", pairs_evaluated);
                     println!("  statistics.strategy: {}", strategy);
                     println!("  statistics.similarity_threshold: {:.4}", threshold);
 
-                    assert!(pairs_evaluated > 0 || count < 2, "Should evaluate pairs when multiple memories exist");
+                    assert!(
+                        pairs_evaluated > 0 || count < 2,
+                        "Should evaluate pairs when multiple memories exist"
+                    );
                     assert_eq!(strategy, "similarity", "Strategy should match request");
                 }
 
                 // Verify consolidation_result
                 if let Some(result) = data.get("consolidation_result") {
                     let status = result.get("status").and_then(|v| v.as_str()).unwrap_or("?");
-                    let candidate_count = result.get("candidate_count").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let candidate_count = result
+                        .get("candidate_count")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
 
                     println!("  consolidation_result.status: {}", status);
-                    println!("  consolidation_result.candidate_count: {}", candidate_count);
+                    println!(
+                        "  consolidation_result.candidate_count: {}",
+                        candidate_count
+                    );
                 }
 
                 // Check candidates_sample if present
                 if let Some(sample) = data.get("candidates_sample").and_then(|c| c.as_array()) {
                     println!("  candidates_sample count: {}", sample.len());
                     for (i, c) in sample.iter().enumerate().take(3) {
-                        let similarity = c.get("similarity").and_then(|v| v.as_f64()).unwrap_or(-1.0);
-                        println!("    [{}] similarity: {:.4}", i+1, similarity);
+                        let similarity =
+                            c.get("similarity").and_then(|v| v.as_f64()).unwrap_or(-1.0);
+                        println!("    [{}] similarity: {:.4}", i + 1, similarity);
                     }
                 }
 

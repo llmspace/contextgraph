@@ -117,10 +117,7 @@ pub trait PurposeIndexOps {
     ///
     /// If an entry with the same memory_id already exists, it is replaced.
     /// Secondary indexes are updated accordingly.
-    fn insert(
-        &mut self,
-        entry: super::entry::PurposeIndexEntry,
-    ) -> PurposeIndexResult<()>;
+    fn insert(&mut self, entry: super::entry::PurposeIndexEntry) -> PurposeIndexResult<()>;
 
     /// Remove a memory from the index.
     ///
@@ -166,10 +163,7 @@ pub trait PurposeIndexOps {
     /// # Errors
     ///
     /// - `NotFound`: If memory_id does not exist in the index
-    fn get(
-        &self,
-        memory_id: Uuid,
-    ) -> PurposeIndexResult<super::entry::PurposeIndexEntry>;
+    fn get(&self, memory_id: Uuid) -> PurposeIndexResult<super::entry::PurposeIndexEntry>;
 
     /// Check if memory exists in index.
     ///

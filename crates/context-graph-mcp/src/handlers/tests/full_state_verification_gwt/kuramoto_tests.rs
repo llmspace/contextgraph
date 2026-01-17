@@ -207,7 +207,10 @@ async fn test_get_kuramoto_state_returns_stepper_status_and_network_data() {
         !is_running,
         "is_running should be false initially (stepper not started)"
     );
-    println!("FSV-1 PASS: is_running = {} (stepper not started)", is_running);
+    println!(
+        "FSV-1 PASS: is_running = {} (stepper not started)",
+        is_running
+    );
 
     // FSV-2: Must have exactly 13 oscillator phases
     let phases = content["phases"].as_array().expect("phases must be array");
@@ -353,12 +356,16 @@ async fn test_get_kuramoto_state_returns_stepper_status_and_network_data() {
 #[tokio::test]
 async fn test_get_kuramoto_state_fails_fast_without_gwt() {
     use crate::handlers::Handlers;
-    use context_graph_core::johari::DynDefaultJohariManager;
-    use context_graph_core::stubs::{InMemoryTeleologicalStore, StubMultiArrayProvider, StubUtlProcessor};
-    use context_graph_core::traits::{MultiArrayEmbeddingProvider, TeleologicalMemoryStore, UtlProcessor};
-    use std::sync::Arc;
     use context_graph_core::alignment::DefaultAlignmentCalculator;
+    use context_graph_core::johari::DynDefaultJohariManager;
     use context_graph_core::purpose::GoalHierarchy;
+    use context_graph_core::stubs::{
+        InMemoryTeleologicalStore, StubMultiArrayProvider, StubUtlProcessor,
+    };
+    use context_graph_core::traits::{
+        MultiArrayEmbeddingProvider, TeleologicalMemoryStore, UtlProcessor,
+    };
+    use std::sync::Arc;
 
     println!("\n=== EDGE CASE TEST: get_kuramoto_state without GWT ===");
 
@@ -371,8 +378,9 @@ async fn test_get_kuramoto_state_fails_fast_without_gwt() {
         Arc::new(StubMultiArrayProvider::new());
     let alignment_calculator = Arc::new(DefaultAlignmentCalculator::new());
     let goal_hierarchy = Arc::new(parking_lot::RwLock::new(GoalHierarchy::new()));
-    let johari_manager: Arc<dyn context_graph_core::johari::JohariTransitionManager> =
-        Arc::new(DynDefaultJohariManager::new(Arc::clone(&teleological_store)));
+    let johari_manager: Arc<dyn context_graph_core::johari::JohariTransitionManager> = Arc::new(
+        DynDefaultJohariManager::new(Arc::clone(&teleological_store)),
+    );
 
     // Use with_johari_manager - has NO GWT providers (no kuramoto_network)
     // This constructor only takes 6 args and creates stubs for the rest
@@ -405,14 +413,19 @@ async fn test_get_kuramoto_state_fails_fast_without_gwt() {
     );
 
     // Verify error message mentions the issue
-    let error_message = error["message"].as_str().expect("error message must be string");
+    let error_message = error["message"]
+        .as_str()
+        .expect("error message must be string");
     assert!(
         error_message.contains("Kuramoto") || error_message.contains("not initialized"),
         "Error message should mention Kuramoto or initialization: {}",
         error_message
     );
 
-    println!("EDGE CASE PASS: get_kuramoto_state fails fast with error code {}", error_code);
+    println!(
+        "EDGE CASE PASS: get_kuramoto_state fails fast with error code {}",
+        error_code
+    );
     println!("Error message: {}", error_message);
     println!("=== EDGE CASE TEST PASSED ===\n");
 }

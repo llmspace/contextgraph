@@ -258,9 +258,9 @@ async fn test_johari_quadrant_action_mapping() {
     // Verify expected mapping exists in code
     // Constitution: utl.johari (lines 154-157)
     let expected_mappings = vec![
-        ("Open", "DirectRecall"),     // ΔS<0.5, ΔC>0.5
-        ("Blind", "TriggerDream"),    // ΔS>0.5, ΔC<0.5 - FIXED ISS-011
-        ("Hidden", "GetNeighborhood"), // ΔS<0.5, ΔC<0.5
+        ("Open", "DirectRecall"),       // ΔS<0.5, ΔC>0.5
+        ("Blind", "TriggerDream"),      // ΔS>0.5, ΔC<0.5 - FIXED ISS-011
+        ("Hidden", "GetNeighborhood"),  // ΔS<0.5, ΔC<0.5
         ("Unknown", "EpistemicAction"), // ΔS>0.5, ΔC>0.5 - FIXED ISS-011
     ];
 

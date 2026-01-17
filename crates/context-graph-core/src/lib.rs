@@ -88,4 +88,7 @@ pub use teleological::{
 pub use purpose::{GoalLevel, GoalNode};
 
 // Memory capture types (Phase 1) - TASK-P1-001, TASK-P1-002, TASK-P1-003
-pub use memory::{ChunkMetadata, HookType, Memory, MemorySource, ResponseType, Session, SessionStatus, TextChunk, MAX_CONTENT_LENGTH};
+pub use memory::{
+    ChunkMetadata, HookType, Memory, MemorySource, ResponseType, Session, SessionStatus, TextChunk,
+    MAX_CONTENT_LENGTH,
+};

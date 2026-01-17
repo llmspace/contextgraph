@@ -4,8 +4,8 @@
 //!                      get_health_status, trigger_healing).
 //! TASK-P0-001: REMOVED auto_bootstrap_north_star per ARCH-03 (goals emerge from topic clustering)
 
-use serde_json::json;
 use crate::tools::types::ToolDefinition;
+use serde_json::json;
 
 /// Returns Autonomous tool definitions (12 tools after TASK-P0-001 removal).
 /// SPEC-AUTONOMOUS-001: Added 5 new tools per constitution NORTH-009, NORTH-012, NORTH-020.

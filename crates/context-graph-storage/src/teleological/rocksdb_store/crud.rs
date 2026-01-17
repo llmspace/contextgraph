@@ -10,8 +10,8 @@ use context_graph_core::error::{CoreError, CoreResult};
 use context_graph_core::types::fingerprint::TeleologicalFingerprint;
 
 use crate::teleological::column_families::{
-    CF_E12_LATE_INTERACTION, CF_E13_SPLADE_INVERTED, CF_E1_MATRYOSHKA_128,
-    CF_FINGERPRINTS, CF_PURPOSE_VECTORS,
+    CF_E12_LATE_INTERACTION, CF_E13_SPLADE_INVERTED, CF_E1_MATRYOSHKA_128, CF_FINGERPRINTS,
+    CF_PURPOSE_VECTORS,
 };
 use crate::teleological::schema::{
     content_key, e12_late_interaction_key, e1_matryoshka_128_key, fingerprint_key,

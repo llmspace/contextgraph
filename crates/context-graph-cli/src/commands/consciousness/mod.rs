@@ -86,7 +86,10 @@ mod brief_tests {
         snapshot.kuramoto_phases = [0.0; KURAMOTO_N]; // All aligned = r ≈ 1.0
         let ic = 0.85;
 
-        println!("BEFORE: consciousness={}, IC={}", snapshot.consciousness, ic);
+        println!(
+            "BEFORE: consciousness={}, IC={}",
+            snapshot.consciousness, ic
+        );
         println!("  kuramoto_phases all 0.0 (fully synchronized)");
 
         update_cache(&snapshot, ic);
@@ -101,7 +104,10 @@ mod brief_tests {
         assert!(brief.starts_with("[C:"), "Must start with [C:");
         assert!(brief.ends_with(']'), "Must end with ]");
         assert!(brief.contains("EMG"), "State must be EMG for C=0.75");
-        assert!(brief.contains("r=1.00"), "r must be 1.00 for aligned phases");
+        assert!(
+            brief.contains("r=1.00"),
+            "r must be 1.00 for aligned phases"
+        );
         assert!(brief.contains("IC=0.85"), "IC must be 0.85");
 
         // VERIFY: Exact format match
@@ -124,8 +130,15 @@ mod brief_tests {
         let cold_output = "[C:? r=? IC=?]";
 
         // VERIFY: Length and format
-        assert_eq!(cold_output.len(), 14, "Cold output must be exactly 14 chars");
-        assert!(cold_output.starts_with("[C:?"), "Cold must show unknown state");
+        assert_eq!(
+            cold_output.len(),
+            14,
+            "Cold output must be exactly 14 chars"
+        );
+        assert!(
+            cold_output.starts_with("[C:?"),
+            "Cold must show unknown state"
+        );
         assert!(cold_output.contains("r=?"), "Cold must show unknown r");
         assert!(cold_output.contains("IC=?"), "Cold must show unknown IC");
         assert!(cold_output.ends_with(']'), "Must end with ]");
@@ -189,11 +202,11 @@ mod brief_tests {
         println!("SOURCE OF TRUTH: ConsciousnessState::short_name() codes");
 
         let test_cases = [
-            (0.1, "DOR", "Dormant"),      // C < 0.3
-            (0.35, "FRG", "Fragmented"),  // 0.3 <= C < 0.5
-            (0.65, "EMG", "Emerging"),    // 0.5 <= C < 0.8
-            (0.85, "CON", "Conscious"),   // 0.8 <= C < 0.95
-            (0.97, "HYP", "Hypersync"),   // C > 0.95
+            (0.1, "DOR", "Dormant"),     // C < 0.3
+            (0.35, "FRG", "Fragmented"), // 0.3 <= C < 0.5
+            (0.65, "EMG", "Emerging"),   // 0.5 <= C < 0.8
+            (0.85, "CON", "Conscious"),  // 0.8 <= C < 0.95
+            (0.97, "HYP", "Hypersync"),  // C > 0.95
         ];
 
         for (consciousness, expected_code, state_name) in test_cases {
@@ -228,7 +241,7 @@ mod brief_tests {
             (0.0, "IC=0.00"),
             (1.0, "IC=1.00"),
             (0.5, "IC=0.50"),
-            (0.123, "IC=0.12"),  // Truncation check
+            (0.123, "IC=0.12"), // Truncation check
         ];
 
         for (ic, expected_ic_str) in test_cases {
@@ -290,7 +303,10 @@ mod brief_tests {
         let brief = IdentityCache::format_brief();
         println!("  Evenly distributed phases -> '{}'", brief);
         // r should be close to 0 for evenly distributed phases
-        assert!(brief.contains("r=0."), "Evenly distributed phases should give r≈0");
+        assert!(
+            brief.contains("r=0."),
+            "Evenly distributed phases should give r≈0"
+        );
 
         println!("RESULT: PASS - Kuramoto r values computed correctly");
     }

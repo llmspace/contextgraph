@@ -35,8 +35,7 @@ fn create_test_hierarchy() -> GoalHierarchy {
     let mut hierarchy = GoalHierarchy::new();
 
     let ns_fp = create_test_goal_fingerprint(0.8);
-    let discovery =
-        GoalDiscoveryMetadata::new(DiscoveryMethod::Bootstrap, 0.9, 1, 0.85).unwrap();
+    let discovery = GoalDiscoveryMetadata::new(DiscoveryMethod::Bootstrap, 0.9, 1, 0.85).unwrap();
 
     // TASK-P0-001: Updated for 3-level hierarchy (Strategic → Tactical → Immediate)
     // Strategic goal (top-level, no parent)
@@ -49,7 +48,9 @@ fn create_test_hierarchy() -> GoalHierarchy {
     .expect("Failed to create Strategic goal");
     let s1_id = s1.id;
 
-    hierarchy.add_goal(s1).expect("Failed to add Strategic goal");
+    hierarchy
+        .add_goal(s1)
+        .expect("Failed to add Strategic goal");
 
     let child_fp = create_test_goal_fingerprint(0.7);
     let child_discovery =
@@ -176,8 +177,7 @@ async fn test_execute_with_johari_filter() {
     // All results should be in Open or Blind quadrant
     for r in &result.results {
         assert!(
-            r.johari_quadrant == JohariQuadrant::Open
-                || r.johari_quadrant == JohariQuadrant::Blind
+            r.johari_quadrant == JohariQuadrant::Open || r.johari_quadrant == JohariQuadrant::Blind
         );
     }
 

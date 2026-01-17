@@ -6,8 +6,8 @@
 use std::collections::HashMap;
 
 use crate::types::fingerprint::{
-    SemanticFingerprint, SparseVector, TeleologicalArray, E1_DIM, E2_DIM, E3_DIM, E4_DIM, E5_DIM,
-    E7_DIM, E8_DIM, E9_DIM, E10_DIM, E11_DIM, E12_TOKEN_DIM,
+    SemanticFingerprint, SparseVector, TeleologicalArray, E10_DIM, E11_DIM, E12_TOKEN_DIM, E1_DIM,
+    E2_DIM, E3_DIM, E4_DIM, E5_DIM, E7_DIM, E8_DIM, E9_DIM,
 };
 
 /// Compute centroid for a cluster of teleological arrays.

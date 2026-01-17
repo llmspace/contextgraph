@@ -276,7 +276,8 @@ impl LifecycleManager {
     /// assert!((weights.lambda_s() - 0.4).abs() < 0.001);
     /// ```
     pub fn get_effective_weights(&self) -> LifecycleLambdaWeights {
-        self.lambda_override.unwrap_or_else(|| self.current_weights())
+        self.lambda_override
+            .unwrap_or_else(|| self.current_weights())
     }
 
     /// Get override deviation from base weights.

@@ -285,7 +285,10 @@ impl DriftLevel {
     /// Check if this level requires recommendations.
     #[inline]
     pub fn needs_recommendation(self) -> bool {
-        matches!(self, DriftLevel::Critical | DriftLevel::High | DriftLevel::Medium)
+        matches!(
+            self,
+            DriftLevel::Critical | DriftLevel::High | DriftLevel::Medium
+        )
     }
 }
 

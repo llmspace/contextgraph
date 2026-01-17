@@ -17,12 +17,8 @@ impl Handlers {
         &self,
         vector_id: &str,
     ) -> Result<(TeleologicalVector, Option<SemanticFingerprint>), String> {
-        let uuid = Uuid::parse_str(vector_id).map_err(|e| {
-            format!(
-                "FAIL FAST: Invalid query_vector_id '{}': {}",
-                vector_id, e
-            )
-        })?;
+        let uuid = Uuid::parse_str(vector_id)
+            .map_err(|e| format!("FAIL FAST: Invalid query_vector_id '{}': {}", vector_id, e))?;
 
         // Retrieve fingerprint from store
         match self.teleological_store.retrieve(uuid).await {

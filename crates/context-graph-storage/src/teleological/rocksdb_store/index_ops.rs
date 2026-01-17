@@ -63,7 +63,10 @@ impl RocksDbTeleologicalStore {
     /// - E12LateInteraction: Use MaxSim
     /// - E13Splade: Use inverted index
     /// - PurposeVector: Use purpose_vector.alignments directly
-    pub(crate) fn get_embedder_vector(semantic: &SemanticFingerprint, embedder: EmbedderIndex) -> &[f32] {
+    pub(crate) fn get_embedder_vector(
+        semantic: &SemanticFingerprint,
+        embedder: EmbedderIndex,
+    ) -> &[f32] {
         match embedder {
             EmbedderIndex::E1Semantic => &semantic.e1_semantic,
             EmbedderIndex::E1Matryoshka128 => {

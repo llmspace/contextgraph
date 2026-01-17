@@ -11,7 +11,9 @@ use tracing::warn;
 use uuid::Uuid;
 
 use super::error::{QuantizedStorageError, QuantizedStorageResult};
-use super::helpers::{deserialize_quantized_embedding, embedder_key, serialize_quantized_embedding};
+use super::helpers::{
+    deserialize_quantized_embedding, embedder_key, serialize_quantized_embedding,
+};
 use super::trait_def::QuantizedFingerprintStorage;
 use crate::teleological::column_families::{
     CF_PURPOSE_VECTORS, QUANTIZED_EMBEDDER_CFS, QUANTIZED_EMBEDDER_CF_COUNT,

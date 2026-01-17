@@ -59,12 +59,11 @@ mod tests;
 // Re-export public types
 pub use config::{CrossSpaceConfig, MissingSpaceHandling, WeightingStrategy};
 pub use default_engine::DefaultCrossSpaceEngine;
-pub use dense::{
-    cosine_similarity, dot_product, euclidean_distance, l2_norm, normalize,
-    DenseSimilarityError,
-};
 #[cfg(target_arch = "x86_64")]
 pub use dense::cosine_similarity_simd;
+pub use dense::{
+    cosine_similarity, dot_product, euclidean_distance, l2_norm, normalize, DenseSimilarityError,
+};
 pub use engine::CrossSpaceSimilarityEngine;
 pub use error::SimilarityError;
 pub use explanation::SimilarityExplanation;

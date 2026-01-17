@@ -16,11 +16,11 @@
 //! - `content`: Content storage tests
 //! - `ego_node`: EGO_NODE persistence tests
 
-mod helpers;
 mod column_family;
-mod key_format;
-mod serialization;
-mod panic;
-mod stale_lock;
 mod content;
 mod ego_node;
+mod helpers;
+mod key_format;
+mod panic;
+mod serialization;
+mod stale_lock;

@@ -5,10 +5,12 @@
 
 use std::collections::HashMap;
 
-use crate::similarity::{cosine_similarity, max_sim, sparse_cosine_similarity, DenseSimilarityError};
+use crate::similarity::{
+    cosine_similarity, max_sim, sparse_cosine_similarity, DenseSimilarityError,
+};
 use crate::teleological::{
-    ComparisonValidationResult, Embedder, GroupType, MatrixSearchConfig,
-    SearchStrategy, SimilarityBreakdown, NUM_EMBEDDERS,
+    ComparisonValidationResult, Embedder, GroupType, MatrixSearchConfig, SearchStrategy,
+    SimilarityBreakdown, NUM_EMBEDDERS,
 };
 use crate::types::{EmbeddingSlice, SemanticFingerprint};
 
@@ -196,7 +198,11 @@ pub(crate) fn compute_coherence(scores: &[Option<f32>; NUM_EMBEDDERS]) -> Option
         return Some(0.0); // All zeros = no coherence information
     }
 
-    let variance: f32 = valid_scores.iter().map(|&s| (s - mean).powi(2)).sum::<f32>() / n;
+    let variance: f32 = valid_scores
+        .iter()
+        .map(|&s| (s - mean).powi(2))
+        .sum::<f32>()
+        / n;
     let std_dev = variance.sqrt();
     let cov = std_dev / mean;
 

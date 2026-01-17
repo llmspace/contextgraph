@@ -74,10 +74,7 @@ pub mod dream {
     pub const STATE_WAKING: &str = "Waking";
     // Include lowercase variants returned by some handlers
     pub const VALID_STATES: [&str; 8] = [
-        "Awake", "awake",
-        "NREM", "nrem",
-        "REM", "rem",
-        "Waking", "waking"
+        "Awake", "awake", "NREM", "nrem", "REM", "rem", "Waking", "waking",
     ];
 }
 

@@ -34,7 +34,10 @@ async fn test_autonomous_status_with_north_star() {
     assert!(response.error.is_none(), "Should not have protocol error");
     let result = response.result.expect("Must have result");
 
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(!is_error, "Should not be error with North Star");
     println!("[VERIFY] Not an error response - PASS");
 
@@ -44,8 +47,14 @@ async fn test_autonomous_status_with_north_star() {
                 if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) {
                     // VERIFY: strategic_goals.configured should be true
                     if let Some(ns) = parsed.get("strategic_goals") {
-                        let configured = ns.get("configured").and_then(|v| v.as_bool()).unwrap_or(false);
-                        assert!(configured, "[FAIL] strategic_goals.configured should be true");
+                        let configured = ns
+                            .get("configured")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        assert!(
+                            configured,
+                            "[FAIL] strategic_goals.configured should be true"
+                        );
                         println!("[VERIFY] strategic_goals.configured = true - PASS");
 
                         if let Some(goal_id) = ns.get("goal_id").and_then(|v| v.as_str()) {

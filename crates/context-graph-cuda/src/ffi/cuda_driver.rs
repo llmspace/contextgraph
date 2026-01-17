@@ -299,9 +299,7 @@ pub fn cuda_result_to_string(result: CUresult) -> String {
         CUDA_ERROR_NOT_INITIALIZED => {
             "CUDA_ERROR_NOT_INITIALIZED (3): cuInit() not called".to_string()
         }
-        CUDA_ERROR_NO_DEVICE => {
-            "CUDA_ERROR_NO_DEVICE (100): No CUDA-capable device".to_string()
-        }
+        CUDA_ERROR_NO_DEVICE => "CUDA_ERROR_NO_DEVICE (100): No CUDA-capable device".to_string(),
         CUDA_ERROR_INVALID_DEVICE => {
             "CUDA_ERROR_INVALID_DEVICE (101): Invalid device ordinal".to_string()
         }

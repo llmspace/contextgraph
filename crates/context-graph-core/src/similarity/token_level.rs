@@ -197,10 +197,7 @@ pub struct TokenAlignment {
 /// assert_eq!(alignments[0].doc_token_idx, 0); // First doc token matches best
 /// ```
 #[inline]
-pub fn token_alignments(
-    query: &[Vec<f32>],
-    document: &[Vec<f32>],
-) -> Vec<TokenAlignment> {
+pub fn token_alignments(query: &[Vec<f32>], document: &[Vec<f32>]) -> Vec<TokenAlignment> {
     if query.is_empty() || document.is_empty() {
         return Vec::new();
     }
@@ -368,8 +365,12 @@ mod tests {
     fn test_approximate_within_tolerance() {
         // SYNTHETIC DATA: Test that approximate is within 5% of exact
         // Use values starting from 1.0 to avoid zero-magnitude vectors
-        let query: Vec<Vec<f32>> = (0..5).map(|i| make_token(&[(i as f32 + 1.0), (5.0 - i as f32 + 1.0)])).collect();
-        let document: Vec<Vec<f32>> = (0..10).map(|i| make_token(&[(i as f32 + 1.0), (i as f32 + 1.0)])).collect();
+        let query: Vec<Vec<f32>> = (0..5)
+            .map(|i| make_token(&[(i as f32 + 1.0), (5.0 - i as f32 + 1.0)]))
+            .collect();
+        let document: Vec<Vec<f32>> = (0..10)
+            .map(|i| make_token(&[(i as f32 + 1.0), (i as f32 + 1.0)]))
+            .collect();
 
         let exact = max_sim(&query, &document);
         let approx = approximate_max_sim(&query, &document, 0.8);
@@ -441,7 +442,10 @@ mod tests {
         let document = vec![make_token(&[1.0])];
 
         let alignments = token_alignments(&query, &document);
-        assert!(alignments.is_empty(), "Empty query should return no alignments");
+        assert!(
+            alignments.is_empty(),
+            "Empty query should return no alignments"
+        );
     }
 
     #[test]

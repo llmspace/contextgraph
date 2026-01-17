@@ -35,10 +35,7 @@ async fn test_ec001_weight_clamped_below_minimum() {
 
     // BEFORE STATE
     println!("BEFORE STATE:");
-    println!(
-        "  current_weights: {:?}",
-        &tracker.current_weights[..3]
-    );
+    println!("  current_weights: {:?}", &tracker.current_weights[..3]);
     println!("  config.min_weight: {} (soft constraint)", min_weight);
     println!("  config.max_weight: {} (hard constraint)", max_weight);
 
@@ -57,10 +54,7 @@ async fn test_ec001_weight_clamped_below_minimum() {
 
     // VERIFY state after update
     println!("\nAFTER STATE:");
-    println!(
-        "  current_weights: {:?}",
-        &tracker.current_weights[..5]
-    );
+    println!("  current_weights: {:?}", &tracker.current_weights[..5]);
 
     let sum: f32 = tracker.current_weights.iter().sum();
     println!("  weights_sum: {:.6}", sum);
@@ -188,7 +182,10 @@ async fn test_ec003_escalation_trigger_at_100_cycles() {
 
     // BEFORE STATE
     println!("BEFORE STATE:");
-    println!("  consecutive_low_count: {}", tracker.consecutive_low_count());
+    println!(
+        "  consecutive_low_count: {}",
+        tracker.consecutive_low_count()
+    );
     println!("  needs_escalation: {}", tracker.needs_escalation());
     assert_eq!(tracker.consecutive_low_count(), 0);
     assert!(!tracker.needs_escalation());
@@ -211,7 +208,10 @@ async fn test_ec003_escalation_trigger_at_100_cycles() {
 
     // VERIFY: Escalation should be triggered
     println!("\nAFTER STATE:");
-    println!("  consecutive_low_count: {}", tracker.consecutive_low_count());
+    println!(
+        "  consecutive_low_count: {}",
+        tracker.consecutive_low_count()
+    );
     println!("  needs_escalation: {}", tracker.needs_escalation());
 
     assert!(
@@ -245,8 +245,14 @@ async fn test_ec004_threshold_boundary_at_0_7() {
 
     // BEFORE STATE
     println!("BEFORE STATE:");
-    println!("  consecutive_low_count: {}", tracker.consecutive_low_count());
-    println!("  low_accuracy_threshold: {}", tracker.config().low_accuracy_threshold);
+    println!(
+        "  consecutive_low_count: {}",
+        tracker.consecutive_low_count()
+    );
+    println!(
+        "  low_accuracy_threshold: {}",
+        tracker.config().low_accuracy_threshold
+    );
 
     // ACTION 1: Record accuracy at exactly 0.7 for all embedders
     for embedder in 0..NUM_EMBEDDERS {
@@ -255,7 +261,10 @@ async fn test_ec004_threshold_boundary_at_0_7() {
 
     // VERIFY: consecutive_low should NOT be incremented (0.7 is NOT below 0.7)
     println!("\nAFTER RECORDING 0.7 ACCURACY:");
-    println!("  consecutive_low_count: {}", tracker.consecutive_low_count());
+    println!(
+        "  consecutive_low_count: {}",
+        tracker.consecutive_low_count()
+    );
 
     // Record a cycle just below threshold
     for embedder in 0..NUM_EMBEDDERS {
@@ -263,7 +272,10 @@ async fn test_ec004_threshold_boundary_at_0_7() {
     }
 
     println!("\nAFTER RECORDING 0.69 ACCURACY:");
-    println!("  consecutive_low_count: {}", tracker.consecutive_low_count());
+    println!(
+        "  consecutive_low_count: {}",
+        tracker.consecutive_low_count()
+    );
 
     // The consecutive_low_count should only increment when accuracy < 0.7
     // At exactly 0.7, it should NOT increment
@@ -276,7 +288,10 @@ async fn test_ec004_threshold_boundary_at_0_7() {
     }
 
     println!("\nAFTER RECORDING 0.9 ACCURACY (recovery):");
-    println!("  consecutive_low_count: {}", tracker.consecutive_low_count());
+    println!(
+        "  consecutive_low_count: {}",
+        tracker.consecutive_low_count()
+    );
 
     assert_eq!(
         tracker.consecutive_low_count(),
@@ -423,8 +438,7 @@ async fn test_ec006_single_winner_distribution() {
     println!("\n======================================================================");
     println!(
         "EVIDENCE: Dominant weight = {:.6}, sum = {:.6}",
-        tracker.current_weights[0],
-        sum
+        tracker.current_weights[0], sum
     );
     println!("======================================================================\n");
 }
@@ -443,7 +457,10 @@ async fn test_ec007_recovery_resets_consecutive_low() {
 
     // BEFORE STATE
     println!("BEFORE STATE:");
-    println!("  consecutive_low_count: {}", tracker.consecutive_low_count());
+    println!(
+        "  consecutive_low_count: {}",
+        tracker.consecutive_low_count()
+    );
     println!("  needs_escalation: {}", tracker.needs_escalation());
 
     // ACTION 1: Trigger escalation (100 low cycles per PRD 2.4.9)
@@ -454,17 +471,26 @@ async fn test_ec007_recovery_resets_consecutive_low() {
     }
 
     println!("\nAFTER 100 LOW CYCLES:");
-    println!("  consecutive_low_count: {}", tracker.consecutive_low_count());
+    println!(
+        "  consecutive_low_count: {}",
+        tracker.consecutive_low_count()
+    );
     println!("  needs_escalation: {}", tracker.needs_escalation());
 
-    assert!(tracker.needs_escalation(), "Should be escalated after 100 cycles per PRD 2.4.9");
+    assert!(
+        tracker.needs_escalation(),
+        "Should be escalated after 100 cycles per PRD 2.4.9"
+    );
     let count_before_reset = tracker.consecutive_low_count();
 
     // ACTION 2: Reset (simulating Bayesian optimization completion)
     tracker.reset_consecutive_low();
 
     println!("\nAFTER RESET:");
-    println!("  consecutive_low_count: {}", tracker.consecutive_low_count());
+    println!(
+        "  consecutive_low_count: {}",
+        tracker.consecutive_low_count()
+    );
     println!("  needs_escalation: {}", tracker.needs_escalation());
 
     // VERIFY: Both count and escalation flag should be reset
@@ -516,7 +542,10 @@ async fn test_ec008_ninetynine_low_then_recovery() {
     }
 
     println!("\nAFTER 99 LOW CYCLES:");
-    println!("  consecutive_low_count: {}", tracker.consecutive_low_count());
+    println!(
+        "  consecutive_low_count: {}",
+        tracker.consecutive_low_count()
+    );
     println!("  needs_escalation: {}", tracker.needs_escalation());
 
     // Should NOT be escalated yet (need 100 per PRD 2.4.9)
@@ -538,7 +567,10 @@ async fn test_ec008_ninetynine_low_then_recovery() {
     }
 
     println!("\nAFTER 1 HIGH CYCLE:");
-    println!("  consecutive_low_count: {}", tracker.consecutive_low_count());
+    println!(
+        "  consecutive_low_count: {}",
+        tracker.consecutive_low_count()
+    );
     println!("  needs_escalation: {}", tracker.needs_escalation());
     println!("  NOTE: Rolling avg still below 0.7, so count continues increasing");
 
@@ -565,7 +597,10 @@ async fn test_ec008_ninetynine_low_then_recovery() {
     }
 
     println!("\nAFTER 10 MORE HIGH CYCLES:");
-    println!("  consecutive_low_count: {}", tracker.consecutive_low_count());
+    println!(
+        "  consecutive_low_count: {}",
+        tracker.consecutive_low_count()
+    );
     println!("  Rolling average should now be above 0.7");
 
     // After escalation, we need to explicitly reset (simulating Bayesian optimization)

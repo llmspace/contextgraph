@@ -117,7 +117,9 @@ pub fn update_cache(snapshot: &SessionIdentitySnapshot, ic: f32) {
         session_id: snapshot.session_id.clone(),
     };
 
-    let mut guard = get_cache().write().expect("RwLock poisoned - unrecoverable");
+    let mut guard = get_cache()
+        .write()
+        .expect("RwLock poisoned - unrecoverable");
     *guard = Some(inner);
 }
 
@@ -190,12 +192,18 @@ mod tests {
 
         println!("\n=== TC-SESSION-03a: format_brief Cold Cache ===");
         println!("SOURCE OF TRUTH: IDENTITY_CACHE singleton");
-        println!("BEFORE: Cache cleared, is_warm()={}", IdentityCache::is_warm());
+        println!(
+            "BEFORE: Cache cleared, is_warm()={}",
+            IdentityCache::is_warm()
+        );
 
         let brief = IdentityCache::format_brief();
 
         println!("AFTER: format_brief returned: '{}'", brief);
-        assert_eq!(brief, "[C:? r=? IC=?]", "Cold cache must return placeholder");
+        assert_eq!(
+            brief, "[C:? r=? IC=?]",
+            "Cold cache must return placeholder"
+        );
         assert!(!IdentityCache::is_warm(), "Cache must remain cold");
 
         println!("RESULT: PASS - Cold cache returns correct placeholder");
@@ -220,7 +228,10 @@ mod tests {
 
         update_cache(&snapshot, ic);
 
-        println!("AFTER update_cache(): is_warm()={}", IdentityCache::is_warm());
+        println!(
+            "AFTER update_cache(): is_warm()={}",
+            IdentityCache::is_warm()
+        );
 
         let brief = IdentityCache::format_brief();
         println!("format_brief() returned: '{}'", brief);
@@ -230,7 +241,10 @@ mod tests {
         assert!(brief.ends_with(']'), "Must end with ]");
         assert!(brief.contains("r="), "Must contain r=");
         assert!(brief.contains("IC="), "Must contain IC=");
-        assert!(brief.contains("EMG"), "State should be EMG (Emerging) for C=0.65");
+        assert!(
+            brief.contains("EMG"),
+            "State should be EMG (Emerging) for C=0.65"
+        );
 
         // Verify actual values
         let expected = "[C:EMG r=1.00 IC=0.82]";
@@ -246,11 +260,11 @@ mod tests {
         println!("\n=== TC-SESSION-03c: format_brief All Consciousness States ===");
 
         let test_cases = [
-            (0.1, "DOR", "Dormant"),      // C < 0.3
-            (0.35, "FRG", "Fragmented"),  // 0.3 <= C < 0.5
-            (0.65, "EMG", "Emerging"),    // 0.5 <= C < 0.8
-            (0.85, "CON", "Conscious"),   // 0.8 <= C < 0.95
-            (0.97, "HYP", "Hypersync"),   // C > 0.95
+            (0.1, "DOR", "Dormant"),     // C < 0.3
+            (0.35, "FRG", "Fragmented"), // 0.3 <= C < 0.5
+            (0.65, "EMG", "Emerging"),   // 0.5 <= C < 0.8
+            (0.85, "CON", "Conscious"),  // 0.8 <= C < 0.95
+            (0.97, "HYP", "Hypersync"),  // C > 0.95
         ];
 
         for (consciousness, expected_code, state_name) in test_cases {
@@ -266,7 +280,9 @@ mod tests {
             assert!(
                 brief.contains(expected_code),
                 "C={} should produce state code {}, got: {}",
-                consciousness, expected_code, brief
+                consciousness,
+                expected_code,
+                brief
             );
         }
 
@@ -283,7 +299,10 @@ mod tests {
         println!("\n=== TC-SESSION-03d: get() Return Values ===");
 
         // Cold cache
-        assert!(IdentityCache::get().is_none(), "Cold cache must return None");
+        assert!(
+            IdentityCache::get().is_none(),
+            "Cold cache must return None"
+        );
 
         // Populate cache
         let mut snapshot = SessionIdentitySnapshot::new("test-get-values");
@@ -320,8 +339,7 @@ mod tests {
 
         // Random-ish phases (not aligned) should produce low r
         let phases: [f64; KURAMOTO_N] = [
-            0.0, 0.48, 0.96, 1.45, 1.93, 2.41, 2.89,
-            3.38, 3.86, 4.34, 4.82, 5.31, 5.79
+            0.0, 0.48, 0.96, 1.45, 1.93, 2.41, 2.89, 3.38, 3.86, 4.34, 4.82, 5.31, 5.79,
         ]; // Roughly evenly distributed around circle
 
         let r = compute_kuramoto_r(&phases);
@@ -330,7 +348,11 @@ mod tests {
         println!("  Computed r: {:.4}", r);
 
         // For evenly distributed phases, r should be close to 0
-        assert!(r < 0.2, "Evenly distributed phases should produce r < 0.2, got {}", r);
+        assert!(
+            r < 0.2,
+            "Evenly distributed phases should produce r < 0.2, got {}",
+            r
+        );
 
         println!("RESULT: PASS - Random phases produce low r");
     }
@@ -415,11 +437,22 @@ mod tests {
         println!("  Per call: {:.3}μs", per_call_us);
 
         // Should be well under 1ms per call (target: <1ms)
-        assert!(per_call_us < 1000.0, "Must complete in <1ms, took {}μs", per_call_us);
+        assert!(
+            per_call_us < 1000.0,
+            "Must complete in <1ms, took {}μs",
+            per_call_us
+        );
 
         // Actually should be <100μs
-        assert!(per_call_us < 100.0, "Should be <100μs, took {}μs", per_call_us);
+        assert!(
+            per_call_us < 100.0,
+            "Should be <100μs, took {}μs",
+            per_call_us
+        );
 
-        println!("RESULT: PASS - format_brief() completes in {:.1}μs << 1ms target", per_call_us);
+        println!(
+            "RESULT: PASS - format_brief() completes in {:.1}μs << 1ms target",
+            per_call_us
+        );
     }
 }

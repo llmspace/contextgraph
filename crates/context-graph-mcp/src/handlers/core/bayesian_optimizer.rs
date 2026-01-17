@@ -234,10 +234,8 @@ impl SimpleGaussianProcess {
         let mut k_matrix = vec![vec![0.0f32; n]; n];
         for (i, row) in k_matrix.iter_mut().enumerate() {
             for (j, cell) in row.iter_mut().enumerate() {
-                *cell = self.rbf_kernel(
-                    self.observations[i].lambda_s,
-                    self.observations[j].lambda_s,
-                );
+                *cell =
+                    self.rbf_kernel(self.observations[i].lambda_s, self.observations[j].lambda_s);
                 if i == j {
                     *cell += self.noise_var;
                 }
@@ -314,7 +312,8 @@ impl SimpleGaussianProcess {
         let z = (mean - f_best) / sigma;
 
         // EI = (mu - f_best) * Phi(z) + sigma * phi(z)
-        let ei = (mean - f_best) * self.standard_normal_cdf(z) + sigma * self.standard_normal_pdf(z);
+        let ei =
+            (mean - f_best) * self.standard_normal_cdf(z) + sigma * self.standard_normal_pdf(z);
 
         // EI must be non-negative
         ei.max(0.0)
@@ -362,7 +361,11 @@ impl SimpleGaussianProcess {
     pub fn best_observation(&self) -> Option<GpObservation> {
         self.observations
             .iter()
-            .max_by(|a, b| a.accuracy.partial_cmp(&b.accuracy).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.accuracy
+                    .partial_cmp(&b.accuracy)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .copied()
     }
 
@@ -607,7 +610,8 @@ impl EscalationManager {
         for lambda_s in initial_samples {
             let accuracy = evaluate_fn(lambda_s);
             if !accuracy.is_nan() && !accuracy.is_infinite() {
-                self.gp.add_observation(GpObservation { lambda_s, accuracy });
+                self.gp
+                    .add_observation(GpObservation { lambda_s, accuracy });
             }
         }
 
@@ -857,7 +861,11 @@ mod tests {
         let (mean, variance) = gp.predict(0.5);
 
         // Prior mean should be 0.5, variance should be signal_var
-        assert!((mean - 0.5).abs() < 0.01, "Prior mean should be 0.5, got {}", mean);
+        assert!(
+            (mean - 0.5).abs() < 0.01,
+            "Prior mean should be 0.5, got {}",
+            mean
+        );
         assert!(variance > 0.0, "Variance should be positive");
     }
 
@@ -911,7 +919,12 @@ mod tests {
         for i in 0..100 {
             let lambda = 0.05 + (i as f32) * 0.0085;
             let ei = gp.expected_improvement(lambda);
-            assert!(ei >= 0.0, "EI should be non-negative, got {} at {}", ei, lambda);
+            assert!(
+                ei >= 0.0,
+                "EI should be non-negative, got {} at {}",
+                ei,
+                lambda
+            );
         }
     }
 
@@ -958,10 +971,7 @@ mod tests {
         // Kernel should be symmetric
         let k12 = gp.rbf_kernel(0.3, 0.7);
         let k21 = gp.rbf_kernel(0.7, 0.3);
-        assert!(
-            (k12 - k21).abs() < EPSILON,
-            "Kernel should be symmetric"
-        );
+        assert!((k12 - k21).abs() < EPSILON, "Kernel should be symmetric");
     }
 
     // -------------------------------------------------------------------------
@@ -1203,10 +1213,7 @@ mod tests {
         // PDF should be symmetric
         let pdf_neg = gp.standard_normal_pdf(-1.0);
         let pdf_pos = gp.standard_normal_pdf(1.0);
-        assert!(
-            (pdf_neg - pdf_pos).abs() < 0.001,
-            "PDF should be symmetric"
-        );
+        assert!((pdf_neg - pdf_pos).abs() < 0.001, "PDF should be symmetric");
 
         // PDF should decrease away from 0
         assert!(pdf_neg < pdf_0, "PDF(-1) should be < PDF(0)");

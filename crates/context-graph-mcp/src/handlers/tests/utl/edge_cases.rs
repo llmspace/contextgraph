@@ -32,7 +32,10 @@ async fn test_ec01_identical_fingerprints() {
     );
 
     let response = handlers.dispatch(request).await;
-    assert!(response.error.is_none(), "Should succeed with identical fingerprints");
+    assert!(
+        response.error.is_none(),
+        "Should succeed with identical fingerprints"
+    );
 
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
@@ -84,7 +87,10 @@ async fn test_ec02_maximum_change_fingerprints() {
     );
 
     let response = handlers.dispatch(request).await;
-    assert!(response.error.is_none(), "Should succeed with maximum change fingerprints");
+    assert!(
+        response.error.is_none(),
+        "Should succeed with maximum change fingerprints"
+    );
 
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
@@ -135,7 +141,10 @@ async fn test_ec03_zero_magnitude_embeddings() {
     );
 
     let response = handlers.dispatch(request).await;
-    assert!(response.error.is_none(), "Should handle zero embeddings gracefully");
+    assert!(
+        response.error.is_none(),
+        "Should handle zero embeddings gracefully"
+    );
 
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
@@ -198,7 +207,9 @@ async fn test_ec04_threshold_boundary() {
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
 
-    let threshold = data["diagnostics"]["johari_threshold"].as_f64().expect("f64");
+    let threshold = data["diagnostics"]["johari_threshold"]
+        .as_f64()
+        .expect("f64");
     let delta_s_agg = data["delta_s_aggregate"].as_f64().expect("f64");
     let delta_c = data["delta_c"].as_f64().expect("f64");
     let johari_agg = data["johari_aggregate"].as_str().expect("string");
@@ -293,7 +304,9 @@ async fn test_ec06_johari_threshold_clamping() {
 
     let result_low = response_low.result.expect("result");
     let data_low = extract_mcp_tool_data(&result_low);
-    let threshold_low = data_low["diagnostics"]["johari_threshold"].as_f64().expect("f64");
+    let threshold_low = data_low["diagnostics"]["johari_threshold"]
+        .as_f64()
+        .expect("f64");
     // Use tolerance for f32/f64 precision issues (0.35 stored as f32 may be 0.34999...)
     assert!(
         threshold_low >= 0.35 - 0.0001,
@@ -318,11 +331,16 @@ async fn test_ec06_johari_threshold_clamping() {
     );
 
     let response_high = handlers.dispatch(request_high).await;
-    assert!(response_high.error.is_none(), "Should handle high threshold");
+    assert!(
+        response_high.error.is_none(),
+        "Should handle high threshold"
+    );
 
     let result_high = response_high.result.expect("result");
     let data_high = extract_mcp_tool_data(&result_high);
-    let threshold_high = data_high["diagnostics"]["johari_threshold"].as_f64().expect("f64");
+    let threshold_high = data_high["diagnostics"]["johari_threshold"]
+        .as_f64()
+        .expect("f64");
     // Use tolerance for f32/f64 precision issues
     assert!(
         threshold_high <= 0.65 + 0.0001,

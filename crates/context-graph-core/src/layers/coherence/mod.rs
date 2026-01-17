@@ -56,7 +56,9 @@ pub use constants::{
 };
 
 // Re-export new Kuramoto constants (constitution-aligned)
-pub use constants::{KURAMOTO_BASE_FREQUENCIES, KURAMOTO_DEFAULT_COUPLING, KURAMOTO_STEP_INTERVAL_MS};
+pub use constants::{
+    KURAMOTO_BASE_FREQUENCIES, KURAMOTO_DEFAULT_COUPLING, KURAMOTO_STEP_INTERVAL_MS,
+};
 
 // Re-export layer components
 pub use layer::CoherenceLayer;

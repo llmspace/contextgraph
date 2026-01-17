@@ -51,8 +51,13 @@ pub enum EmbedderNameError {
     },
 
     /// Deprecated name used after deprecation period.
-    #[error("E_E8_NAME_003: Deprecated name '{deprecated}' no longer supported. Use '{canonical}'")]
-    DeprecatedRemoved { deprecated: String, canonical: String },
+    #[error(
+        "E_E8_NAME_003: Deprecated name '{deprecated}' no longer supported. Use '{canonical}'"
+    )]
+    DeprecatedRemoved {
+        deprecated: String,
+        canonical: String,
+    },
 }
 
 /// The 13 embedding models in the teleological array system.

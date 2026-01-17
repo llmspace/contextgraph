@@ -27,8 +27,8 @@
 //! - REQ-HOOKS-44: Integration tests for persistence
 //! - REQ-HOOKS-47: No mock data in any tests
 
+pub mod exit_code_test;
 pub mod helpers;
 pub mod hook_lifecycle_test;
 pub mod identity_integration_test;
-pub mod exit_code_test;
 pub mod timeout_test;

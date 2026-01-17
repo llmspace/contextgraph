@@ -10,9 +10,9 @@ use std::time::Instant;
 use crate::error::{CoreError, CoreResult};
 
 use super::math::dot_product_f32;
-use super::types::{CacheStats, CachedResponse, DEFAULT_BETA, DEFAULT_CACHE_CAPACITY, PATTERN_DIM};
 #[allow(deprecated)]
 use super::types::MIN_HIT_SIMILARITY;
+use super::types::{CacheStats, CachedResponse, DEFAULT_BETA, DEFAULT_CACHE_CAPACITY, PATTERN_DIM};
 
 // ============================================================
 // Modern Hopfield Network Cache

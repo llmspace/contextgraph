@@ -42,10 +42,7 @@ impl Handlers {
                 self.handle_memory_search_multi_perspective(request.id, request.params)
                     .await
             }
-            methods::MEMORY_COMPARE => {
-                self.handle_memory_compare(request.id, request.params)
-                    .await
-            }
+            methods::MEMORY_COMPARE => self.handle_memory_compare(request.id, request.params).await,
             methods::MEMORY_BATCH_COMPARE => {
                 self.handle_memory_batch_compare(request.id, request.params)
                     .await

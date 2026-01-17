@@ -24,7 +24,6 @@ use serde::{Deserialize, Serialize};
 pub enum GoalLevel {
     // REMOVED: NorthStar per TASK-P0-001 (ARCH-03)
     // North Star was a manual goal concept - goals now emerge autonomously
-
     /// Top-level strategic objectives (emergent from data patterns).
     /// Highest level in hierarchy.
     Strategic = 0,

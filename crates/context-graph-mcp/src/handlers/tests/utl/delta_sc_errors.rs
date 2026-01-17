@@ -30,7 +30,9 @@ async fn test_gwt_compute_delta_sc_missing_vertex_id() {
     );
 
     let response = handlers.dispatch(request).await;
-    let error = response.error.expect("Should have error for missing vertex_id");
+    let error = response
+        .error
+        .expect("Should have error for missing vertex_id");
 
     assert!(
         error.message.contains("vertex_id"),
@@ -63,7 +65,9 @@ async fn test_gwt_compute_delta_sc_invalid_vertex_id() {
     let error = response.error.expect("Should have error for invalid UUID");
 
     assert!(
-        error.message.contains("UUID") || error.message.contains("uuid") || error.message.contains("Invalid"),
+        error.message.contains("UUID")
+            || error.message.contains("uuid")
+            || error.message.contains("Invalid"),
         "Error message should indicate invalid UUID: {:?}",
         error.message
     );
@@ -88,7 +92,9 @@ async fn test_gwt_compute_delta_sc_missing_old_fingerprint() {
     );
 
     let response = handlers.dispatch(request).await;
-    let error = response.error.expect("Should have error for missing old_fingerprint");
+    let error = response
+        .error
+        .expect("Should have error for missing old_fingerprint");
 
     assert!(
         error.message.contains("old_fingerprint"),
@@ -116,7 +122,9 @@ async fn test_gwt_compute_delta_sc_missing_new_fingerprint() {
     );
 
     let response = handlers.dispatch(request).await;
-    let error = response.error.expect("Should have error for missing new_fingerprint");
+    let error = response
+        .error
+        .expect("Should have error for missing new_fingerprint");
 
     assert!(
         error.message.contains("new_fingerprint"),
@@ -143,10 +151,14 @@ async fn test_gwt_compute_delta_sc_invalid_fingerprint_json() {
     );
 
     let response = handlers.dispatch(request).await;
-    let error = response.error.expect("Should have error for invalid fingerprint JSON");
+    let error = response
+        .error
+        .expect("Should have error for invalid fingerprint JSON");
 
     assert!(
-        error.message.contains("parse") || error.message.contains("fingerprint") || error.message.contains("Failed"),
+        error.message.contains("parse")
+            || error.message.contains("fingerprint")
+            || error.message.contains("Failed"),
         "Error message should indicate parse failure: {:?}",
         error.message
     );

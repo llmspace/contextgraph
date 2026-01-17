@@ -591,7 +591,10 @@ mod tests {
         println!("Default General Thresholds:");
         println!("  gate: {} (expected: 0.70)", default.gate);
         println!("  hypersync: {} (expected: 0.95)", default.hypersync);
-        println!("  fragmentation: {} (expected: 0.50)", default.fragmentation);
+        println!(
+            "  fragmentation: {} (expected: 0.50)",
+            default.fragmentation
+        );
         assert_eq!(default.gate, 0.70);
         assert_eq!(default.hypersync, 0.95);
         assert_eq!(default.fragmentation, 0.50);

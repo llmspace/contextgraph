@@ -35,9 +35,7 @@ fn test_purpose_query_target_pattern_valid() {
         _ => panic!("Expected Pattern variant"),
     }
 
-    println!(
-        "[VERIFIED] PurposeQueryTarget::pattern creates Pattern variant with valid params"
-    );
+    println!("[VERIFIED] PurposeQueryTarget::pattern creates Pattern variant with valid params");
 }
 
 #[test]

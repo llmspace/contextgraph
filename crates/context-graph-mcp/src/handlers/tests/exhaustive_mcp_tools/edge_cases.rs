@@ -2,9 +2,9 @@
 
 use serde_json::json;
 
-use crate::handlers::tests::{create_test_handlers, create_test_handlers_no_goals};
-use super::helpers::{make_tool_call, assert_success, assert_tool_error};
+use super::helpers::{assert_success, assert_tool_error, make_tool_call};
 use super::synthetic_data;
+use crate::handlers::tests::{create_test_handlers, create_test_handlers_no_goals};
 
 #[tokio::test]
 async fn test_unknown_tool_name() {
@@ -90,7 +90,10 @@ async fn test_very_long_content() {
 
     let response = handlers.dispatch(request).await;
     // Should handle large content (may succeed or fail gracefully)
-    assert!(response.error.is_none(), "Should not crash on large content");
+    assert!(
+        response.error.is_none(),
+        "Should not crash on large content"
+    );
 }
 
 #[tokio::test]

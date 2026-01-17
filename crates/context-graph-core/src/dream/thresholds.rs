@@ -250,7 +250,10 @@ mod tests {
 
         println!("[VERIFIED] default_general() matches legacy constants:");
         println!("  activity: {} == 0.15 (ACTIVITY_THRESHOLD)", t.activity);
-        println!("  semantic_leap: {} == 0.70 (MIN_SEMANTIC_LEAP)", t.semantic_leap);
+        println!(
+            "  semantic_leap: {} == 0.70 (MIN_SEMANTIC_LEAP)",
+            t.semantic_leap
+        );
         println!(
             "  shortcut_confidence: {} == 0.70 (SHORTCUT_CONFIDENCE_THRESHOLD)",
             t.shortcut_confidence
@@ -497,7 +500,10 @@ mod tests {
             semantic_leap: 0.40,
             shortcut_confidence: 0.70,
         };
-        assert!(!t1.is_valid(), "semantic_leap=0.40 below min 0.50 should fail");
+        assert!(
+            !t1.is_valid(),
+            "semantic_leap=0.40 below min 0.50 should fail"
+        );
 
         // Semantic leap above maximum (0.90)
         let t2 = DreamThresholds {
@@ -505,7 +511,10 @@ mod tests {
             semantic_leap: 0.95,
             shortcut_confidence: 0.70,
         };
-        assert!(!t2.is_valid(), "semantic_leap=0.95 above max 0.90 should fail");
+        assert!(
+            !t2.is_valid(),
+            "semantic_leap=0.95 above max 0.90 should fail"
+        );
     }
 
     #[test]
@@ -516,7 +525,10 @@ mod tests {
             semantic_leap: 0.70,
             shortcut_confidence: 0.40,
         };
-        assert!(!t1.is_valid(), "shortcut_confidence=0.40 below min 0.50 should fail");
+        assert!(
+            !t1.is_valid(),
+            "shortcut_confidence=0.40 below min 0.50 should fail"
+        );
 
         // Shortcut confidence above maximum (0.85)
         let t2 = DreamThresholds {
@@ -524,7 +536,10 @@ mod tests {
             semantic_leap: 0.70,
             shortcut_confidence: 0.90,
         };
-        assert!(!t2.is_valid(), "shortcut_confidence=0.90 above max 0.85 should fail");
+        assert!(
+            !t2.is_valid(),
+            "shortcut_confidence=0.90 above max 0.85 should fail"
+        );
     }
 
     // ========================================================
@@ -539,8 +554,14 @@ mod tests {
         let default = DreamThresholds::default_general();
         println!("Default General Thresholds:");
         println!("  activity: {} (expected: 0.15)", default.activity);
-        println!("  semantic_leap: {} (expected: 0.70)", default.semantic_leap);
-        println!("  shortcut_confidence: {} (expected: 0.70)", default.shortcut_confidence);
+        println!(
+            "  semantic_leap: {} (expected: 0.70)",
+            default.semantic_leap
+        );
+        println!(
+            "  shortcut_confidence: {} (expected: 0.70)",
+            default.shortcut_confidence
+        );
         assert_eq!(default.activity, 0.15);
         assert_eq!(default.semantic_leap, 0.70);
         assert_eq!(default.shortcut_confidence, 0.70);
@@ -575,12 +596,42 @@ mod tests {
         let t = DreamThresholds::default_general();
 
         let test_cases: [(f32, &str, bool, bool); 6] = [
-            (0.14, "should_trigger_dream", t.should_trigger_dream(0.14), true),
-            (0.15, "should_trigger_dream", t.should_trigger_dream(0.15), false),
-            (0.69, "is_valid_semantic_leap", t.is_valid_semantic_leap(0.69), false),
-            (0.70, "is_valid_semantic_leap", t.is_valid_semantic_leap(0.70), true),
-            (0.69, "can_create_shortcut", t.can_create_shortcut(0.69), false),
-            (0.70, "can_create_shortcut", t.can_create_shortcut(0.70), true),
+            (
+                0.14,
+                "should_trigger_dream",
+                t.should_trigger_dream(0.14),
+                true,
+            ),
+            (
+                0.15,
+                "should_trigger_dream",
+                t.should_trigger_dream(0.15),
+                false,
+            ),
+            (
+                0.69,
+                "is_valid_semantic_leap",
+                t.is_valid_semantic_leap(0.69),
+                false,
+            ),
+            (
+                0.70,
+                "is_valid_semantic_leap",
+                t.is_valid_semantic_leap(0.70),
+                true,
+            ),
+            (
+                0.69,
+                "can_create_shortcut",
+                t.can_create_shortcut(0.69),
+                false,
+            ),
+            (
+                0.70,
+                "can_create_shortcut",
+                t.can_create_shortcut(0.70),
+                true,
+            ),
         ];
 
         for (value, method, actual, expected) in test_cases {

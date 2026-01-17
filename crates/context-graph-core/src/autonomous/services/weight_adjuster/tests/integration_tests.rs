@@ -1,7 +1,9 @@
 //! Integration tests for weight adjuster apply, report, and workflow operations.
 
 use crate::autonomous::bootstrap::GoalId;
-use crate::autonomous::evolution::{AdjustmentReason as EvolutionAdjustmentReason, WeightAdjustment};
+use crate::autonomous::evolution::{
+    AdjustmentReason as EvolutionAdjustmentReason, WeightAdjustment,
+};
 use crate::autonomous::services::weight_adjuster::{
     AdjustmentReport, WeightAdjuster, WeightAdjusterConfig,
 };

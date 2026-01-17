@@ -57,12 +57,12 @@ pub mod error;
 pub mod gpu;
 pub mod models;
 pub mod provider;
+pub mod pruning;
 pub mod quantization;
 pub mod storage;
 pub mod traits;
 pub mod types;
 pub mod warm;
-pub mod pruning;
 
 // Cache re-exports
 pub use cache::{CacheKey, CacheStats, EmbeddingCache};
@@ -103,4 +103,6 @@ pub use storage::{
 };
 
 // Pruning re-exports
-pub use pruning::{ImportanceScoringMethod, PrunedEmbeddings, TokenPruningConfig, TokenPruningQuantizer};
+pub use pruning::{
+    ImportanceScoringMethod, PrunedEmbeddings, TokenPruningConfig, TokenPruningQuantizer,
+};

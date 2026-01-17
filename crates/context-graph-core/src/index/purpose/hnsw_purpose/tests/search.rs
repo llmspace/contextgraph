@@ -7,8 +7,8 @@ use crate::types::fingerprint::PurposeVector;
 use crate::types::JohariQuadrant;
 
 use crate::index::purpose::entry::{GoalId, PurposeIndexEntry, PurposeMetadata};
-use crate::index::purpose::query::{PurposeQuery, PurposeQueryTarget};
 use crate::index::purpose::hnsw_purpose::{HnswPurposeIndex, PurposeIndexOps};
+use crate::index::purpose::query::{PurposeQuery, PurposeQueryTarget};
 
 // =========================================================================
 // Helper functions (duplicated for test module isolation)
@@ -64,9 +64,7 @@ fn test_search_empty_index() {
         "Empty index should return empty results"
     );
 
-    println!(
-        "[VERIFIED] Search on empty index returns empty results (correct database semantics)"
-    );
+    println!("[VERIFIED] Search on empty index returns empty results (correct database semantics)");
 }
 
 #[test]
@@ -272,8 +270,7 @@ fn test_search_from_memory_non_existent_fails() {
     let index = HnswPurposeIndex::new(purpose_config()).unwrap();
     let non_existent = Uuid::new_v4();
 
-    let query =
-        PurposeQuery::new(PurposeQueryTarget::from_memory(non_existent), 10, 0.0).unwrap();
+    let query = PurposeQuery::new(PurposeQueryTarget::from_memory(non_existent), 10, 0.0).unwrap();
 
     let result = index.search(&query);
 

@@ -207,7 +207,10 @@ async fn test_trigger_workspace_broadcast_low_r_without_force() {
     let data = extract_mcp_tool_data(&result);
 
     // FSV: Verify success is false (below coherence threshold)
-    let success = data.get("success").and_then(|v| v.as_bool()).unwrap_or(true);
+    let success = data
+        .get("success")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
     assert!(
         !success,
         "[FSV] Broadcast should fail with low r without force"

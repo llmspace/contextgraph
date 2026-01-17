@@ -56,13 +56,27 @@ async fn phase7_comprehensive_store_retrieve_fsv() {
     let (handlers, store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
 
     // Store varied content types
-    let test_contents = [("ML", "Deep learning optimization with gradient descent and backpropagation"),
-        ("Systems", "Kubernetes container orchestration for microservices"),
-        ("Database", "PostgreSQL query optimization with indexing strategies"),
+    let test_contents = [
+        (
+            "ML",
+            "Deep learning optimization with gradient descent and backpropagation",
+        ),
+        (
+            "Systems",
+            "Kubernetes container orchestration for microservices",
+        ),
+        (
+            "Database",
+            "PostgreSQL query optimization with indexing strategies",
+        ),
         ("Security", "OAuth 2.0 authentication flow with JWT tokens"),
-        ("API", "GraphQL schema design with resolvers and mutations")];
+        ("API", "GraphQL schema design with resolvers and mutations"),
+    ];
 
-    println!("\n[STORE PHASE] Storing {} diverse memories:", test_contents.len());
+    println!(
+        "\n[STORE PHASE] Storing {} diverse memories:",
+        test_contents.len()
+    );
 
     let mut stored_ids: Vec<(String, String)> = Vec::new();
 
@@ -77,7 +91,11 @@ async fn phase7_comprehensive_store_retrieve_fsv() {
         );
 
         let response = handlers.dispatch(request).await;
-        assert!(response.error.is_none(), "Store must succeed for {}", domain);
+        assert!(
+            response.error.is_none(),
+            "Store must succeed for {}",
+            domain
+        );
 
         let result = response.result.expect("Should have result");
         let fp_id = result
@@ -95,7 +113,11 @@ async fn phase7_comprehensive_store_retrieve_fsv() {
 
     let count = store.count().await.expect("count() works");
     assert_eq!(count, test_contents.len(), "Count must match stored");
-    println!("  - Store count: {} (expected {})", count, test_contents.len());
+    println!(
+        "  - Store count: {} (expected {})",
+        count,
+        test_contents.len()
+    );
 
     let mut all_verified = true;
     for (domain, fp_id) in &stored_ids {
@@ -103,7 +125,8 @@ async fn phase7_comprehensive_store_retrieve_fsv() {
         let retrieved = store.retrieve(uuid).await.expect("retrieve() works");
 
         if let Some(fp) = retrieved {
-            println!("  - {} [{}]: VERIFIED (theta={:.4}, hash={}...)",
+            println!(
+                "  - {} [{}]: VERIFIED (theta={:.4}, hash={}...)",
                 domain,
                 &fp_id[..8],
                 fp.alignment_score,
@@ -117,7 +140,10 @@ async fn phase7_comprehensive_store_retrieve_fsv() {
 
     assert!(all_verified, "All fingerprints must be verified");
 
-    println!("\n[PHASE 7 TEST 1 PASSED] All {} fingerprints verified in RocksDB", count);
+    println!(
+        "\n[PHASE 7 TEST 1 PASSED] All {} fingerprints verified in RocksDB",
+        count
+    );
     println!("================================================================================\n");
 }
 
@@ -141,19 +167,31 @@ async fn phase7_mcp_tool_inventory_verification() {
     assert!(response.error.is_none(), "tools/list must succeed");
 
     let result = response.result.expect("Should have result");
-    let tools = result.get("tools").and_then(|t| t.as_array()).expect("Must have tools array");
+    let tools = result
+        .get("tools")
+        .and_then(|t| t.as_array())
+        .expect("Must have tools array");
 
     println!("\n[INVENTORY] Found {} MCP tools:", tools.len());
 
     // Expected tool categories (for documentation)
-    let _expected_categories = [("Memory", vec!["store_memory", "get_memetic_status"]),
+    let _expected_categories = [
+        ("Memory", vec!["store_memory", "get_memetic_status"]),
         ("Search", vec!["search_graph", "search_teleological"]),
         ("GWT", vec!["get_consciousness_state", "get_kuramoto_sync"]),
-        ("Teleological", vec!["compute_teleological_vector", "fuse_embeddings"]),
-        ("Autonomous", vec!["auto_bootstrap_north_star", "get_autonomous_status"])];
+        (
+            "Teleological",
+            vec!["compute_teleological_vector", "fuse_embeddings"],
+        ),
+        (
+            "Autonomous",
+            vec!["auto_bootstrap_north_star", "get_autonomous_status"],
+        ),
+    ];
 
     // Count by prefix
-    let mut category_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut category_counts: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
 
     for tool in tools {
         if let Some(name) = tool.get("name").and_then(|n| n.as_str()) {
@@ -172,7 +210,11 @@ async fn phase7_mcp_tool_inventory_verification() {
     }
 
     // Verify minimum tool count (should be 35)
-    assert!(tools.len() >= 30, "Expected at least 30 tools, got {}", tools.len());
+    assert!(
+        tools.len() >= 30,
+        "Expected at least 30 tools, got {}",
+        tools.len()
+    );
 
     // Verify critical tools exist
     let tool_names: Vec<&str> = tools
@@ -192,11 +234,18 @@ async fn phase7_mcp_tool_inventory_verification() {
     println!("\n  Critical tools verification:");
     for tool in critical_tools {
         let exists = tool_names.contains(&tool);
-        println!("    - {}: {}", tool, if exists { "PRESENT" } else { "MISSING" });
+        println!(
+            "    - {}: {}",
+            tool,
+            if exists { "PRESENT" } else { "MISSING" }
+        );
         assert!(exists, "Critical tool {} must exist", tool);
     }
 
-    println!("\n[PHASE 7 TEST 2 PASSED] {} MCP tools verified", tools.len());
+    println!(
+        "\n[PHASE 7 TEST 2 PASSED] {} MCP tools verified",
+        tools.len()
+    );
     println!("================================================================================\n");
 }
 
@@ -236,7 +285,10 @@ async fn phase7_gwt_consciousness_state_verification() {
         // Verify attention level
         if let Some(attention) = result.get("attentionLevel").and_then(|a| a.as_f64()) {
             let in_range = (0.0..=1.0).contains(&attention);
-            println!("  - Attention level: {:.4} (in_range={})", attention, in_range);
+            println!(
+                "  - Attention level: {:.4} (in_range={})",
+                attention, in_range
+            );
         }
     }
 
@@ -247,11 +299,17 @@ async fn phase7_gwt_consciousness_state_verification() {
     if let Some(err) = &kuramoto_response.error {
         println!("  - Kuramoto sync not available: {}", err.message);
     } else if let Some(kuramoto_result) = &kuramoto_response.result {
-        if let Some(order) = kuramoto_result.get("orderParameter").and_then(|o| o.as_f64()) {
+        if let Some(order) = kuramoto_result
+            .get("orderParameter")
+            .and_then(|o| o.as_f64())
+        {
             println!("  - Kuramoto order parameter: {:.4}", order);
         }
 
-        if let Some(oscillators) = kuramoto_result.get("oscillators").and_then(|o| o.as_array()) {
+        if let Some(oscillators) = kuramoto_result
+            .get("oscillators")
+            .and_then(|o| o.as_array())
+        {
             println!("  - Oscillator count: {} (expected 13)", oscillators.len());
         }
     }
@@ -287,7 +345,11 @@ async fn phase7_complete_system_health_check() {
     );
     let store_resp = handlers.dispatch(store_req).await;
     let store_ok = store_resp.error.is_none();
-    health_checks.push(("Store", store_ok, if store_ok { "OK" } else { "FAIL" }.to_string()));
+    health_checks.push((
+        "Store",
+        store_ok,
+        if store_ok { "OK" } else { "FAIL" }.to_string(),
+    ));
 
     // Check 2: Tools listing works
     println!("[HEALTH CHECK 2] Tools listing...");
@@ -305,13 +367,20 @@ async fn phase7_complete_system_health_check() {
 
     // Check 3: Search works
     println!("[HEALTH CHECK 3] Search functionality...");
-    let search_req = make_tool_call("search_graph", json!({
-        "query": "test",
-        "maxResults": 5
-    }));
+    let search_req = make_tool_call(
+        "search_graph",
+        json!({
+            "query": "test",
+            "maxResults": 5
+        }),
+    );
     let search_resp = handlers.dispatch(search_req).await;
     let search_ok = search_resp.error.is_none();
-    health_checks.push(("Search", search_ok, if search_ok { "OK" } else { "FAIL" }.to_string()));
+    health_checks.push((
+        "Search",
+        search_ok,
+        if search_ok { "OK" } else { "FAIL" }.to_string(),
+    ));
 
     // Check 4: GWT state is accessible
     println!("[HEALTH CHECK 4] GWT consciousness...");
@@ -361,10 +430,17 @@ async fn phase7_complete_system_health_check() {
     }
 
     let pass_count = health_checks.iter().filter(|(_, ok, _)| *ok).count();
-    println!("\n  Total: {}/{} checks passed", pass_count, health_checks.len());
+    println!(
+        "\n  Total: {}/{} checks passed",
+        pass_count,
+        health_checks.len()
+    );
     println!("  Note: GWT state may not be available in cold test environment");
 
-    assert!(critical_ok, "Critical health checks (Store, Tools List) must pass");
+    assert!(
+        critical_ok,
+        "Critical health checks (Store, Tools List) must pass"
+    );
 
     println!("\n[PHASE 7 TEST 4 PASSED] System health verified");
     println!("================================================================================\n");

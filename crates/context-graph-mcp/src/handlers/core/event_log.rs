@@ -352,11 +352,8 @@ impl MetaLearningEventLog {
     ///
     /// Applies all filters in the query and handles pagination.
     pub fn query(&self, query: &EventLogQuery) -> Vec<&MetaLearningEvent> {
-        let mut results: Vec<&MetaLearningEvent> = self
-            .events
-            .iter()
-            .filter(|e| query.matches(e))
-            .collect();
+        let mut results: Vec<&MetaLearningEvent> =
+            self.events.iter().filter(|e| query.matches(e)).collect();
 
         // Apply pagination
         let offset = query.offset.unwrap_or(0);
@@ -584,18 +581,12 @@ mod tests {
             MetaLearningEventType::LambdaAdjustment => {
                 MetaLearningEvent::lambda_adjustment(0, 0.5, 0.6)
             }
-            MetaLearningEventType::BayesianEscalation => {
-                MetaLearningEvent::bayesian_escalation(10)
-            }
-            MetaLearningEventType::AccuracyAlert => {
-                MetaLearningEvent::accuracy_alert(0.5, 0.7)
-            }
+            MetaLearningEventType::BayesianEscalation => MetaLearningEvent::bayesian_escalation(10),
+            MetaLearningEventType::AccuracyAlert => MetaLearningEvent::accuracy_alert(0.5, 0.7),
             MetaLearningEventType::AccuracyRecovery => {
                 MetaLearningEvent::accuracy_recovery(0.5, 0.8)
             }
-            MetaLearningEventType::WeightClamped => {
-                MetaLearningEvent::weight_clamped(0, 0.95, 0.9)
-            }
+            MetaLearningEventType::WeightClamped => MetaLearningEvent::weight_clamped(0, 0.95, 0.9),
         }
     }
 
@@ -678,12 +669,12 @@ mod tests {
     fn test_query_by_domain() {
         let mut log = MetaLearningEventLog::new();
 
-        let event1 = create_test_event(MetaLearningEventType::LambdaAdjustment)
-            .with_domain(Domain::Code);
-        let event2 = create_test_event(MetaLearningEventType::LambdaAdjustment)
-            .with_domain(Domain::Medical);
-        let event3 = create_test_event(MetaLearningEventType::LambdaAdjustment)
-            .with_domain(Domain::Code);
+        let event1 =
+            create_test_event(MetaLearningEventType::LambdaAdjustment).with_domain(Domain::Code);
+        let event2 =
+            create_test_event(MetaLearningEventType::LambdaAdjustment).with_domain(Domain::Medical);
+        let event3 =
+            create_test_event(MetaLearningEventType::LambdaAdjustment).with_domain(Domain::Code);
 
         log.log_event(event1).unwrap();
         log.log_event(event2).unwrap();
@@ -756,7 +747,10 @@ mod tests {
 
         // Verify event data survived
         let events: Vec<_> = restored.recent_events(10);
-        assert_eq!(events[0].event_type, MetaLearningEventType::LambdaAdjustment);
+        assert_eq!(
+            events[0].event_type,
+            MetaLearningEventType::LambdaAdjustment
+        );
         assert_eq!(events[1].event_type, MetaLearningEventType::AccuracyAlert);
         assert_eq!(events[1].domain, Domain::Code);
     }
@@ -960,7 +954,10 @@ mod tests {
             .limit(10)
             .offset(5);
 
-        assert_eq!(query.event_type, Some(MetaLearningEventType::LambdaAdjustment));
+        assert_eq!(
+            query.event_type,
+            Some(MetaLearningEventType::LambdaAdjustment)
+        );
         assert_eq!(query.domain, Some(Domain::Code));
         assert_eq!(query.limit, Some(10));
         assert_eq!(query.offset, Some(5));
@@ -1025,7 +1022,11 @@ mod tests {
 
         // BEFORE: Empty log
         println!("FSV: Testing FIFO eviction policy");
-        println!("BEFORE: event_count={}, total_logged={}", log.event_count(), log.total_logged());
+        println!(
+            "BEFORE: event_count={}, total_logged={}",
+            log.event_count(),
+            log.total_logged()
+        );
 
         // Add 5 events (capacity is 3)
         for i in 0..5 {
@@ -1043,8 +1044,16 @@ mod tests {
         );
 
         // FSV Assertions
-        assert_eq!(log.event_count(), 3, "FSV FAIL: Should have exactly 3 events");
-        assert_eq!(log.total_evicted(), 2, "FSV FAIL: Should have evicted 2 events");
+        assert_eq!(
+            log.event_count(),
+            3,
+            "FSV FAIL: Should have exactly 3 events"
+        );
+        assert_eq!(
+            log.total_evicted(),
+            2,
+            "FSV FAIL: Should have evicted 2 events"
+        );
 
         // Verify FIFO: oldest events (0, 1) should be gone, (2, 3, 4) remain
         let events: Vec<_> = log.recent_events(10);
@@ -1221,6 +1230,9 @@ mod tests {
         // Offset past end
         let query = EventLogQuery::new().offset(100);
         let empty = log.query(&query);
-        assert!(empty.is_empty(), "FSV FAIL: Offset past end should be empty");
+        assert!(
+            empty.is_empty(),
+            "FSV FAIL: Offset past end should be empty"
+        );
     }
 }

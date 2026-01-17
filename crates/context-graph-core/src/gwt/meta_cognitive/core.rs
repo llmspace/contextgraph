@@ -30,8 +30,8 @@ use chrono::Utc;
 use std::collections::VecDeque;
 
 use super::types::{
-    FrequencyAdjustment, MetaCognitiveLoop, MetaCognitiveState, ScoreTrend, ACH_BASELINE, ACH_MAX,
-    ACH_DECAY_RATE,
+    FrequencyAdjustment, MetaCognitiveLoop, MetaCognitiveState, ScoreTrend, ACH_BASELINE,
+    ACH_DECAY_RATE, ACH_MAX,
 };
 
 impl MetaCognitiveLoop {

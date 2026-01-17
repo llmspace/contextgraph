@@ -132,7 +132,10 @@ fn test_magnitude() {
 fn test_cosine_distance_identical() {
     let a = vec![1.0, 2.0, 3.0];
     let dist = cosine_distance(&a, &a);
-    assert!(dist.abs() < 1e-6, "Identical vectors should have distance ~0");
+    assert!(
+        dist.abs() < 1e-6,
+        "Identical vectors should have distance ~0"
+    );
 }
 
 #[test]
@@ -291,7 +294,7 @@ fn test_mean_distance_multiple_members() {
 fn test_mean_distance_skips_mismatched_dimensions() {
     let query = vec![1.0, 0.0, 0.0];
     let cluster = vec![
-        vec![1.0, 0.0], // Wrong dimension - skipped
+        vec![1.0, 0.0],      // Wrong dimension - skipped
         vec![0.0, 1.0, 0.0], // Orthogonal = 1
     ];
 
@@ -329,16 +332,10 @@ fn test_compute_cluster_fit_basic() {
     let query = vec![0.1, 0.2, 0.3, 0.4];
 
     // Same cluster: similar vectors
-    let same_cluster = vec![
-        vec![0.12, 0.22, 0.28, 0.38],
-        vec![0.11, 0.21, 0.29, 0.39],
-    ];
+    let same_cluster = vec![vec![0.12, 0.22, 0.28, 0.38], vec![0.11, 0.21, 0.29, 0.39]];
 
     // Nearest cluster: quite different vectors
-    let nearest_cluster = vec![
-        vec![0.8, 0.1, 0.05, 0.05],
-        vec![0.7, 0.2, 0.05, 0.05],
-    ];
+    let nearest_cluster = vec![vec![0.8, 0.1, 0.05, 0.05], vec![0.7, 0.2, 0.05, 0.05]];
 
     let context = ClusterContext::new(same_cluster, nearest_cluster);
     let config = ClusterFitConfig::default();
@@ -347,7 +344,10 @@ fn test_compute_cluster_fit_basic() {
 
     // Should have positive silhouette (well-clustered)
     assert!(result.silhouette > 0.0, "Expected positive silhouette");
-    assert!(result.score > 0.5, "Expected score > 0.5 for well-clustered");
+    assert!(
+        result.score > 0.5,
+        "Expected score > 0.5 for well-clustered"
+    );
 
     // Verify output ranges per AP-10
     assert!(
@@ -367,16 +367,10 @@ fn test_compute_cluster_fit_wrong_cluster() {
     let query = vec![0.9, 0.1, 0.0, 0.0];
 
     // Same cluster: vectors very different from query
-    let same_cluster = vec![
-        vec![0.0, 0.0, 0.9, 0.1],
-        vec![0.0, 0.0, 0.8, 0.2],
-    ];
+    let same_cluster = vec![vec![0.0, 0.0, 0.9, 0.1], vec![0.0, 0.0, 0.8, 0.2]];
 
     // Nearest cluster: vectors similar to query
-    let nearest_cluster = vec![
-        vec![0.85, 0.15, 0.0, 0.0],
-        vec![0.88, 0.12, 0.0, 0.0],
-    ];
+    let nearest_cluster = vec![vec![0.85, 0.15, 0.0, 0.0], vec![0.88, 0.12, 0.0, 0.0]];
 
     let context = ClusterContext::new(same_cluster, nearest_cluster);
     let config = ClusterFitConfig::default();
@@ -601,10 +595,7 @@ fn test_compute_cluster_fit_output_ranges() {
         vec![0.4, 0.6, 0.0, 0.0],
         vec![0.55, 0.45, 0.0, 0.0],
     ];
-    let nearest_cluster = vec![
-        vec![0.0, 0.0, 0.5, 0.5],
-        vec![0.0, 0.0, 0.6, 0.4],
-    ];
+    let nearest_cluster = vec![vec![0.0, 0.0, 0.5, 0.5], vec![0.0, 0.0, 0.6, 0.4]];
 
     let context = ClusterContext::new(same_cluster, nearest_cluster);
 
@@ -760,12 +751,12 @@ fn test_silhouette_sklearn_reference_euclidean() {
     // Reference values computed with Python sklearn/scipy (see docstring above)
     let query = vec![0.0, 0.0];
     let same_cluster = vec![
-        vec![1.0, 0.0],  // euclidean distance = 1.0
-        vec![0.0, 1.0],  // euclidean distance = 1.0
+        vec![1.0, 0.0], // euclidean distance = 1.0
+        vec![0.0, 1.0], // euclidean distance = 1.0
     ];
     let nearest_cluster = vec![
-        vec![3.0, 0.0],  // euclidean distance = 3.0
-        vec![0.0, 3.0],  // euclidean distance = 3.0
+        vec![3.0, 0.0], // euclidean distance = 3.0
+        vec![0.0, 3.0], // euclidean distance = 3.0
     ];
 
     // Expected values (from Python):
@@ -785,17 +776,20 @@ fn test_silhouette_sklearn_reference_euclidean() {
     assert!(
         (result.silhouette - expected_silhouette).abs() < 1e-5,
         "Silhouette mismatch: got {} expected {}",
-        result.silhouette, expected_silhouette
+        result.silhouette,
+        expected_silhouette
     );
     assert!(
         (result.intra_distance - expected_intra).abs() < 1e-5,
         "Intra distance mismatch: got {} expected {}",
-        result.intra_distance, expected_intra
+        result.intra_distance,
+        expected_intra
     );
     assert!(
         (result.inter_distance - expected_inter).abs() < 1e-5,
         "Inter distance mismatch: got {} expected {}",
-        result.inter_distance, expected_inter
+        result.inter_distance,
+        expected_inter
     );
 }
 
@@ -803,18 +797,18 @@ fn test_silhouette_sklearn_reference_euclidean() {
 fn test_silhouette_sklearn_reference_cosine() {
     // TASK-UTL-P2-001: Test with cosine distance against reference values
     // Using orthogonal vectors for predictable results
-    let query = vec![1.0, 0.0, 0.0, 0.0];  // Unit vector along first axis
+    let query = vec![1.0, 0.0, 0.0, 0.0]; // Unit vector along first axis
 
     // Same cluster: nearly identical to query (small cosine distance)
     let same_cluster = vec![
-        vec![1.0, 0.0, 0.0, 0.0],  // Identical = cosine distance 0
-        vec![1.0, 0.0, 0.0, 0.0],  // Identical = cosine distance 0
+        vec![1.0, 0.0, 0.0, 0.0], // Identical = cosine distance 0
+        vec![1.0, 0.0, 0.0, 0.0], // Identical = cosine distance 0
     ];
 
     // Nearest cluster: orthogonal to query (cosine distance = 1.0)
     let nearest_cluster = vec![
-        vec![0.0, 1.0, 0.0, 0.0],  // Orthogonal = cosine distance 1.0
-        vec![0.0, 0.0, 1.0, 0.0],  // Orthogonal = cosine distance 1.0
+        vec![0.0, 1.0, 0.0, 0.0], // Orthogonal = cosine distance 1.0
+        vec![0.0, 0.0, 1.0, 0.0], // Orthogonal = cosine distance 1.0
     ];
 
     // Expected values:
@@ -833,17 +827,20 @@ fn test_silhouette_sklearn_reference_cosine() {
     assert!(
         (result.silhouette - expected_silhouette).abs() < 1e-5,
         "Silhouette mismatch: got {} expected {}",
-        result.silhouette, expected_silhouette
+        result.silhouette,
+        expected_silhouette
     );
     assert!(
         (result.intra_distance - expected_intra).abs() < 1e-5,
         "Intra distance mismatch: got {} expected {}",
-        result.intra_distance, expected_intra
+        result.intra_distance,
+        expected_intra
     );
     assert!(
         (result.inter_distance - expected_inter).abs() < 1e-5,
         "Inter distance mismatch: got {} expected {}",
-        result.inter_distance, expected_inter
+        result.inter_distance,
+        expected_inter
     );
 }
 
@@ -859,7 +856,8 @@ fn test_euclidean_distance_scipy_reference() {
     assert!(
         (result - expected).abs() < 1e-6,
         "Euclidean distance mismatch: got {} expected {}",
-        result, expected
+        result,
+        expected
     );
 
     // Additional reference: scipy.spatial.distance.euclidean([1,2,3], [4,6,8]) = sqrt(50)
@@ -871,7 +869,8 @@ fn test_euclidean_distance_scipy_reference() {
     assert!(
         (result2 - expected2).abs() < 1e-5,
         "Euclidean distance mismatch: got {} expected {}",
-        result2, expected2
+        result2,
+        expected2
     );
 }
 
@@ -923,7 +922,8 @@ fn test_manhattan_distance_scipy_reference() {
     assert!(
         (result - expected).abs() < 1e-6,
         "Manhattan distance mismatch: got {} expected {}",
-        result, expected
+        result,
+        expected
     );
 
     // Additional reference: cityblock([1,2,3,4], [5,6,7,8]) = 16
@@ -935,7 +935,8 @@ fn test_manhattan_distance_scipy_reference() {
     assert!(
         (result2 - expected2).abs() < 1e-6,
         "Manhattan distance mismatch: got {} expected {}",
-        result2, expected2
+        result2,
+        expected2
     );
 }
 
@@ -947,16 +948,24 @@ fn test_silhouette_high_dimensional() {
     let query: Vec<f32> = (0..dim).map(|i| (i as f32 * 0.001).sin()).collect();
 
     // Same cluster: small perturbations of query
-    let same_cluster: Vec<Vec<f32>> = (0..5).map(|j| {
-        query.iter().enumerate()
-            .map(|(i, &v)| v + (i as f32 * j as f32 * 0.0001).cos() * 0.01)
-            .collect()
-    }).collect();
+    let same_cluster: Vec<Vec<f32>> = (0..5)
+        .map(|j| {
+            query
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| v + (i as f32 * j as f32 * 0.0001).cos() * 0.01)
+                .collect()
+        })
+        .collect();
 
     // Nearest cluster: orthogonal-ish vectors
-    let nearest_cluster: Vec<Vec<f32>> = (0..5).map(|j| {
-        (0..dim).map(|i| ((i as f32 + j as f32 * 100.0) * 0.002).cos()).collect()
-    }).collect();
+    let nearest_cluster: Vec<Vec<f32>> = (0..5)
+        .map(|j| {
+            (0..dim)
+                .map(|i| ((i as f32 + j as f32 * 100.0) * 0.002).cos())
+                .collect()
+        })
+        .collect();
 
     let context = ClusterContext::new(same_cluster, nearest_cluster);
     let config = ClusterFitConfig::default();
@@ -965,12 +974,27 @@ fn test_silhouette_high_dimensional() {
 
     // Should produce valid results without NaN/Inf
     assert!(!result.silhouette.is_nan(), "Silhouette should not be NaN");
-    assert!(!result.silhouette.is_infinite(), "Silhouette should not be Inf");
-    assert!((-1.0..=1.0).contains(&result.silhouette),
-        "Silhouette {} should be in [-1, 1]", result.silhouette);
-    assert!(!result.intra_distance.is_nan(), "Intra distance should not be NaN");
-    assert!(!result.inter_distance.is_nan(), "Inter distance should not be NaN");
-    assert!(result.intra_distance < result.inter_distance,
+    assert!(
+        !result.silhouette.is_infinite(),
+        "Silhouette should not be Inf"
+    );
+    assert!(
+        (-1.0..=1.0).contains(&result.silhouette),
+        "Silhouette {} should be in [-1, 1]",
+        result.silhouette
+    );
+    assert!(
+        !result.intra_distance.is_nan(),
+        "Intra distance should not be NaN"
+    );
+    assert!(
+        !result.inter_distance.is_nan(),
+        "Inter distance should not be NaN"
+    );
+    assert!(
+        result.intra_distance < result.inter_distance,
         "Intra {} should be less than inter {} for well-clustered",
-        result.intra_distance, result.inter_distance);
+        result.intra_distance,
+        result.inter_distance
+    );
 }

@@ -174,8 +174,7 @@ async fn test_coherence_layer_latency_benchmark() {
     let mut max_us: u64 = 0;
 
     for i in 0..iterations {
-        let mut input =
-            LayerInput::new(format!("bench-{}", i), format!("Benchmark content {}", i));
+        let mut input = LayerInput::new(format!("bench-{}", i), format!("Benchmark content {}", i));
         input.context.pulse.entropy = (i as f32 / iterations as f32).clamp(0.0, 1.0);
         input.context.pulse.coherence = 0.5;
 
@@ -463,7 +462,10 @@ async fn test_coherence_layer_with_atc() {
     );
 
     // Process an input
-    let input = LayerInput::new("atc-test".to_string(), "Test with ATC thresholds".to_string());
+    let input = LayerInput::new(
+        "atc-test".to_string(),
+        "Test with ATC thresholds".to_string(),
+    );
     let result = layer.process(input).await.unwrap();
 
     assert!(result.result.success);
@@ -514,10 +516,7 @@ async fn test_gwt_thresholds_validation_rejects_invalid() {
         hypersync: 0.95,
         fragmentation: 0.50,
     };
-    assert!(
-        !invalid1.is_valid(),
-        "gate > hypersync should be invalid"
-    );
+    assert!(!invalid1.is_valid(), "gate > hypersync should be invalid");
 
     // Test invalid: fragmentation > gate
     let invalid2 = GwtThresholds {
@@ -540,7 +539,10 @@ async fn test_gwt_thresholds_validation_rejects_invalid() {
 
     // Test CoherenceLayer::with_thresholds rejects invalid
     let result = CoherenceLayer::with_thresholds(invalid1);
-    assert!(result.is_err(), "with_thresholds should reject invalid thresholds");
+    assert!(
+        result.is_err(),
+        "with_thresholds should reject invalid thresholds"
+    );
 
     println!("[VERIFIED] GwtThresholds validation rejects invalid configurations");
 }
@@ -555,8 +557,10 @@ async fn test_fsv_gwt_thresholds_comprehensive() {
 
     // 1. Verify default_general returns legacy values
     let t = GwtThresholds::default_general();
-    println!("1. default_general(): gate={}, hypersync={}, frag={}",
-             t.gate, t.hypersync, t.fragmentation);
+    println!(
+        "1. default_general(): gate={}, hypersync={}, frag={}",
+        t.gate, t.hypersync, t.fragmentation
+    );
     assert!((t.gate - 0.70).abs() < 1e-6);
     assert!((t.hypersync - 0.95).abs() < 1e-6);
     assert!((t.fragmentation - 0.50).abs() < 1e-6);
@@ -564,10 +568,18 @@ async fn test_fsv_gwt_thresholds_comprehensive() {
     // 2. Verify from_atc works for all domains
     let atc = AdaptiveThresholdCalibration::new();
     println!("\n2. from_atc() domain thresholds:");
-    for domain in [Domain::Medical, Domain::Legal, Domain::Code, Domain::General, Domain::Creative] {
+    for domain in [
+        Domain::Medical,
+        Domain::Legal,
+        Domain::Code,
+        Domain::General,
+        Domain::Creative,
+    ] {
         let dt = GwtThresholds::from_atc(&atc, domain).unwrap();
-        println!("   {:?}: gate={:.3}, hypersync={:.3}, frag={:.3}",
-                 domain, dt.gate, dt.hypersync, dt.fragmentation);
+        println!(
+            "   {:?}: gate={:.3}, hypersync={:.3}, frag={:.3}",
+            domain, dt.gate, dt.hypersync, dt.fragmentation
+        );
         assert!(dt.is_valid());
     }
 
@@ -575,8 +587,13 @@ async fn test_fsv_gwt_thresholds_comprehensive() {
     println!("\n3. Helper method tests:");
     let test_r_values = [0.30, 0.50, 0.70, 0.95, 0.96];
     for r in test_r_values {
-        println!("   r={:.2}: broadcast={}, hypersync={}, fragmented={}",
-                 r, t.should_broadcast(r), t.is_hypersync(r), t.is_fragmented(r));
+        println!(
+            "   r={:.2}: broadcast={}, hypersync={}, fragmented={}",
+            r,
+            t.should_broadcast(r),
+            t.is_hypersync(r),
+            t.is_fragmented(r)
+        );
     }
 
     // 4. Verify CoherenceLayer integration
@@ -587,7 +604,8 @@ async fn test_fsv_gwt_thresholds_comprehensive() {
         gate: 0.75,
         hypersync: 0.96,
         fragmentation: 0.45,
-    }).unwrap();
+    })
+    .unwrap();
 
     println!("   Default layer gate: {:.3}", layer_default.gw_threshold());
     println!("   ATC Code layer gate: {:.3}", layer_atc.gw_threshold());

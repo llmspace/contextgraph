@@ -81,7 +81,10 @@ pub struct GreenContextsConfig {
 impl Default for GreenContextsConfig {
     fn default() -> Self {
         Self {
-            min_compute_capability: (GREEN_CONTEXTS_MIN_COMPUTE_MAJOR, GREEN_CONTEXTS_MIN_COMPUTE_MINOR),
+            min_compute_capability: (
+                GREEN_CONTEXTS_MIN_COMPUTE_MAJOR,
+                GREEN_CONTEXTS_MIN_COMPUTE_MINOR,
+            ),
             inference_partition: INFERENCE_PARTITION_PERCENT,
             background_partition: BACKGROUND_PARTITION_PERCENT,
         }
@@ -107,12 +110,12 @@ impl GreenContextsConfig {
         }
         if self.inference_partition < 0.0 || self.background_partition < 0.0 {
             return Err(CudaError::InvalidConfig(
-                "Partition percentages cannot be negative".to_string()
+                "Partition percentages cannot be negative".to_string(),
             ));
         }
         if self.min_compute_capability.0 == 0 {
             return Err(CudaError::InvalidConfig(
-                "Compute capability major version cannot be 0".to_string()
+                "Compute capability major version cannot be 0".to_string(),
             ));
         }
         Ok(())
@@ -153,7 +156,10 @@ pub fn should_enable_green_contexts(device: &GpuDevice) -> bool {
 ///
 /// Same as `should_enable_green_contexts` but with configurable minimum
 /// compute capability requirements.
-pub fn should_enable_green_contexts_with_config(device: &GpuDevice, config: &GreenContextsConfig) -> bool {
+pub fn should_enable_green_contexts_with_config(
+    device: &GpuDevice,
+    config: &GreenContextsConfig,
+) -> bool {
     let (major, minor) = device.compute_capability();
     let (req_major, req_minor) = config.min_compute_capability;
 
@@ -386,16 +392,16 @@ impl GreenContexts {
             // Blackwell (RTX 50 series)
             (12, _) => 170, // RTX 5090: ~170 SMs (21,760 cores / 128)
             // Ada Lovelace (RTX 40 series)
-            (8, 9) => 128,  // RTX 4090: 128 SMs
-            (8, 6) => 84,   // RTX 4080: 76-84 SMs
+            (8, 9) => 128, // RTX 4090: 128 SMs
+            (8, 6) => 84,  // RTX 4080: 76-84 SMs
             // Hopper
-            (9, 0) => 132,  // H100: 132 SMs
+            (9, 0) => 132, // H100: 132 SMs
             // Ampere
-            (8, 0) => 108,  // A100: 108 SMs
+            (8, 0) => 108, // A100: 108 SMs
             // Turing
-            (7, 5) => 72,   // RTX 2080 Ti: 68 SMs
+            (7, 5) => 72, // RTX 2080 Ti: 68 SMs
             // Volta
-            (7, 0) => 80,   // V100: 80 SMs
+            (7, 0) => 80, // V100: 80 SMs
             // Fallback: conservative estimate
             _ => 32,
         }
@@ -521,7 +527,8 @@ mod tests {
         let sum = INFERENCE_PARTITION_PERCENT + BACKGROUND_PARTITION_PERCENT;
         assert!(
             (sum - 1.0).abs() < 0.001,
-            "Partition percentages must sum to 1.0, got {}", sum
+            "Partition percentages must sum to 1.0, got {}",
+            sum
         );
     }
 
@@ -566,8 +573,10 @@ mod tests {
 
     #[test]
     fn test_min_sms_constant() {
-        assert!(MIN_SMS_FOR_PARTITIONING >= 8,
-            "Need at least 8 SMs for meaningful partitioning");
+        assert!(
+            MIN_SMS_FOR_PARTITIONING >= 8,
+            "Need at least 8 SMs for meaningful partitioning"
+        );
     }
 
     // ========================================================================
@@ -627,23 +636,36 @@ mod tests {
         let (major, _) = device.compute_capability();
         if major >= 7 {
             // Should be enabled on Volta+ GPUs
-            assert!(gc.is_enabled(), "Green Contexts should be enabled on Volta+ GPU");
+            assert!(
+                gc.is_enabled(),
+                "Green Contexts should be enabled on Volta+ GPU"
+            );
 
-            let inference = gc.inference_context().expect("inference partition should exist");
+            let inference = gc
+                .inference_context()
+                .expect("inference partition should exist");
             assert_eq!(inference.partition_id(), 0);
             assert!(inference.sm_count() > 0);
 
-            let background = gc.background_context().expect("background partition should exist");
+            let background = gc
+                .background_context()
+                .expect("background partition should exist");
             assert_eq!(background.partition_id(), 1);
             assert!(background.sm_count() > 0);
 
             // Verify partition sizes are reasonable
-            assert!(inference.sm_count() > background.sm_count(),
+            assert!(
+                inference.sm_count() > background.sm_count(),
                 "Inference partition ({}) should be larger than background ({}) (70% vs 30%)",
-                inference.sm_count(), background.sm_count());
+                inference.sm_count(),
+                background.sm_count()
+            );
         } else {
             // Older GPU - should gracefully degrade
-            assert!(!gc.is_enabled(), "Green Contexts should be disabled on pre-Volta GPU");
+            assert!(
+                !gc.is_enabled(),
+                "Green Contexts should be disabled on pre-Volta GPU"
+            );
         }
     }
 
@@ -655,17 +677,26 @@ mod tests {
 
         // Only run on RTX 5090
         if major != 12 || minor != 0 {
-            println!("Skipping: requires RTX 5090 (compute 12.0), got {}.{}", major, minor);
+            println!(
+                "Skipping: requires RTX 5090 (compute 12.0), got {}.{}",
+                major, minor
+            );
             return;
         }
 
         let gc = GreenContexts::new(&device, GreenContextsConfig::default());
 
-        assert!(gc.is_enabled(), "Green Contexts must be enabled on RTX 5090");
+        assert!(
+            gc.is_enabled(),
+            "Green Contexts must be enabled on RTX 5090"
+        );
 
         // RTX 5090 should have ~170 SMs
-        assert!(gc.total_sm_count() >= 150,
-            "RTX 5090 should have ~170 SMs, got {}", gc.total_sm_count());
+        assert!(
+            gc.total_sm_count() >= 150,
+            "RTX 5090 should have ~170 SMs, got {}",
+            gc.total_sm_count()
+        );
 
         let inference = gc.inference_context().expect("inference partition");
         let background = gc.background_context().expect("background partition");
@@ -674,10 +705,16 @@ mod tests {
         let inference_percent = inference.sm_count() as f32 / gc.total_sm_count() as f32;
         let background_percent = background.sm_count() as f32 / gc.total_sm_count() as f32;
 
-        assert!((inference_percent - 0.70).abs() < 0.05,
-            "Inference should be ~70%, got {:.1}%", inference_percent * 100.0);
-        assert!((background_percent - 0.30).abs() < 0.05,
-            "Background should be ~30%, got {:.1}%", background_percent * 100.0);
+        assert!(
+            (inference_percent - 0.70).abs() < 0.05,
+            "Inference should be ~70%, got {:.1}%",
+            inference_percent * 100.0
+        );
+        assert!(
+            (background_percent - 0.30).abs() < 0.05,
+            "Background should be ~30%, got {:.1}%",
+            background_percent * 100.0
+        );
     }
 
     #[test]
@@ -692,7 +729,10 @@ mod tests {
             background_partition: 0.3,
         };
         let gc = GreenContexts::new(&device, invalid_config);
-        assert!(!gc.is_enabled(), "Should gracefully disable with impossible requirements");
+        assert!(
+            !gc.is_enabled(),
+            "Should gracefully disable with impossible requirements"
+        );
 
         // Very high partition sum should be caught by validation
         let bad_config = GreenContextsConfig {
@@ -701,6 +741,9 @@ mod tests {
             background_partition: 0.5, // Sum = 1.3
         };
         let gc = GreenContexts::new(&device, bad_config);
-        assert!(!gc.is_enabled(), "Should disable with invalid partition sum");
+        assert!(
+            !gc.is_enabled(),
+            "Should disable with invalid partition sum"
+        );
     }
 }

@@ -72,6 +72,8 @@ pub use column_families::{
     synergy_matrix_cf_options,
     teleological_profiles_cf_options,
     teleological_vectors_cf_options,
+    // TASK-CONTENT-001: Content column family
+    CF_CONTENT,
     // TASK-STORAGE-P2-001: E12 Late Interaction column family constant
     CF_E12_LATE_INTERACTION,
     CF_E13_SPLADE_INVERTED,
@@ -99,8 +101,6 @@ pub use column_families::{
     CF_SYNERGY_MATRIX,
     CF_TELEOLOGICAL_PROFILES,
     CF_TELEOLOGICAL_VECTORS,
-    // TASK-CONTENT-001: Content column family
-    CF_CONTENT,
     QUANTIZED_EMBEDDER_CFS,
     QUANTIZED_EMBEDDER_CF_COUNT,
     TELEOLOGICAL_CFS,
@@ -148,14 +148,14 @@ pub use serialization::{
     deserialize_memory_id_list,
     deserialize_purpose_vector,
     deserialize_teleological_fingerprint,
-    // TASK-GWT-P1-001: Ego node version constant
-    EGO_NODE_VERSION,
     serialize_e1_matryoshka_128,
     // TASK-GWT-P1-001: Ego node serialization
     serialize_ego_node,
     serialize_memory_id_list,
     serialize_purpose_vector,
     serialize_teleological_fingerprint,
+    // TASK-GWT-P1-001: Ego node version constant
+    EGO_NODE_VERSION,
     TELEOLOGICAL_VERSION,
 };
 
@@ -203,6 +203,6 @@ pub use rocksdb_store::{
 
 // Re-export search types (TASK-LOGIC-005)
 pub use search::{
-    EmbedderSearchHit, SearchError, SearchResult, SingleEmbedderSearch,
-    SingleEmbedderSearchConfig, SingleEmbedderSearchResults,
+    EmbedderSearchHit, SearchError, SearchResult, SingleEmbedderSearch, SingleEmbedderSearchConfig,
+    SingleEmbedderSearchResults,
 };

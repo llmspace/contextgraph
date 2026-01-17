@@ -13,8 +13,8 @@
 //! constitution.yaml mcp.transport: [stdio, sse]
 //! Performance budget: MCP Response <100ms
 
-use std::time::Duration;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 // CRITICAL: Reuse existing JsonRpcError from protocol.rs - DO NOT DUPLICATE
 pub use crate::protocol::JsonRpcError;
@@ -90,7 +90,10 @@ impl SseConfig {
     /// Panics if duration is zero.
     #[must_use]
     pub fn with_max_duration(mut self, duration: Duration) -> Self {
-        assert!(!duration.is_zero(), "max_connection_duration cannot be zero");
+        assert!(
+            !duration.is_zero(),
+            "max_connection_duration cannot be zero"
+        );
         self.max_connection_duration = duration;
         self
     }
@@ -276,14 +279,14 @@ impl McpSseEvent {
 // SSE HANDLER (TASK-33)
 // ============================================================================
 
-use std::convert::Infallible;
-use std::sync::atomic::{AtomicU64, Ordering};
 use axum::{
     extract::State,
     response::sse::{Event, KeepAlive, Sse},
     routing::get,
     Router,
 };
+use std::convert::Infallible;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::broadcast;
 
 /// Counter for generating unique event IDs.
@@ -410,22 +413,20 @@ impl SseAppState {
     /// If the count is already 0, it remains 0 (no underflow).
     pub fn decrement_connections(&self) -> u64 {
         // Use fetch_update to prevent underflow below 0
-        let result = self.connection_count.fetch_update(
-            Ordering::Relaxed,
-            Ordering::Relaxed,
-            |current| {
-                if current > 0 {
-                    Some(current - 1)
-                } else {
-                    None // Don't update if already 0
-                }
-            }
-        );
+        let result =
+            self.connection_count
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+                    if current > 0 {
+                        Some(current - 1)
+                    } else {
+                        None // Don't update if already 0
+                    }
+                });
 
         // Return the new value (either decremented or unchanged 0)
         match result {
             Ok(old_val) => old_val - 1, // Successfully decremented, return new value
-            Err(val) => val,             // Was already 0, return 0
+            Err(val) => val,            // Was already 0, return 0
         }
     }
 }
@@ -599,7 +600,7 @@ pub async fn sse_handler(
     Sse::new(stream).keep_alive(
         KeepAlive::new()
             .interval(config.keepalive_interval)
-            .text("keep-alive")
+            .text("keep-alive"),
     )
 }
 
@@ -757,10 +758,7 @@ mod tests {
 
     #[test]
     fn test_mcp_sse_event_roundtrip() {
-        let original = McpSseEvent::response(
-            "req-123",
-            serde_json::json!({"memories": []}),
-        );
+        let original = McpSseEvent::response("req-123", serde_json::json!({"memories": []}));
 
         let json = original.to_json().unwrap();
         let parsed: McpSseEvent = serde_json::from_str(&json).unwrap();
@@ -1017,8 +1015,9 @@ mod tests {
         let state = SseAppState::new(
             SseConfig::default()
                 .with_keepalive(Duration::from_millis(50))
-                .with_max_duration(Duration::from_millis(200))
-        ).unwrap();
+                .with_max_duration(Duration::from_millis(200)),
+        )
+        .unwrap();
 
         // Spawn a task to broadcast events - TRACK THE HANDLE
         let state_clone = state.clone();
@@ -1043,7 +1042,9 @@ mod tests {
         assert!(content_type.to_str().unwrap().contains("text/event-stream"));
 
         // CRITICAL: Await spawned task to prevent zombie processes
-        broadcast_handle.await.expect("broadcast task should complete");
+        broadcast_handle
+            .await
+            .expect("broadcast task should complete");
     }
 
     #[tokio::test]
@@ -1079,9 +1080,7 @@ mod tests {
     /// DO NOT use fire-and-forget tokio::spawn in tests.
     #[tokio::test]
     async fn test_sse_broadcast_to_multiple_async_receivers() {
-        let state = SseAppState::new(
-            SseConfig::default().with_buffer_size(10)
-        ).unwrap();
+        let state = SseAppState::new(SseConfig::default().with_buffer_size(10)).unwrap();
 
         let mut rx1 = state.subscribe();
         let mut rx2 = state.subscribe();
@@ -1090,10 +1089,7 @@ mod tests {
         let state_clone = state.clone();
         let broadcast_handle = tokio::spawn(async move {
             for i in 0..5 {
-                let event = McpSseEvent::notification(
-                    "counter",
-                    serde_json::json!({"value": i})
-                );
+                let event = McpSseEvent::notification("counter", serde_json::json!({"value": i}));
                 state_clone.broadcast(event);
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
@@ -1122,6 +1118,8 @@ mod tests {
         assert!(count2 > 0, "rx2 should receive events");
 
         // CRITICAL: Await spawned task to prevent zombie processes
-        broadcast_handle.await.expect("broadcast task should complete");
+        broadcast_handle
+            .await
+            .expect("broadcast task should complete");
     }
 }

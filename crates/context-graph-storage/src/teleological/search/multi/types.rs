@@ -218,7 +218,9 @@ impl AggregatedHit {
     /// Check if this ID was found by a specific embedder.
     #[inline]
     pub fn found_by(&self, embedder: EmbedderIndex) -> bool {
-        self.contributing_embedders.iter().any(|(e, _, _)| *e == embedder)
+        self.contributing_embedders
+            .iter()
+            .any(|(e, _, _)| *e == embedder)
     }
 
     /// Get the original similarity from a specific embedder (if found).
@@ -366,7 +368,10 @@ impl MultiEmbedderSearchResults {
     /// Get results found by multiple embedders.
     #[inline]
     pub fn multi_modal_only(&self) -> Vec<&AggregatedHit> {
-        self.aggregated_hits.iter().filter(|h| h.is_multi_modal()).collect()
+        self.aggregated_hits
+            .iter()
+            .filter(|h| h.is_multi_modal())
+            .collect()
     }
 
     /// Get average aggregated score.
@@ -375,7 +380,11 @@ impl MultiEmbedderSearchResults {
         if self.aggregated_hits.is_empty() {
             None
         } else {
-            let sum: f32 = self.aggregated_hits.iter().map(|h| h.aggregated_score).sum();
+            let sum: f32 = self
+                .aggregated_hits
+                .iter()
+                .map(|h| h.aggregated_score)
+                .sum();
             Some(sum / self.aggregated_hits.len() as f32)
         }
     }

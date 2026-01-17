@@ -1,7 +1,9 @@
 //! Unit tests for weight adjuster momentum, validation, and compute adjustment.
 
 use crate::autonomous::bootstrap::GoalId;
-use crate::autonomous::evolution::{AdjustmentReason as EvolutionAdjustmentReason, WeightAdjustment};
+use crate::autonomous::evolution::{
+    AdjustmentReason as EvolutionAdjustmentReason, WeightAdjustment,
+};
 use crate::autonomous::services::weight_adjuster::{AdjustmentReason, WeightAdjuster};
 
 // === Compute Momentum Tests ===

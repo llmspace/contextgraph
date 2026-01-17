@@ -103,12 +103,7 @@ impl DefaultKnnEntropy {
 }
 
 impl EmbedderEntropy for DefaultKnnEntropy {
-    fn compute_delta_s(
-        &self,
-        current: &[f32],
-        history: &[Vec<f32>],
-        k: usize,
-    ) -> UtlResult<f32> {
+    fn compute_delta_s(&self, current: &[f32], history: &[Vec<f32>], k: usize) -> UtlResult<f32> {
         // Validate input
         if current.is_empty() {
             return Err(UtlError::EmptyInput);
@@ -334,11 +329,7 @@ mod tests {
                 .collect();
 
             let history: Vec<Vec<f32>> = (0..10)
-                .map(|j| {
-                    (0..384)
-                        .map(|i| (i + j * 50) as f32 / 384.0)
-                        .collect()
-                })
+                .map(|j| (0..384).map(|i| (i + j * 50) as f32 / 384.0).collect())
                 .collect();
 
             let result = calculator.compute_delta_s(&current, &history, 5);

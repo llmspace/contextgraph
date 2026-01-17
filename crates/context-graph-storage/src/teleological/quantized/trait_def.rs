@@ -3,7 +3,9 @@
 //! Defines the `QuantizedFingerprintStorage` trait for storing and retrieving
 //! quantized fingerprints with all 13 embedders.
 
-use context_graph_embeddings::{QuantizationRouter, QuantizedEmbedding, StoredQuantizedFingerprint};
+use context_graph_embeddings::{
+    QuantizationRouter, QuantizedEmbedding, StoredQuantizedFingerprint,
+};
 use uuid::Uuid;
 
 use super::error::QuantizedStorageResult;

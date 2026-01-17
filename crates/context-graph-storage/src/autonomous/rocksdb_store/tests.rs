@@ -8,8 +8,7 @@ mod tests {
     use tempfile::TempDir;
 
     use context_graph_core::autonomous::{
-        AdaptiveThresholdState, AutonomousConfig, GoalId,
-        MemoryCurationState, MemoryId,
+        AdaptiveThresholdState, AutonomousConfig, GoalId, MemoryCurationState, MemoryId,
     };
     // TASK-P0-004: Removed DriftDataPoint, GoalActivityMetrics imports (used by removed CF)
 

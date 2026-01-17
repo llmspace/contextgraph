@@ -40,9 +40,9 @@
 mod content;
 mod search;
 mod similarity;
-mod trait_impl;
 #[cfg(test)]
 mod tests;
+mod trait_impl;
 
 use std::sync::atomic::AtomicUsize;
 
@@ -53,7 +53,6 @@ use uuid::Uuid;
 use crate::gwt::ego_node::SelfEgoNode;
 use crate::traits::TeleologicalStorageBackend;
 use crate::types::fingerprint::TeleologicalFingerprint;
-
 
 /// In-memory implementation of TeleologicalMemoryStore.
 ///
@@ -89,7 +88,10 @@ impl InMemoryTeleologicalStore {
 
     /// Create with pre-allocated capacity.
     pub fn with_capacity(capacity: usize) -> Self {
-        info!("Creating InMemoryTeleologicalStore with capacity {} (TEST ONLY)", capacity);
+        info!(
+            "Creating InMemoryTeleologicalStore with capacity {} (TEST ONLY)",
+            capacity
+        );
         Self {
             data: DashMap::with_capacity(capacity),
             deleted: DashMap::new(),

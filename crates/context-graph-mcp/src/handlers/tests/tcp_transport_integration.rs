@@ -32,13 +32,13 @@ use serde_json::json;
 use crate::protocol::{error_codes, JsonRpcRequest, JsonRpcResponse};
 
 /// Helper to connect to a TCP server with timeout.
-async fn connect_with_timeout(addr: &SocketAddr, timeout_secs: u64) -> tokio::io::Result<TcpStream> {
-    timeout(
-        Duration::from_secs(timeout_secs),
-        TcpStream::connect(addr),
-    )
-    .await
-    .map_err(|_| std::io::Error::new(std::io::ErrorKind::TimedOut, "Connection timeout"))?
+async fn connect_with_timeout(
+    addr: &SocketAddr,
+    timeout_secs: u64,
+) -> tokio::io::Result<TcpStream> {
+    timeout(Duration::from_secs(timeout_secs), TcpStream::connect(addr))
+        .await
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::TimedOut, "Connection timeout"))?
 }
 
 /// Helper to send a JSON-RPC request and receive response.
@@ -273,7 +273,9 @@ fn test_bind_address_validation() {
 async fn test_tcp_server_initialize() {
     let addr: SocketAddr = "127.0.0.1:3100".parse().unwrap();
 
-    let mut stream = connect_with_timeout(&addr, 5).await.expect("Failed to connect");
+    let mut stream = connect_with_timeout(&addr, 5)
+        .await
+        .expect("Failed to connect");
 
     let request = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
@@ -312,7 +314,9 @@ async fn test_tcp_server_initialize() {
 async fn test_tcp_server_tools_list() {
     let addr: SocketAddr = "127.0.0.1:3100".parse().unwrap();
 
-    let mut stream = connect_with_timeout(&addr, 5).await.expect("Failed to connect");
+    let mut stream = connect_with_timeout(&addr, 5)
+        .await
+        .expect("Failed to connect");
 
     // First initialize
     let init_request = JsonRpcRequest {
@@ -343,7 +347,10 @@ async fn test_tcp_server_tools_list() {
     assert!(response.error.is_none(), "tools/list should not error");
 
     if let Some(result) = response.result {
-        assert!(result.get("tools").is_some(), "Result should have tools array");
+        assert!(
+            result.get("tools").is_some(),
+            "Result should have tools array"
+        );
     }
 }
 
@@ -355,7 +362,9 @@ async fn test_tcp_server_tools_list() {
 async fn test_tcp_server_rejects_invalid_json() {
     let addr: SocketAddr = "127.0.0.1:3100".parse().unwrap();
 
-    let mut stream = connect_with_timeout(&addr, 5).await.expect("Failed to connect");
+    let mut stream = connect_with_timeout(&addr, 5)
+        .await
+        .expect("Failed to connect");
     let (reader, mut writer) = stream.split();
     let mut reader = BufReader::new(reader);
 
@@ -368,10 +377,17 @@ async fn test_tcp_server_rejects_invalid_json() {
     reader.read_line(&mut line).await.unwrap();
 
     let response: JsonRpcResponse = serde_json::from_str(line.trim()).unwrap();
-    assert!(response.error.is_some(), "Should return error for invalid JSON");
+    assert!(
+        response.error.is_some(),
+        "Should return error for invalid JSON"
+    );
 
     let error = response.error.unwrap();
-    assert_eq!(error.code, error_codes::PARSE_ERROR, "Should be parse error");
+    assert_eq!(
+        error.code,
+        error_codes::PARSE_ERROR,
+        "Should be parse error"
+    );
 }
 
 /// Test multiple concurrent TCP connections.

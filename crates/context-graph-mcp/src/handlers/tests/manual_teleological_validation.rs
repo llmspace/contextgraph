@@ -136,13 +136,20 @@ async fn test_val_002_search_teleological_orthogonal_vectors_similarity_0() {
     let response = handlers.dispatch(request).await;
 
     let result = response.result.expect("MUST have result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     // Log physical evidence
     eprintln!("=== PHYSICAL EVIDENCE: search_teleological empty query_content ===");
     eprintln!("isError: {}", is_error);
     if let Some(content) = result.get("content").and_then(|v| v.as_array()) {
-        if let Some(text) = content.first().and_then(|c| c.get("text")).and_then(|t| t.as_str()) {
+        if let Some(text) = content
+            .first()
+            .and_then(|c| c.get("text"))
+            .and_then(|t| t.as_str())
+        {
             eprintln!("Error message: {}", text);
         }
     }
@@ -177,23 +184,35 @@ async fn test_val_003_search_teleological_ranking_order_descending() {
     let response = handlers.dispatch(request).await;
 
     let result = response.result.expect("result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     // Log physical evidence
     eprintln!("=== PHYSICAL EVIDENCE: search_teleological no query params ===");
     eprintln!("isError: {}", is_error);
     if let Some(content) = result.get("content").and_then(|v| v.as_array()) {
-        if let Some(text) = content.first().and_then(|c| c.get("text")).and_then(|t| t.as_str()) {
+        if let Some(text) = content
+            .first()
+            .and_then(|c| c.get("text"))
+            .and_then(|t| t.as_str())
+        {
             eprintln!("Error message: {}", text);
             assert!(text.contains("FAIL FAST"), "Error should mention FAIL FAST");
-            assert!(text.contains("query_content") || text.contains("query_vector_id"),
-                "Error should mention missing parameters");
+            assert!(
+                text.contains("query_content") || text.contains("query_vector_id"),
+                "Error should mention missing parameters"
+            );
         }
     }
     eprintln!("=============================================================");
 
     // CRITICAL: Missing both query params MUST fail fast
-    assert!(is_error, "MUST return isError=true for missing query params");
+    assert!(
+        is_error,
+        "MUST return isError=true for missing query params"
+    );
 }
 
 // =============================================================================
@@ -279,13 +298,23 @@ async fn test_val_004_fuse_embeddings_uniform_fusion() {
     eprintln!("==========================================================");
 
     // CRITICAL: Verify purpose_vector has 13 elements (one per embedder)
-    assert_eq!(pv.len(), 13, "purpose_vector MUST have 13 elements (one per embedder)");
+    assert_eq!(
+        pv.len(),
+        13,
+        "purpose_vector MUST have 13 elements (one per embedder)"
+    );
 
     // Verify group_alignments structure
     assert!(ga.get("semantic").is_some(), "Must have semantic alignment");
     assert!(ga.get("temporal").is_some(), "Must have temporal alignment");
-    assert!(ga.get("structural").is_some(), "Must have structural alignment");
-    assert!(ga.get("experiential").is_some(), "Must have experiential alignment");
+    assert!(
+        ga.get("structural").is_some(),
+        "Must have structural alignment"
+    );
+    assert!(
+        ga.get("experiential").is_some(),
+        "Must have experiential alignment"
+    );
 
     // Confidence must be in [0, 1]
     let confidence = parsed["confidence"].as_f64().expect("confidence");

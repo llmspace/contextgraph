@@ -4,8 +4,8 @@
 //! and token embeddings (Stage 5 MaxSim).
 
 use std::collections::{HashMap, HashSet};
-use std::sync::RwLock;
 use std::sync::atomic::AtomicUsize;
+use std::sync::RwLock;
 use uuid::Uuid;
 
 // ============================================================================

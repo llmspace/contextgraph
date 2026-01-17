@@ -26,7 +26,7 @@ use tracing::{debug, info};
 use uuid::Uuid;
 
 use super::constants;
-use super::hyperbolic_walk::{HyperbolicExplorer, ExplorationResult};
+use super::hyperbolic_walk::{ExplorationResult, HyperbolicExplorer};
 use super::types::HyperbolicWalkConfig;
 use crate::error::CoreResult;
 
@@ -153,7 +153,7 @@ impl RemPhase {
         let walk_config = HyperbolicWalkConfig {
             step_size: 0.1,
             max_steps: 100,
-            temperature: constants::REM_TEMPERATURE,         // Constitution: 2.0
+            temperature: constants::REM_TEMPERATURE, // Constitution: 2.0
             min_blind_spot_distance: constants::MIN_SEMANTIC_LEAP, // Constitution: 0.7
             direction_samples: 8,
         };
@@ -222,7 +222,8 @@ impl RemPhase {
         let starting_positions: Vec<[f32; 64]> = vec![[0.0f32; 64]];
 
         // Execute hyperbolic exploration using HyperbolicExplorer
-        let exploration_result: ExplorationResult = self.explorer.explore(&starting_positions, interrupt_flag);
+        let exploration_result: ExplorationResult =
+            self.explorer.explore(&starting_positions, interrupt_flag);
 
         // Convert ExplorationResult to RemReport with real metrics
         let blind_spots_found = exploration_result
@@ -327,9 +328,18 @@ mod tests {
         let phase = RemPhase::new();
 
         assert_eq!(phase.duration.as_secs(), 120, "duration must be 2 minutes");
-        assert_eq!(phase.temperature, 2.0, "temperature must be 2.0 per Constitution");
-        assert_eq!(phase.min_semantic_leap, 0.7, "semantic_leap must be 0.7 per Constitution");
-        assert_eq!(phase.query_limit, 100, "query_limit must be 100 per Constitution");
+        assert_eq!(
+            phase.temperature, 2.0,
+            "temperature must be 2.0 per Constitution"
+        );
+        assert_eq!(
+            phase.min_semantic_leap, 0.7,
+            "semantic_leap must be 0.7 per Constitution"
+        );
+        assert_eq!(
+            phase.query_limit, 100,
+            "query_limit must be 100 per Constitution"
+        );
     }
 
     #[test]
@@ -344,10 +354,16 @@ mod tests {
         assert_eq!(phase.query_limit, constants::MAX_REM_QUERIES);
 
         // Verify explorer is initialized with Constitution-compliant config
-        assert_eq!(phase.explorer.config().temperature, 2.0,
-            "explorer temperature must be 2.0 per Constitution");
-        assert_eq!(phase.explorer.config().min_blind_spot_distance, 0.7,
-            "explorer min_blind_spot_distance must be 0.7 per Constitution");
+        assert_eq!(
+            phase.explorer.config().temperature,
+            2.0,
+            "explorer temperature must be 2.0 per Constitution"
+        );
+        assert_eq!(
+            phase.explorer.config().min_blind_spot_distance,
+            0.7,
+            "explorer min_blind_spot_distance must be 0.7 per Constitution"
+        );
     }
 
     #[test]
@@ -468,20 +484,33 @@ mod tests {
         let report = phase.process(&interrupt).await.unwrap();
 
         // CRITICAL: Verify real exploration occurred (not stub values)
-        assert!(report.completed, "exploration should complete without interrupt");
-        assert!(report.queries_generated > 0, "must generate queries via HyperbolicExplorer");
-        assert!(report.queries_generated <= 100,
-            "queries {} must not exceed Constitution limit 100", report.queries_generated);
+        assert!(
+            report.completed,
+            "exploration should complete without interrupt"
+        );
+        assert!(
+            report.queries_generated > 0,
+            "must generate queries via HyperbolicExplorer"
+        );
+        assert!(
+            report.queries_generated <= 100,
+            "queries {} must not exceed Constitution limit 100",
+            report.queries_generated
+        );
 
         // With no known positions, all visited positions are blind spots
         // This verifies real exploration is happening
-        assert!(report.unique_nodes_visited > 0,
-            "must visit unique positions via hyperbolic walk");
+        assert!(
+            report.unique_nodes_visited > 0,
+            "must visit unique positions via hyperbolic walk"
+        );
 
         // Verify real exploration metrics (not stub multiples like *3)
         // unique_nodes_visited should equal sum of walk trajectory lengths
-        assert!(report.unique_nodes_visited <= report.queries_generated * 50,
-            "unique_nodes_visited should be bounded by max possible walk steps");
+        assert!(
+            report.unique_nodes_visited <= report.queries_generated * 50,
+            "unique_nodes_visited should be bounded by max possible walk steps"
+        );
     }
 
     #[tokio::test]
@@ -492,9 +521,11 @@ mod tests {
         let report = phase.process(&interrupt).await.unwrap();
 
         // Constitution: query_limit = 100
-        assert!(report.queries_generated <= 100,
+        assert!(
+            report.queries_generated <= 100,
             "Constitution violation: queries_generated {} exceeds limit 100",
-            report.queries_generated);
+            report.queries_generated
+        );
     }
 
     #[tokio::test]
@@ -510,8 +541,10 @@ mod tests {
         // (filtering for is_significant())
 
         // Real exploration should produce some coverage
-        assert!(report.exploration_coverage > 0.0,
-            "exploration_coverage should be > 0 from real exploration");
+        assert!(
+            report.exploration_coverage > 0.0,
+            "exploration_coverage should be > 0 from real exploration"
+        );
     }
 
     #[tokio::test]
@@ -525,8 +558,10 @@ mod tests {
         // These assertions ensure we're not returning placeholder values
 
         // Duration should be very short (exploration is fast with no actual embedding lookups)
-        assert!(report.duration.as_millis() < 10000,
-            "exploration should complete quickly without real embedding lookups");
+        assert!(
+            report.duration.as_millis() < 10000,
+            "exploration should complete quickly without real embedding lookups"
+        );
 
         // queries_generated should match explorer's actual query count
         // (not stub value like `self.query_limit`)

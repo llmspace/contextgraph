@@ -103,21 +103,33 @@ impl RealHnswIndex {
         match metric {
             DistanceMetric::Cosine | DistanceMetric::AsymmetricCosine => {
                 let hnsw = Hnsw::<f32, DistCosine>::new(
-                    m, max_elements, max_layer, ef_construction, DistCosine {},
+                    m,
+                    max_elements,
+                    max_layer,
+                    ef_construction,
+                    DistCosine {},
                 );
                 index.inner_cosine = Some(hnsw);
                 debug!("Created DistCosine HNSW index");
             }
             DistanceMetric::Euclidean => {
                 let hnsw = Hnsw::<f32, DistL2>::new(
-                    m, max_elements, max_layer, ef_construction, DistL2 {},
+                    m,
+                    max_elements,
+                    max_layer,
+                    ef_construction,
+                    DistL2 {},
                 );
                 index.inner_l2 = Some(hnsw);
                 debug!("Created DistL2 HNSW index");
             }
             DistanceMetric::DotProduct => {
                 let hnsw = Hnsw::<f32, DistDot>::new(
-                    m, max_elements, max_layer, ef_construction, DistDot {},
+                    m,
+                    max_elements,
+                    max_layer,
+                    ef_construction,
+                    DistDot {},
                 );
                 index.inner_dot = Some(hnsw);
                 debug!("Created DistDot HNSW index");
@@ -131,10 +143,22 @@ impl RealHnswIndex {
                     message: "MaxSim distance metric is not compatible with HNSW.".to_string(),
                 });
             }
+            DistanceMetric::Jaccard => {
+                error!("FATAL: Jaccard distance is not compatible with HNSW indexing (use inverted index)");
+                return Err(IndexError::HnswConstructionFailed {
+                    dimension,
+                    m,
+                    ef_construction,
+                    message: "Jaccard distance metric is for sparse vectors and not compatible with HNSW.".to_string(),
+                });
+            }
         }
 
         index.initialized = true;
-        info!("RealHnswIndex created successfully: dim={}, metric={:?}", dimension, metric);
+        info!(
+            "RealHnswIndex created successfully: dim={}, metric={:?}",
+            dimension, metric
+        );
         Ok(index)
     }
 
@@ -151,7 +175,8 @@ impl RealHnswIndex {
         if vector.len() != self.config.dimension {
             error!(
                 "FATAL: Dimension mismatch in HNSW add: expected {}, got {}",
-                self.config.dimension, vector.len()
+                self.config.dimension,
+                vector.len()
             );
             return Err(IndexError::DimensionMismatch {
                 embedder: EmbedderIndex::E1Semantic,
@@ -183,7 +208,8 @@ impl RealHnswIndex {
                     debug!("Inserted vector into DistCosine HNSW: data_id={}", data_id);
                 } else {
                     return Err(IndexError::HnswInsertionFailed {
-                        memory_id: id, dimension: vector.len(),
+                        memory_id: id,
+                        dimension: vector.len(),
                         message: "Cosine HNSW index not initialized".to_string(),
                     });
                 }
@@ -193,7 +219,8 @@ impl RealHnswIndex {
                     hnsw.insert_slice((vector, data_id));
                 } else {
                     return Err(IndexError::HnswInsertionFailed {
-                        memory_id: id, dimension: vector.len(),
+                        memory_id: id,
+                        dimension: vector.len(),
                         message: "L2 HNSW index not initialized".to_string(),
                     });
                 }
@@ -203,15 +230,24 @@ impl RealHnswIndex {
                     hnsw.insert_slice((vector, data_id));
                 } else {
                     return Err(IndexError::HnswInsertionFailed {
-                        memory_id: id, dimension: vector.len(),
+                        memory_id: id,
+                        dimension: vector.len(),
                         message: "DotProduct HNSW index not initialized".to_string(),
                     });
                 }
             }
             DistanceMetric::MaxSim => {
                 return Err(IndexError::HnswInsertionFailed {
-                    memory_id: id, dimension: vector.len(),
+                    memory_id: id,
+                    dimension: vector.len(),
                     message: "MaxSim is not supported for HNSW".to_string(),
+                });
+            }
+            DistanceMetric::Jaccard => {
+                return Err(IndexError::HnswInsertionFailed {
+                    memory_id: id,
+                    dimension: vector.len(),
+                    message: "Jaccard is for sparse vectors and not supported for HNSW".to_string(),
                 });
             }
         }
@@ -224,7 +260,8 @@ impl RealHnswIndex {
     pub fn search(&self, query: &[f32], k: usize) -> IndexResult<Vec<(Uuid, f32)>> {
         if !self.initialized {
             return Err(IndexError::HnswSearchFailed {
-                k, query_dim: query.len(),
+                k,
+                query_dim: query.len(),
                 message: "Index not initialized".to_string(),
             });
         }
@@ -244,34 +281,45 @@ impl RealHnswIndex {
 
         let ef_search = self.config.ef_search.max(k);
         let neighbours: Vec<Neighbour> = match self.active_metric {
-            DistanceMetric::Cosine | DistanceMetric::AsymmetricCosine => {
-                self.inner_cosine.as_ref()
-                    .map(|h| h.search(query, k, ef_search))
-                    .ok_or_else(|| IndexError::HnswSearchFailed {
-                        k, query_dim: query.len(),
-                        message: "Cosine HNSW index not available".to_string(),
-                    })?
-            }
-            DistanceMetric::Euclidean => {
-                self.inner_l2.as_ref()
-                    .map(|h| h.search(query, k, ef_search))
-                    .ok_or_else(|| IndexError::HnswSearchFailed {
-                        k, query_dim: query.len(),
-                        message: "L2 HNSW index not available".to_string(),
-                    })?
-            }
-            DistanceMetric::DotProduct => {
-                self.inner_dot.as_ref()
-                    .map(|h| h.search(query, k, ef_search))
-                    .ok_or_else(|| IndexError::HnswSearchFailed {
-                        k, query_dim: query.len(),
-                        message: "DotProduct HNSW index not available".to_string(),
-                    })?
-            }
+            DistanceMetric::Cosine | DistanceMetric::AsymmetricCosine => self
+                .inner_cosine
+                .as_ref()
+                .map(|h| h.search(query, k, ef_search))
+                .ok_or_else(|| IndexError::HnswSearchFailed {
+                    k,
+                    query_dim: query.len(),
+                    message: "Cosine HNSW index not available".to_string(),
+                })?,
+            DistanceMetric::Euclidean => self
+                .inner_l2
+                .as_ref()
+                .map(|h| h.search(query, k, ef_search))
+                .ok_or_else(|| IndexError::HnswSearchFailed {
+                    k,
+                    query_dim: query.len(),
+                    message: "L2 HNSW index not available".to_string(),
+                })?,
+            DistanceMetric::DotProduct => self
+                .inner_dot
+                .as_ref()
+                .map(|h| h.search(query, k, ef_search))
+                .ok_or_else(|| IndexError::HnswSearchFailed {
+                    k,
+                    query_dim: query.len(),
+                    message: "DotProduct HNSW index not available".to_string(),
+                })?,
             DistanceMetric::MaxSim => {
                 return Err(IndexError::HnswSearchFailed {
-                    k, query_dim: query.len(),
+                    k,
+                    query_dim: query.len(),
                     message: "MaxSim is not supported for HNSW".to_string(),
+                });
+            }
+            DistanceMetric::Jaccard => {
+                return Err(IndexError::HnswSearchFailed {
+                    k,
+                    query_dim: query.len(),
+                    message: "Jaccard is for sparse vectors and not supported for HNSW".to_string(),
                 });
             }
         };
@@ -281,17 +329,23 @@ impl RealHnswIndex {
             .filter_map(|n| {
                 self.data_id_to_uuid.get(&n.d_id).map(|&uuid| {
                     let similarity = match self.active_metric {
-                        DistanceMetric::Cosine | DistanceMetric::AsymmetricCosine => 1.0 - n.distance,
+                        DistanceMetric::Cosine | DistanceMetric::AsymmetricCosine => {
+                            1.0 - n.distance
+                        }
                         DistanceMetric::Euclidean => 1.0 / (1.0 + n.distance),
                         DistanceMetric::DotProduct => -n.distance,
-                        DistanceMetric::MaxSim => 0.0,
+                        DistanceMetric::MaxSim | DistanceMetric::Jaccard => 0.0,
                     };
                     (uuid, similarity)
                 })
             })
             .collect();
 
-        debug!("HNSW search completed: k={}, returned={} results", k, results.len());
+        debug!(
+            "HNSW search completed: k={}, returned={} results",
+            k,
+            results.len()
+        );
         Ok(results)
     }
 
@@ -301,7 +355,10 @@ impl RealHnswIndex {
             self.uuid_to_data_id.remove(&id);
             self.data_id_to_uuid.remove(&data_id);
             self.stored_vectors.remove(&id);
-            warn!("Removed UUID {} from mappings (data_id={}). Vector remains in graph.", id, data_id);
+            warn!(
+                "Removed UUID {} from mappings (data_id={}). Vector remains in graph.",
+                id, data_id
+            );
             true
         } else {
             false
@@ -309,10 +366,14 @@ impl RealHnswIndex {
     }
 
     #[inline]
-    pub fn len(&self) -> usize { self.uuid_to_data_id.len() }
+    pub fn len(&self) -> usize {
+        self.uuid_to_data_id.len()
+    }
 
     #[inline]
-    pub fn is_empty(&self) -> bool { self.uuid_to_data_id.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.uuid_to_data_id.is_empty()
+    }
 
     /// Approximate memory usage in bytes.
     pub fn memory_usage(&self) -> usize {
@@ -325,26 +386,46 @@ impl RealHnswIndex {
     /// Get the number of points in the underlying HNSW graph.
     pub fn hnsw_point_count(&self) -> usize {
         match self.active_metric {
-            DistanceMetric::Cosine | DistanceMetric::AsymmetricCosine => {
-                self.inner_cosine.as_ref().map(|h| h.get_nb_point()).unwrap_or(0)
-            }
-            DistanceMetric::Euclidean => {
-                self.inner_l2.as_ref().map(|h| h.get_nb_point()).unwrap_or(0)
-            }
-            DistanceMetric::DotProduct => {
-                self.inner_dot.as_ref().map(|h| h.get_nb_point()).unwrap_or(0)
-            }
-            DistanceMetric::MaxSim => 0,
+            DistanceMetric::Cosine | DistanceMetric::AsymmetricCosine => self
+                .inner_cosine
+                .as_ref()
+                .map(|h| h.get_nb_point())
+                .unwrap_or(0),
+            DistanceMetric::Euclidean => self
+                .inner_l2
+                .as_ref()
+                .map(|h| h.get_nb_point())
+                .unwrap_or(0),
+            DistanceMetric::DotProduct => self
+                .inner_dot
+                .as_ref()
+                .map(|h| h.get_nb_point())
+                .unwrap_or(0),
+            DistanceMetric::MaxSim | DistanceMetric::Jaccard => 0,
         }
     }
 
     // === Accessors for persistence module ===
 
-    pub(super) fn uuid_to_data_id(&self) -> &HashMap<Uuid, usize> { &self.uuid_to_data_id }
-    pub(super) fn stored_vectors(&self) -> &HashMap<Uuid, Vec<f32>> { &self.stored_vectors }
-    pub(super) fn config(&self) -> &HnswConfig { &self.config }
-    pub(super) fn active_metric(&self) -> DistanceMetric { self.active_metric }
-    pub(super) fn next_data_id(&self) -> &AtomicUsize { &self.next_data_id }
-    pub(super) fn next_data_id_mut(&mut self) -> &mut AtomicUsize { &mut self.next_data_id }
-    pub(super) fn set_active_metric(&mut self, metric: DistanceMetric) { self.active_metric = metric; }
+    pub(super) fn uuid_to_data_id(&self) -> &HashMap<Uuid, usize> {
+        &self.uuid_to_data_id
+    }
+    pub(super) fn stored_vectors(&self) -> &HashMap<Uuid, Vec<f32>> {
+        &self.stored_vectors
+    }
+    pub(super) fn config(&self) -> &HnswConfig {
+        &self.config
+    }
+    pub(super) fn active_metric(&self) -> DistanceMetric {
+        self.active_metric
+    }
+    pub(super) fn next_data_id(&self) -> &AtomicUsize {
+        &self.next_data_id
+    }
+    pub(super) fn next_data_id_mut(&mut self) -> &mut AtomicUsize {
+        &mut self.next_data_id
+    }
+    pub(super) fn set_active_metric(&mut self, metric: DistanceMetric) {
+        self.active_metric = metric;
+    }
 }

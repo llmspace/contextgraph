@@ -60,28 +60,63 @@ async fn test_drift_check_valid_fingerprints() {
     // Response now includes: overall_drift, per_embedder_drift, most_drifted_embedders, recommendations, trend
 
     // Verify overall_drift (5-level classification: None, Low, Medium, High, Critical)
-    let overall_drift = result.get("overall_drift").expect("Must have overall_drift");
-    assert!(overall_drift.get("level").is_some(), "Must have drift level");
-    assert!(overall_drift.get("similarity").is_some(), "Must have similarity");
-    assert!(overall_drift.get("drift_score").is_some(), "Must have drift_score");
-    assert!(overall_drift.get("has_drifted").is_some(), "Must have has_drifted");
+    let overall_drift = result
+        .get("overall_drift")
+        .expect("Must have overall_drift");
+    assert!(
+        overall_drift.get("level").is_some(),
+        "Must have drift level"
+    );
+    assert!(
+        overall_drift.get("similarity").is_some(),
+        "Must have similarity"
+    );
+    assert!(
+        overall_drift.get("drift_score").is_some(),
+        "Must have drift_score"
+    );
+    assert!(
+        overall_drift.get("has_drifted").is_some(),
+        "Must have has_drifted"
+    );
 
     // Verify per_embedder_drift (exactly 13 entries, one per embedder E1-E13)
     let per_embedder = result.get("per_embedder_drift").and_then(|v| v.as_array());
     assert!(per_embedder.is_some(), "Must have per_embedder_drift array");
-    assert_eq!(per_embedder.unwrap().len(), 13, "Must have exactly 13 embedder entries");
+    assert_eq!(
+        per_embedder.unwrap().len(),
+        13,
+        "Must have exactly 13 embedder entries"
+    );
 
     // Verify most_drifted_embedders (top 5, sorted worst-first)
-    let most_drifted = result.get("most_drifted_embedders").and_then(|v| v.as_array());
+    let most_drifted = result
+        .get("most_drifted_embedders")
+        .and_then(|v| v.as_array());
     assert!(most_drifted.is_some(), "Must have most_drifted_embedders");
-    assert!(most_drifted.unwrap().len() <= 5, "Must have at most 5 most drifted");
+    assert!(
+        most_drifted.unwrap().len() <= 5,
+        "Must have at most 5 most drifted"
+    );
 
     // Verify recommendations array
-    assert!(result.get("recommendations").and_then(|v| v.as_array()).is_some(), "Must have recommendations");
+    assert!(
+        result
+            .get("recommendations")
+            .and_then(|v| v.as_array())
+            .is_some(),
+        "Must have recommendations"
+    );
 
     // Verify analyzed_count and check_time_ms
-    assert!(result.get("analyzed_count").is_some(), "Must have analyzed_count");
-    assert!(result.get("check_time_ms").is_some(), "Must have check_time_ms");
+    assert!(
+        result.get("analyzed_count").is_some(),
+        "Must have analyzed_count"
+    );
+    assert!(
+        result.get("check_time_ms").is_some(),
+        "Must have check_time_ms"
+    );
     assert!(result.get("timestamp").is_some(), "Must have timestamp");
 }
 

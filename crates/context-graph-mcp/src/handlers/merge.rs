@@ -265,7 +265,10 @@ impl Handlers {
     /// 5. Generate reversal hash and store reversal record
     /// 6. Store merged fingerprint
     /// 7. Mark source fingerprints as merged (soft delete)
-    async fn execute_merge(&self, input: &MergeConceptsInput) -> Result<MergeConceptsOutput, String> {
+    async fn execute_merge(
+        &self,
+        input: &MergeConceptsInput,
+    ) -> Result<MergeConceptsOutput, String> {
         // Step 1: Fetch all source fingerprints using batch retrieval
         let source_fingerprints = self.fetch_source_fingerprints(&input.source_ids).await?;
 
@@ -341,7 +344,10 @@ impl Handlers {
             .map(|f| serde_json::to_string(f))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| {
-                error!("CRITICAL: Failed to serialize fingerprint for reversal record: {}", e);
+                error!(
+                    "CRITICAL: Failed to serialize fingerprint for reversal record: {}",
+                    e
+                );
                 format!("Internal error: failed to serialize reversal data: {}", e)
             })?;
 
@@ -372,10 +378,7 @@ impl Handlers {
             .store_content(merged_id, &merged_content)
             .await
         {
-            warn!(
-                "Failed to store merged content (continuing): {}",
-                e
-            );
+            warn!("Failed to store merged content (continuing): {}", e);
             // Non-fatal - content storage is optional per trait defaults
         }
 
@@ -425,10 +428,7 @@ impl Handlers {
             match result {
                 Some(fp) => fingerprints.push(fp),
                 None => {
-                    return Err(format!(
-                        "Source fingerprint not found: {}",
-                        source_ids[i]
-                    ));
+                    return Err(format!("Source fingerprint not found: {}", source_ids[i]));
                 }
             }
         }
@@ -478,7 +478,10 @@ impl Handlers {
     }
 
     /// Merge semantic fingerprints using UNION strategy (average all dimensions).
-    fn merge_semantic_union(&self, fingerprints: &[TeleologicalFingerprint]) -> SemanticFingerprint {
+    fn merge_semantic_union(
+        &self,
+        fingerprints: &[TeleologicalFingerprint],
+    ) -> SemanticFingerprint {
         debug_assert!(
             !fingerprints.is_empty(),
             "merge_semantic_union: precondition violated - empty fingerprints"
@@ -510,20 +513,15 @@ impl Handlers {
                 .collect(),
         );
         let e5_causal = Self::average_dense_vectors(
-            fingerprints
-                .iter()
-                .map(|f| &f.semantic.e5_causal)
-                .collect(),
+            fingerprints.iter().map(|f| &f.semantic.e5_causal).collect(),
         );
-        let e7_code = Self::average_dense_vectors(
-            fingerprints.iter().map(|f| &f.semantic.e7_code).collect(),
-        );
+        let e7_code =
+            Self::average_dense_vectors(fingerprints.iter().map(|f| &f.semantic.e7_code).collect());
         let e8_graph = Self::average_dense_vectors(
             fingerprints.iter().map(|f| &f.semantic.e8_graph).collect(),
         );
-        let e9_hdc = Self::average_dense_vectors(
-            fingerprints.iter().map(|f| &f.semantic.e9_hdc).collect(),
-        );
+        let e9_hdc =
+            Self::average_dense_vectors(fingerprints.iter().map(|f| &f.semantic.e9_hdc).collect());
         let e10_multimodal = Self::average_dense_vectors(
             fingerprints
                 .iter()
@@ -607,10 +605,7 @@ impl Handlers {
                 .collect(),
         );
         let e5_causal = Self::intersection_dense_vectors(
-            fingerprints
-                .iter()
-                .map(|f| &f.semantic.e5_causal)
-                .collect(),
+            fingerprints.iter().map(|f| &f.semantic.e5_causal).collect(),
         );
         let e7_code = Self::intersection_dense_vectors(
             fingerprints.iter().map(|f| &f.semantic.e7_code).collect(),
@@ -731,10 +726,7 @@ impl Handlers {
             &weights,
         );
         let e5_causal = Self::weighted_average_dense_vectors(
-            fingerprints
-                .iter()
-                .map(|f| &f.semantic.e5_causal)
-                .collect(),
+            fingerprints.iter().map(|f| &f.semantic.e5_causal).collect(),
             &weights,
         );
         let e7_code = Self::weighted_average_dense_vectors(
@@ -825,7 +817,10 @@ impl Handlers {
     }
 
     /// Merge Johari fingerprints by averaging soft quadrant weights.
-    fn merge_johari_fingerprints(&self, fingerprints: &[TeleologicalFingerprint]) -> JohariFingerprint {
+    fn merge_johari_fingerprints(
+        &self,
+        fingerprints: &[TeleologicalFingerprint],
+    ) -> JohariFingerprint {
         if fingerprints.is_empty() {
             return JohariFingerprint::default();
         }
@@ -909,10 +904,11 @@ impl Handlers {
         let mut result = vec![0.0f32; dim];
 
         for i in 0..dim {
-            let all_significant =
-                vectors
-                    .iter()
-                    .all(|v| v.get(i).map(|&x| x.abs() >= INTERSECTION_THRESHOLD).unwrap_or(false));
+            let all_significant = vectors.iter().all(|v| {
+                v.get(i)
+                    .map(|&x| x.abs() >= INTERSECTION_THRESHOLD)
+                    .unwrap_or(false)
+            });
 
             if all_significant {
                 let sum: f32 = vectors.iter().filter_map(|v| v.get(i)).sum();
@@ -996,13 +992,12 @@ impl Handlers {
         let first_indices: std::collections::HashSet<u16> =
             vectors[0].indices.iter().cloned().collect();
 
-        let common_indices: std::collections::HashSet<u16> = vectors.iter().skip(1).fold(
-            first_indices,
-            |acc, vec| {
-                let vec_indices: std::collections::HashSet<u16> = vec.indices.iter().cloned().collect();
+        let common_indices: std::collections::HashSet<u16> =
+            vectors.iter().skip(1).fold(first_indices, |acc, vec| {
+                let vec_indices: std::collections::HashSet<u16> =
+                    vec.indices.iter().cloned().collect();
                 acc.intersection(&vec_indices).cloned().collect()
-            },
-        );
+            });
 
         // Average values for common indices
         let n = vectors.len() as f32;
@@ -1071,8 +1066,8 @@ impl Handlers {
 
     /// Store reversal record for 30-day undo capability (SEC-06).
     async fn store_reversal_record(&self, record: &ReversalRecord) -> Result<(), String> {
-        let content =
-            serde_json::to_string(record).map_err(|e| format!("Failed to serialize reversal record: {}", e))?;
+        let content = serde_json::to_string(record)
+            .map_err(|e| format!("Failed to serialize reversal record: {}", e))?;
 
         // Use the merged_id to store reversal record as content
         // Key format: reversal record is associated with merged node

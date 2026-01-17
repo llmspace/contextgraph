@@ -48,9 +48,7 @@ mod tests;
 
 // Re-export all public types for backwards compatibility
 pub use legacy::{CoreError, CoreResult};
-pub use sub_errors::{
-    ConfigError, EmbeddingError, GpuError, IndexError, McpError, StorageError,
-};
+pub use sub_errors::{ConfigError, EmbeddingError, GpuError, IndexError, McpError, StorageError};
 pub use unified::ContextGraphError;
 
 // Re-export Result type alias

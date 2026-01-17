@@ -182,7 +182,10 @@ impl WakeController {
         let current_state = *self.state.read();
 
         if current_state != WakeState::Dreaming {
-            debug!("Wake signal ignored: not in dreaming state ({:?})", current_state);
+            debug!(
+                "Wake signal ignored: not in dreaming state ({:?})",
+                current_state
+            );
             return Ok(());
         }
 
@@ -434,7 +437,10 @@ mod tests {
         let controller = WakeController::new();
         assert_eq!(controller.state(), WakeState::Idle);
         assert!(!controller.is_dreaming());
-        assert!(controller.max_latency.as_millis() < 100, "Must be <100ms per Constitution");
+        assert!(
+            controller.max_latency.as_millis() < 100,
+            "Must be <100ms per Constitution"
+        );
     }
 
     #[test]
@@ -463,7 +469,11 @@ mod tests {
 
         // Complete immediately (should be well under 100ms)
         let latency = controller.complete_wake().unwrap();
-        assert!(latency < Duration::from_millis(100), "Latency {:?} must be <100ms", latency);
+        assert!(
+            latency < Duration::from_millis(100),
+            "Latency {:?} must be <100ms",
+            latency
+        );
         assert_eq!(controller.stats().wake_count, 1);
         assert_eq!(controller.stats().latency_violations, 0);
     }
@@ -591,11 +601,18 @@ mod tests {
         // Action: Check GPU budget
         let result = controller.check_gpu_budget();
 
-        println!("STATE AFTER: {:?}, signaled: {}", controller.state(), controller.is_wake_signaled());
+        println!(
+            "STATE AFTER: {:?}, signaled: {}",
+            controller.state(),
+            controller.is_wake_signaled()
+        );
 
         // Expected: Should NOT trigger wake (>= threshold is 30%, we're AT 30%)
         // The check is `usage > self.max_gpu_usage`, so 0.30 > 0.30 is false
-        assert!(result.is_ok(), "GPU at exactly 30% should not trigger (strict > comparison)");
+        assert!(
+            result.is_ok(),
+            "GPU at exactly 30% should not trigger (strict > comparison)"
+        );
     }
 
     #[test]
@@ -611,7 +628,11 @@ mod tests {
         // Action: Check GPU budget
         let result = controller.check_gpu_budget();
 
-        println!("STATE AFTER: {:?}, signaled: {}", controller.state(), controller.is_wake_signaled());
+        println!(
+            "STATE AFTER: {:?}, signaled: {}",
+            controller.state(),
+            controller.is_wake_signaled()
+        );
 
         // Expected: Should trigger wake (0.31 > 0.30)
         assert!(matches!(result, Err(WakeError::GpuBudgetExceeded { .. })));

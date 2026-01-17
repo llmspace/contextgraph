@@ -150,9 +150,9 @@ impl JohariThresholds {
         let high_coherence = self.is_high_coherence(delta_c);
 
         match (low_entropy, high_coherence) {
-            (true, true) => JohariQuadrant::Open,    // Low S, High C
-            (true, false) => JohariQuadrant::Hidden, // Low S, Low C
-            (false, false) => JohariQuadrant::Blind, // High S, Low C
+            (true, true) => JohariQuadrant::Open,     // Low S, High C
+            (true, false) => JohariQuadrant::Hidden,  // Low S, Low C
+            (false, false) => JohariQuadrant::Blind,  // High S, Low C
             (false, true) => JohariQuadrant::Unknown, // High S, High C
         }
     }
@@ -631,7 +631,10 @@ mod tests {
             !invalid_low.is_valid(),
             "entropy=0.30 should fail validation"
         );
-        println!("  entropy=0.30: is_valid()={} (expected false)", invalid_low.is_valid());
+        println!(
+            "  entropy=0.30: is_valid()={} (expected false)",
+            invalid_low.is_valid()
+        );
 
         let invalid_high = JohariThresholds {
             entropy: 0.70,
@@ -642,7 +645,10 @@ mod tests {
             !invalid_high.is_valid(),
             "entropy=0.70 should fail validation"
         );
-        println!("  entropy=0.70: is_valid()={} (expected false)", invalid_high.is_valid());
+        println!(
+            "  entropy=0.70: is_valid()={} (expected false)",
+            invalid_high.is_valid()
+        );
         println!("  [VERIFIED] Invalid thresholds correctly rejected\n");
 
         println!("=== FSV COMPLETE: All verifications passed ===\n");

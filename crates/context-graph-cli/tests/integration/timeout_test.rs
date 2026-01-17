@@ -47,13 +47,8 @@ async fn test_pre_tool_use_completes_under_100ms() {
 
     // First, start a session
     let start_input = create_session_start_input(&session_id, "/tmp", "cli", None);
-    let start_result = invoke_hook_with_stdin(
-        "session-start",
-        &session_id,
-        &[],
-        &start_input,
-        db_path,
-    );
+    let start_result =
+        invoke_hook_with_stdin("session-start", &session_id, &[], &start_input, db_path);
     assert_exit_code(&start_result, EXIT_SUCCESS, "SessionStart failed");
 
     // Run multiple PreToolUse calls to get consistent timing
@@ -73,12 +68,7 @@ async fn test_pre_tool_use_completes_under_100ms() {
         let result = invoke_hook_with_stdin(
             "pre-tool",
             &session_id,
-            &[
-                "--tool-name",
-                "Read",
-                "--fast-path",
-                "true",
-            ],
+            &["--tool-name", "Read", "--fast-path", "true"],
             &input,
             db_path,
         );
@@ -104,7 +94,9 @@ async fn test_pre_tool_use_completes_under_100ms() {
     assert!(
         p95 < TIMEOUT_PRE_TOOL_MS,
         "PreToolUse p95 timing {}ms exceeds budget {}ms.\nTimes: {:?}",
-        p95, TIMEOUT_PRE_TOOL_MS, times
+        p95,
+        TIMEOUT_PRE_TOOL_MS,
+        times
     );
 
     // End session
@@ -154,13 +146,8 @@ async fn test_session_end_can_use_full_30s_budget() {
 
     // Start session
     let start_input = create_session_start_input(&session_id, "/tmp", "cli", None);
-    let start_result = invoke_hook_with_stdin(
-        "session-start",
-        &session_id,
-        &[],
-        &start_input,
-        db_path,
-    );
+    let start_result =
+        invoke_hook_with_stdin("session-start", &session_id, &[], &start_input, db_path);
     assert_exit_code(&start_result, EXIT_SUCCESS, "SessionStart failed");
 
     // Do some activity to create state worth persisting
@@ -176,12 +163,7 @@ async fn test_session_end_can_use_full_30s_budget() {
         let _ = invoke_hook_with_stdin(
             "post-tool",
             &session_id,
-            &[
-                "--tool-name",
-                "Write",
-                "--success",
-                "true",
-            ],
+            &["--tool-name", "Write", "--success", "true"],
             &post_input,
             db_path,
         );
@@ -193,12 +175,7 @@ async fn test_session_end_can_use_full_30s_budget() {
     let end_result = invoke_hook_with_stdin(
         "session-end",
         &session_id,
-        &[
-            "--duration-ms",
-            "60000",
-            "--generate-summary",
-            "true",
-        ],
+        &["--duration-ms", "60000", "--generate-summary", "true"],
         &end_input,
         db_path,
     );
@@ -214,7 +191,8 @@ async fn test_session_end_can_use_full_30s_budget() {
         assert!(
             (reported_time as i64 - elapsed as i64).unsigned_abs() < tolerance,
             "Reported time {}ms differs significantly from wall clock {}ms",
-            reported_time, elapsed
+            reported_time,
+            elapsed
         );
     }
 
@@ -246,13 +224,8 @@ async fn test_timing_recorded_in_output() {
 
     // SessionStart
     let start_input = create_session_start_input(&session_id, "/tmp", "cli", None);
-    let start_result = invoke_hook_with_stdin(
-        "session-start",
-        &session_id,
-        &[],
-        &start_input,
-        db_path,
-    );
+    let start_result =
+        invoke_hook_with_stdin("session-start", &session_id, &[], &start_input, db_path);
     assert_exit_code(&start_result, EXIT_SUCCESS, "SessionStart failed");
 
     let start_time = start_result.reported_execution_time_ms();
@@ -267,12 +240,7 @@ async fn test_timing_recorded_in_output() {
     let pre_result = invoke_hook_with_stdin(
         "pre-tool",
         &session_id,
-        &[
-            "--tool-name",
-            "Read",
-            "--fast-path",
-            "true",
-        ],
+        &["--tool-name", "Read", "--fast-path", "true"],
         &pre_input,
         db_path,
     );
@@ -286,16 +254,12 @@ async fn test_timing_recorded_in_output() {
     );
 
     // PostToolUse
-    let post_input = create_post_tool_input(&session_id, "Read", json!({}), "result", "tu-timing-001");
+    let post_input =
+        create_post_tool_input(&session_id, "Read", json!({}), "result", "tu-timing-001");
     let post_result = invoke_hook_with_stdin(
         "post-tool",
         &session_id,
-        &[
-            "--tool-name",
-            "Read",
-            "--success",
-            "true",
-        ],
+        &["--tool-name", "Read", "--success", "true"],
         &post_input,
         db_path,
     );
@@ -310,13 +274,8 @@ async fn test_timing_recorded_in_output() {
 
     // UserPromptSubmit
     let prompt_input = create_prompt_submit_input(&session_id, "test prompt", vec![]);
-    let prompt_result = invoke_hook_with_stdin(
-        "prompt-submit",
-        &session_id,
-        &[],
-        &prompt_input,
-        db_path,
-    );
+    let prompt_result =
+        invoke_hook_with_stdin("prompt-submit", &session_id, &[], &prompt_input, db_path);
     assert_exit_code(&prompt_result, EXIT_SUCCESS, "PromptSubmit failed");
 
     let prompt_time = prompt_result.reported_execution_time_ms();
@@ -374,13 +333,8 @@ async fn test_all_hooks_within_budget() {
 
     // SessionStart (budget: 5000ms)
     let start_input = create_session_start_input(&session_id, "/tmp", "cli", None);
-    let start_result = invoke_hook_with_stdin(
-        "session-start",
-        &session_id,
-        &[],
-        &start_input,
-        db_path,
-    );
+    let start_result =
+        invoke_hook_with_stdin("session-start", &session_id, &[], &start_input, db_path);
     assert_exit_code(&start_result, EXIT_SUCCESS, "SessionStart failed");
     assert_timing_under_budget(&start_result, TIMEOUT_SESSION_START_MS, "SessionStart");
 
@@ -389,12 +343,7 @@ async fn test_all_hooks_within_budget() {
     let pre_result = invoke_hook_with_stdin(
         "pre-tool",
         &session_id,
-        &[
-            "--tool-name",
-            "Read",
-            "--fast-path",
-            "true",
-        ],
+        &["--tool-name", "Read", "--fast-path", "true"],
         &pre_input,
         db_path,
     );
@@ -402,16 +351,12 @@ async fn test_all_hooks_within_budget() {
     assert_timing_under_budget(&pre_result, TIMEOUT_PRE_TOOL_MS, "PreToolUse");
 
     // PostToolUse (budget: 3000ms)
-    let post_input = create_post_tool_input(&session_id, "Read", json!({}), "result", "tu-budget-001");
+    let post_input =
+        create_post_tool_input(&session_id, "Read", json!({}), "result", "tu-budget-001");
     let post_result = invoke_hook_with_stdin(
         "post-tool",
         &session_id,
-        &[
-            "--tool-name",
-            "Read",
-            "--success",
-            "true",
-        ],
+        &["--tool-name", "Read", "--success", "true"],
         &post_input,
         db_path,
     );
@@ -420,13 +365,8 @@ async fn test_all_hooks_within_budget() {
 
     // UserPromptSubmit (budget: 2000ms)
     let prompt_input = create_prompt_submit_input(&session_id, "test", vec![]);
-    let prompt_result = invoke_hook_with_stdin(
-        "prompt-submit",
-        &session_id,
-        &[],
-        &prompt_input,
-        db_path,
-    );
+    let prompt_result =
+        invoke_hook_with_stdin("prompt-submit", &session_id, &[], &prompt_input, db_path);
     assert_exit_code(&prompt_result, EXIT_SUCCESS, "PromptSubmit failed");
     assert_timing_under_budget(&prompt_result, TIMEOUT_USER_PROMPT_MS, "UserPromptSubmit");
 

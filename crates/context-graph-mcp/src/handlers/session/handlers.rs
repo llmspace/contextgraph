@@ -123,7 +123,9 @@ pub fn call_session_start(
     params: SessionStartParams,
 ) -> SessionHandlerResult {
     // Generate session_id if not provided
-    let session_id = params.session_id.unwrap_or_else(|| Uuid::new_v4().to_string());
+    let session_id = params
+        .session_id
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
 
     tracing::info!(
         session_id = %session_id,
@@ -323,7 +325,12 @@ pub fn call_post_tool_use(
 
     let duration_ms = params.duration_ms.unwrap_or(0);
 
-    match manager.post_tool_use(&params.session_id, &params.tool_name, params.success, duration_ms) {
+    match manager.post_tool_use(
+        &params.session_id,
+        &params.tool_name,
+        params.success,
+        duration_ms,
+    ) {
         Ok(()) => {
             let response = PostToolUseResponse {
                 session_id: params.session_id,
@@ -502,7 +509,10 @@ mod tests {
             arguments: Some(json!({"content": "test"})),
         };
         let pre_result = call_pre_tool_use(&manager, pre_params).unwrap();
-        println!("FSV-2: Pre-tool recorded, count: {}", pre_result["tool_count"]);
+        println!(
+            "FSV-2: Pre-tool recorded, count: {}",
+            pre_result["tool_count"]
+        );
 
         // 3. Post-tool use
         let post_params = PostToolUseParams {

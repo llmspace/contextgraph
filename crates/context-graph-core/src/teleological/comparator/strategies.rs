@@ -90,7 +90,11 @@ pub(crate) trait AggregationStrategies {
 
         let n = valid_scores.len() as f32;
         let mean: f32 = valid_scores.iter().sum::<f32>() / n;
-        let variance: f32 = valid_scores.iter().map(|&s| (s - mean).powi(2)).sum::<f32>() / n;
+        let variance: f32 = valid_scores
+            .iter()
+            .map(|&s| (s - mean).powi(2))
+            .sum::<f32>()
+            / n;
         let std_dev = variance.sqrt();
 
         // Coefficient of variation determines strategy
@@ -161,10 +165,7 @@ pub(crate) fn aggregate_hierarchical(scores: &[Option<f32>; NUM_EMBEDDERS]) -> f
     let mut valid_groups = 0;
 
     for group_indices in groups.iter() {
-        let group_scores: Vec<f32> = group_indices
-            .iter()
-            .filter_map(|&i| scores[i])
-            .collect();
+        let group_scores: Vec<f32> = group_indices.iter().filter_map(|&i| scores[i]).collect();
 
         if !group_scores.is_empty() {
             let group_mean: f32 = group_scores.iter().sum::<f32>() / group_scores.len() as f32;
@@ -191,7 +192,11 @@ pub(crate) fn aggregate_tucker(scores: &[Option<f32>; NUM_EMBEDDERS]) -> f32 {
 
     let n = valid_scores.len() as f32;
     let mean: f32 = valid_scores.iter().sum::<f32>() / n;
-    let variance: f32 = valid_scores.iter().map(|&s| (s - mean).powi(2)).sum::<f32>() / n;
+    let variance: f32 = valid_scores
+        .iter()
+        .map(|&s| (s - mean).powi(2))
+        .sum::<f32>()
+        / n;
     let std_dev = variance.sqrt();
 
     // Tucker-inspired: weight by how close each score is to the mean

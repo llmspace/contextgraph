@@ -68,80 +68,37 @@ pub use hebbian::{
     EdgeUpdate, HebbianEngine, HebbianUpdateResult,
 };
 pub use hyperbolic_walk::{
-    DiscoveredBlindSpot,
-    ExplorationResult,
-    HyperbolicExplorer,
-    WalkResult,
-    position_to_query,
-    sample_starting_positions,
+    position_to_query, sample_starting_positions, DiscoveredBlindSpot, ExplorationResult,
+    HyperbolicExplorer, WalkResult,
 };
 pub use nrem::{MemoryProvider, NremPhase, NremReport, NullMemoryProvider};
 pub use poincare_walk::{
-    PoincareBallConfig,
-    direction_toward,
-    geodesic_distance,
-    inner_product_64,
-    is_far_from_all,
-    mobius_add,
-    norm_64,
-    norm_squared_64,
-    project_to_ball,
-    random_direction,
-    sample_direction_with_temperature,
-    scale_direction,
-    softmax_temperature,
-    validate_in_ball,
+    direction_toward, geodesic_distance, inner_product_64, is_far_from_all, mobius_add, norm_64,
+    norm_squared_64, project_to_ball, random_direction, sample_direction_with_temperature,
+    scale_direction, softmax_temperature, validate_in_ball, PoincareBallConfig,
 };
 pub use rem::{RemPhase, RemReport};
 pub use scheduler::DreamScheduler;
 pub use thresholds::DreamThresholds;
 pub use triggers::{
-    EntropyCalculator,
-    GpuMonitor,
-    GpuMonitorError,
-    StubGpuMonitor,
-    TriggerConfig,
+    gpu_thresholds, EntropyCalculator, GpuMonitor, GpuMonitorError, StubGpuMonitor, TriggerConfig,
     TriggerManager,
-    gpu_thresholds,
 };
 
+pub use mcp_events::{
+    BlindSpotDiscovered, BroadcastError, DreamCycleCompleted, DreamCycleStarted, DreamEvent,
+    DreamEventBroadcaster, GpuBudgetWarning, LoggingBroadcaster, NoOpBroadcaster,
+    NremPhaseCompleted, RemPhaseCompleted, ShortcutCreated, WakeTriggered,
+};
 #[cfg(feature = "nvml")]
 pub use triggers::NvmlGpuMonitor;
 pub use types::{
-    ConsolidationCallback,
-    ConsolidationMetrics,
-    DreamPhase,
-    EntropyWindow,
-    ExtendedTriggerReason,
-    GpuTriggerState,
-    HebbianConfig,
-    HyperbolicWalkConfig,
-    InvalidMetricsError,
-    NodeActivation,
+    ConsolidationCallback, ConsolidationMetrics, DreamPhase, EntropyWindow, ExtendedTriggerReason,
+    GpuTriggerState, HebbianConfig, HyperbolicWalkConfig, InvalidMetricsError, NodeActivation,
     WalkStep,
 };
-pub use mcp_events::{
-    BlindSpotDiscovered,
-    BroadcastError,
-    DreamCycleCompleted,
-    DreamCycleStarted,
-    DreamEvent,
-    DreamEventBroadcaster,
-    GpuBudgetWarning,
-    LoggingBroadcaster,
-    NoOpBroadcaster,
-    NremPhaseCompleted,
-    RemPhaseCompleted,
-    ShortcutCreated,
-    WakeTriggered,
-};
 pub use wake_controller::{
-    ResourceSnapshot,
-    WakeController,
-    WakeError,
-    WakeHandle,
-    WakeState,
-    WakeStats,
+    ResourceSnapshot, WakeController, WakeError, WakeHandle, WakeState, WakeStats,
 };
 
 use serde::{Deserialize, Serialize};
@@ -194,7 +151,10 @@ pub mod constants {
     pub const MIN_SHORTCUT_TRAVERSALS: usize = 5;
 
     /// Confidence threshold for shortcuts (Constitution: 0.7)
-    #[deprecated(since = "0.5.0", note = "Use DreamThresholds.shortcut_confidence instead")]
+    #[deprecated(
+        since = "0.5.0",
+        note = "Use DreamThresholds.shortcut_confidence instead"
+    )]
     pub const SHORTCUT_CONFIDENCE_THRESHOLD: f32 = 0.7;
 }
 

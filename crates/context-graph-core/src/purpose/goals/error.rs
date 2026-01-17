@@ -35,7 +35,6 @@ pub enum GoalHierarchyError {
 
     // REMOVED: MultipleNorthStars per TASK-P0-001 (ARCH-03)
     // Multiple Strategic goals are now allowed - they emerge autonomously
-
     /// Referenced parent goal does not exist.
     #[error("Parent goal not found: {0}")]
     ParentNotFound(Uuid),

@@ -153,7 +153,10 @@ mod tests {
     fn test_session_start_schema() {
         let defs = definitions();
         let tool = defs.iter().find(|d| d.name == "session_start").unwrap();
-        let props = tool.input_schema.get("properties").expect("should have properties");
+        let props = tool
+            .input_schema
+            .get("properties")
+            .expect("should have properties");
 
         // Check session_id property
         assert!(props.get("session_id").is_some());
@@ -163,7 +166,12 @@ mod tests {
         assert!(props.get("metadata").is_some());
 
         // session_start has no required fields
-        let required = tool.input_schema.get("required").unwrap().as_array().unwrap();
+        let required = tool
+            .input_schema
+            .get("required")
+            .unwrap()
+            .as_array()
+            .unwrap();
         assert!(required.is_empty());
     }
 
@@ -173,11 +181,13 @@ mod tests {
         let tool = defs.iter().find(|d| d.name == "session_end").unwrap();
 
         // session_end requires session_id
-        let required = tool.input_schema.get("required").unwrap().as_array().unwrap();
-        let required_fields: Vec<&str> = required
-            .iter()
-            .map(|v| v.as_str().unwrap())
-            .collect();
+        let required = tool
+            .input_schema
+            .get("required")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        let required_fields: Vec<&str> = required.iter().map(|v| v.as_str().unwrap()).collect();
         assert!(required_fields.contains(&"session_id"));
     }
 
@@ -187,11 +197,13 @@ mod tests {
         let tool = defs.iter().find(|d| d.name == "pre_tool_use").unwrap();
 
         // pre_tool_use requires session_id and tool_name
-        let required = tool.input_schema.get("required").unwrap().as_array().unwrap();
-        let required_fields: Vec<&str> = required
-            .iter()
-            .map(|v| v.as_str().unwrap())
-            .collect();
+        let required = tool
+            .input_schema
+            .get("required")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        let required_fields: Vec<&str> = required.iter().map(|v| v.as_str().unwrap()).collect();
         assert!(required_fields.contains(&"session_id"));
         assert!(required_fields.contains(&"tool_name"));
     }
@@ -202,11 +214,13 @@ mod tests {
         let tool = defs.iter().find(|d| d.name == "post_tool_use").unwrap();
 
         // post_tool_use requires session_id, tool_name, success
-        let required = tool.input_schema.get("required").unwrap().as_array().unwrap();
-        let required_fields: Vec<&str> = required
-            .iter()
-            .map(|v| v.as_str().unwrap())
-            .collect();
+        let required = tool
+            .input_schema
+            .get("required")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        let required_fields: Vec<&str> = required.iter().map(|v| v.as_str().unwrap()).collect();
         assert!(required_fields.contains(&"session_id"));
         assert!(required_fields.contains(&"tool_name"));
         assert!(required_fields.contains(&"success"));

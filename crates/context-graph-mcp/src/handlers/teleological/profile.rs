@@ -104,9 +104,7 @@ impl Handlers {
                     "name": profile.name,
                 }),
             ),
-            None => {
-                self.tool_error_with_pulse(id, &format!("Profile '{}' not found", profile_id))
-            }
+            None => self.tool_error_with_pulse(id, &format!("Profile '{}' not found", profile_id)),
         }
     }
 

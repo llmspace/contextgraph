@@ -81,21 +81,24 @@ mod tests {
         // Check all expected properties exist
         assert!(props.get("delta_s").is_some(), "delta_s property missing");
         assert!(props.get("delta_c").is_some(), "delta_c property missing");
-        assert!(props.get("memory_id").is_some(), "memory_id property missing");
+        assert!(
+            props.get("memory_id").is_some(),
+            "memory_id property missing"
+        );
         assert!(
             props.get("embedder_index").is_some(),
             "embedder_index property missing"
         );
-        assert!(props.get("threshold").is_some(), "threshold property missing");
+        assert!(
+            props.get("threshold").is_some(),
+            "threshold property missing"
+        );
     }
 
     #[test]
     fn test_delta_s_bounds() {
         let tools = definitions();
-        let props = tools[0]
-            .input_schema
-            .get("properties")
-            .unwrap();
+        let props = tools[0].input_schema.get("properties").unwrap();
         let delta_s = props.get("delta_s").unwrap();
 
         assert_eq!(delta_s.get("minimum").unwrap().as_f64().unwrap(), 0.0);
@@ -106,10 +109,7 @@ mod tests {
     #[test]
     fn test_delta_c_bounds() {
         let tools = definitions();
-        let props = tools[0]
-            .input_schema
-            .get("properties")
-            .unwrap();
+        let props = tools[0].input_schema.get("properties").unwrap();
         let delta_c = props.get("delta_c").unwrap();
 
         assert_eq!(delta_c.get("minimum").unwrap().as_f64().unwrap(), 0.0);
@@ -120,10 +120,7 @@ mod tests {
     #[test]
     fn test_embedder_index_bounds() {
         let tools = definitions();
-        let props = tools[0]
-            .input_schema
-            .get("properties")
-            .unwrap();
+        let props = tools[0].input_schema.get("properties").unwrap();
         let embedder_index = props.get("embedder_index").unwrap();
 
         assert_eq!(embedder_index.get("minimum").unwrap().as_i64().unwrap(), 0);
@@ -134,10 +131,7 @@ mod tests {
     #[test]
     fn test_threshold_bounds_and_default() {
         let tools = definitions();
-        let props = tools[0]
-            .input_schema
-            .get("properties")
-            .unwrap();
+        let props = tools[0].input_schema.get("properties").unwrap();
         let threshold = props.get("threshold").unwrap();
 
         assert_eq!(threshold.get("minimum").unwrap().as_f64().unwrap(), 0.0);
@@ -148,10 +142,7 @@ mod tests {
     #[test]
     fn test_memory_id_uuid_format() {
         let tools = definitions();
-        let props = tools[0]
-            .input_schema
-            .get("properties")
-            .unwrap();
+        let props = tools[0].input_schema.get("properties").unwrap();
         let memory_id = props.get("memory_id").unwrap();
 
         assert_eq!(memory_id.get("type").unwrap().as_str().unwrap(), "string");
@@ -164,7 +155,10 @@ mod tests {
         let schema = &tools[0].input_schema;
         // Claude API doesn't support oneOf/allOf/anyOf at root level
         // Validation happens in handler instead
-        assert!(schema.get("oneOf").is_none(), "oneOf not allowed at root level");
+        assert!(
+            schema.get("oneOf").is_none(),
+            "oneOf not allowed at root level"
+        );
         assert_eq!(
             schema.get("additionalProperties").and_then(|v| v.as_bool()),
             Some(false)

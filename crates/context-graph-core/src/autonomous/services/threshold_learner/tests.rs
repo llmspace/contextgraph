@@ -184,9 +184,7 @@ fn test_thompson_sample_updates_with_feedback() {
     // Beta should increase (failure)
     assert!(learner.get_embedder_state(0).unwrap().thompson.beta > initial_beta);
 
-    println!(
-        "[PASS] test_thompson_sample_updates_with_feedback: Thompson params update correctly"
-    );
+    println!("[PASS] test_thompson_sample_updates_with_feedback: Thompson params update correctly");
 }
 
 #[test]

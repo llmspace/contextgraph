@@ -30,6 +30,6 @@ mod tests;
 // Re-export all public types for backwards compatibility
 pub use manager::SelfHealingManager;
 pub use types::{
-    HealingAction, HealingResult, HealthIssue, IssueSeverity, SelfHealingConfig,
-    SystemHealthState, SystemOperationalStatus,
+    HealingAction, HealingResult, HealthIssue, IssueSeverity, SelfHealingConfig, SystemHealthState,
+    SystemOperationalStatus,
 };

@@ -32,7 +32,11 @@ pub fn validate_in_ball(point: &[f32; 64], config: &PoincareBallConfig, context:
     if norm >= config.max_norm {
         panic!(
             "[POINCARE_WALK] Point outside ball at {}:{} ({}): norm = {:.6}, max = {:.6}",
-            file!(), line!(), context, norm, config.max_norm
+            file!(),
+            line!(),
+            context,
+            norm,
+            config.max_norm
         );
     }
 }
@@ -80,8 +84,12 @@ mod tests {
         let v = [0.125f32; 64];
         let expected = 64.0 * 0.015625; // 1.0
         let actual = norm_squared_64(&v);
-        assert!((actual - expected).abs() < 1e-6,
-            "expected {}, got {}", expected, actual);
+        assert!(
+            (actual - expected).abs() < 1e-6,
+            "expected {}, got {}",
+            expected,
+            actual
+        );
     }
 
     #[test]
@@ -89,8 +97,12 @@ mod tests {
         let v = [0.125f32; 64];
         let expected = 1.0f32; // sqrt(1.0)
         let actual = norm_64(&v);
-        assert!((actual - expected).abs() < 1e-6,
-            "expected {}, got {}", expected, actual);
+        assert!(
+            (actual - expected).abs() < 1e-6,
+            "expected {}, got {}",
+            expected,
+            actual
+        );
     }
 
     #[test]
@@ -101,7 +113,10 @@ mod tests {
         b[1] = 1.0;
 
         let result = inner_product_64(&a, &b);
-        assert!(result.abs() < 1e-10, "orthogonal vectors should have 0 inner product");
+        assert!(
+            result.abs() < 1e-10,
+            "orthogonal vectors should have 0 inner product"
+        );
     }
 
     #[test]
@@ -133,8 +148,12 @@ mod tests {
         let new_norm = norm_64(&point);
 
         assert!(projected, "should need projection");
-        assert!(new_norm < config.max_norm,
-            "projected norm {} should be < max_norm {}", new_norm, config.max_norm);
+        assert!(
+            new_norm < config.max_norm,
+            "projected norm {} should be < max_norm {}",
+            new_norm,
+            config.max_norm
+        );
     }
 
     #[test]

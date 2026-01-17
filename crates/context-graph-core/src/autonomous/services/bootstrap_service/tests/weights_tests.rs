@@ -110,7 +110,8 @@ fn test_idf_weighting_enabled() {
     let service_without = BootstrapService::with_config(config_without_idf);
 
     let candidate = GoalCandidate {
-        text: "The goal mission purpose objective is to build this system architecture.".to_string(),
+        text: "The goal mission purpose objective is to build this system architecture."
+            .to_string(),
         source: "test.md".to_string(),
         position: 0.1,
         density: 0.2,

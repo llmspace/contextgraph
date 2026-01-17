@@ -194,11 +194,12 @@ fn test_concurrent_allocation_contention() {
     // SYNTHETIC INPUT: Limited budget, many contenders
     let budget = 10 * 1024; // 10KB
     let allocation_size = 5 * 1024; // 5KB each
-    // Only 2 can succeed out of 10
+                                    // Only 2 can succeed out of 10
     let num_threads = 10;
 
-    let manager =
-        Arc::new(GpuMemoryManager::new(GpuMemoryConfig::with_budget(budget)).expect("Manager creation"));
+    let manager = Arc::new(
+        GpuMemoryManager::new(GpuMemoryConfig::with_budget(budget)).expect("Manager creation"),
+    );
     let barrier = Arc::new(Barrier::new(num_threads));
 
     println!(
@@ -234,12 +235,11 @@ fn test_concurrent_allocation_contention() {
     let successes: usize = results.iter().filter(|(_, ok)| *ok).count();
 
     // SOURCE OF TRUTH: manager.used()
-    println!("AFTER: {} of {} allocations succeeded", successes, num_threads);
     println!(
-        "VERIFY: used={}, budget={}",
-        manager.used(),
-        budget
+        "AFTER: {} of {} allocations succeeded",
+        successes, num_threads
     );
+    println!("VERIFY: used={}, budget={}", manager.used(), budget);
 
     // At most 2 can succeed (10KB / 5KB = 2)
     // But due to timing, might be less
@@ -248,10 +248,7 @@ fn test_concurrent_allocation_contention() {
         "At most 2 should succeed with 5KB allocations in 10KB budget, got {}",
         successes
     );
-    assert!(
-        manager.used() <= budget,
-        "Cannot exceed budget"
-    );
+    assert!(manager.used() <= budget, "Cannot exceed budget");
 
     // Memory should be freed now
     assert_eq!(manager.used(), 0, "All handles dropped, memory freed");

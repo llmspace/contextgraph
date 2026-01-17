@@ -253,7 +253,9 @@ async fn test_purpose_vectors_differentiate_semantics() {
         discovery,
     )
     .expect("Failed to create goal");
-    hierarchy.add_goal(strategic_goal).expect("Failed to add goal");
+    hierarchy
+        .add_goal(strategic_goal)
+        .expect("Failed to add goal");
 
     let config = PurposeComputeConfig::with_hierarchy(hierarchy);
     let computer = DefaultPurposeComputer::new();

@@ -108,7 +108,10 @@ impl HnswMultiSpaceIndex {
         self.hnsw_indexes.get(embedder)
     }
 
-    pub(super) fn get_hnsw_index_mut(&mut self, embedder: &EmbedderIndex) -> Option<&mut RealHnswIndex> {
+    pub(super) fn get_hnsw_index_mut(
+        &mut self,
+        embedder: &EmbedderIndex,
+    ) -> Option<&mut RealHnswIndex> {
         self.hnsw_indexes.get_mut(embedder)
     }
 
@@ -126,11 +129,19 @@ impl HnswMultiSpaceIndex {
 
     // === SPLADE index accessors ===
 
-    pub(super) fn add_splade_internal(&mut self, memory_id: Uuid, sparse: &[(usize, f32)]) -> IndexResult<()> {
+    pub(super) fn add_splade_internal(
+        &mut self,
+        memory_id: Uuid,
+        sparse: &[(usize, f32)],
+    ) -> IndexResult<()> {
         self.splade_index.add(memory_id, sparse)
     }
 
-    pub(super) fn search_splade_internal(&self, sparse_query: &[(usize, f32)], k: usize) -> Vec<(Uuid, f32)> {
+    pub(super) fn search_splade_internal(
+        &self,
+        sparse_query: &[(usize, f32)],
+        k: usize,
+    ) -> Vec<(Uuid, f32)> {
         self.splade_index.search(sparse_query, k)
     }
 

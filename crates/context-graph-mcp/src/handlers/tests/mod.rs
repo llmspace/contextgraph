@@ -43,11 +43,10 @@ mod causal;
 mod cognitive_pulse;
 mod consciousness_dispatch;
 mod content_storage_verification;
-mod exhaustive_mcp_tools;
 mod epistemic;
 mod error_codes;
+mod exhaustive_mcp_tools;
 mod full_state_verification;
-mod tcp_transport_integration;
 mod full_state_verification_gwt;
 mod full_state_verification_johari;
 mod full_state_verification_meta_utl;
@@ -56,12 +55,14 @@ mod full_state_verification_search;
 mod initialize;
 mod inject_synthetic_data;
 mod integration_e2e;
+mod manual_delta_sc_verification;
 mod manual_fix_verification;
 mod manual_fsv_purpose;
 mod manual_fsv_verification;
 mod manual_mcp_happy_paths;
 mod manual_teleological_validation;
 mod memory;
+mod meta_cognitive;
 mod phase1_manual_store_verify;
 mod phase2_search_retrieval;
 mod phase3_gwt_consciousness;
@@ -69,16 +70,15 @@ mod phase4_autonomous_bootstrap;
 mod phase5_teleological_operations;
 mod phase6_cross_agent_coordination;
 mod phase7_final_state_verification;
-mod meta_cognitive;
 mod purpose;
 mod search;
 mod stubfix_fsv_tests;
 mod task_emb_024_verification;
+mod tcp_transport_integration;
 mod teleological;
 mod tools_call;
 mod tools_list;
 mod utl;
-mod manual_delta_sc_verification;
 
 use std::sync::Arc;
 
@@ -912,7 +912,9 @@ pub(crate) fn create_test_handlers_with_all_components() -> Handlers {
         SelfEgoProviderImpl, WorkspaceProviderImpl,
     };
     use context_graph_core::atc::AdaptiveThresholdCalibration;
-    use context_graph_core::dream::{AmortizedLearner, DreamController, DreamScheduler, TriggerManager};
+    use context_graph_core::dream::{
+        AmortizedLearner, DreamController, DreamScheduler, TriggerManager,
+    };
     use context_graph_core::neuromod::NeuromodulationManager;
 
     let store = Arc::new(InMemoryTeleologicalStore::new());

@@ -46,7 +46,10 @@ pub(crate) fn compute_semantic_scores(
     scores[2] = cosine_similarity(&query.e3_temporal_periodic, &target.e3_temporal_periodic);
 
     // E4: Temporal Positional
-    scores[3] = cosine_similarity(&query.e4_temporal_positional, &target.e4_temporal_positional);
+    scores[3] = cosine_similarity(
+        &query.e4_temporal_positional,
+        &target.e4_temporal_positional,
+    );
 
     // E5: Causal
     scores[4] = cosine_similarity(&query.e5_causal, &target.e5_causal);

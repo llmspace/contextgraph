@@ -4,11 +4,11 @@
 
 #![allow(clippy::assertions_on_constants)] // Intentional assertions on constant thresholds for documentation
 
+#[allow(deprecated)]
+use super::super::IC_CRISIS_THRESHOLD;
 use super::super::{
     cosine_similarity_13d, IC_CRITICAL_THRESHOLD, IC_HEALTHY_THRESHOLD, IC_WARNING_THRESHOLD,
 };
-#[allow(deprecated)]
-use super::super::IC_CRISIS_THRESHOLD;
 
 #[test]
 fn test_cosine_similarity_13d_identical_vectors() {
@@ -136,8 +136,12 @@ fn test_cosine_similarity_13d_different_magnitudes() {
 #[test]
 fn test_cosine_similarity_13d_real_purpose_vectors() {
     // Realistic purpose vectors (values in [0, 1])
-    let v1 = [0.85, 0.78, 0.92, 0.67, 0.73, 0.61, 0.88, 0.75, 0.81, 0.69, 0.84, 0.72, 0.79];
-    let v2 = [0.82, 0.75, 0.89, 0.70, 0.76, 0.65, 0.85, 0.72, 0.78, 0.72, 0.81, 0.69, 0.82];
+    let v1 = [
+        0.85, 0.78, 0.92, 0.67, 0.73, 0.61, 0.88, 0.75, 0.81, 0.69, 0.84, 0.72, 0.79,
+    ];
+    let v2 = [
+        0.82, 0.75, 0.89, 0.70, 0.76, 0.65, 0.85, 0.72, 0.78, 0.72, 0.81, 0.69, 0.82,
+    ];
 
     let similarity = cosine_similarity_13d(&v1, &v2);
 
@@ -147,7 +151,11 @@ fn test_cosine_similarity_13d_real_purpose_vectors() {
         "Similar purpose vectors should have high cosine, got {}",
         similarity
     );
-    assert!(similarity <= 1.0, "Cosine should be <= 1.0, got {}", similarity);
+    assert!(
+        similarity <= 1.0,
+        "Cosine should be <= 1.0, got {}",
+        similarity
+    );
 }
 
 #[test]

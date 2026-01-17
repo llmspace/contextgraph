@@ -43,18 +43,17 @@
 //! Run with real GPU embeddings (requires CUDA):
 //!   cargo test --package context-graph-mcp integration_e2e --features cuda -- --nocapture
 
-mod infrastructure;
-mod fsv_lifecycle;
-mod fsv_search;
-mod fsv_alignment;
-mod fsv_johari;
-mod fsv_meta_utl;
-mod fsv_cross_handler;
 mod edge_cases;
+mod fsv_alignment;
+mod fsv_cross_handler;
+mod fsv_johari;
+mod fsv_lifecycle;
+mod fsv_meta_utl;
+mod fsv_search;
+mod infrastructure;
 
 #[cfg(feature = "cuda")]
 mod real_gpu_tests;
 
 #[cfg(feature = "cuda")]
 mod real_gpu_benchmark;
-

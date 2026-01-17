@@ -60,7 +60,9 @@ async fn test_fsv_identity_listener_computes_ic_on_memory_enters() {
     assert_eq!(before_history, 0, "History must start empty");
 
     // EXECUTE - Send MemoryEnters with fingerprint
-    let alignments = [0.8, 0.7, 0.9, 0.6, 0.85, 0.75, 0.8, 0.7, 0.9, 0.65, 0.8, 0.75, 0.85];
+    let alignments = [
+        0.8, 0.7, 0.9, 0.6, 0.85, 0.75, 0.8, 0.7, 0.9, 0.65, 0.8, 0.75, 0.85,
+    ];
     let fingerprint = create_test_fingerprint(alignments);
     let event = WorkspaceEvent::MemoryEnters {
         id: Uuid::new_v4(),
@@ -78,10 +80,15 @@ async fn test_fsv_identity_listener_computes_ic_on_memory_enters() {
     println!("AFTER: history_len = {}", after_history);
 
     // VERIFY - First event establishes baseline, IC computed
-    assert_eq!(after_history, 1, "History should have 1 entry after first event");
+    assert_eq!(
+        after_history, 1,
+        "History should have 1 entry after first event"
+    );
 
     // EVIDENCE
-    println!("EVIDENCE: IdentityContinuityListener correctly processes MemoryEnters with fingerprint");
+    println!(
+        "EVIDENCE: IdentityContinuityListener correctly processes MemoryEnters with fingerprint"
+    );
 }
 
 // ============================================================
@@ -115,7 +122,9 @@ async fn test_identity_listener_ignores_no_fingerprint() {
         "History should remain empty for events without fingerprint"
     );
 
-    println!("EVIDENCE: IdentityContinuityListener correctly ignores MemoryEnters without fingerprint");
+    println!(
+        "EVIDENCE: IdentityContinuityListener correctly ignores MemoryEnters without fingerprint"
+    );
 }
 
 // ============================================================
@@ -171,7 +180,9 @@ async fn test_identity_listener_consecutive_events() {
     let listener = IdentityContinuityListener::new(ego_node, Arc::clone(&broadcaster));
 
     // First event - establishes baseline
-    let alignments1 = [0.8, 0.7, 0.9, 0.6, 0.85, 0.75, 0.8, 0.7, 0.9, 0.65, 0.8, 0.75, 0.85];
+    let alignments1 = [
+        0.8, 0.7, 0.9, 0.6, 0.85, 0.75, 0.8, 0.7, 0.9, 0.65, 0.8, 0.75, 0.85,
+    ];
     let fp1 = create_test_fingerprint(alignments1);
     let event1 = WorkspaceEvent::MemoryEnters {
         id: Uuid::new_v4(),
@@ -186,7 +197,9 @@ async fn test_identity_listener_consecutive_events() {
     println!("IC after first event: {:.3}", ic_after_first);
 
     // Second event - similar alignments (should have high IC)
-    let alignments2 = [0.82, 0.72, 0.88, 0.62, 0.83, 0.77, 0.78, 0.72, 0.88, 0.67, 0.78, 0.77, 0.83];
+    let alignments2 = [
+        0.82, 0.72, 0.88, 0.62, 0.83, 0.77, 0.78, 0.72, 0.88, 0.67, 0.78, 0.77, 0.83,
+    ];
     let fp2 = create_test_fingerprint(alignments2);
     let event2 = WorkspaceEvent::MemoryEnters {
         id: Uuid::new_v4(),
@@ -229,7 +242,9 @@ async fn test_identity_listener_low_ic_warning() {
     let listener = IdentityContinuityListener::new(ego_node, Arc::clone(&broadcaster));
 
     // First event - high positive alignments
-    let alignments1 = [0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9];
+    let alignments1 = [
+        0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9,
+    ];
     let fp1 = create_test_fingerprint(alignments1);
     let event1 = WorkspaceEvent::MemoryEnters {
         id: Uuid::new_v4(),
@@ -241,7 +256,9 @@ async fn test_identity_listener_low_ic_warning() {
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
     // Second event - moderate change in alignments
-    let alignments2 = [0.5, 0.6, 0.5, 0.6, 0.5, 0.6, 0.5, 0.6, 0.5, 0.6, 0.5, 0.6, 0.5];
+    let alignments2 = [
+        0.5, 0.6, 0.5, 0.6, 0.5, 0.6, 0.5, 0.6, 0.5, 0.6, 0.5, 0.6, 0.5,
+    ];
     let fp2 = create_test_fingerprint(alignments2);
     let event2 = WorkspaceEvent::MemoryEnters {
         id: Uuid::new_v4(),
@@ -265,7 +282,9 @@ async fn test_identity_listener_low_ic_warning() {
         "IC should be less than 1.0 for different purpose vectors"
     );
 
-    println!("EVIDENCE: Identity listener correctly detects IC changes from purpose vector divergence");
+    println!(
+        "EVIDENCE: Identity listener correctly detects IC changes from purpose vector divergence"
+    );
 }
 
 // ============================================================
@@ -285,7 +304,8 @@ async fn test_zombie_fix_drop_immediately_after_event() {
 
     // Create listener, send event, drop immediately
     {
-        let listener = IdentityContinuityListener::new(Arc::clone(&ego_node), Arc::clone(&broadcaster));
+        let listener =
+            IdentityContinuityListener::new(Arc::clone(&ego_node), Arc::clone(&broadcaster));
 
         let fp = create_test_fingerprint([0.8; 13]);
         let event = WorkspaceEvent::MemoryEnters {
@@ -315,7 +335,8 @@ async fn test_zombie_fix_rapid_events_then_drop() {
     let broadcaster = Arc::new(WorkspaceEventBroadcaster::new());
 
     {
-        let listener = IdentityContinuityListener::new(Arc::clone(&ego_node), Arc::clone(&broadcaster));
+        let listener =
+            IdentityContinuityListener::new(Arc::clone(&ego_node), Arc::clone(&broadcaster));
 
         // Send 10 events rapidly (each spawns a task)
         for i in 0..10 {
@@ -350,7 +371,8 @@ async fn test_zombie_fix_drop_during_processing() {
     let broadcaster = Arc::new(WorkspaceEventBroadcaster::new());
 
     {
-        let listener = IdentityContinuityListener::new(Arc::clone(&ego_node), Arc::clone(&broadcaster));
+        let listener =
+            IdentityContinuityListener::new(Arc::clone(&ego_node), Arc::clone(&broadcaster));
 
         // Send event
         let fp = create_test_fingerprint([0.9; 13]);

@@ -16,9 +16,14 @@ async fn test_05_search_multi() {
     let (handlers, _store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
 
     // Store memories
-    for content in ["vector embeddings for similarity", "database optimization techniques"] {
+    for content in [
+        "vector embeddings for similarity",
+        "database optimization techniques",
+    ] {
         let params = json!({ "content": content, "importance": 0.8 });
-        handlers.dispatch(make_request("memory/store", 1, Some(params))).await;
+        handlers
+            .dispatch(make_request("memory/store", 1, Some(params)))
+            .await;
     }
 
     // Search - MUST include minSimilarity per constitution FAIL FAST policy
@@ -35,9 +40,16 @@ async fn test_05_search_multi() {
     let request = make_request("search/multi", 10, Some(search_params));
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Should not have error: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Should not have error: {:?}",
+        response.error
+    );
     let result = response.result.expect("Should have result");
 
     println!("\n[VERIFICATION]");
@@ -62,9 +74,16 @@ async fn test_06_search_weight_profiles() {
     let request = make_request("search/weight_profiles", 1, None);
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Should not have error: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Should not have error: {:?}",
+        response.error
+    );
     let result = response.result.expect("Should have result");
 
     println!("\n[VERIFICATION]");

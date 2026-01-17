@@ -104,7 +104,10 @@ impl SelfEgoNode {
     /// From constitution.yaml lines 365-392:
     /// - self_ego_node.fields includes: fingerprint, purpose_vector, coherence_with_actions
     /// - loop: "Retrieve->A(action,PV)->if<0.55 self_reflect->update fingerprint->store evolution"
-    pub fn update_from_fingerprint(&mut self, fingerprint: &TeleologicalFingerprint) -> CoreResult<()> {
+    pub fn update_from_fingerprint(
+        &mut self,
+        fingerprint: &TeleologicalFingerprint,
+    ) -> CoreResult<()> {
         // 1. Copy purpose_vector.alignments to self.purpose_vector
         self.purpose_vector = fingerprint.purpose_vector.alignments;
 

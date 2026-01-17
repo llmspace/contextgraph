@@ -15,13 +15,13 @@
 //! - `handlers`: Handlers struct definition and constructors
 //! - `dispatch`: Request dispatch logic
 
+pub mod bayesian_optimizer;
 mod dispatch;
 pub mod event_log;
 mod handlers;
-pub mod bayesian_optimizer;
 pub mod lambda_correction;
-mod meta_utl_tracker;
 pub mod meta_utl_service;
+mod meta_utl_tracker;
 mod types;
 
 // Re-export all public types for backwards compatibility

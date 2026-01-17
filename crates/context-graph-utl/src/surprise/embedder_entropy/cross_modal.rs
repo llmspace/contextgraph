@@ -214,12 +214,7 @@ impl CrossModalEntropy {
 }
 
 impl EmbedderEntropy for CrossModalEntropy {
-    fn compute_delta_s(
-        &self,
-        current: &[f32],
-        history: &[Vec<f32>],
-        k: usize,
-    ) -> UtlResult<f32> {
+    fn compute_delta_s(&self, current: &[f32], history: &[Vec<f32>], k: usize) -> UtlResult<f32> {
         // Validate input: empty current is an error per spec
         if current.is_empty() {
             return Err(UtlError::EmptyInput);
@@ -345,9 +340,7 @@ mod tests {
         assert!(result.is_ok());
         let delta_s = result.unwrap();
 
-        println!(
-            "BEFORE: history contains 20 identical embeddings to current"
-        );
+        println!("BEFORE: history contains 20 identical embeddings to current");
         println!("AFTER: delta_s = {}", delta_s);
         assert!(
             delta_s < 0.5,
@@ -426,10 +419,8 @@ mod tests {
         // Same modality history (text-like)
         let text_history: Vec<Vec<f32>> = vec![text_current.clone(); 10];
 
-        let cross_modal_result =
-            calculator.compute_delta_s(&text_current, &visual_history, 5);
-        let same_modal_result =
-            calculator.compute_delta_s(&text_current, &text_history, 5);
+        let cross_modal_result = calculator.compute_delta_s(&text_current, &visual_history, 5);
+        let same_modal_result = calculator.compute_delta_s(&text_current, &text_history, 5);
 
         assert!(cross_modal_result.is_ok());
         assert!(same_modal_result.is_ok());
@@ -560,7 +551,10 @@ mod tests {
         let result3 = calculator.compute_delta_s(&mixed, &history, 5);
         assert!(result3.is_ok());
         let delta_s3 = result3.unwrap();
-        assert!(!delta_s3.is_nan(), "delta_s should not be NaN for mixed values");
+        assert!(
+            !delta_s3.is_nan(),
+            "delta_s should not be NaN for mixed values"
+        );
 
         println!("[PASS] test_cross_modal_no_nan_infinity - AP-10 compliant");
     }
@@ -584,16 +578,11 @@ mod tests {
             "cross_weight should be 0.4, got {}",
             calculator.cross_modal_weight
         );
-        assert_eq!(
-            calculator.k_neighbors, 10,
-            "k_neighbors should be 10"
-        );
+        assert_eq!(calculator.k_neighbors, 10, "k_neighbors should be 10");
 
         println!(
             "[PASS] test_cross_modal_from_config - intra={}, cross={}, k={}",
-            calculator.intra_modal_weight,
-            calculator.cross_modal_weight,
-            calculator.k_neighbors
+            calculator.intra_modal_weight, calculator.cross_modal_weight, calculator.k_neighbors
         );
     }
 
@@ -645,10 +634,7 @@ mod tests {
             calculator.running_variance, 0.1,
             "running_variance should reset to 0.1"
         );
-        assert_eq!(
-            calculator.sample_count, 0,
-            "sample_count should reset to 0"
-        );
+        assert_eq!(calculator.sample_count, 0, "sample_count should reset to 0");
 
         println!("[PASS] test_cross_modal_reset");
     }

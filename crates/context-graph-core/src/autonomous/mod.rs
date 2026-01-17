@@ -33,8 +33,8 @@ pub use autonomous_thresholds::{AutonomousThresholds, DriftLevel, ObsolescenceLe
 pub use bootstrap::*;
 pub use curation::*;
 pub use discovery::{
-    Cluster, ClusteringAlgorithm, DiscoveredGoal, DiscoveryConfig, DiscoveryResult,
-    GoalCandidate, GoalDiscoveryPipeline, GoalRelationship, NumClusters,
+    Cluster, ClusteringAlgorithm, DiscoveredGoal, DiscoveryConfig, DiscoveryResult, GoalCandidate,
+    GoalDiscoveryPipeline, GoalRelationship, NumClusters,
 };
 pub use drift::*;
 pub use evolution::*;

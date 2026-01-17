@@ -21,11 +21,11 @@
 //! All operations use REAL RocksDB databases in temp directories.
 //! Failure is fatal and provides detailed diagnostics.
 
-mod helpers;
-mod write_read_tests;
 mod column_family_tests;
 mod edge_case_tests;
+mod helpers;
 mod persistence_tests;
+mod write_read_tests;
 
 // Re-export for test discovery
 pub use helpers::*;

@@ -56,9 +56,7 @@ fn bench_cache_get(c: &mut Criterion) {
     snapshot.consciousness = 0.70;
     update_cache(&snapshot, 0.85);
 
-    c.bench_function("cache_get", |b| {
-        b.iter(|| black_box(IdentityCache::get()))
-    });
+    c.bench_function("cache_get", |b| b.iter(|| black_box(IdentityCache::get())));
 }
 
 /// Benchmark is_warm() check performance.
@@ -68,7 +66,9 @@ fn bench_is_warm(c: &mut Criterion) {
     snapshot.consciousness = 0.60;
     update_cache(&snapshot, 0.85);
 
-    c.bench_function("is_warm", |b| b.iter(|| black_box(IdentityCache::is_warm())));
+    c.bench_function("is_warm", |b| {
+        b.iter(|| black_box(IdentityCache::is_warm()))
+    });
 }
 
 /// Benchmark all consciousness states to verify no outliers.

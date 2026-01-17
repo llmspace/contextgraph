@@ -69,4 +69,6 @@ pub use serotonin::{
     SerotoninLevel, SerotoninModulator, NUM_EMBEDDING_SPACES, SEROTONIN_BASELINE, SEROTONIN_MAX,
     SEROTONIN_MIN,
 };
-pub use state::{cascade, CascadeReport, ModulatorType, NeuromodulationManager, NeuromodulationState};
+pub use state::{
+    cascade, CascadeReport, ModulatorType, NeuromodulationManager, NeuromodulationState,
+};

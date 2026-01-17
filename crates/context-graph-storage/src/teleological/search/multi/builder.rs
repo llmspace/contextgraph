@@ -7,9 +7,7 @@ use std::collections::HashMap;
 use super::super::super::indexes::EmbedderIndex;
 use super::super::error::SearchResult;
 use super::executor::MultiEmbedderSearch;
-use super::types::{
-    AggregationStrategy, MultiEmbedderSearchResults, NormalizationStrategy,
-};
+use super::types::{AggregationStrategy, MultiEmbedderSearchResults, NormalizationStrategy};
 
 // ============================================================================
 // MULTI-SEARCH BUILDER

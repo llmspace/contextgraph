@@ -252,11 +252,7 @@ mod tests {
         println!("=== TEST: Identical vectors have distance 0, similarity 1 ===");
         println!("BEFORE: distance = 0.0");
 
-        let hit = EmbedderSearchHit::from_hnsw(
-            Uuid::new_v4(),
-            0.0,
-            EmbedderIndex::E1Semantic,
-        );
+        let hit = EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 0.0, EmbedderIndex::E1Semantic);
 
         println!("AFTER: similarity = {}", hit.similarity);
         assert!((hit.similarity - 1.0).abs() < 1e-6);
@@ -270,11 +266,7 @@ mod tests {
         println!("=== TEST: Orthogonal vectors have distance 1, similarity 0 ===");
         println!("BEFORE: distance = 1.0");
 
-        let hit = EmbedderSearchHit::from_hnsw(
-            Uuid::new_v4(),
-            1.0,
-            EmbedderIndex::E1Semantic,
-        );
+        let hit = EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 1.0, EmbedderIndex::E1Semantic);
 
         println!("AFTER: similarity = {}", hit.similarity);
         assert!(hit.similarity.abs() < 1e-6);
@@ -288,14 +280,10 @@ mod tests {
         println!("=== TEST: Opposite vectors have distance 2, similarity clamped to 0 ===");
         println!("BEFORE: distance = 2.0");
 
-        let hit = EmbedderSearchHit::from_hnsw(
-            Uuid::new_v4(),
-            2.0,
-            EmbedderIndex::E1Semantic,
-        );
+        let hit = EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 2.0, EmbedderIndex::E1Semantic);
 
         println!("AFTER: similarity = {}", hit.similarity);
-        assert_eq!(hit.similarity, 0.0);  // Clamped
+        assert_eq!(hit.similarity, 0.0); // Clamped
 
         println!("RESULT: PASS");
     }
@@ -305,15 +293,11 @@ mod tests {
         println!("=== TEST: Partial similarity (distance 0.3) ===");
         println!("BEFORE: distance = 0.3");
 
-        let hit = EmbedderSearchHit::from_hnsw(
-            Uuid::new_v4(),
-            0.3,
-            EmbedderIndex::E8Graph,
-        );
+        let hit = EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 0.3, EmbedderIndex::E8Graph);
 
         println!("AFTER: similarity = {}", hit.similarity);
         assert!((hit.similarity - 0.7).abs() < 1e-6);
-        assert!(!hit.is_high_similarity());  // 0.7 < 0.9
+        assert!(!hit.is_high_similarity()); // 0.7 < 0.9
 
         println!("RESULT: PASS");
     }
@@ -324,7 +308,7 @@ mod tests {
 
         let hit = EmbedderSearchHit::from_hnsw(
             Uuid::new_v4(),
-            0.2,  // similarity = 0.8
+            0.2, // similarity = 0.8
             EmbedderIndex::E1Semantic,
         );
 
@@ -367,9 +351,9 @@ mod tests {
 
         let results = SingleEmbedderSearchResults {
             hits: vec![
-                EmbedderSearchHit::from_hnsw(id1, 0.1, EmbedderIndex::E1Semantic),  // sim 0.9
-                EmbedderSearchHit::from_hnsw(id2, 0.3, EmbedderIndex::E1Semantic),  // sim 0.7
-                EmbedderSearchHit::from_hnsw(id3, 0.5, EmbedderIndex::E1Semantic),  // sim 0.5
+                EmbedderSearchHit::from_hnsw(id1, 0.1, EmbedderIndex::E1Semantic), // sim 0.9
+                EmbedderSearchHit::from_hnsw(id2, 0.3, EmbedderIndex::E1Semantic), // sim 0.7
+                EmbedderSearchHit::from_hnsw(id3, 0.5, EmbedderIndex::E1Semantic), // sim 0.5
             ],
             embedder: EmbedderIndex::E1Semantic,
             k: 10,
@@ -409,7 +393,7 @@ mod tests {
         };
 
         assert_eq!(results.top_n(2).len(), 2);
-        assert_eq!(results.top_n(10).len(), 4);  // Only 4 available
+        assert_eq!(results.top_n(10).len(), 4); // Only 4 available
         assert_eq!(results.top_n(0).len(), 0);
 
         println!("RESULT: PASS");
@@ -421,9 +405,9 @@ mod tests {
 
         let results = SingleEmbedderSearchResults {
             hits: vec![
-                EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 0.1, EmbedderIndex::E1Semantic),  // 0.9
-                EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 0.3, EmbedderIndex::E1Semantic),  // 0.7
-                EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 0.6, EmbedderIndex::E1Semantic),  // 0.4
+                EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 0.1, EmbedderIndex::E1Semantic), // 0.9
+                EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 0.3, EmbedderIndex::E1Semantic), // 0.7
+                EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 0.6, EmbedderIndex::E1Semantic), // 0.4
             ],
             embedder: EmbedderIndex::E1Semantic,
             k: 10,
@@ -449,9 +433,9 @@ mod tests {
 
         let results = SingleEmbedderSearchResults {
             hits: vec![
-                EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 0.0, EmbedderIndex::E1Semantic),  // 1.0
-                EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 0.5, EmbedderIndex::E1Semantic),  // 0.5
-                EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 1.0, EmbedderIndex::E1Semantic),  // 0.0
+                EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 0.0, EmbedderIndex::E1Semantic), // 1.0
+                EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 0.5, EmbedderIndex::E1Semantic), // 0.5
+                EmbedderSearchHit::from_hnsw(Uuid::new_v4(), 1.0, EmbedderIndex::E1Semantic), // 0.0
             ],
             embedder: EmbedderIndex::E1Semantic,
             k: 10,
@@ -461,7 +445,7 @@ mod tests {
 
         let avg = results.average_similarity().unwrap();
         println!("Average similarity: {}", avg);
-        assert!((avg - 0.5).abs() < 1e-6);  // (1.0 + 0.5 + 0.0) / 3 = 0.5
+        assert!((avg - 0.5).abs() < 1e-6); // (1.0 + 0.5 + 0.0) / 3 = 0.5
 
         println!("RESULT: PASS");
     }

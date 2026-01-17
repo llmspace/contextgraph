@@ -42,7 +42,9 @@ use uuid::Uuid;
 
 use context_graph_core::gwt::session_identity::{classify_ic, update_cache, IdentityCache};
 use context_graph_core::gwt::ConsciousnessState;
-use context_graph_core::traits::{MultiArrayEmbeddingProvider, TeleologicalMemoryStore, TeleologicalSearchOptions};
+use context_graph_core::traits::{
+    MultiArrayEmbeddingProvider, TeleologicalMemoryStore, TeleologicalSearchOptions,
+};
 use context_graph_core::types::JohariQuadrant;
 use context_graph_embeddings::{GpuConfig, ProductionMultiArrayProvider};
 use context_graph_storage::rocksdb_backend::{RocksDbMemex, StandaloneSessionIdentityManager};
@@ -198,7 +200,7 @@ impl InjectContextResponse {
 #[inline]
 fn classify_johari(delta_s: f32, delta_c: f32, threshold: f32) -> JohariQuadrant {
     match (delta_s < threshold, delta_c > threshold) {
-        (true, true) => JohariQuadrant::Open,    // Low surprise, high coherence
+        (true, true) => JohariQuadrant::Open, // Low surprise, high coherence
         (false, false) => JohariQuadrant::Blind, // High surprise, low coherence
         (true, false) => JohariQuadrant::Hidden, // Low surprise, low coherence
         (false, true) => JohariQuadrant::Unknown, // High surprise, high coherence
@@ -340,9 +342,15 @@ fn output_context(response: &InjectContextResponse, format: InjectFormat) {
         InjectFormat::Standard => {
             // Multi-line, ~100 tokens
             println!("=== Consciousness Context ===");
-            println!("State: {} (IC={:.2}, r={:.2})", response.consciousness_state, response.ic, response.kuramoto_r);
+            println!(
+                "State: {} (IC={:.2}, r={:.2})",
+                response.consciousness_state, response.ic, response.kuramoto_r
+            );
             println!("IC Status: {}", response.ic_status);
-            println!("Johari: {} → {}", response.johari_quadrant, response.recommended_action);
+            println!(
+                "Johari: {} → {}",
+                response.johari_quadrant, response.recommended_action
+            );
             if let Some(ref session) = response.session_id {
                 println!("Session: {}", session);
             }
@@ -366,8 +374,18 @@ fn output_context(response: &InjectContextResponse, format: InjectFormat) {
             println!("  Recommended:     {}", response.recommended_action);
             println!();
             println!("Metadata");
-            println!("  Session ID:   {}", response.session_id.as_deref().unwrap_or("N/A"));
-            println!("  Data Source:  {}", if response.from_cache { "Cache" } else { "Storage" });
+            println!(
+                "  Session ID:   {}",
+                response.session_id.as_deref().unwrap_or("N/A")
+            );
+            println!(
+                "  Data Source:  {}",
+                if response.from_cache {
+                    "Cache"
+                } else {
+                    "Storage"
+                }
+            );
             if let Some(ref error) = response.error {
                 println!();
                 println!("Error: {}", error);
@@ -393,7 +411,9 @@ fn output_degraded(format: InjectFormat, error_msg: &str) {
             println!("=== Consciousness Context (Degraded) ===");
             println!();
             println!("No context available.");
-            println!("Recommended: Run 'consciousness check-identity' or 'session restore-identity'");
+            println!(
+                "Recommended: Run 'consciousness check-identity' or 'session restore-identity'"
+            );
             println!();
             println!("Error: {}", error_msg);
         }
@@ -439,18 +459,16 @@ pub async fn inject_context_command(args: InjectContextArgs) -> i32 {
         // Determine teleological DB path
         let teleological_path = match &args.teleological_db_path {
             Some(p) => p.clone(),
-            None => {
-                match home_dir() {
-                    Some(home) => home.join(".context-graph").join("teleological"),
-                    None => {
-                        error!("Cannot determine home directory for teleological DB path");
-                        eprintln!(
+            None => match home_dir() {
+                Some(home) => home.join(".context-graph").join("teleological"),
+                None => {
+                    error!("Cannot determine home directory for teleological DB path");
+                    eprintln!(
                             "Error: Cannot determine teleological DB path. Set --teleological-db-path or CONTEXT_GRAPH_TELEOLOGICAL_DB_PATH"
                         );
-                        return 1;
-                    }
+                    return 1;
                 }
-            }
+            },
         };
 
         // Execute semantic search
@@ -485,19 +503,17 @@ pub async fn inject_context_command(args: InjectContextArgs) -> i32 {
     // Determine DB path
     let db_path = match &args.db_path {
         Some(p) => p.clone(),
-        None => {
-            match home_dir() {
-                Some(home) => home.join(".context-graph").join("db"),
-                None => {
-                    error!("Cannot determine home directory for DB path");
-                    output_degraded(
-                        args.format,
-                        "Cannot determine DB path. Set --db-path or CONTEXT_GRAPH_DB_PATH",
-                    );
-                    return 1;
-                }
+        None => match home_dir() {
+            Some(home) => home.join(".context-graph").join("db"),
+            None => {
+                error!("Cannot determine home directory for DB path");
+                output_degraded(
+                    args.format,
+                    "Cannot determine DB path. Set --db-path or CONTEXT_GRAPH_DB_PATH",
+                );
+                return 1;
             }
-        }
+        },
     };
 
     // Get context from cache or storage
@@ -594,7 +610,10 @@ async fn execute_semantic_search(
 ) -> Result<SemanticSearchResult, String> {
     info!(
         "semantic-search: Starting with query={:?}, node_ids={:?}, top_k={}, max_tokens={}",
-        query, node_ids.map(|ids| ids.len()), top_k, max_tokens
+        query,
+        node_ids.map(|ids| ids.len()),
+        top_k,
+        max_tokens
     );
 
     // Open teleological store
@@ -649,7 +668,10 @@ async fn execute_query_search(
                 .unwrap_or_else(|| PathBuf::from("./models"))
         });
 
-    debug!("semantic-search: Loading embedding provider from {:?}", models_dir);
+    debug!(
+        "semantic-search: Loading embedding provider from {:?}",
+        models_dir
+    );
 
     // Create embedding provider
     let provider = ProductionMultiArrayProvider::new(models_dir.clone(), GpuConfig::default())
@@ -664,7 +686,10 @@ async fn execute_query_search(
         })?;
 
     // Generate query embeddings
-    debug!("semantic-search: Generating embeddings for query: {:?}", query);
+    debug!(
+        "semantic-search: Generating embeddings for query: {:?}",
+        query
+    );
     let query_output = provider.embed_all(query).await.map_err(|e| {
         let msg = format!("Failed to generate query embeddings: {}", e);
         error!("{}", msg);
@@ -745,14 +770,28 @@ async fn execute_node_id_retrieval(
     let not_found: Vec<_> = fingerprints
         .iter()
         .zip(uuids.iter())
-        .filter_map(|(fp, id)| if fp.is_none() { Some(id.to_string()) } else { None })
+        .filter_map(|(fp, id)| {
+            if fp.is_none() {
+                Some(id.to_string())
+            } else {
+                None
+            }
+        })
         .collect();
 
     if !not_found.is_empty() {
-        warn!("node-id-retrieval: {} IDs not found: {:?}", not_found.len(), not_found);
+        warn!(
+            "node-id-retrieval: {} IDs not found: {:?}",
+            not_found.len(),
+            not_found
+        );
     }
 
-    info!("node-id-retrieval: Found {}/{} nodes", found_ids.len(), uuids.len());
+    info!(
+        "node-id-retrieval: Found {}/{} nodes",
+        found_ids.len(),
+        uuids.len()
+    );
 
     // Fetch content for found IDs
     let contents = store.get_content_batch(&found_ids).await.map_err(|e| {
@@ -805,7 +844,10 @@ fn truncate_to_tokens(contents: &[String], max_tokens: usize) -> (String, usize)
             combined.push_str(&content[..remaining]);
             combined.push_str("...[truncated]");
             current_chars += remaining + 14;
-            debug!("truncate_to_tokens: Truncated entry {} to {} chars", i, remaining);
+            debug!(
+                "truncate_to_tokens: Truncated entry {} to {} chars",
+                i, remaining
+            );
             break;
         }
     }
@@ -918,10 +960,7 @@ mod tests {
 
         for (delta_s, delta_c, threshold, expected) in test_cases {
             let result = classify_johari(delta_s, delta_c, threshold);
-            println!(
-                "  ΔS={:.2}, ΔC={:.2} → {:?}",
-                delta_s, delta_c, result
-            );
+            println!("  ΔS={:.2}, ΔC={:.2} → {:?}", delta_s, delta_c, result);
             assert_eq!(result, expected);
         }
 
@@ -944,10 +983,7 @@ mod tests {
 
         for (delta_s, delta_c, threshold, expected) in test_cases {
             let result = classify_johari(delta_s, delta_c, threshold);
-            println!(
-                "  ΔS={:.2}, ΔC={:.2} → {:?}",
-                delta_s, delta_c, result
-            );
+            println!("  ΔS={:.2}, ΔC={:.2} → {:?}", delta_s, delta_c, result);
             assert_eq!(result, expected);
         }
 
@@ -970,10 +1006,7 @@ mod tests {
 
         for (delta_s, delta_c, threshold, expected) in test_cases {
             let result = classify_johari(delta_s, delta_c, threshold);
-            println!(
-                "  ΔS={:.2}, ΔC={:.2} → {:?}",
-                delta_s, delta_c, result
-            );
+            println!("  ΔS={:.2}, ΔC={:.2} → {:?}", delta_s, delta_c, result);
             assert_eq!(result, expected);
         }
 
@@ -998,7 +1031,10 @@ mod tests {
 
         for (quadrant, expected_action) in test_cases {
             let action = johari_action(quadrant);
-            println!("  {:?} → '{}' (expected: '{}')", quadrant, action, expected_action);
+            println!(
+                "  {:?} → '{}' (expected: '{}')",
+                quadrant, action, expected_action
+            );
             assert_eq!(
                 action, expected_action,
                 "johari_action({:?}) should be '{}'",
@@ -1031,12 +1067,20 @@ mod tests {
         // ΔS just below, ΔC at threshold
         let result2 = classify_johari(0.499, 0.5, 0.5);
         println!("  ΔS=0.499, ΔC=0.5 → {:?}", result2);
-        assert_eq!(result2, JohariQuadrant::Hidden, "ΔS<thresh, ΔC<=thresh → Hidden");
+        assert_eq!(
+            result2,
+            JohariQuadrant::Hidden,
+            "ΔS<thresh, ΔC<=thresh → Hidden"
+        );
 
         // ΔS at threshold, ΔC just above
         let result3 = classify_johari(0.5, 0.501, 0.5);
         println!("  ΔS=0.5, ΔC=0.501 → {:?}", result3);
-        assert_eq!(result3, JohariQuadrant::Unknown, "ΔS>=thresh, ΔC>thresh → Unknown");
+        assert_eq!(
+            result3,
+            JohariQuadrant::Unknown,
+            "ΔS>=thresh, ΔC>thresh → Unknown"
+        );
 
         println!("RESULT: PASS - Boundary conditions handled correctly");
     }
@@ -1067,14 +1111,19 @@ mod tests {
             snapshot.last_ic = 0.85;
             snapshot.kuramoto_phases = [0.0; 13]; // Aligned phases → r ≈ 1.0
 
-            manager.save_snapshot(&snapshot).expect("save_snapshot must succeed");
-            println!("BEFORE: Saved snapshot with IC={}, C={}", snapshot.last_ic, snapshot.consciousness);
+            manager
+                .save_snapshot(&snapshot)
+                .expect("save_snapshot must succeed");
+            println!(
+                "BEFORE: Saved snapshot with IC={}, C={}",
+                snapshot.last_ic, snapshot.consciousness
+            );
             // storage is dropped here
         }
 
         // Load context with force_storage (storage is now closed)
-        let context = get_context_from_cache_or_storage(&db_path, true)
-            .expect("get_context should succeed");
+        let context =
+            get_context_from_cache_or_storage(&db_path, true).expect("get_context should succeed");
 
         println!("AFTER:");
         println!("  IC: {:.4}", context.ic);
@@ -1085,9 +1134,15 @@ mod tests {
 
         // VERIFY
         assert!((context.ic - 0.85).abs() < 0.01, "IC should be ~0.85");
-        assert!(context.kuramoto_r > 0.99, "r should be ~1.0 for aligned phases");
+        assert!(
+            context.kuramoto_r > 0.99,
+            "r should be ~1.0 for aligned phases"
+        );
         assert_eq!(context.session_id, "test-inject-context");
-        assert!(!context.from_cache, "Should be from storage with force_storage=true");
+        assert!(
+            !context.from_cache,
+            "Should be from storage with force_storage=true"
+        );
 
         println!("RESULT: PASS - Context loaded from storage correctly");
     }
@@ -1149,9 +1204,18 @@ mod tests {
         println!("JSON: {}", json);
 
         assert!(json.contains("\"ic\":0.85"), "JSON should contain IC");
-        assert!(json.contains("\"johari_quadrant\":\"Open\""), "JSON should contain quadrant");
-        assert!(json.contains("\"recommended_action\":\"get_node\""), "JSON should contain action");
-        assert!(!json.contains("error"), "JSON should not contain error when None");
+        assert!(
+            json.contains("\"johari_quadrant\":\"Open\""),
+            "JSON should contain quadrant"
+        );
+        assert!(
+            json.contains("\"recommended_action\":\"get_node\""),
+            "JSON should contain action"
+        );
+        assert!(
+            !json.contains("error"),
+            "JSON should not contain error when None"
+        );
 
         println!("RESULT: PASS - Response serializes correctly");
     }
@@ -1166,13 +1230,22 @@ mod tests {
         let response = InjectContextResponse::degraded("Test error message".to_string());
 
         assert_eq!(response.ic, 0.0, "Degraded IC should be 0.0");
-        assert_eq!(response.ic_status, "Unknown", "Degraded status should be Unknown");
-        assert_eq!(response.johari_quadrant, "Unknown", "Degraded quadrant should be Unknown");
+        assert_eq!(
+            response.ic_status, "Unknown",
+            "Degraded status should be Unknown"
+        );
+        assert_eq!(
+            response.johari_quadrant, "Unknown",
+            "Degraded quadrant should be Unknown"
+        );
         assert_eq!(
             response.recommended_action, "restore-identity",
             "Degraded action should be restore-identity"
         );
-        assert!(response.error.is_some(), "Degraded should have error message");
+        assert!(
+            response.error.is_some(),
+            "Degraded should have error message"
+        );
 
         println!("RESULT: PASS - Degraded response created correctly");
     }
@@ -1222,7 +1295,10 @@ mod tests {
         };
 
         let exit_code = inject_context_command(args).await;
-        println!("AFTER: inject_context_command returned exit_code={}", exit_code);
+        println!(
+            "AFTER: inject_context_command returned exit_code={}",
+            exit_code
+        );
 
         assert_eq!(exit_code, 0, "Command should succeed with exit code 0");
 
@@ -1280,7 +1356,10 @@ mod tests {
             elapsed
         );
 
-        println!("RESULT: PASS - Performance within target ({:?} < 1s)", elapsed);
+        println!(
+            "RESULT: PASS - Performance within target ({:?} < 1s)",
+            elapsed
+        );
     }
 
     // =========================================================================
@@ -1293,7 +1372,11 @@ mod tests {
         // With threshold 0.3
         let result1 = classify_johari(0.2, 0.5, 0.3);
         println!("  threshold=0.3: ΔS=0.2, ΔC=0.5 → {:?}", result1);
-        assert_eq!(result1, JohariQuadrant::Open, "Low ΔS, high ΔC with low threshold");
+        assert_eq!(
+            result1,
+            JohariQuadrant::Open,
+            "Low ΔS, high ΔC with low threshold"
+        );
 
         // With threshold 0.7
         let result2 = classify_johari(0.5, 0.8, 0.7);
@@ -1365,7 +1448,10 @@ mod tests {
 
         // Should be 40 chars + "...[truncated]" (14 chars) = 54 chars
         assert!(result.len() <= 54, "Should be truncated to ~54 chars");
-        assert!(result.ends_with("...[truncated]"), "Should end with truncation marker");
+        assert!(
+            result.ends_with("...[truncated]"),
+            "Should end with truncation marker"
+        );
         assert!(tokens <= 14, "Tokens should be limited"); // (40 + 14 + 3) / 4 ≈ 14
         println!("Result: {} chars, {} tokens", result.len(), tokens);
         println!("RESULT: PASS - Long content truncated correctly");
@@ -1383,7 +1469,10 @@ mod tests {
 
         assert!(result.contains("First entry"), "Should contain first entry");
         assert!(result.contains("---"), "Should contain separator");
-        assert!(result.contains("Second entry"), "Should contain second entry");
+        assert!(
+            result.contains("Second entry"),
+            "Should contain second entry"
+        );
         assert!(result.contains("Third entry"), "Should contain third entry");
         println!("Combined result ({} tokens):\n{}", tokens, result);
         println!("RESULT: PASS - Multiple entries combined correctly");
@@ -1405,7 +1494,10 @@ mod tests {
         assert_eq!(separator_count, 1, "Should have exactly one separator");
         assert!(result.contains("Valid content"));
         assert!(result.contains("More content"));
-        println!("Result ({} tokens, {} separators):\n{}", tokens, separator_count, result);
+        println!(
+            "Result ({} tokens, {} separators):\n{}",
+            tokens, separator_count, result
+        );
         println!("RESULT: PASS - Empty entries skipped correctly");
     }
 
@@ -1434,7 +1526,10 @@ mod tests {
         // The truncation should trigger immediately
         println!("Result: '{}', tokens: {}", result, tokens);
         // With 0 max_chars, we should get empty or just truncation marker
-        assert!(result.is_empty() || result.len() <= 14, "Should be minimal output");
+        assert!(
+            result.is_empty() || result.len() <= 14,
+            "Should be minimal output"
+        );
         println!("RESULT: PASS - Zero max tokens handled gracefully");
     }
 
@@ -1504,8 +1599,8 @@ mod tests {
         let args = InjectContextArgs {
             db_path: None,
             format: InjectFormat::Standard,
-            delta_s: 0.3,  // Default per spec
-            delta_c: 0.7,  // Default per spec
+            delta_s: 0.3,   // Default per spec
+            delta_c: 0.7,   // Default per spec
             threshold: 0.5, // Default per constitution.yaml
             force_storage: false,
             query: None,

@@ -148,10 +148,7 @@ fn test_rocksdb_store_retrieve_fingerprint() {
     let id = original.id;
 
     println!("BEFORE: Storing fingerprint {}", id);
-    println!(
-        "  - Theta to north star: {:.4}",
-        original.alignment_score
-    );
+    println!("  - Theta to north star: {:.4}", original.alignment_score);
     println!(
         "  - Evolution snapshots: {}",
         original.purpose_evolution.len()
@@ -181,10 +178,7 @@ fn test_rocksdb_store_retrieve_fingerprint() {
 
     let retrieved = deserialize_teleological_fingerprint(&retrieved_bytes);
     println!("AFTER: Retrieved fingerprint {}", retrieved.id);
-    println!(
-        "  - Theta to north star: {:.4}",
-        retrieved.alignment_score
-    );
+    println!("  - Theta to north star: {:.4}", retrieved.alignment_score);
     println!(
         "  - Evolution snapshots: {}",
         retrieved.purpose_evolution.len()

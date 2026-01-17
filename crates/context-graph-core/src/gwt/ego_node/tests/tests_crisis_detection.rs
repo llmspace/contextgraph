@@ -439,7 +439,9 @@ fn test_status_ordinal_ordering() {
     let r3 = monitor.detect_crisis();
     assert!(r3.recovering, "Warning -> Healthy should be recovering");
 
-    println!("EVIDENCE: Status ordinals correctly ordered: Critical < Degraded < Warning < Healthy");
+    println!(
+        "EVIDENCE: Status ordinals correctly ordered: Critical < Degraded < Warning < Healthy"
+    );
 }
 
 // ============================================================================

@@ -199,11 +199,7 @@ impl<T: TokenStorage> MaxSimScorer<T> {
     /// # Returns
     /// MaxSim score in [0, 1] (assuming normalized vectors)
     #[inline]
-    pub fn compute_maxsim(
-        &self,
-        query_tokens: &[Vec<f32>],
-        doc_tokens: &[Vec<f32>],
-    ) -> f32 {
+    pub fn compute_maxsim(&self, query_tokens: &[Vec<f32>], doc_tokens: &[Vec<f32>]) -> f32 {
         if query_tokens.is_empty() || doc_tokens.is_empty() {
             return 0.0;
         }
@@ -236,11 +232,7 @@ impl<T: TokenStorage> MaxSimScorer<T> {
     ///
     /// # Returns
     /// `Some(score)` if document has tokens, `None` otherwise
-    pub fn score_document(
-        &self,
-        query_tokens: &[Vec<f32>],
-        doc_id: Uuid,
-    ) -> Option<f32> {
+    pub fn score_document(&self, query_tokens: &[Vec<f32>], doc_id: Uuid) -> Option<f32> {
         let doc_tokens = self.token_storage.get_tokens(doc_id)?;
         Some(self.compute_maxsim(query_tokens, &doc_tokens))
     }
@@ -256,11 +248,7 @@ impl<T: TokenStorage> MaxSimScorer<T> {
     /// # Returns
     /// Vector of (id, score) pairs, sorted by descending score.
     /// Documents without tokens are excluded.
-    pub fn score_batch(
-        &self,
-        query_tokens: &[Vec<f32>],
-        doc_ids: &[Uuid],
-    ) -> Vec<(Uuid, f32)> {
+    pub fn score_batch(&self, query_tokens: &[Vec<f32>], doc_ids: &[Uuid]) -> Vec<(Uuid, f32)> {
         if query_tokens.is_empty() || doc_ids.is_empty() {
             return Vec::new();
         }
@@ -268,7 +256,8 @@ impl<T: TokenStorage> MaxSimScorer<T> {
         let mut results: Vec<(Uuid, f32)> = doc_ids
             .par_iter()
             .filter_map(|&id| {
-                self.score_document(query_tokens, id).map(|score| (id, score))
+                self.score_document(query_tokens, id)
+                    .map(|score| (id, score))
             })
             .collect();
 
@@ -321,10 +310,7 @@ impl<T: TokenStorage> MaxSimScorer<T> {
 ///
 /// Convenience function for when you have tokens directly.
 #[inline]
-pub fn compute_maxsim_direct(
-    query_tokens: &[Vec<f32>],
-    doc_tokens: &[Vec<f32>],
-) -> f32 {
+pub fn compute_maxsim_direct(query_tokens: &[Vec<f32>], doc_tokens: &[Vec<f32>]) -> f32 {
     if query_tokens.is_empty() || doc_tokens.is_empty() {
         return 0.0;
     }
@@ -521,10 +507,7 @@ mod tests {
     fn test_maxsim_different_tokens() {
         println!("=== TEST: MaxSim Different Tokens ===");
 
-        let query = vec![
-            generate_normalized_token(1),
-            generate_normalized_token(2),
-        ];
+        let query = vec![generate_normalized_token(1), generate_normalized_token(2)];
         let doc = vec![
             generate_normalized_token(100),
             generate_normalized_token(200),
@@ -579,10 +562,7 @@ mod tests {
 
         let id = Uuid::new_v4();
         // Use IDENTICAL tokens for query and document to verify MaxSim = 1.0
-        let doc_tokens = vec![
-            generate_normalized_token(10),
-            generate_normalized_token(20),
-        ];
+        let doc_tokens = vec![generate_normalized_token(10), generate_normalized_token(20)];
         storage.insert(id, doc_tokens.clone());
 
         // Query uses same tokens as doc - should give MaxSim = 1.0
@@ -594,7 +574,11 @@ mod tests {
         let score = score.unwrap();
         println!("Score: {}", score);
         // Identical query and doc tokens should give MaxSim = 1.0
-        assert!((score - 1.0).abs() < 1e-5, "Identical tokens should score ~1.0, got {}", score);
+        assert!(
+            (score - 1.0).abs() < 1e-5,
+            "Identical tokens should score ~1.0, got {}",
+            score
+        );
 
         println!("[VERIFIED] Scorer correctly scores single document with MaxSim = 1.0");
     }
@@ -746,7 +730,11 @@ mod tests {
         let results = scorer.score_batch(&query_tokens, &ids);
         let elapsed = start.elapsed();
 
-        println!("[AFTER] Scored {} documents in {:?}", results.len(), elapsed);
+        println!(
+            "[AFTER] Scored {} documents in {:?}",
+            results.len(),
+            elapsed
+        );
 
         // Target: <15ms
         // This is a soft target - CI might be slower

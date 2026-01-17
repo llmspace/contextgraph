@@ -163,7 +163,12 @@ mod tests {
     #[test]
     fn test_list_threshold_names() {
         let names = AdaptiveThresholdCalibration::list_threshold_names();
-        assert_eq!(names.len(), 20, "Expected 20 threshold names, got {}", names.len());
+        assert_eq!(
+            names.len(),
+            20,
+            "Expected 20 threshold names, got {}",
+            names.len()
+        );
         assert!(names.contains(&"theta_opt"));
         assert!(names.contains(&"theta_gate"));
         assert!(names.contains(&"theta_obsolescence_high"));
@@ -202,8 +207,12 @@ mod tests {
         // Medical is strictest (1.0), Creative is loosest (0.2)
         let medical_gate = atc.get_threshold("theta_gate", Domain::Medical).unwrap();
         let creative_gate = atc.get_threshold("theta_gate", Domain::Creative).unwrap();
-        let medical_hypersync = atc.get_threshold("theta_hypersync", Domain::Medical).unwrap();
-        let creative_hypersync = atc.get_threshold("theta_hypersync", Domain::Creative).unwrap();
+        let medical_hypersync = atc
+            .get_threshold("theta_hypersync", Domain::Medical)
+            .unwrap();
+        let creative_hypersync = atc
+            .get_threshold("theta_hypersync", Domain::Creative)
+            .unwrap();
 
         assert!(
             medical_gate > creative_gate,
@@ -251,9 +260,7 @@ mod tests {
             Domain::Research,
             Domain::General,
         ] {
-            let low = atc
-                .get_threshold("theta_obsolescence_low", domain)
-                .unwrap();
+            let low = atc.get_threshold("theta_obsolescence_low", domain).unwrap();
             let high = atc
                 .get_threshold("theta_obsolescence_high", domain)
                 .unwrap();

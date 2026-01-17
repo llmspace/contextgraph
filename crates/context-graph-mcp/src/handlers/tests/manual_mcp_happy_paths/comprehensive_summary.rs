@@ -36,7 +36,10 @@ async fn test_all_happy_paths_summary() {
             println!("  [PASS] {} - {}", name, method);
         } else {
             let err = response.error.as_ref().unwrap();
-            println!("  [FAIL] {} - {} - Error: {} ({})", name, method, err.message, err.code);
+            println!(
+                "  [FAIL] {} - {} - Error: {} ({})",
+                name, method, err.message, err.code
+            );
         }
     }
 
@@ -45,8 +48,12 @@ async fn test_all_happy_paths_summary() {
         "content": "Comprehensive test memory for all happy paths",
         "importance": 0.9
     });
-    let store_response = handlers.dispatch(make_request("memory/store", 1, Some(store_params))).await;
-    let fingerprint_id = store_response.result.as_ref()
+    let store_response = handlers
+        .dispatch(make_request("memory/store", 1, Some(store_params)))
+        .await;
+    let fingerprint_id = store_response
+        .result
+        .as_ref()
         .and_then(|r| r.get("fingerprintId"))
         .and_then(|v| v.as_str())
         .unwrap_or("test-id")
@@ -55,76 +62,220 @@ async fn test_all_happy_paths_summary() {
     println!("\nRunning {} MCP method tests...\n", 17);
 
     // Test each method
-    run_test(&handlers, "Initialize", "initialize", Some(json!({
-        "protocolVersion": "2024-11-05",
-        "capabilities": {},
-        "clientInfo": {"name": "test", "version": "1.0"}
-    })), &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "Initialize",
+        "initialize",
+        Some(json!({
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "test", "version": "1.0"}
+        })),
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
-    run_test(&handlers, "Tools List", "tools/list", None, &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "Tools List",
+        "tools/list",
+        None,
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
-    run_test(&handlers, "Memory Store", "memory/store", Some(json!({
-        "content": "Test content",
-        "importance": 0.8
-    })), &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "Memory Store",
+        "memory/store",
+        Some(json!({
+            "content": "Test content",
+            "importance": 0.8
+        })),
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
-    run_test(&handlers, "Memory Retrieve", "memory/retrieve", Some(json!({
-        "fingerprintId": fingerprint_id
-    })), &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "Memory Retrieve",
+        "memory/retrieve",
+        Some(json!({
+            "fingerprintId": fingerprint_id
+        })),
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
-    run_test(&handlers, "Memory Search", "memory/search", Some(json!({
-        "query": "test",
-        "topK": 5,
-        "minSimilarity": 0.0
-    })), &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "Memory Search",
+        "memory/search",
+        Some(json!({
+            "query": "test",
+            "topK": 5,
+            "minSimilarity": 0.0
+        })),
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
-    run_test(&handlers, "Search Multi", "search/multi", Some(json!({
-        "query": "test",
-        "topK": 5,
-        "minSimilarity": 0.0
-    })), &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "Search Multi",
+        "search/multi",
+        Some(json!({
+            "query": "test",
+            "topK": 5,
+            "minSimilarity": 0.0
+        })),
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
-    run_test(&handlers, "Search Weight Profiles", "search/weight_profiles", None, &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "Search Weight Profiles",
+        "search/weight_profiles",
+        None,
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
-    run_test(&handlers, "Purpose Query", "purpose/query", Some(json!({
-        "purpose_vector": [0.8, 0.7, 0.6, 0.5, 0.9, 0.4, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.5]
-    })), &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "Purpose Query",
+        "purpose/query",
+        Some(json!({
+            "purpose_vector": [0.8, 0.7, 0.6, 0.5, 0.9, 0.4, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.5]
+        })),
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
-    run_test(&handlers, "UTL Compute", "utl/compute", Some(json!({
-        "input": "Test content for UTL computation to calculate universal truth likelihood"
-    })), &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "UTL Compute",
+        "utl/compute",
+        Some(json!({
+            "input": "Test content for UTL computation to calculate universal truth likelihood"
+        })),
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
-    run_test(&handlers, "UTL Metrics", "utl/metrics", Some(json!({
-        "input": "Test content for UTL metrics to analyze universal truth likelihood"
-    })), &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "UTL Metrics",
+        "utl/metrics",
+        Some(json!({
+            "input": "Test content for UTL metrics to analyze universal truth likelihood"
+        })),
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
-    run_test(&handlers, "System Status", "system/status", None, &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "System Status",
+        "system/status",
+        None,
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
-    run_test(&handlers, "System Health", "system/health", None, &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "System Health",
+        "system/health",
+        None,
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
-    run_test(&handlers, "Johari Distribution", "johari/get_distribution", Some(json!({
-        "memory_id": fingerprint_id
-    })), &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "Johari Distribution",
+        "johari/get_distribution",
+        Some(json!({
+            "memory_id": fingerprint_id
+        })),
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
-    run_test(&handlers, "Johari Find by Quadrant", "johari/find_by_quadrant", Some(json!({
-        "quadrant": "Unknown",
-        "embedder_index": 0,
-        "limit": 5
-    })), &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "Johari Find by Quadrant",
+        "johari/find_by_quadrant",
+        Some(json!({
+            "quadrant": "Unknown",
+            "embedder_index": 0,
+            "limit": 5
+        })),
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
     // GWT/Consciousness tests may fail if not initialized
-    run_test(&handlers, "GWT Consciousness Level", "gwt/consciousness_level", None, &mut passed, &mut total).await;
-    run_test(&handlers, "Consciousness Get State", "consciousness/get_state", None, &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "GWT Consciousness Level",
+        "gwt/consciousness_level",
+        None,
+        &mut passed,
+        &mut total,
+    )
+    .await;
+    run_test(
+        &handlers,
+        "Consciousness Get State",
+        "consciousness/get_state",
+        None,
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
     // Final memory delete
-    run_test(&handlers, "Memory Delete", "memory/delete", Some(json!({
-        "fingerprintId": fingerprint_id
-    })), &mut passed, &mut total).await;
+    run_test(
+        &handlers,
+        "Memory Delete",
+        "memory/delete",
+        Some(json!({
+            "fingerprintId": fingerprint_id
+        })),
+        &mut passed,
+        &mut total,
+    )
+    .await;
 
     println!("\n========================================================================================================");
-    println!("SUMMARY: {}/{} tests passed ({:.1}%)", passed, total, (passed as f64 / total as f64) * 100.0);
+    println!(
+        "SUMMARY: {}/{} tests passed ({:.1}%)",
+        passed,
+        total,
+        (passed as f64 / total as f64) * 100.0
+    );
     println!("========================================================================================================\n");
 
     // Core functionality should all pass
-    assert!(passed >= 14, "At least 14 core tests should pass (GWT/consciousness may not be initialized)");
+    assert!(
+        passed >= 14,
+        "At least 14 core tests should pass (GWT/consciousness may not be initialized)"
+    );
 }

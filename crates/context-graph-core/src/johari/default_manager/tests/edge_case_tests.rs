@@ -75,14 +75,24 @@ async fn edge_case_3_max_embedder_index() {
 
     // Index 12 should work (valid max)
     let valid_result = manager
-        .transition(id, 12, JohariQuadrant::Open, TransitionTrigger::DreamConsolidation)
+        .transition(
+            id,
+            12,
+            JohariQuadrant::Open,
+            TransitionTrigger::DreamConsolidation,
+        )
         .await;
 
     assert!(valid_result.is_ok());
 
     // Index 13 should fail
     let invalid_result = manager
-        .transition(id, 13, JohariQuadrant::Open, TransitionTrigger::DreamConsolidation)
+        .transition(
+            id,
+            13,
+            JohariQuadrant::Open,
+            TransitionTrigger::DreamConsolidation,
+        )
         .await;
 
     assert!(invalid_result.is_err());

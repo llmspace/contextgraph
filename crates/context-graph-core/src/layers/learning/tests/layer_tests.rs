@@ -53,7 +53,10 @@ async fn test_learning_layer_with_context() {
         "Should have positive delta with high surprise/coherence"
     );
 
-    println!("[VERIFIED] LearningLayer uses L1/L3 context: delta = {}", delta);
+    println!(
+        "[VERIFIED] LearningLayer uses L1/L3 context: delta = {}",
+        delta
+    );
 }
 
 #[tokio::test]
@@ -96,8 +99,7 @@ async fn test_consolidation_trigger() {
         .with_learning_rate(1.0)
         .with_consolidation_threshold(0.01);
 
-    let mut input =
-        LayerInput::new("test-789".to_string(), "trigger consolidation".to_string());
+    let mut input = LayerInput::new("test-789".to_string(), "trigger consolidation".to_string());
     input.context.pulse.entropy = 0.9; // High surprise
     input.context.pulse.coherence = 0.9; // High coherence
 

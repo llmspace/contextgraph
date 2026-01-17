@@ -62,7 +62,10 @@ async fn test_issue1_search_teleological_query_content_parameter() {
 
     // VERIFY: Check content structure
     if let Some(content) = result.get("content").and_then(|v| v.as_array()) {
-        println!("[VERIFY] Content array present with {} items - PASS", content.len());
+        println!(
+            "[VERIFY] Content array present with {} items - PASS",
+            content.len()
+        );
 
         if let Some(first) = content.first() {
             if let Some(text) = first.get("text").and_then(|v| v.as_str()) {
@@ -77,10 +80,16 @@ async fn test_issue1_search_teleological_query_content_parameter() {
                 println!("[VERIFY] No 'missing field query' error - PASS");
 
                 // Check if it's an expected error (FAIL FAST is OK)
-                let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+                let is_error = result
+                    .get("isError")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
                 if is_error {
                     // Some errors are expected (e.g., no stored vectors to search)
-                    println!("[INFO] Tool returned expected error (isError=true): {}", text);
+                    println!(
+                        "[INFO] Tool returned expected error (isError=true): {}",
+                        text
+                    );
                     // Verify it's a valid FAIL FAST error, not a parameter parsing error
                     if text.contains("FAIL FAST") {
                         println!("[VERIFY] FAIL FAST error (expected for empty store) - PASS");
@@ -89,8 +98,12 @@ async fn test_issue1_search_teleological_query_content_parameter() {
                     // Success case
                     println!("[VERIFY] Tool executed successfully");
                     if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) {
-                        if let Some(query_type) = parsed.get("query_type").and_then(|v| v.as_str()) {
-                            assert_eq!(query_type, "embedded", "[FAIL] Expected query_type=embedded");
+                        if let Some(query_type) = parsed.get("query_type").and_then(|v| v.as_str())
+                        {
+                            assert_eq!(
+                                query_type, "embedded",
+                                "[FAIL] Expected query_type=embedded"
+                            );
                             println!("[VERIFY] query_type=embedded - PASS");
                         }
                     }
@@ -106,7 +119,10 @@ async fn test_issue1_search_teleological_query_content_parameter() {
     println!("\n[PHYSICAL EVIDENCE]");
     println!("  Request method: tools/call");
     println!("  Tool name: search_teleological");
-    println!("  Parameter: query_content (string) = \"{}\"", synthetic_query);
+    println!(
+        "  Parameter: query_content (string) = \"{}\"",
+        synthetic_query
+    );
     println!("  Response error: {:?}", response.error);
     println!("  Response has result: true"); // Already consumed by expect() above
     println!("\n[ISSUE-1 VERIFICATION COMPLETE]\n");
@@ -136,7 +152,10 @@ async fn test_issue1_query_content_or_vector_id() {
         })),
     );
     let response1 = handlers.dispatch(request1).await;
-    assert!(response1.error.is_none(), "query_content alone should not cause protocol error");
+    assert!(
+        response1.error.is_none(),
+        "query_content alone should not cause protocol error"
+    );
     println!("[VERIFY] query_content alone accepted - PASS");
 
     // Test 2: Only query_vector_id (should work if UUID valid, fail if not found)
@@ -152,7 +171,10 @@ async fn test_issue1_query_content_or_vector_id() {
         })),
     );
     let response2 = handlers.dispatch(request2).await;
-    assert!(response2.error.is_none(), "query_vector_id alone should not cause protocol error");
+    assert!(
+        response2.error.is_none(),
+        "query_vector_id alone should not cause protocol error"
+    );
     println!("[VERIFY] query_vector_id alone accepted - PASS");
 
     // The result may be an error (vector not found), but that's expected business logic

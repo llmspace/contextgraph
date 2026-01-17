@@ -14,7 +14,7 @@
 //! All tests use real InMemoryTeleologicalStore with real fingerprints.
 //! NO fallbacks, NO default values, NO workarounds.
 
-mod helpers;
-mod fsv_tests;
 mod edge_cases;
+mod fsv_tests;
+mod helpers;
 mod weight_constraint_tests;

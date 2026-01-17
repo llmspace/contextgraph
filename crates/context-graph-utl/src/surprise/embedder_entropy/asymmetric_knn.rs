@@ -92,12 +92,7 @@ impl AsymmetricKnnEntropy {
 }
 
 impl EmbedderEntropy for AsymmetricKnnEntropy {
-    fn compute_delta_s(
-        &self,
-        current: &[f32],
-        history: &[Vec<f32>],
-        k: usize,
-    ) -> UtlResult<f32> {
+    fn compute_delta_s(&self, current: &[f32], history: &[Vec<f32>], k: usize) -> UtlResult<f32> {
         // Validate input
         if current.is_empty() {
             return Err(UtlError::EmptyInput);

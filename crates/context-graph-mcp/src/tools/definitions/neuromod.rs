@@ -1,8 +1,8 @@
 //! Neuromodulation tool definitions.
 //! TASK-NEUROMOD-MCP: Neuromodulator state and adjustments.
 
-use serde_json::json;
 use crate::tools::types::ToolDefinition;
+use serde_json::json;
 
 /// Returns Neuromodulation tool definitions (2 tools).
 pub fn definitions() -> Vec<ToolDefinition> {
@@ -19,7 +19,6 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "required": []
             }),
         ),
-
         // adjust_neuromodulator - Adjust a specific modulator
         ToolDefinition::new(
             "adjust_neuromodulator",

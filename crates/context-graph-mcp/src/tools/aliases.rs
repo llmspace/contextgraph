@@ -47,16 +47,25 @@ mod tests {
 
     #[test]
     fn test_consolidate_memories_alias() {
-        assert_eq!(resolve_alias("consolidate_memories"), "trigger_consolidation");
+        assert_eq!(
+            resolve_alias("consolidate_memories"),
+            "trigger_consolidation"
+        );
     }
 
     #[test]
     fn test_canonical_name_unchanged() {
         // Canonical names should pass through unchanged
         assert_eq!(resolve_alias("discover_sub_goals"), "discover_sub_goals");
-        assert_eq!(resolve_alias("trigger_consolidation"), "trigger_consolidation");
+        assert_eq!(
+            resolve_alias("trigger_consolidation"),
+            "trigger_consolidation"
+        );
         assert_eq!(resolve_alias("inject_context"), "inject_context");
-        assert_eq!(resolve_alias("get_consciousness_state"), "get_consciousness_state");
+        assert_eq!(
+            resolve_alias("get_consciousness_state"),
+            "get_consciousness_state"
+        );
     }
 
     #[test]

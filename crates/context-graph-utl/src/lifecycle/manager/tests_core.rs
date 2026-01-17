@@ -201,16 +201,28 @@ mod tests {
         let json = serde_json::to_string(&manager).expect("serialize");
 
         // Verify override is in JSON
-        assert!(json.contains("lambda_override"), "lambda_override should be in JSON");
+        assert!(
+            json.contains("lambda_override"),
+            "lambda_override should be in JSON"
+        );
 
         // Deserialize
         let restored: LifecycleManager = serde_json::from_str(&json).expect("deserialize");
 
         // Verify override preserved
-        assert!(restored.has_lambda_override(), "override should be preserved");
+        assert!(
+            restored.has_lambda_override(),
+            "override should be preserved"
+        );
         let restored_weights = restored.get_effective_weights();
-        assert!((restored_weights.lambda_s() - 0.4).abs() < 1e-6, "lambda_s should be 0.4");
-        assert!((restored_weights.lambda_c() - 0.6).abs() < 1e-6, "lambda_c should be 0.6");
+        assert!(
+            (restored_weights.lambda_s() - 0.4).abs() < 1e-6,
+            "lambda_s should be 0.4"
+        );
+        assert!(
+            (restored_weights.lambda_c() - 0.6).abs() < 1e-6,
+            "lambda_c should be 0.6"
+        );
     }
 
     #[test]
@@ -226,11 +238,14 @@ mod tests {
             "smoothing_window": 5
         }"#;
 
-        let manager: LifecycleManager = serde_json::from_str(json_without_override)
-            .expect("deserialize old format");
+        let manager: LifecycleManager =
+            serde_json::from_str(json_without_override).expect("deserialize old format");
 
         // Should not have override (defaults to None)
-        assert!(!manager.has_lambda_override(), "override should default to None");
+        assert!(
+            !manager.has_lambda_override(),
+            "override should default to None"
+        );
     }
 
     #[test]
@@ -242,6 +257,9 @@ mod tests {
         let json = serde_json::to_string(&manager).expect("serialize");
 
         // When None, field should be omitted
-        assert!(!json.contains("lambda_override"), "lambda_override should be omitted when None");
+        assert!(
+            !json.contains("lambda_override"),
+            "lambda_override should be omitted when None"
+        );
     }
 }

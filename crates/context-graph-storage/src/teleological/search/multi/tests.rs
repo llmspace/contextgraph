@@ -191,9 +191,9 @@ fn test_normalization_ranknorm() {
     let normalized = search.normalize_scores(&hits, &NormalizationStrategy::RankNorm);
 
     assert_eq!(normalized.len(), 3);
-    assert!((normalized[0].2 - 1.0).abs() < 0.001);      // 1/1
-    assert!((normalized[1].2 - 0.5).abs() < 0.001);      // 1/2
-    assert!((normalized[2].2 - 0.333).abs() < 0.01);     // 1/3
+    assert!((normalized[0].2 - 1.0).abs() < 0.001); // 1/1
+    assert!((normalized[1].2 - 0.5).abs() < 0.001); // 1/2
+    assert!((normalized[2].2 - 0.333).abs() < 0.01); // 1/3
 
     println!("RESULT: PASS");
 }
@@ -412,10 +412,9 @@ fn test_multi_search_builder() {
     let registry = Arc::new(EmbedderIndexRegistry::new());
     let search = MultiEmbedderSearch::new(Arc::clone(&registry));
 
-    let queries: HashMap<EmbedderIndex, Vec<f32>> =
-        [(EmbedderIndex::E8Graph, vec![0.5f32; 384])]
-            .into_iter()
-            .collect();
+    let queries: HashMap<EmbedderIndex, Vec<f32>> = [(EmbedderIndex::E8Graph, vec![0.5f32; 384])]
+        .into_iter()
+        .collect();
 
     let result = MultiSearchBuilder::new(queries)
         .k(50)
@@ -435,13 +434,12 @@ fn test_multi_search_builder() {
 fn test_builder_add_query() {
     println!("=== TEST: MultiSearchBuilder::add_query ===");
 
-    let queries: HashMap<EmbedderIndex, Vec<f32>> =
-        [(EmbedderIndex::E8Graph, vec![0.5f32; 384])]
-            .into_iter()
-            .collect();
+    let queries: HashMap<EmbedderIndex, Vec<f32>> = [(EmbedderIndex::E8Graph, vec![0.5f32; 384])]
+        .into_iter()
+        .collect();
 
-    let builder = MultiSearchBuilder::new(queries)
-        .add_query(EmbedderIndex::E1Semantic, vec![0.5f32; 1024]);
+    let builder =
+        MultiSearchBuilder::new(queries).add_query(EmbedderIndex::E1Semantic, vec![0.5f32; 1024]);
 
     assert_eq!(builder.queries.len(), 2);
     assert!(builder.queries.contains_key(&EmbedderIndex::E1Semantic));
@@ -593,8 +591,13 @@ fn test_full_state_verification() {
     println!("  Embedders searched: {:?}", results.embedders_searched);
 
     for (i, hit) in results.iter().enumerate() {
-        println!("  [{}] ID={} score={:.4} embedders={}",
-                 i, hit.id, hit.aggregated_score, hit.embedder_count());
+        println!(
+            "  [{}] ID={} score={:.4} embedders={}",
+            i,
+            hit.id,
+            hit.aggregated_score,
+            hit.embedder_count()
+        );
         for (emb, orig, norm) in &hit.contributing_embedders {
             println!("       {:?}: orig={:.4}, norm={:.4}", emb, orig, norm);
         }
@@ -606,7 +609,10 @@ fn test_full_state_verification() {
 
     // id_shared should be found by both (multi-modal)
     let shared_hit = results.iter().find(|h| h.id == id_shared).unwrap();
-    assert!(shared_hit.is_multi_modal(), "shared ID should be multi-modal");
+    assert!(
+        shared_hit.is_multi_modal(),
+        "shared ID should be multi-modal"
+    );
     assert_eq!(shared_hit.embedder_count(), 2);
 
     // id_e1_only should be found only by E1
@@ -631,11 +637,17 @@ fn test_full_state_verification() {
     // Verify vectors in index
     let found_shared_e1 = index_e1.search(&vec_e1, 1, None).unwrap();
     assert!(!found_shared_e1.is_empty());
-    println!("  id_shared in E1: found with distance {:.4}", found_shared_e1[0].1);
+    println!(
+        "  id_shared in E1: found with distance {:.4}",
+        found_shared_e1[0].1
+    );
 
     let found_shared_e8 = index_e8.search(&vec_e8, 1, None).unwrap();
     assert!(!found_shared_e8.is_empty());
-    println!("  id_shared in E8: found with distance {:.4}", found_shared_e8[0].1);
+    println!(
+        "  id_shared in E8: found with distance {:.4}",
+        found_shared_e8[0].1
+    );
 
     println!();
     println!("=== FULL STATE VERIFICATION COMPLETE ===");

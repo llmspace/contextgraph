@@ -220,11 +220,7 @@ mod tests {
         let id = Uuid::new_v4();
 
         // Add document tokens
-        let doc_tokens: Vec<Vec<f32>> = vec![
-            vec![1.0; 128],
-            vec![0.5; 128],
-            vec![0.0; 128],
-        ];
+        let doc_tokens: Vec<Vec<f32>> = vec![vec![1.0; 128], vec![0.5; 128], vec![0.0; 128]];
         token_storage.insert(id, doc_tokens);
 
         println!("[BEFORE] Token storage has {} entries", token_storage.len());
@@ -285,16 +281,14 @@ mod tests {
         let mut bad_matryoshka = vec![0.5; 128];
         bad_matryoshka[50] = f32::NAN;
 
-        let result = pipeline.execute(
-            &[],
-            &bad_matryoshka,
-            &vec![0.5; 1024],
-            &[],
-        );
+        let result = pipeline.execute(&[], &bad_matryoshka, &vec![0.5; 1024], &[]);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(matches!(err, PipelineError::Search(SearchError::InvalidVector { .. })));
+        assert!(matches!(
+            err,
+            PipelineError::Search(SearchError::InvalidVector { .. })
+        ));
 
         println!("[VERIFIED] NaN in vector causes FAIL FAST");
     }
@@ -309,16 +303,14 @@ mod tests {
         // Wrong dimension for matryoshka (should be 128)
         let bad_matryoshka = vec![0.5; 64];
 
-        let result = pipeline.execute(
-            &[],
-            &bad_matryoshka,
-            &vec![0.5; 1024],
-            &[],
-        );
+        let result = pipeline.execute(&[], &bad_matryoshka, &vec![0.5; 1024], &[]);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(matches!(err, PipelineError::Search(SearchError::DimensionMismatch { .. })));
+        assert!(matches!(
+            err,
+            PipelineError::Search(SearchError::DimensionMismatch { .. })
+        ));
 
         println!("[VERIFIED] Wrong dimension causes FAIL FAST");
     }
@@ -393,7 +385,10 @@ mod tests {
         candidate.add_stage_score(PipelineStage::SpladeFilter, 0.75);
         assert_eq!(candidate.score, 0.75);
         assert_eq!(candidate.stage_scores.len(), 1);
-        assert_eq!(candidate.stage_scores[0], (PipelineStage::SpladeFilter, 0.75));
+        assert_eq!(
+            candidate.stage_scores[0],
+            (PipelineStage::SpladeFilter, 0.75)
+        );
 
         println!("[VERIFIED] PipelineCandidate works correctly");
     }
@@ -443,11 +438,7 @@ mod tests {
             splade_index.add(id, &[(100, 0.5 + i as f32 / 20.0)]);
         }
 
-        let pipeline = RetrievalPipeline::new(
-            registry,
-            Some(splade_index),
-            None,
-        );
+        let pipeline = RetrievalPipeline::new(registry, Some(splade_index), None);
 
         // Execute only Stage 1
         let result = pipeline.execute_stages(

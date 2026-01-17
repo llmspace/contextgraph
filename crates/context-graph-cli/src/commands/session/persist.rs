@@ -101,18 +101,16 @@ pub async fn persist_identity_command(args: PersistIdentityArgs) -> i32 {
     // Determine DB path
     let db_path = match &args.db_path {
         Some(p) => p.clone(),
-        None => {
-            match home_dir() {
-                Some(home) => home.join(".context-graph").join("db"),
-                None => {
-                    error!("Cannot determine home directory for DB path");
-                    eprintln!(
-                        "Error: Cannot determine DB path. Set --db-path or CONTEXT_GRAPH_DB_PATH"
-                    );
-                    return 1;
-                }
+        None => match home_dir() {
+            Some(home) => home.join(".context-graph").join("db"),
+            None => {
+                error!("Cannot determine home directory for DB path");
+                eprintln!(
+                    "Error: Cannot determine DB path. Set --db-path or CONTEXT_GRAPH_DB_PATH"
+                );
+                return 1;
             }
-        }
+        },
     };
 
     debug!("persist-identity: db_path={:?}", db_path);
@@ -170,7 +168,11 @@ pub async fn persist_identity_command(args: PersistIdentityArgs) -> i32 {
                 final_session_id, err_str
             );
             eprintln!("Error: Failed to save session identity: {}", err_str);
-            if is_corruption_error(&err_str) { 2 } else { 1 }
+            if is_corruption_error(&err_str) {
+                2
+            } else {
+                1
+            }
         }
     }
 }
@@ -274,9 +276,13 @@ mod tests {
         let manager = StandaloneSessionIdentityManager::new(Arc::clone(&storage));
 
         // Execute persist (simulating command logic)
-        let (ic, _r, consciousness_state, session_id) = IdentityCache::get().expect("Cache must be warm");
+        let (ic, _r, consciousness_state, session_id) =
+            IdentityCache::get().expect("Cache must be warm");
         let reconstructed_consciousness = state_to_level(&consciousness_state);
-        println!("  Reconstructed consciousness: {} (from {:?})", reconstructed_consciousness, consciousness_state);
+        println!(
+            "  Reconstructed consciousness: {} (from {:?})",
+            reconstructed_consciousness, consciousness_state
+        );
 
         let mut persist_snapshot = SessionIdentitySnapshot::new(&session_id);
         persist_snapshot.consciousness = reconstructed_consciousness;
@@ -302,15 +308,16 @@ mod tests {
 
         assert_eq!(loaded.session_id, "test-persist-session");
         // Note: consciousness is reconstructed from state, so 0.75 -> Emerging -> 0.65
-        assert!((loaded.consciousness - 0.65).abs() < 0.01,
-            "Consciousness should be 0.65 (Emerging state midpoint), got {}", loaded.consciousness);
+        assert!(
+            (loaded.consciousness - 0.65).abs() < 0.01,
+            "Consciousness should be 0.65 (Emerging state midpoint), got {}",
+            loaded.consciousness
+        );
         assert!((loaded.last_ic - 0.85).abs() < 0.01);
         assert!(loaded.timestamp_ms > 0);
 
         // VERIFY: File exists on disk
-        let db_files = std::fs::read_dir(tmp_dir.path())
-            .expect("read_dir")
-            .count();
+        let db_files = std::fs::read_dir(tmp_dir.path()).expect("read_dir").count();
         println!("VERIFICATION - DB directory has {} entries", db_files);
         assert!(db_files > 0, "RocksDB must have created files");
 
@@ -402,7 +409,7 @@ mod tests {
             (r#"{"reason":"logout"}"#, "logout"),
             (r#"{"reason":"prompt_input_exit"}"#, "prompt_input_exit"),
             (r#"{"reason":"other"}"#, "other"),
-            (r#"{}"#, "exit"),  // Default
+            (r#"{}"#, "exit"), // Default
         ];
 
         for (json, expected_reason) in test_cases {

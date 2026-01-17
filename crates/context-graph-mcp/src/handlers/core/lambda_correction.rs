@@ -84,7 +84,8 @@ pub trait SelfCorrectingLambda {
     /// - Positive error (over-predicted) reduces lambda_s
     /// - Negative error (under-predicted) increases lambda_s
     /// - Higher ACh = higher learning rate (faster adaptation)
-    fn adjust_lambdas(&mut self, prediction_error: f32, ach_level: f32) -> Option<LambdaAdjustment>;
+    fn adjust_lambdas(&mut self, prediction_error: f32, ach_level: f32)
+        -> Option<LambdaAdjustment>;
 
     /// Get current corrected lambda weights.
     fn corrected_weights(&self) -> LifecycleLambdaWeights;
@@ -235,7 +236,11 @@ impl AdaptiveLambdaWeights {
     /// # Returns
     ///
     /// New `LifecycleLambdaWeights` or error if invariants cannot be satisfied
-    pub fn apply_and_normalize(&self, delta_s: f32, delta_c: f32) -> UtlResult<LifecycleLambdaWeights> {
+    pub fn apply_and_normalize(
+        &self,
+        delta_s: f32,
+        delta_c: f32,
+    ) -> UtlResult<LifecycleLambdaWeights> {
         // Compute raw new values
         let mut new_s = self.current_weights.lambda_s() + delta_s;
         let mut new_c = self.current_weights.lambda_c() + delta_c;
@@ -289,11 +294,7 @@ impl AdaptiveLambdaWeights {
     ///
     /// `Ok(())` if valid, `Err(UtlError)` otherwise
     pub fn validate_adjustment(&self, new_weights: &LifecycleLambdaWeights) -> UtlResult<()> {
-        validate_lambda_invariants(
-            new_weights.lambda_s(),
-            new_weights.lambda_c(),
-            &self.config,
-        )
+        validate_lambda_invariants(new_weights.lambda_s(), new_weights.lambda_c(), &self.config)
     }
 
     /// Get adjustment count.
@@ -326,7 +327,11 @@ impl AdaptiveLambdaWeights {
 }
 
 impl SelfCorrectingLambda for AdaptiveLambdaWeights {
-    fn adjust_lambdas(&mut self, prediction_error: f32, ach_level: f32) -> Option<LambdaAdjustment> {
+    fn adjust_lambdas(
+        &mut self,
+        prediction_error: f32,
+        ach_level: f32,
+    ) -> Option<LambdaAdjustment> {
         // Validate inputs - reject NaN and Infinity
         if prediction_error.is_nan() || prediction_error.is_infinite() {
             tracing::warn!(
@@ -635,7 +640,10 @@ mod tests {
 
         let adj = result.unwrap();
         // Positive error should reduce lambda_s
-        assert!(adj.delta_lambda_s < 0.0, "Positive error should reduce lambda_s");
+        assert!(
+            adj.delta_lambda_s < 0.0,
+            "Positive error should reduce lambda_s"
+        );
     }
 
     #[test]
@@ -725,7 +733,10 @@ mod tests {
         assert!(result.is_none(), "Infinity input should return None");
 
         let result = adaptive.adjust_lambdas(f32::NEG_INFINITY, ACH_BASELINE);
-        assert!(result.is_none(), "Negative infinity input should return None");
+        assert!(
+            result.is_none(),
+            "Negative infinity input should return None"
+        );
     }
 
     #[test]
@@ -765,11 +776,7 @@ mod tests {
             "lambda_c out of bounds: {}",
             c
         );
-        assert!(
-            (s + c - 1.0).abs() < EPSILON,
-            "Sum not 1.0: {}",
-            s + c
-        );
+        assert!((s + c - 1.0).abs() < EPSILON, "Sum not 1.0: {}", s + c);
     }
 
     #[test]
@@ -782,11 +789,7 @@ mod tests {
         adaptive.record_accuracy(0.7);
 
         let avg = adaptive.rolling_accuracy();
-        assert!(
-            (avg - 0.8).abs() < 0.001,
-            "Expected avg 0.8, got {}",
-            avg
-        );
+        assert!((avg - 0.8).abs() < 0.001, "Expected avg 0.8, got {}", avg);
     }
 
     #[test]
@@ -948,14 +951,8 @@ mod tests {
             (sum - 1.0).abs() < EPSILON,
             "FSV FAIL: sum invariant violated"
         );
-        assert!(
-            current.lambda_s() >= 0.05,
-            "FSV FAIL: lambda_s below min"
-        );
-        assert!(
-            current.lambda_s() <= 0.9,
-            "FSV FAIL: lambda_s above max"
-        );
+        assert!(current.lambda_s() >= 0.05, "FSV FAIL: lambda_s below min");
+        assert!(current.lambda_s() <= 0.9, "FSV FAIL: lambda_s above max");
     }
 
     #[test]
@@ -1029,11 +1026,17 @@ mod tests {
 
         // Exactly at threshold - should NOT adjust
         let result = adaptive.adjust_lambdas(0.2, ACH_BASELINE);
-        assert!(result.is_none(), "Exact threshold should not trigger adjustment");
+        assert!(
+            result.is_none(),
+            "Exact threshold should not trigger adjustment"
+        );
 
         // Just above threshold - should adjust
         let result = adaptive.adjust_lambdas(0.201, ACH_BASELINE);
-        assert!(result.is_some(), "Just above threshold should trigger adjustment");
+        assert!(
+            result.is_some(),
+            "Just above threshold should trigger adjustment"
+        );
     }
 
     #[test]

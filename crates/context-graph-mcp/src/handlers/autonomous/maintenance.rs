@@ -339,8 +339,7 @@ impl Handlers {
                 for i in 0..memory_contents.len() {
                     for j in (i + 1)..memory_contents.len() {
                         if i < fingerprints.len() && j < fingerprints.len() {
-                            let diff =
-                                (fingerprints[i].1 - fingerprints[j].1).num_seconds().abs();
+                            let diff = (fingerprints[i].1 - fingerprints[j].1).num_seconds().abs();
                             if diff < window_secs {
                                 pairs.push(MemoryPair::new(
                                     memory_contents[i].clone(),

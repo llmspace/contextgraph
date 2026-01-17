@@ -79,13 +79,25 @@ pub enum DistanceMetric {
     AsymmetricCosine,
     /// MaxSim for ColBERT (NOT HNSW-compatible).
     MaxSim,
+    /// Jaccard index for sparse vectors (NOT HNSW-compatible).
+    Jaccard,
 }
 
 impl DistanceMetric {
     /// Check if this metric is compatible with HNSW indexing.
+    ///
+    /// MaxSim and Jaccard are NOT HNSW-compatible:
+    /// - MaxSim requires token-level computation
+    /// - Jaccard is for sparse vectors (uses inverted index)
     #[inline]
     pub fn is_hnsw_compatible(&self) -> bool {
-        !matches!(self, Self::MaxSim)
+        !matches!(self, Self::MaxSim | Self::Jaccard)
+    }
+
+    /// Check if this metric requires sparse vector handling.
+    #[inline]
+    pub fn is_sparse_metric(&self) -> bool {
+        matches!(self, Self::Jaccard)
     }
 }
 

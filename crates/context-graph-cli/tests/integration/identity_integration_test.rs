@@ -21,10 +21,9 @@ use tempfile::TempDir;
 
 use super::helpers::{
     assert_exit_code, create_session_end_input, create_session_start_input,
-    generate_test_session_id, invoke_hook_with_stdin,
-    load_snapshot_for_verification, log_test_evidence, verify_snapshot_exists,
-    verify_snapshot_link, EXIT_SUCCESS, IC_CRISIS_THRESHOLD,
-    IC_HEALTHY_THRESHOLD, IC_NORMAL_THRESHOLD,
+    generate_test_session_id, invoke_hook_with_stdin, load_snapshot_for_verification,
+    log_test_evidence, verify_snapshot_exists, verify_snapshot_link, EXIT_SUCCESS,
+    IC_CRISIS_THRESHOLD, IC_HEALTHY_THRESHOLD, IC_NORMAL_THRESHOLD,
 };
 
 // =============================================================================
@@ -47,13 +46,8 @@ async fn test_identity_snapshot_created_on_session_end() {
 
     // SessionStart
     let start_input = create_session_start_input(&session_id, "/tmp", "cli", None);
-    let start_result = invoke_hook_with_stdin(
-        "session-start",
-        &session_id,
-        &[],
-        &start_input,
-        db_path,
-    );
+    let start_result =
+        invoke_hook_with_stdin("session-start", &session_id, &[], &start_input, db_path);
     assert_exit_code(&start_result, EXIT_SUCCESS, "SessionStart failed");
 
     // Verify no snapshot yet (session is active)
@@ -65,10 +59,7 @@ async fn test_identity_snapshot_created_on_session_end() {
     let end_result = invoke_hook_with_stdin(
         "session-end",
         &session_id,
-        &[
-            "--duration-ms",
-            "30000",
-        ],
+        &["--duration-ms", "30000"],
         &end_input,
         db_path,
     );
@@ -81,8 +72,8 @@ async fn test_identity_snapshot_created_on_session_end() {
     );
 
     // Load and verify snapshot contents
-    let snapshot = load_snapshot_for_verification(db_path, &session_id)
-        .expect("Snapshot should be loadable");
+    let snapshot =
+        load_snapshot_for_verification(db_path, &session_id).expect("Snapshot should be loadable");
 
     // Verify session_id
     assert_eq!(
@@ -128,10 +119,7 @@ async fn test_identity_snapshot_created_on_session_end() {
     }
 
     // Verify timestamp
-    assert!(
-        snapshot.timestamp_ms > 0,
-        "timestamp_ms should be positive"
-    );
+    assert!(snapshot.timestamp_ms > 0, "timestamp_ms should be positive");
 
     log_test_evidence(
         "test_identity_snapshot_created_on_session_end",
@@ -170,23 +158,15 @@ async fn test_identity_restoration_with_drift_metrics() {
 
     // Create and complete first session
     let start_input1 = create_session_start_input(&old_session, "/tmp", "cli", None);
-    let start_result1 = invoke_hook_with_stdin(
-        "session-start",
-        &old_session,
-        &[],
-        &start_input1,
-        db_path,
-    );
+    let start_result1 =
+        invoke_hook_with_stdin("session-start", &old_session, &[], &start_input1, db_path);
     assert_exit_code(&start_result1, EXIT_SUCCESS, "First SessionStart failed");
 
     let end_input1 = create_session_end_input(&old_session, 60000, "normal", None);
     let end_result1 = invoke_hook_with_stdin(
         "session-end",
         &old_session,
-        &[
-            "--duration-ms",
-            "60000",
-        ],
+        &["--duration-ms", "60000"],
         &end_input1,
         db_path,
     );
@@ -202,14 +182,12 @@ async fn test_identity_restoration_with_drift_metrics() {
     thread::sleep(Duration::from_millis(10));
 
     // Start new session with previous_session_id
-    let start_input2 = create_session_start_input(&new_session, "/tmp", "resume", Some(&old_session));
+    let start_input2 =
+        create_session_start_input(&new_session, "/tmp", "resume", Some(&old_session));
     let start_result2 = invoke_hook_with_stdin(
         "session-start",
         &new_session,
-        &[
-            "--previous-session-id",
-            &old_session,
-        ],
+        &["--previous-session-id", &old_session],
         &start_input2,
         db_path,
     );
@@ -262,10 +240,7 @@ async fn test_identity_restoration_with_drift_metrics() {
     let end_result2 = invoke_hook_with_stdin(
         "session-end",
         &new_session,
-        &[
-            "--duration-ms",
-            "30000",
-        ],
+        &["--duration-ms", "30000"],
         &end_input2,
         db_path,
     );
@@ -318,13 +293,7 @@ async fn test_drift_metrics_computation_accuracy() {
 
     // Create and end first session
     let start1 = create_session_start_input(&old_session, "/tmp", "cli", None);
-    let r1 = invoke_hook_with_stdin(
-        "session-start",
-        &old_session,
-        &[],
-        &start1,
-        db_path,
-    );
+    let r1 = invoke_hook_with_stdin("session-start", &old_session, &[], &start1, db_path);
     assert_exit_code(&r1, EXIT_SUCCESS, "First SessionStart");
 
     // Get IC from first session (captured for logging, may be unused)
@@ -344,8 +313,8 @@ async fn test_drift_metrics_computation_accuracy() {
     assert_exit_code(&re1, EXIT_SUCCESS, "First SessionEnd");
 
     // Load first snapshot for comparison
-    let old_snapshot = load_snapshot_for_verification(db_path, &old_session)
-        .expect("Old snapshot should exist");
+    let old_snapshot =
+        load_snapshot_for_verification(db_path, &old_session).expect("Old snapshot should exist");
 
     // Delay for time difference
     thread::sleep(Duration::from_millis(50));
@@ -355,10 +324,7 @@ async fn test_drift_metrics_computation_accuracy() {
     let r2 = invoke_hook_with_stdin(
         "session-start",
         &new_session,
-        &[
-            "--previous-session-id",
-            &old_session,
-        ],
+        &["--previous-session-id", &old_session],
         &start2,
         db_path,
     );
@@ -459,13 +425,8 @@ async fn test_ic_classification_thresholds() {
 
     // SessionStart
     let start_input = create_session_start_input(&session_id, "/tmp", "cli", None);
-    let start_result = invoke_hook_with_stdin(
-        "session-start",
-        &session_id,
-        &[],
-        &start_input,
-        db_path,
-    );
+    let start_result =
+        invoke_hook_with_stdin("session-start", &session_id, &[], &start_input, db_path);
     assert_exit_code(&start_result, EXIT_SUCCESS, "SessionStart failed");
 
     // Get IC classification from output
@@ -527,7 +488,8 @@ async fn test_ic_classification_thresholds() {
     assert!(
         valid_levels.contains(&ic_level),
         "IC level '{}' is not a valid level. Expected one of {:?}",
-        ic_level, valid_levels
+        ic_level,
+        valid_levels
     );
 
     // Verify crisis_triggered is consistent with IC value
@@ -589,21 +551,23 @@ async fn test_previous_session_not_found() {
     let result = invoke_hook_with_stdin(
         "session-start",
         &new_session,
-        &[
-            "--previous-session-id",
-            fake_prev,
-        ],
+        &["--previous-session-id", fake_prev],
         &start_input,
         db_path,
     );
 
     // CLI is resilient: logs warning and starts fresh instead of failing
-    assert_exit_code(&result, EXIT_SUCCESS, "CLI should gracefully start fresh when previous session not found");
+    assert_exit_code(
+        &result,
+        EXIT_SUCCESS,
+        "CLI should gracefully start fresh when previous session not found",
+    );
 
     // Verify warning is logged about missing session
     let stderr_lower = result.stderr.to_lowercase();
     assert!(
-        stderr_lower.contains("previous session not found") || stderr_lower.contains("starting fresh"),
+        stderr_lower.contains("previous session not found")
+            || stderr_lower.contains("starting fresh"),
         "Should log warning about missing previous session.\nstderr: {}",
         result.stderr
     );

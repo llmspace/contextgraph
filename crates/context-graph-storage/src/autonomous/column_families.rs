@@ -233,7 +233,10 @@ mod tests {
             "AUTONOMOUS_CFS length must match AUTONOMOUS_CF_COUNT"
         );
         // TASK-P0-004: Reduced from 7 to 5 CFs
-        assert_eq!(AUTONOMOUS_CF_COUNT, 5, "Must have exactly 5 CFs after TASK-P0-004");
+        assert_eq!(
+            AUTONOMOUS_CF_COUNT, 5,
+            "Must have exactly 5 CFs after TASK-P0-004"
+        );
     }
 
     #[test]

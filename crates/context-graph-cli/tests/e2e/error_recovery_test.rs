@@ -149,7 +149,10 @@ async fn test_e2e_invalid_json_error() {
         let case_name = "array_instead_of_object";
         let invalid_json = r#"["session_id", "test"]"#;
 
-        println!("\n--- Testing session_start.sh with {} (type error) ---", case_name);
+        println!(
+            "\n--- Testing session_start.sh with {} (type error) ---",
+            case_name
+        );
         println!("Input: {}", invalid_json);
 
         let result = execute_hook_script(
@@ -206,7 +209,10 @@ async fn test_e2e_invalid_json_error() {
         if result.exit_code == EXIT_SUCCESS {
             println!("CLI accepted null input (auto-generated session_id)");
         } else {
-            println!("CLI rejected null input with exit code {}", result.exit_code);
+            println!(
+                "CLI rejected null input with exit code {}",
+                result.exit_code
+            );
         }
 
         log_test_evidence(
@@ -247,7 +253,10 @@ async fn test_e2e_missing_session_id_behavior() {
         "timestamp": chrono::Utc::now().to_rfc3339()
     });
 
-    println!("Input: {}", serde_json::to_string_pretty(&missing_session_id).unwrap());
+    println!(
+        "Input: {}",
+        serde_json::to_string_pretty(&missing_session_id).unwrap()
+    );
 
     let result = execute_hook_script(
         "session_start.sh",
@@ -273,7 +282,10 @@ async fn test_e2e_missing_session_id_behavior() {
     } else if result.exit_code == EXIT_INVALID_INPUT {
         println!("CLI rejected missing session_id (strict validation)");
     } else {
-        println!("Unexpected exit code: {} - documenting behavior", result.exit_code);
+        println!(
+            "Unexpected exit code: {} - documenting behavior",
+            result.exit_code
+        );
     }
 
     log_test_evidence(
@@ -310,19 +322,18 @@ async fn test_e2e_hook_error_recovery() {
 
     // Step 1: Execute failing hook (empty stdin)
     println!("\n[1/3] Executing failing hook (empty stdin)...");
-    let fail_result = execute_hook_script(
-        "session_start.sh",
-        "",
-        TIMEOUT_SESSION_START_MS,
-        db_path,
-    )
-    .expect("session_start.sh execution failed");
+    let fail_result =
+        execute_hook_script("session_start.sh", "", TIMEOUT_SESSION_START_MS, db_path)
+            .expect("session_start.sh execution failed");
 
     assert_eq!(
         fail_result.exit_code, EXIT_INVALID_INPUT,
         "Expected INVALID_INPUT exit code"
     );
-    println!("First hook failed as expected (exit code {})", fail_result.exit_code);
+    println!(
+        "First hook failed as expected (exit code {})",
+        fail_result.exit_code
+    );
 
     // Step 2: Execute valid hook
     println!("\n[2/3] Executing valid hook...");
@@ -340,7 +351,10 @@ async fn test_e2e_hook_error_recovery() {
         "Second hook should succeed.\\nstdout: {}\\nstderr: {}",
         valid_result.stdout, valid_result.stderr
     );
-    println!("Second hook succeeded (exit code {})", valid_result.exit_code);
+    println!(
+        "Second hook succeeded (exit code {})",
+        valid_result.exit_code
+    );
 
     // Step 3: Verify session is properly initialized
     println!("\n[3/3] Verifying session state...");
@@ -533,7 +547,10 @@ async fn test_e2e_structured_error_output() {
     };
 
     if let Some(error) = error_json {
-        println!("Parsed error JSON: {}", serde_json::to_string_pretty(&error).unwrap());
+        println!(
+            "Parsed error JSON: {}",
+            serde_json::to_string_pretty(&error).unwrap()
+        );
 
         // Check for common error fields
         if error.get("error").is_some() || error.get("message").is_some() {
@@ -595,7 +612,10 @@ async fn test_e2e_database_error_handling() {
         // Some implementations may create the directory or use fallback
         println!("WARNING: Succeeded with invalid DB path - may be using fallback");
     } else {
-        println!("Returned exit code {} - documenting behavior", result.exit_code);
+        println!(
+            "Returned exit code {} - documenting behavior",
+            result.exit_code
+        );
     }
 
     log_test_evidence(

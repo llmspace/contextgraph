@@ -26,11 +26,7 @@ use super::math::{inner_product_64, norm_squared_64, project_to_ball, validate_i
 ///
 /// # Panics
 /// Panics if input point p is outside the ball.
-pub fn mobius_add(
-    p: &[f32; 64],
-    v: &[f32; 64],
-    config: &PoincareBallConfig,
-) -> [f32; 64] {
+pub fn mobius_add(p: &[f32; 64], v: &[f32; 64], config: &PoincareBallConfig) -> [f32; 64] {
     // Fail fast: validate input
     validate_in_ball(p, config, "mobius_add input p");
 
@@ -46,7 +42,9 @@ pub fn mobius_add(
     if denom.abs() < config.epsilon {
         panic!(
             "[POINCARE_WALK] Degenerate Mobius addition at {}:{}: denom = {:e}",
-            file!(), line!(), denom
+            file!(),
+            line!(),
+            denom
         );
     }
 
@@ -83,11 +81,7 @@ pub fn mobius_add(
 ///
 /// # Panics
 /// Panics if either input point is outside the ball.
-pub fn geodesic_distance(
-    p: &[f32; 64],
-    q: &[f32; 64],
-    config: &PoincareBallConfig,
-) -> f32 {
+pub fn geodesic_distance(p: &[f32; 64], q: &[f32; 64], config: &PoincareBallConfig) -> f32 {
     // Fail fast: validate inputs
     validate_in_ball(p, config, "geodesic_distance input p");
     validate_in_ball(q, config, "geodesic_distance input q");
@@ -97,7 +91,8 @@ pub fn geodesic_distance(
     let q_sq = norm_squared_64(q);
 
     // ||p - q||²
-    let diff_sq: f32 = p.iter()
+    let diff_sq: f32 = p
+        .iter()
         .zip(q.iter())
         .map(|(&pi, &qi)| (pi - qi).powi(2))
         .sum();
@@ -129,11 +124,7 @@ pub fn geodesic_distance(
 ///
 /// # Returns
 /// Direction vector (not normalized)
-pub fn direction_toward(
-    p: &[f32; 64],
-    q: &[f32; 64],
-    config: &PoincareBallConfig,
-) -> [f32; 64] {
+pub fn direction_toward(p: &[f32; 64], q: &[f32; 64], config: &PoincareBallConfig) -> [f32; 64] {
     // Use -p ⊕ q to get the direction
     let neg_p = {
         let mut neg = *p;
@@ -148,11 +139,11 @@ pub fn direction_toward(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::math::norm_64;
+    use super::*;
+    use crate::dream::poincare_walk::sampling::random_direction;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
-    use crate::dream::poincare_walk::sampling::random_direction;
 
     /// Deterministic RNG for reproducible tests
     fn make_rng() -> ChaCha8Rng {
@@ -200,8 +191,12 @@ mod tests {
             let result = mobius_add(&p, &v, &config);
             let norm = norm_64(&result);
 
-            assert!(norm < config.max_norm,
-                "result norm {} should be < max_norm {}", norm, config.max_norm);
+            assert!(
+                norm < config.max_norm,
+                "result norm {} should be < max_norm {}",
+                norm,
+                config.max_norm
+            );
         }
     }
 
@@ -222,7 +217,11 @@ mod tests {
 
         let dist = geodesic_distance(&p, &p, &config);
 
-        assert!(dist.abs() < 1e-6, "distance to self should be 0, got {}", dist);
+        assert!(
+            dist.abs() < 1e-6,
+            "distance to self should be 0, got {}",
+            dist
+        );
     }
 
     #[test]
@@ -232,16 +231,24 @@ mod tests {
 
         for _ in 0..10 {
             let mut p = random_direction(&mut rng);
-            for x in p.iter_mut() { *x *= 0.3; }
+            for x in p.iter_mut() {
+                *x *= 0.3;
+            }
 
             let mut q = random_direction(&mut rng);
-            for x in q.iter_mut() { *x *= 0.4; }
+            for x in q.iter_mut() {
+                *x *= 0.4;
+            }
 
             let d1 = geodesic_distance(&p, &q, &config);
             let d2 = geodesic_distance(&q, &p, &config);
 
-            assert!((d1 - d2).abs() < 1e-5,
-                "distance should be symmetric: {} vs {}", d1, d2);
+            assert!(
+                (d1 - d2).abs() < 1e-5,
+                "distance should be symmetric: {} vs {}",
+                d1,
+                d2
+            );
         }
     }
 
@@ -258,8 +265,13 @@ mod tests {
         let d_qr = geodesic_distance(&q, &r, &config);
         let d_pr = geodesic_distance(&p, &r, &config);
 
-        assert!(d_pr <= d_pq + d_qr + 1e-5,
-            "triangle inequality violated: {} > {} + {}", d_pr, d_pq, d_qr);
+        assert!(
+            d_pr <= d_pq + d_qr + 1e-5,
+            "triangle inequality violated: {} > {} + {}",
+            d_pr,
+            d_pq,
+            d_qr
+        );
     }
 
     #[test]
@@ -283,13 +295,19 @@ mod tests {
 
         // Taking a step in this direction should reduce distance
         let mut scaled_dir = dir;
-        for x in scaled_dir.iter_mut() { *x *= 0.01; }
+        for x in scaled_dir.iter_mut() {
+            *x *= 0.01;
+        }
         let p_new = mobius_add(&p, &scaled_dir, &config);
 
         let dist_before = geodesic_distance(&p, &q, &config);
         let dist_after = geodesic_distance(&p_new, &q, &config);
 
-        assert!(dist_after < dist_before,
-            "moving toward q should reduce distance: {} -> {}", dist_before, dist_after);
+        assert!(
+            dist_after < dist_before,
+            "moving toward q should reduce distance: {} -> {}",
+            dist_before,
+            dist_after
+        );
     }
 }

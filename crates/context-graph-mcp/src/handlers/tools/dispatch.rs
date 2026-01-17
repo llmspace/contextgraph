@@ -105,15 +105,11 @@ impl Handlers {
             // TASK-37: GPU status tool
             tool_names::GET_GPU_STATUS => self.call_get_gpu_status(id).await,
             // TASK-S01: Trigger mental_check based on entropy
-            tool_names::TRIGGER_MENTAL_CHECK => {
-                self.call_trigger_mental_check(id, arguments).await
-            }
+            tool_names::TRIGGER_MENTAL_CHECK => self.call_trigger_mental_check(id, arguments).await,
             // TASK-S02: Get trigger configuration
             tool_names::GET_TRIGGER_CONFIG => self.call_get_trigger_config(id).await,
             // TASK-S03: Get trigger history
-            tool_names::GET_TRIGGER_HISTORY => {
-                self.call_get_trigger_history(id, arguments).await
-            }
+            tool_names::GET_TRIGGER_HISTORY => self.call_get_trigger_history(id, arguments).await,
             // TASK-NEUROMOD-MCP: Neuromodulation tools
             tool_names::GET_NEUROMODULATION_STATE => self.call_get_neuromodulation_state(id).await,
             tool_names::ADJUST_NEUROMODULATOR => {
@@ -177,9 +173,7 @@ impl Handlers {
                 self.call_get_johari_classification(id, arguments).await
             }
             // TASK-34: Coherence state summary
-            tool_names::GET_COHERENCE_STATE => {
-                self.call_get_coherence_state(id, arguments).await
-            }
+            tool_names::GET_COHERENCE_STATE => self.call_get_coherence_state(id, arguments).await,
             // TASK-38: Identity continuity focused status
             tool_names::GET_IDENTITY_CONTINUITY => {
                 self.call_get_identity_continuity(id, arguments).await

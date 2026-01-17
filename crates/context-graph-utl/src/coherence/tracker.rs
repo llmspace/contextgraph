@@ -297,7 +297,8 @@ impl CoherenceTracker {
         cluster_context: &ClusterContext,
     ) -> f32 {
         // 1. Compute ClusterFit using the silhouette coefficient
-        let cluster_fit_result = compute_cluster_fit(vertex, cluster_context, &self.cluster_fit_config);
+        let cluster_fit_result =
+            compute_cluster_fit(vertex, cluster_context, &self.cluster_fit_config);
         let cluster_fit = cluster_fit_result.score;
 
         // 2. Get consistency from rolling window
@@ -749,14 +750,8 @@ mod tests {
 
         // Create test cluster context with well-clustered point
         let cluster_context = ClusterContext::new(
-            vec![
-                vec![0.5, 0.5, 0.5, 0.5],
-                vec![0.6, 0.6, 0.4, 0.4],
-            ],
-            vec![
-                vec![0.9, 0.1, 0.0, 0.0],
-                vec![0.85, 0.15, 0.0, 0.0],
-            ],
+            vec![vec![0.5, 0.5, 0.5, 0.5], vec![0.6, 0.6, 0.4, 0.4]],
+            vec![vec![0.9, 0.1, 0.0, 0.0], vec![0.85, 0.15, 0.0, 0.0]],
         );
 
         let vertex = vec![0.55, 0.55, 0.45, 0.45];
@@ -874,10 +869,8 @@ mod tests {
         let config = CoherenceConfig::default();
         let mut tracker = CoherenceTracker::new(&config);
 
-        let cluster_context = ClusterContext::new(
-            vec![vec![0.5, 0.5], vec![0.6, 0.6]],
-            vec![vec![0.9, 0.1]],
-        );
+        let cluster_context =
+            ClusterContext::new(vec![vec![0.5, 0.5], vec![0.6, 0.6]], vec![vec![0.9, 0.1]]);
 
         let vertex = vec![0.55, 0.55];
 
@@ -886,10 +879,7 @@ mod tests {
 
         // Should still return valid result with fallback for connectivity
         assert!((0.0..=1.0).contains(&coherence));
-        assert!(
-            !coherence.is_nan(),
-            "Output should not be NaN per AP-10"
-        );
+        assert!(!coherence.is_nan(), "Output should not be NaN per AP-10");
 
         // Test with infinity
         let coherence_inf = tracker.compute_coherence(&vertex, f32::INFINITY, &cluster_context);
@@ -972,9 +962,8 @@ mod tests {
         assert!(result.cluster_fit_result.is_some());
 
         // Verify formula: score = α×connectivity + β×cluster_fit + γ×consistency
-        let expected_score = 0.4 * result.connectivity
-            + 0.4 * result.cluster_fit
-            + 0.2 * result.consistency;
+        let expected_score =
+            0.4 * result.connectivity + 0.4 * result.cluster_fit + 0.2 * result.consistency;
         assert!(
             (result.score - expected_score).abs() < 0.001,
             "Score {} doesn't match formula result {}",
@@ -990,14 +979,8 @@ mod tests {
 
         // Create test cluster context with well-separated clusters
         let cluster_context = ClusterContext::new(
-            vec![
-                vec![0.5, 0.5, 0.5],
-                vec![0.6, 0.6, 0.6],
-            ],
-            vec![
-                vec![0.9, 0.9, 0.9],
-                vec![0.95, 0.95, 0.95],
-            ],
+            vec![vec![0.5, 0.5, 0.5], vec![0.6, 0.6, 0.6]],
+            vec![vec![0.9, 0.9, 0.9], vec![0.95, 0.95, 0.95]],
         );
 
         let vertex = vec![0.55, 0.55, 0.55];
@@ -1028,16 +1011,16 @@ mod tests {
         // Vertex closer to nearest_cluster than same_cluster (misclassified)
         let cluster_context = ClusterContext::new(
             vec![
-                vec![0.0, 0.0, 0.9, 0.1],  // Far from query
-                vec![0.0, 0.0, 0.8, 0.2],  // Far from query
+                vec![0.0, 0.0, 0.9, 0.1], // Far from query
+                vec![0.0, 0.0, 0.8, 0.2], // Far from query
             ],
             vec![
-                vec![0.85, 0.15, 0.0, 0.0],  // Close to query
-                vec![0.88, 0.12, 0.0, 0.0],  // Close to query
+                vec![0.85, 0.15, 0.0, 0.0], // Close to query
+                vec![0.88, 0.12, 0.0, 0.0], // Close to query
             ],
         );
 
-        let vertex = vec![0.9, 0.1, 0.0, 0.0];  // Closer to nearest_cluster
+        let vertex = vec![0.9, 0.1, 0.0, 0.0]; // Closer to nearest_cluster
         let connectivity = 0.5;
 
         let coherence = tracker.compute_coherence(&vertex, connectivity, &cluster_context);

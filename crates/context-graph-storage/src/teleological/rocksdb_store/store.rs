@@ -19,9 +19,8 @@ use uuid::Uuid;
 use context_graph_core::types::fingerprint::TeleologicalFingerprint;
 
 use crate::teleological::column_families::{
-    get_all_teleological_cf_descriptors, CF_CONTENT, CF_E12_LATE_INTERACTION,
-    CF_E1_MATRYOSHKA_128, CF_EGO_NODE, CF_FINGERPRINTS, CF_PURPOSE_VECTORS,
-    QUANTIZED_EMBEDDER_CFS, TELEOLOGICAL_CFS,
+    get_all_teleological_cf_descriptors, CF_CONTENT, CF_E12_LATE_INTERACTION, CF_E1_MATRYOSHKA_128,
+    CF_EGO_NODE, CF_FINGERPRINTS, CF_PURPOSE_VECTORS, QUANTIZED_EMBEDDER_CFS, TELEOLOGICAL_CFS,
 };
 use crate::teleological::indexes::EmbedderIndexRegistry;
 use crate::teleological::schema::{
@@ -199,7 +198,11 @@ impl RocksDbTeleologicalStore {
         {
             use std::os::unix::io::AsRawFd;
 
-            let file = match fs::OpenOptions::new().read(true).write(true).open(&lock_path) {
+            let file = match fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(&lock_path)
+            {
                 Ok(f) => f,
                 Err(e) => {
                     warn!("Cannot open LOCK file for inspection: {}", e);
@@ -245,7 +248,10 @@ impl RocksDbTeleologicalStore {
     }
 
     /// Attempt to remove a stale lock file.
-    fn try_remove_lock_file(lock_path: &Path, lock_path_str: &str) -> TeleologicalStoreResult<bool> {
+    fn try_remove_lock_file(
+        lock_path: &Path,
+        lock_path_str: &str,
+    ) -> TeleologicalStoreResult<bool> {
         match fs::remove_file(lock_path) {
             Ok(()) => {
                 info!(
@@ -361,14 +367,20 @@ impl RocksDbTeleologicalStore {
         // Step 1: Read CURRENT file to get MANIFEST filename
         let current_path = path_ref.join("CURRENT");
         if !current_path.exists() {
-            debug!("No CURRENT file at '{}' - new database, skipping corruption check", path_str);
+            debug!(
+                "No CURRENT file at '{}' - new database, skipping corruption check",
+                path_str
+            );
             return Ok(());
         }
 
         let manifest_name = match fs::read_to_string(&current_path) {
             Ok(content) => content.trim().to_string(),
             Err(e) => {
-                warn!("Cannot read CURRENT file at '{}': {} - skipping corruption check", path_str, e);
+                warn!(
+                    "Cannot read CURRENT file at '{}': {} - skipping corruption check",
+                    path_str, e
+                );
                 return Ok(());
             }
         };
@@ -398,7 +410,8 @@ impl RocksDbTeleologicalStore {
             Err(e) => {
                 error!(
                     "FAIL FAST: Cannot read MANIFEST '{}': {}",
-                    manifest_path.display(), e
+                    manifest_path.display(),
+                    e
                 );
                 return Err(TeleologicalStoreError::OpenFailed {
                     path: path_str,
@@ -524,7 +537,9 @@ impl RocksDbTeleologicalStore {
     ///
     /// Note: Currently unused - we rely on RocksDB's own corruption detection.
     #[allow(dead_code)]
-    fn extract_sst_references_from_manifest(manifest_bytes: &[u8]) -> std::collections::HashSet<u64> {
+    fn extract_sst_references_from_manifest(
+        manifest_bytes: &[u8],
+    ) -> std::collections::HashSet<u64> {
         let mut referenced_files = std::collections::HashSet::new();
 
         // RocksDB uses protobuf-style variable-length integer encoding (varint).

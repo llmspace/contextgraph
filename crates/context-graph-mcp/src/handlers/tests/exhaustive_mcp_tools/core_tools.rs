@@ -8,9 +8,9 @@
 
 use serde_json::json;
 
-use crate::handlers::tests::create_test_handlers;
-use super::helpers::{make_tool_call, assert_success, assert_tool_error, get_tool_data};
+use super::helpers::{assert_success, assert_tool_error, get_tool_data, make_tool_call};
 use super::synthetic_data;
+use crate::handlers::tests::create_test_handlers;
 
 // -------------------------------------------------------------------------
 // inject_context
@@ -31,7 +31,10 @@ async fn test_inject_context_basic() {
     assert_success(&response, "inject_context");
 
     let data = get_tool_data(&response);
-    assert!(data.get("fingerprintId").is_some(), "Must return fingerprintId");
+    assert!(
+        data.get("fingerprintId").is_some(),
+        "Must return fingerprintId"
+    );
     assert!(data.get("utl").is_some(), "Must return UTL metrics");
 }
 
@@ -151,7 +154,10 @@ async fn test_store_memory_basic() {
     assert_success(&response, "store_memory");
 
     let data = get_tool_data(&response);
-    assert!(data.get("fingerprintId").is_some(), "Must return fingerprintId");
+    assert!(
+        data.get("fingerprintId").is_some(),
+        "Must return fingerprintId"
+    );
 }
 
 #[tokio::test]
@@ -242,7 +248,10 @@ async fn test_get_memetic_status_basic() {
 
     let data = get_tool_data(&response);
     assert!(data.get("phase").is_some(), "Must have phase");
-    assert!(data.get("fingerprintCount").is_some(), "Must have fingerprintCount");
+    assert!(
+        data.get("fingerprintCount").is_some(),
+        "Must have fingerprintCount"
+    );
     assert!(data.get("utl").is_some(), "Must have utl");
     assert!(data.get("layers").is_some(), "Must have layers");
 }
@@ -374,12 +383,24 @@ async fn test_utl_status_basic() {
     assert_success(&response, "utl_status");
 
     let data = get_tool_data(&response);
-    assert!(data.get("lifecycle_phase").is_some(), "Must have lifecycle_phase");
-    assert!(data.get("interaction_count").is_some(), "Must have interaction_count");
+    assert!(
+        data.get("lifecycle_phase").is_some(),
+        "Must have lifecycle_phase"
+    );
+    assert!(
+        data.get("interaction_count").is_some(),
+        "Must have interaction_count"
+    );
     assert!(data.get("entropy").is_some(), "Must have entropy");
     assert!(data.get("coherence").is_some(), "Must have coherence");
-    assert!(data.get("learning_score").is_some(), "Must have learning_score");
-    assert!(data.get("johari_quadrant").is_some(), "Must have johari_quadrant");
+    assert!(
+        data.get("learning_score").is_some(),
+        "Must have learning_score"
+    );
+    assert!(
+        data.get("johari_quadrant").is_some(),
+        "Must have johari_quadrant"
+    );
 }
 
 #[tokio::test]

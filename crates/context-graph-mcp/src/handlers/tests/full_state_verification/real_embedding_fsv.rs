@@ -13,8 +13,8 @@ use std::time::Instant;
 
 use crate::protocol::JsonRpcId;
 
-use super::helpers::make_request;
 use super::super::{create_test_handlers_with_real_embeddings, extract_mcp_tool_data};
+use super::helpers::make_request;
 
 /// FSV-REAL-001: Verify REAL embeddings produce 13-embedding fingerprints.
 ///
@@ -261,7 +261,10 @@ async fn test_fsv_real_embeddings_persistence() {
         .and_then(|fp| fp.get("contentHashHex"))
         .and_then(|v| v.as_str())
     {
-        println!("[FSV] Content hash: {}... (check)", &hash[..16.min(hash.len())]);
+        println!(
+            "[FSV] Content hash: {}... (check)",
+            &hash[..16.min(hash.len())]
+        );
     }
 
     // === FSV: Delete and verify removal ===

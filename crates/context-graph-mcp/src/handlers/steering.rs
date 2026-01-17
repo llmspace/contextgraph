@@ -46,7 +46,10 @@ impl Handlers {
             Ok(c) => c,
             Err(e) => {
                 error!(error = %e, "get_steering_feedback: FAIL FAST - Failed to get node count");
-                return self.tool_error_with_pulse(id, &format!("Store error: Failed to get node count: {}", e));
+                return self.tool_error_with_pulse(
+                    id,
+                    &format!("Store error: Failed to get node count: {}", e),
+                );
             }
         };
 
@@ -55,11 +58,18 @@ impl Handlers {
         // we use approximations based on available fingerprint data:
         // - orphan_count: fingerprints with access_count == 0 (never accessed/connected)
         // - connectivity: ratio of fingerprints with θ > 0.5 (aligned with North Star)
-        let johari_list = match self.teleological_store.list_all_johari(total_count.max(100)).await {
+        let johari_list = match self
+            .teleological_store
+            .list_all_johari(total_count.max(100))
+            .await
+        {
             Ok(list) => list,
             Err(e) => {
                 error!(error = %e, "get_steering_feedback: FAIL FAST - Failed to list fingerprints");
-                return self.tool_error_with_pulse(id, &format!("Store error: Failed to list fingerprints: {}", e));
+                return self.tool_error_with_pulse(
+                    id,
+                    &format!("Store error: Failed to list fingerprints: {}", e),
+                );
             }
         };
 

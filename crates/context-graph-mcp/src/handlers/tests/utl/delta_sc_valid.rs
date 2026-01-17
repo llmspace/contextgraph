@@ -139,9 +139,7 @@ async fn test_gwt_compute_delta_sc_ap10_range_compliance() {
     let data = extract_mcp_tool_data(&result);
 
     // AP-10: All values must be in [0, 1]
-    let delta_s_per_embedder = data["delta_s_per_embedder"]
-        .as_array()
-        .expect("array");
+    let delta_s_per_embedder = data["delta_s_per_embedder"].as_array().expect("array");
     for (i, val) in delta_s_per_embedder.iter().enumerate() {
         let v = val.as_f64().expect("f64");
         assert!(
@@ -202,9 +200,7 @@ async fn test_gwt_compute_delta_sc_johari_quadrant_values() {
 
     // Verify Johari quadrants are valid enum values
     let valid_quadrants = ["Open", "Blind", "Hidden", "Unknown"];
-    let johari_quadrants = data["johari_quadrants"]
-        .as_array()
-        .expect("array");
+    let johari_quadrants = data["johari_quadrants"].as_array().expect("array");
 
     for (i, quadrant) in johari_quadrants.iter().enumerate() {
         let q = quadrant.as_str().expect("string");

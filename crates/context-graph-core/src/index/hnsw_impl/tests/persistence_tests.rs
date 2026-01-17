@@ -173,8 +173,7 @@ fn test_load_rejects_legacy_null_simple_format() {
 async fn test_multi_space_load_rejects_legacy_files() {
     use std::io::Write;
 
-    let temp_dir =
-        std::env::temp_dir().join(format!("legacy_multispace_test_{}", Uuid::new_v4()));
+    let temp_dir = std::env::temp_dir().join(format!("legacy_multispace_test_{}", Uuid::new_v4()));
     std::fs::create_dir_all(&temp_dir).unwrap();
 
     let meta_path = temp_dir.join("index_meta.json");

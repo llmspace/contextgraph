@@ -82,7 +82,10 @@ async fn test_process_action_awareness_updates_purpose_vector() {
 
     println!("EVIDENCE: purpose_vector correctly updated via process_action_awareness");
     println!("  - alignment: {:.4}", reflection_result.alignment);
-    println!("  - identity_status: {:?}", reflection_result.identity_status);
+    println!(
+        "  - identity_status: {:?}",
+        reflection_result.identity_status
+    );
 }
 
 // ============================================================
@@ -107,7 +110,10 @@ async fn test_fsv_process_action_awareness() {
     {
         let ego = gwt.self_ego_node.read().await;
         println!("  - purpose_vector[0]: {:.4}", ego.purpose_vector[0]);
-        println!("  - coherence_with_actions: {:.4}", ego.coherence_with_actions);
+        println!(
+            "  - coherence_with_actions: {:.4}",
+            ego.coherence_with_actions
+        );
         println!(
             "  - identity_trajectory.len: {}",
             ego.identity_trajectory.len()
@@ -115,7 +121,10 @@ async fn test_fsv_process_action_awareness() {
     }
     {
         let loop_mgr = gwt.self_awareness_loop.read().await;
-        println!("  - identity_coherence: {:.4}", loop_mgr.identity_coherence());
+        println!(
+            "  - identity_coherence: {:.4}",
+            loop_mgr.identity_coherence()
+        );
         println!("  - identity_status: {:?}", loop_mgr.identity_status());
     }
 
@@ -145,7 +154,10 @@ async fn test_fsv_process_action_awareness() {
     }
     {
         let loop_mgr = gwt.self_awareness_loop.read().await;
-        println!("  - identity_coherence: {:.4}", loop_mgr.identity_coherence());
+        println!(
+            "  - identity_coherence: {:.4}",
+            loop_mgr.identity_coherence()
+        );
         println!("  - identity_status: {:?}", loop_mgr.identity_status());
     }
 

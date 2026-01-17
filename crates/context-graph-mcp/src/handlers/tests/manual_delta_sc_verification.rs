@@ -28,7 +28,8 @@ use uuid::Uuid;
 
 use context_graph_core::types::fingerprint::{
     JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
-    E10_DIM, E11_DIM, E1_DIM, E2_DIM, E3_DIM, E4_DIM, E5_DIM, E7_DIM, E8_DIM, E9_DIM, NUM_EMBEDDERS,
+    E10_DIM, E11_DIM, E1_DIM, E2_DIM, E3_DIM, E4_DIM, E5_DIM, E7_DIM, E8_DIM, E9_DIM,
+    NUM_EMBEDDERS,
 };
 
 use crate::protocol::JsonRpcId;
@@ -132,17 +133,7 @@ fn verify_utl_formula(
 /// Extract delta_sc results from the response.
 fn extract_delta_sc_results(
     data: &serde_json::Value,
-) -> Result<
-    (
-        Vec<f64>,
-        f64,
-        f64,
-        Vec<String>,
-        String,
-        f64,
-    ),
-    String,
-> {
+) -> Result<(Vec<f64>, f64, f64, Vec<String>, String, f64), String> {
     let delta_s_per_embedder = data
         .get("delta_s_per_embedder")
         .and_then(|v| v.as_array())

@@ -18,7 +18,7 @@
 
 use serde_json::json;
 
-use super::helpers::{make_tool_call, get_tool_data};
+use super::helpers::{get_tool_data, make_tool_call};
 use crate::handlers::tests::{create_test_handlers, create_test_handlers_with_all_components};
 
 // -------------------------------------------------------------------------
@@ -49,11 +49,15 @@ async fn test_get_gpu_status_basic_success() {
     let result = response.result.as_ref().expect("Must have result");
 
     // Check if this is a tool error (which is expected when no GpuMonitor)
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     if is_error {
         // This is expected - GpuMonitor not configured in test handlers
-        let content = result.get("content")
+        let content = result
+            .get("content")
             .and_then(|v| v.as_array())
             .and_then(|arr| arr.first())
             .and_then(|c| c.get("text"))
@@ -61,9 +65,9 @@ async fn test_get_gpu_status_basic_success() {
             .expect("Error must have content text");
 
         assert!(
-            content.contains("GPU_MONITOR_NOT_INITIALIZED") ||
-            content.contains("not initialized") ||
-            content.contains("not configured"),
+            content.contains("GPU_MONITOR_NOT_INITIALIZED")
+                || content.contains("not initialized")
+                || content.contains("not configured"),
             "Error should indicate GpuMonitor not configured: {}",
             content
         );
@@ -96,7 +100,10 @@ async fn test_get_gpu_status_fails_without_gpu_monitor() {
     );
 
     let result = response.result.as_ref().expect("Must have result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     assert!(
         is_error,
@@ -104,7 +111,8 @@ async fn test_get_gpu_status_fails_without_gpu_monitor() {
     );
 
     // Verify error contains useful information
-    let content = result.get("content")
+    let content = result
+        .get("content")
         .and_then(|v| v.as_array())
         .and_then(|arr| arr.first())
         .and_then(|c| c.get("text"))
@@ -113,10 +121,10 @@ async fn test_get_gpu_status_fails_without_gpu_monitor() {
 
     // Must mention configuration or initialization issue
     assert!(
-        content.contains("GPU_MONITOR_NOT_INITIALIZED") ||
-        content.contains("not initialized") ||
-        content.contains("not configured") ||
-        content.contains("gpu_monitor"),
+        content.contains("GPU_MONITOR_NOT_INITIALIZED")
+            || content.contains("not initialized")
+            || content.contains("not configured")
+            || content.contains("gpu_monitor"),
         "Error message should indicate GpuMonitor configuration issue: {}",
         content
     );
@@ -155,11 +163,15 @@ async fn test_get_gpu_status_response_fields_documented() {
     let result = response.result.as_ref().expect("Must have result");
 
     // Verify it's an error (expected without configuration)
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(is_error, "Expected error when GpuMonitor not configured");
 
     // Verify error has structured data
-    let content = result.get("content")
+    let content = result
+        .get("content")
         .and_then(|v| v.as_array())
         .and_then(|arr| arr.first())
         .and_then(|c| c.get("text"))
@@ -167,8 +179,8 @@ async fn test_get_gpu_status_response_fields_documented() {
         .expect("Error must have content text");
 
     // Parse error JSON to verify structure
-    let error_data: serde_json::Value = serde_json::from_str(content)
-        .expect("Error content must be valid JSON");
+    let error_data: serde_json::Value =
+        serde_json::from_str(content).expect("Error content must be valid JSON");
 
     assert!(
         error_data.get("error_type").is_some(),

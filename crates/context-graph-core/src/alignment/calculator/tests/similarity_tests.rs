@@ -46,15 +46,15 @@ fn test_propagation_weights() {
     // Strategic is now top-level (was NorthStar before)
     assert_eq!(
         DefaultAlignmentCalculator::get_propagation_weight(GoalLevel::Strategic),
-        1.0  // Top-level gets full weight
+        1.0 // Top-level gets full weight
     );
     assert_eq!(
         DefaultAlignmentCalculator::get_propagation_weight(GoalLevel::Tactical),
-        0.6  // Middle level
+        0.6 // Middle level
     );
     assert_eq!(
         DefaultAlignmentCalculator::get_propagation_weight(GoalLevel::Immediate),
-        0.3  // Lowest level
+        0.3 // Lowest level
     );
     println!("[VERIFIED] Propagation weights match TASK-P0-001 spec");
 }

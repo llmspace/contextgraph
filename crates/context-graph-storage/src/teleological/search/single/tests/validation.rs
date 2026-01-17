@@ -4,8 +4,8 @@
 
 use std::sync::Arc;
 
-use crate::teleological::search::error::SearchError;
 use crate::teleological::indexes::{EmbedderIndex, EmbedderIndexRegistry};
+use crate::teleological::search::error::SearchError;
 
 use crate::teleological::search::single::search::SingleEmbedderSearch;
 
@@ -22,7 +22,7 @@ fn test_unsupported_embedder_e6() {
     println!("BEFORE: Attempting search on E6Sparse");
 
     let search = create_test_search();
-    let query = vec![1.0f32; 100];  // Dimension doesn't matter
+    let query = vec![1.0f32; 100]; // Dimension doesn't matter
 
     let result = search.search(EmbedderIndex::E6Sparse, &query, 10, None);
 
@@ -83,7 +83,7 @@ fn test_dimension_mismatch() {
     println!("BEFORE: E1Semantic expects 1024D, providing 512D");
 
     let search = create_test_search();
-    let query = vec![1.0f32; 512];  // Wrong: E1 expects 1024
+    let query = vec![1.0f32; 512]; // Wrong: E1 expects 1024
 
     let result = search.search(EmbedderIndex::E1Semantic, &query, 10, None);
 
@@ -91,7 +91,11 @@ fn test_dimension_mismatch() {
     assert!(result.is_err());
 
     match result.unwrap_err() {
-        SearchError::DimensionMismatch { embedder, expected, actual } => {
+        SearchError::DimensionMismatch {
+            embedder,
+            expected,
+            actual,
+        } => {
             assert_eq!(embedder, EmbedderIndex::E1Semantic);
             assert_eq!(expected, 1024);
             assert_eq!(actual, 512);

@@ -45,7 +45,10 @@ async fn test_embedder_scores_fix_non_zero_scores() {
 
     // Now search with related content
     let search_content = "distributed systems architecture patterns";
-    println!("[EXECUTE] Searching with query_content: \"{}\"", search_content);
+    println!(
+        "[EXECUTE] Searching with query_content: \"{}\"",
+        search_content
+    );
 
     let request = make_request(
         "tools/call",
@@ -73,7 +76,10 @@ async fn test_embedder_scores_fix_non_zero_scores() {
     println!("[VERIFY] No protocol error - PASS");
 
     let result = response.result.expect("Must have result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(!is_error, "[FAIL] Tool returned error: {:?}", result);
     println!("[VERIFY] Tool succeeded - PASS");
 
@@ -83,7 +89,10 @@ async fn test_embedder_scores_fix_non_zero_scores() {
             if let Some(text) = first.get("text").and_then(|v| v.as_str()) {
                 if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) {
                     // Check success field
-                    let success = parsed.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+                    let success = parsed
+                        .get("success")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
                     assert!(success, "[FAIL] Response success=false");
                     println!("[VERIFY] Response success=true - PASS");
 
@@ -104,11 +113,23 @@ async fn test_embedder_scores_fix_non_zero_scores() {
                                 .get("breakdown")
                                 .and_then(|b| b.get("embedder_scores"))
                                 .and_then(|v| v.as_array())
-                                .or_else(|| first_result.get("embedder_scores").and_then(|v| v.as_array()));
+                                .or_else(|| {
+                                    first_result
+                                        .get("embedder_scores")
+                                        .and_then(|v| v.as_array())
+                                });
 
                             if let Some(scores) = scores_opt {
-                                println!("[EVIDENCE] embedder_scores array found with {} elements", scores.len());
-                                assert_eq!(scores.len(), 13, "[FAIL] Expected 13 embedder scores, got {}", scores.len());
+                                println!(
+                                    "[EVIDENCE] embedder_scores array found with {} elements",
+                                    scores.len()
+                                );
+                                assert_eq!(
+                                    scores.len(),
+                                    13,
+                                    "[FAIL] Expected 13 embedder scores, got {}",
+                                    scores.len()
+                                );
                                 println!("[VERIFY] 13 embedder scores present - PASS");
 
                                 // CRITICAL: Verify at least one score is non-zero
@@ -119,7 +140,8 @@ async fn test_embedder_scores_fix_non_zero_scores() {
 
                                 let has_non_zero = scores_f32.iter().any(|&s| s > 0.0001);
                                 let sum: f32 = scores_f32.iter().sum();
-                                let max_score: f32 = scores_f32.iter().cloned().fold(0.0f32, f32::max);
+                                let max_score: f32 =
+                                    scores_f32.iter().cloned().fold(0.0f32, f32::max);
 
                                 println!("[EVIDENCE] Embedder scores: {:?}", scores_f32);
                                 println!("[EVIDENCE] Sum of scores: {}", sum);
@@ -225,7 +247,10 @@ async fn test_embedder_scores_variety_across_spaces() {
     assert!(response.error.is_none(), "[FAIL] Protocol error");
 
     let result = response.result.expect("Must have result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(!is_error, "[FAIL] Tool returned error");
 
     // Analyze embedder score variety
@@ -249,21 +274,27 @@ async fn test_embedder_scores_variety_across_spaces() {
                                     .collect();
 
                                 // Calculate statistics
-                                let non_zero_scores: Vec<f32> = scores_f32.iter()
+                                let non_zero_scores: Vec<f32> = scores_f32
+                                    .iter()
                                     .filter(|&&s| s > 0.0001)
                                     .cloned()
                                     .collect();
 
                                 if !non_zero_scores.is_empty() {
-                                    let min_score = non_zero_scores.iter().cloned().fold(f32::MAX, f32::min);
-                                    let max_score = non_zero_scores.iter().cloned().fold(0.0f32, f32::max);
-                                    let avg_score: f32 = non_zero_scores.iter().sum::<f32>() / non_zero_scores.len() as f32;
+                                    let min_score =
+                                        non_zero_scores.iter().cloned().fold(f32::MAX, f32::min);
+                                    let max_score =
+                                        non_zero_scores.iter().cloned().fold(0.0f32, f32::max);
+                                    let avg_score: f32 = non_zero_scores.iter().sum::<f32>()
+                                        / non_zero_scores.len() as f32;
                                     let range = max_score - min_score;
 
                                     // Calculate variance to measure diversity
-                                    let variance: f32 = non_zero_scores.iter()
+                                    let variance: f32 = non_zero_scores
+                                        .iter()
                                         .map(|&s| (s - avg_score).powi(2))
-                                        .sum::<f32>() / non_zero_scores.len() as f32;
+                                        .sum::<f32>()
+                                        / non_zero_scores.len() as f32;
                                     let std_dev = variance.sqrt();
 
                                     println!("\n[RESULT {}] Embedder Score Analysis:", idx + 1);
@@ -278,10 +309,17 @@ async fn test_embedder_scores_variety_across_spaces() {
                                     // If all scores are identical (std_dev ~ 0), the fix didn't work
                                     println!("\n[VERIFY] Checking for score variety...");
                                     if std_dev < 0.0001 {
-                                        println!("[WARN] Very low variance - scores are nearly uniform");
-                                        println!("  This is expected when comparing SIMILAR content");
+                                        println!(
+                                            "[WARN] Very low variance - scores are nearly uniform"
+                                        );
+                                        println!(
+                                            "  This is expected when comparing SIMILAR content"
+                                        );
                                     } else if std_dev < 0.01 {
-                                        println!("[INFO] Low variance ({:.6}) - moderate diversity", std_dev);
+                                        println!(
+                                            "[INFO] Low variance ({:.6}) - moderate diversity",
+                                            std_dev
+                                        );
                                     } else {
                                         println!("[PASS] Good variance ({:.6}) - diverse embedder scores!", std_dev);
                                     }

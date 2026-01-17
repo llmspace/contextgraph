@@ -266,9 +266,21 @@ fn test_multiple_evictions() {
 
     // Verify the last 3 entries (7, 8, 9)
     let all_vals: Vec<f32> = history.history().iter().map(|s| s.vector[0]).collect();
-    assert!((all_vals[0] - 0.7).abs() < 1e-5, "Expected 0.7, got {}", all_vals[0]);
-    assert!((all_vals[1] - 0.8).abs() < 1e-5, "Expected 0.8, got {}", all_vals[1]);
-    assert!((all_vals[2] - 0.9).abs() < 1e-5, "Expected 0.9, got {}", all_vals[2]);
+    assert!(
+        (all_vals[0] - 0.7).abs() < 1e-5,
+        "Expected 0.7, got {}",
+        all_vals[0]
+    );
+    assert!(
+        (all_vals[1] - 0.8).abs() < 1e-5,
+        "Expected 0.8, got {}",
+        all_vals[1]
+    );
+    assert!(
+        (all_vals[2] - 0.9).abs() < 1e-5,
+        "Expected 0.9, got {}",
+        all_vals[2]
+    );
 }
 
 #[test]

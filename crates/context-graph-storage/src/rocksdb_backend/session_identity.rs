@@ -193,7 +193,10 @@ impl RocksDbMemex {
     ///     println!("Found session with IC: {}", snapshot.last_ic);
     /// }
     /// ```
-    pub fn load_snapshot(&self, session_id: &str) -> StorageResult<Option<SessionIdentitySnapshot>> {
+    pub fn load_snapshot(
+        &self,
+        session_id: &str,
+    ) -> StorageResult<Option<SessionIdentitySnapshot>> {
         let start = std::time::Instant::now();
 
         debug!(
@@ -381,10 +384,7 @@ impl RocksDbMemex {
                     error = %e,
                     "CORRUPTION ERROR: latest pointer contains invalid UTF-8"
                 );
-                StorageError::Serialization(format!(
-                    "Latest pointer contains invalid UTF-8: {}",
-                    e
-                ))
+                StorageError::Serialization(format!("Latest pointer contains invalid UTF-8: {}", e))
             })?;
 
             debug!(
@@ -527,8 +527,12 @@ mod tests {
         snapshot.last_ic = 0.85;
         snapshot.consciousness = 0.7;
         snapshot.integration = 0.9;
-        snapshot.kuramoto_phases = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0];
-        snapshot.purpose_vector = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3];
+        snapshot.kuramoto_phases = [
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0,
+        ];
+        snapshot.purpose_vector = [
+            0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3,
+        ];
         snapshot.append_to_trajectory([0.5; KURAMOTO_N]);
 
         println!("BEFORE: Created snapshot");
@@ -537,7 +541,9 @@ mod tests {
         println!("  trajectory.len: {}", snapshot.trajectory.len());
 
         // EXECUTE: Save
-        memex.save_snapshot(&snapshot).expect("save_snapshot must succeed");
+        memex
+            .save_snapshot(&snapshot)
+            .expect("save_snapshot must succeed");
         println!("AFTER SAVE: Snapshot written to RocksDB");
 
         // EXECUTE: Load by session_id
@@ -552,14 +558,35 @@ mod tests {
         println!("  trajectory.len: {}", loaded.trajectory.len());
 
         // VERIFY: Round-trip equality
-        assert_eq!(loaded.session_id, snapshot.session_id, "session_id mismatch");
-        assert_eq!(loaded.timestamp_ms, snapshot.timestamp_ms, "timestamp_ms mismatch");
+        assert_eq!(
+            loaded.session_id, snapshot.session_id,
+            "session_id mismatch"
+        );
+        assert_eq!(
+            loaded.timestamp_ms, snapshot.timestamp_ms,
+            "timestamp_ms mismatch"
+        );
         assert_eq!(loaded.last_ic, snapshot.last_ic, "last_ic mismatch");
-        assert_eq!(loaded.consciousness, snapshot.consciousness, "consciousness mismatch");
-        assert_eq!(loaded.integration, snapshot.integration, "integration mismatch");
-        assert_eq!(loaded.kuramoto_phases, snapshot.kuramoto_phases, "kuramoto_phases mismatch");
-        assert_eq!(loaded.purpose_vector, snapshot.purpose_vector, "purpose_vector mismatch");
-        assert_eq!(loaded.trajectory, snapshot.trajectory, "trajectory mismatch");
+        assert_eq!(
+            loaded.consciousness, snapshot.consciousness,
+            "consciousness mismatch"
+        );
+        assert_eq!(
+            loaded.integration, snapshot.integration,
+            "integration mismatch"
+        );
+        assert_eq!(
+            loaded.kuramoto_phases, snapshot.kuramoto_phases,
+            "kuramoto_phases mismatch"
+        );
+        assert_eq!(
+            loaded.purpose_vector, snapshot.purpose_vector,
+            "purpose_vector mismatch"
+        );
+        assert_eq!(
+            loaded.trajectory, snapshot.trajectory,
+            "trajectory mismatch"
+        );
         assert_eq!(loaded, snapshot, "Full snapshot equality");
 
         println!("RESULT: PASS - Round-trip preserves all 14 fields");
@@ -610,7 +637,10 @@ mod tests {
         println!("  last_ic: {}", latest.last_ic);
 
         // VERIFY: Should be s3 (newest based on last save)
-        assert_eq!(latest.session_id, "session-newest", "Should return newest session");
+        assert_eq!(
+            latest.session_id, "session-newest",
+            "Should return newest session"
+        );
         assert_eq!(latest.timestamp_ms, 3000, "Should have newest timestamp");
         assert_eq!(latest.last_ic, 0.9, "Should have newest IC value");
 
@@ -657,7 +687,10 @@ mod tests {
         match result {
             Err(StorageError::NotFound { id }) => {
                 println!("  error.id: {}", id);
-                assert!(id.contains("non-existent-session"), "Error should contain session ID");
+                assert!(
+                    id.contains("non-existent-session"),
+                    "Error should contain session ID"
+                );
                 println!("RESULT: PASS - NotFound error for missing session");
             }
             Ok(_) => panic!("Should have returned NotFound error, got Ok"),
@@ -692,7 +725,10 @@ mod tests {
         println!("  session_id: {}", loaded.session_id);
 
         // VERIFY
-        assert_eq!(loaded.session_id, session_id, "Unicode session_id must round-trip");
+        assert_eq!(
+            loaded.session_id, session_id,
+            "Unicode session_id must round-trip"
+        );
         println!("RESULT: PASS - Unicode session ID handled correctly");
     }
 
@@ -727,8 +763,15 @@ mod tests {
         println!("  trajectory.len: {}", loaded.trajectory.len());
 
         // VERIFY
-        assert_eq!(loaded.trajectory.len(), MAX_TRAJECTORY_LEN, "Trajectory length preserved");
-        assert_eq!(loaded.trajectory, snapshot.trajectory, "Trajectory data preserved");
+        assert_eq!(
+            loaded.trajectory.len(),
+            MAX_TRAJECTORY_LEN,
+            "Trajectory length preserved"
+        );
+        assert_eq!(
+            loaded.trajectory, snapshot.trajectory,
+            "Trajectory data preserved"
+        );
         println!("RESULT: PASS - Max trajectory handled correctly");
     }
 
@@ -764,7 +807,11 @@ mod tests {
                 .expect("load must succeed")
                 .expect("Snapshot must exist");
 
-            assert_eq!(loaded.last_ic, ic_value, "IC value {} must round-trip", ic_value);
+            assert_eq!(
+                loaded.last_ic, ic_value,
+                "IC value {} must round-trip",
+                ic_value
+            );
             assert_eq!(
                 loaded.cross_session_ic, ic_value,
                 "cross_session_ic {} must round-trip",
@@ -813,8 +860,14 @@ mod tests {
         println!("  last_ic: {}", recovered.last_ic);
 
         // VERIFY: Should have recovered the original snapshot
-        assert_eq!(recovered.session_id, "recovery-test", "Should recover correct session");
-        assert_eq!(recovered.timestamp_ms, 5000, "Should recover correct timestamp");
+        assert_eq!(
+            recovered.session_id, "recovery-test",
+            "Should recover correct session"
+        );
+        assert_eq!(
+            recovered.timestamp_ms, 5000,
+            "Should recover correct timestamp"
+        );
         assert_eq!(recovered.last_ic, 0.88, "Should recover correct IC");
 
         println!("RESULT: PASS - Temporal recovery works with corrupt latest pointer");
@@ -890,7 +943,9 @@ mod tests {
         let mut snapshot = SessionIdentitySnapshot::new("verify-session-xyz");
         snapshot.last_ic = 0.92;
         snapshot.consciousness = 0.78;
-        snapshot.kuramoto_phases = [1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9, 10.1, 11.1, 12.1, 13.1];
+        snapshot.kuramoto_phases = [
+            1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9, 10.1, 11.1, 12.1, 13.1,
+        ];
         snapshot.append_to_trajectory([0.5; KURAMOTO_N]);
 
         // Save
@@ -904,34 +959,56 @@ mod tests {
         let session_data = memex.db.get_cf(cf, &session_key).expect("get must succeed");
         println!("\n1. SESSION DATA CHECK:");
         println!("   Key: s:verify-session-xyz");
-        println!("   Key bytes: {:?}", &session_key[..std::cmp::min(20, session_key.len())]);
+        println!(
+            "   Key bytes: {:?}",
+            &session_key[..std::cmp::min(20, session_key.len())]
+        );
         assert!(session_data.is_some(), "Session data must exist");
         let data = session_data.unwrap();
         println!("   Data exists: YES");
         println!("   Data length: {} bytes", data.len());
-        assert!(data.len() > 100, "Data should be >100 bytes (got {})", data.len());
+        assert!(
+            data.len() > 100,
+            "Data should be >100 bytes (got {})",
+            data.len()
+        );
 
         // 2. Verify latest pointer
-        let latest_data = memex.db.get_cf(cf, SESSION_LATEST_KEY).expect("get must succeed");
+        let latest_data = memex
+            .db
+            .get_cf(cf, SESSION_LATEST_KEY)
+            .expect("get must succeed");
         println!("\n2. LATEST POINTER CHECK:");
         println!("   Key: {:?}", SESSION_LATEST_KEY);
         assert!(latest_data.is_some(), "Latest pointer must exist");
         let latest = latest_data.unwrap();
         let latest_str = std::str::from_utf8(&latest).expect("UTF-8");
         println!("   Value: {}", latest_str);
-        assert_eq!(latest_str, "verify-session-xyz", "Latest must point to our session");
+        assert_eq!(
+            latest_str, "verify-session-xyz",
+            "Latest must point to our session"
+        );
 
         // 3. Verify temporal index
         let temporal_key = session_temporal_key(snapshot.timestamp_ms);
-        let temporal_data = memex.db.get_cf(cf, &temporal_key).expect("get must succeed");
+        let temporal_data = memex
+            .db
+            .get_cf(cf, &temporal_key)
+            .expect("get must succeed");
         println!("\n3. TEMPORAL INDEX CHECK:");
-        println!("   Key (first 10 bytes): {:?}", &temporal_key[..std::cmp::min(10, temporal_key.len())]);
+        println!(
+            "   Key (first 10 bytes): {:?}",
+            &temporal_key[..std::cmp::min(10, temporal_key.len())]
+        );
         println!("   Timestamp: {}", snapshot.timestamp_ms);
         assert!(temporal_data.is_some(), "Temporal index must exist");
         let temporal = temporal_data.unwrap();
         let temporal_str = std::str::from_utf8(&temporal).expect("UTF-8");
         println!("   Value: {}", temporal_str);
-        assert_eq!(temporal_str, "verify-session-xyz", "Temporal must point to our session");
+        assert_eq!(
+            temporal_str, "verify-session-xyz",
+            "Temporal must point to our session"
+        );
 
         // 4. Verify deserialization matches original
         let loaded = memex
@@ -939,11 +1016,24 @@ mod tests {
             .expect("load must succeed")
             .expect("must exist");
         println!("\n4. DESERIALIZATION VERIFICATION:");
-        println!("   session_id: {} == {}", loaded.session_id, snapshot.session_id);
+        println!(
+            "   session_id: {} == {}",
+            loaded.session_id, snapshot.session_id
+        );
         println!("   last_ic: {} == {}", loaded.last_ic, snapshot.last_ic);
-        println!("   consciousness: {} == {}", loaded.consciousness, snapshot.consciousness);
-        println!("   kuramoto_phases[0]: {} == {}", loaded.kuramoto_phases[0], snapshot.kuramoto_phases[0]);
-        println!("   trajectory.len: {} == {}", loaded.trajectory.len(), snapshot.trajectory.len());
+        println!(
+            "   consciousness: {} == {}",
+            loaded.consciousness, snapshot.consciousness
+        );
+        println!(
+            "   kuramoto_phases[0]: {} == {}",
+            loaded.kuramoto_phases[0], snapshot.kuramoto_phases[0]
+        );
+        println!(
+            "   trajectory.len: {} == {}",
+            loaded.trajectory.len(),
+            snapshot.trajectory.len()
+        );
 
         assert_eq!(loaded, snapshot, "Full equality check");
 

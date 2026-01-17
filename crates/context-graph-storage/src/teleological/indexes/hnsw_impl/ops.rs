@@ -114,12 +114,12 @@ impl EmbedderIndexOps for HnswEmbedderIndex {
         };
 
         // O(log n) HNSW graph traversal - NOT brute force!
-        let results = index.search(query, request_k).map_err(|e| {
-            IndexError::OperationFailed {
+        let results = index
+            .search(query, request_k)
+            .map_err(|e| IndexError::OperationFailed {
                 embedder: self.embedder,
                 message: format!("usearch search failed: {}", e),
-            }
-        })?;
+            })?;
 
         // Map keys back to UUIDs, filtering removed entries
         let mut output = Vec::with_capacity(k.min(active_count));

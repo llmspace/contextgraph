@@ -102,9 +102,7 @@ fn bench_maxsim_token_scaling(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new(format!("q{}_d{}", n_query, n_doc), n_query * n_doc),
             &(&query, &doc),
-            |bench, (q, d)| {
-                bench.iter(|| compute_maxsim_direct(black_box(q), black_box(d)))
-            },
+            |bench, (q, d)| bench.iter(|| compute_maxsim_direct(black_box(q), black_box(d))),
         );
     }
 
@@ -121,9 +119,7 @@ fn bench_maxsim_batch(c: &mut Criterion) {
     let query = generate_document(&mut rng, 10);
 
     // 50 candidates with 15 tokens each (typical Stage 5 input)
-    let candidates: Vec<Vec<Vec<f32>>> = (0..50)
-        .map(|_| generate_document(&mut rng, 15))
-        .collect();
+    let candidates: Vec<Vec<Vec<f32>>> = (0..50).map(|_| generate_document(&mut rng, 15)).collect();
 
     let mut group = c.benchmark_group("maxsim_batch");
 

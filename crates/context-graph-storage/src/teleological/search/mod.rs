@@ -98,67 +98,67 @@ pub use single::{SingleEmbedderSearch, SingleEmbedderSearchConfig};
 
 // Re-export multi-embedder search types
 pub use multi::{
-    // Search struct and builder
-    MultiEmbedderSearch,
-    MultiSearchBuilder,
-    // Configuration
-    MultiEmbedderSearchConfig,
-    // Strategy enums
-    NormalizationStrategy,
-    AggregationStrategy,
     // Result types
     AggregatedHit,
-    PerEmbedderResults,
+    AggregationStrategy,
+    // Search struct and builder
+    MultiEmbedderSearch,
+    // Configuration
+    MultiEmbedderSearchConfig,
     MultiEmbedderSearchResults,
+    MultiSearchBuilder,
+    // Strategy enums
+    NormalizationStrategy,
+    PerEmbedderResults,
 };
 
 // Re-export matrix strategy search types
 pub use matrix::{
-    // Matrix types
-    SearchMatrix,
-    MatrixAnalysis,
     // Correlation types
     CorrelationAnalysis,
     CorrelationPattern,
-    // Search struct and builder
-    MatrixStrategySearch,
+    MatrixAnalysis,
     MatrixSearchBuilder,
     // Result types
     MatrixSearchResults,
+    // Search struct and builder
+    MatrixStrategySearch,
+    // Matrix types
+    SearchMatrix,
 };
 
 // Re-export pipeline types
 pub use pipeline::{
-    // Pipeline struct and builder
-    RetrievalPipeline,
-    PipelineBuilder,
-    // Configuration
-    PipelineConfig,
-    StageConfig,
-    // Stage enum
-    PipelineStage,
-    // Result types
-    PipelineResult,
-    StageResult,
-    PipelineCandidate,
-    // Error types
-    PipelineError,
-    // Storage traits
-    TokenStorage,
-    SpladeIndex,
+    InMemorySpladeIndex,
     // In-memory implementations for testing
     InMemoryTokenStorage,
-    InMemorySpladeIndex,
+    PipelineBuilder,
+    PipelineCandidate,
+    // Configuration
+    PipelineConfig,
+    // Error types
+    PipelineError,
+    // Result types
+    PipelineResult,
+    // Stage enum
+    PipelineStage,
+    // Pipeline struct and builder
+    RetrievalPipeline,
+    SpladeIndex,
+    StageConfig,
+    StageResult,
+    // Storage traits
+    TokenStorage,
 };
 
 // Re-export MaxSim scorer types (TASK-STORAGE-P2-001)
 pub use maxsim::{
-    // Scorer struct
-    MaxSimScorer,
-    // SIMD-optimized cosine similarity
-    cosine_similarity_128d,
     // Standalone MaxSim computation
     compute_maxsim_direct,
+    // SIMD-optimized cosine similarity
+    cosine_similarity_128d,
+    // Scorer struct
+    MaxSimScorer,
     // Constants
     E12_TOKEN_DIM,
 };

@@ -63,8 +63,7 @@ impl Handlers {
 
         match operation {
             "get_all" => {
-                let goals: Vec<serde_json::Value> =
-                    hierarchy.iter().map(goal_to_json).collect();
+                let goals: Vec<serde_json::Value> = hierarchy.iter().map(goal_to_json).collect();
 
                 let stats = compute_hierarchy_stats(&hierarchy);
 

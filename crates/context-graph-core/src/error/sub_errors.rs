@@ -339,13 +339,13 @@ impl McpError {
     #[inline]
     pub fn error_code(&self) -> i32 {
         match self {
-            Self::InvalidRequest(_) => -32600,  // INVALID_REQUEST
-            Self::MethodNotFound(_) => -32601,  // METHOD_NOT_FOUND
-            Self::InvalidParams(_) => -32602,   // INVALID_PARAMS
-            Self::RateLimited(_) => -32005,     // RATE_LIMITED
-            Self::Unauthorized(_) => -32006,    // UNAUTHORIZED
-            Self::SessionExpired => -32000,     // SESSION_NOT_FOUND
-            Self::PiiDetected => -32007,        // PII_DETECTED
+            Self::InvalidRequest(_) => -32600, // INVALID_REQUEST
+            Self::MethodNotFound(_) => -32601, // METHOD_NOT_FOUND
+            Self::InvalidParams(_) => -32602,  // INVALID_PARAMS
+            Self::RateLimited(_) => -32005,    // RATE_LIMITED
+            Self::Unauthorized(_) => -32006,   // UNAUTHORIZED
+            Self::SessionExpired => -32000,    // SESSION_NOT_FOUND
+            Self::PiiDetected => -32007,       // PII_DETECTED
         }
     }
 }

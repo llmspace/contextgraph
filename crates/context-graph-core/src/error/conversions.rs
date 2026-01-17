@@ -40,12 +40,13 @@ impl From<crate::index::error::IndexError> for IndexError {
                 let embedder = embedder_index_to_embedder(embedder);
                 IndexError::RebuildRequired(embedder)
             }
-            ExistingIndexError::InvalidTermId { term_id, vocab_size } => {
-                IndexError::Inverted(format!(
-                    "Invalid term_id {} (vocab_size={})",
-                    term_id, vocab_size
-                ))
-            }
+            ExistingIndexError::InvalidTermId {
+                term_id,
+                vocab_size,
+            } => IndexError::Inverted(format!(
+                "Invalid term_id {} (vocab_size={})",
+                term_id, vocab_size
+            )),
             ExistingIndexError::ZeroNormVector { memory_id } => IndexError::InsertionFailed {
                 memory_id,
                 message: "Zero-norm vector".to_string(),
@@ -75,9 +76,10 @@ impl From<crate::index::error::IndexError> for IndexError {
             ExistingIndexError::HnswSearchFailed { message, .. } => IndexError::Hnsw(message),
             ExistingIndexError::HnswPersistenceFailed { message, .. } => IndexError::Hnsw(message),
             ExistingIndexError::HnswInternalError { message, .. } => IndexError::Hnsw(message),
-            ExistingIndexError::LegacyFormatRejected { path, message } => {
-                IndexError::Corruption(Embedder::Semantic, format!("Legacy: {} - {}", path, message))
-            }
+            ExistingIndexError::LegacyFormatRejected { path, message } => IndexError::Corruption(
+                Embedder::Semantic,
+                format!("Legacy: {} - {}", path, message),
+            ),
         }
     }
 }
@@ -131,9 +133,7 @@ impl From<CoreError> for ContextGraphError {
             CoreError::ValidationError { field, message } => {
                 ContextGraphError::Validation(format!("{}: {}", field, message))
             }
-            CoreError::StorageError(msg) => {
-                ContextGraphError::Storage(StorageError::Database(msg))
-            }
+            CoreError::StorageError(msg) => ContextGraphError::Storage(StorageError::Database(msg)),
             CoreError::IndexError(msg) => ContextGraphError::Index(IndexError::Hnsw(msg)),
             CoreError::ConfigError(msg) => ContextGraphError::Config(ConfigError::Missing(msg)),
             CoreError::UtlError(msg) => ContextGraphError::Internal(format!("UTL: {}", msg)),

@@ -19,8 +19,8 @@
 
 use serde_json::json;
 
+use super::helpers::{assert_success, make_tool_call};
 use crate::handlers::tests::create_test_handlers;
-use super::helpers::{make_tool_call, assert_success};
 
 // REMOVED: auto_bootstrap_north_star tests per TASK-P0-001 (ARCH-03)
 // The tool has been removed. Goals now emerge from topic clustering.

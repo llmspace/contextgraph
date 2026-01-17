@@ -15,8 +15,7 @@ async fn test_learning_layer_latency_benchmark() {
     let mut max_us: u64 = 0;
 
     for i in 0..iterations {
-        let mut input =
-            LayerInput::new(format!("bench-{}", i), format!("Benchmark content {}", i));
+        let mut input = LayerInput::new(format!("bench-{}", i), format!("Benchmark content {}", i));
         input.context.pulse.entropy = (i as f32 / iterations as f32).clamp(0.0, 1.0);
         input.context.pulse.coherence = 0.5 + (i as f32 / iterations as f32 * 0.5);
 

@@ -35,7 +35,9 @@ async fn test_inject_context_stores_content() {
 
     let response = handlers.dispatch(request).await;
     assert!(response.error.is_none(), "inject_context should succeed");
-    let result = response.result.expect("inject_context should return result");
+    let result = response
+        .result
+        .expect("inject_context should return result");
     let data = extract_mcp_tool_data(&result);
 
     // Verify we got a fingerprint ID back
@@ -97,7 +99,9 @@ async fn test_search_graph_returns_content() {
         search_response.error.is_none(),
         "search_graph should succeed"
     );
-    let result = search_response.result.expect("search_graph should return result");
+    let result = search_response
+        .result
+        .expect("search_graph should return result");
     let data = extract_mcp_tool_data(&result);
 
     // Verify results structure
@@ -169,7 +173,9 @@ async fn test_search_graph_omits_content_by_default() {
         search_response.error.is_none(),
         "search_graph should succeed"
     );
-    let result = search_response.result.expect("search_graph should return result");
+    let result = search_response
+        .result
+        .expect("search_graph should return result");
     let data = extract_mcp_tool_data(&result);
 
     // Verify results don't have content field (backward compatibility)
@@ -215,7 +221,9 @@ async fn test_content_storage_round_trip() {
         inject_response.error.is_none(),
         "inject_context should succeed"
     );
-    let inject_result = inject_response.result.expect("inject_context should return result");
+    let inject_result = inject_response
+        .result
+        .expect("inject_context should return result");
     let inject_data = extract_mcp_tool_data(&inject_result);
 
     let fingerprint_id = inject_data
@@ -247,7 +255,9 @@ async fn test_content_storage_round_trip() {
         search_response.error.is_none(),
         "search_graph should succeed"
     );
-    let search_result = search_response.result.expect("search_graph should return result");
+    let search_result = search_response
+        .result
+        .expect("search_graph should return result");
     let search_data = extract_mcp_tool_data(&search_result);
 
     // Step 3: Verify content is retrieved

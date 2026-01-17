@@ -210,12 +210,7 @@ pub fn compute_cluster_coherence(
 
     let similarities: Vec<f32> = members
         .iter()
-        .filter_map(|m| {
-            comparator
-                .compare(m, centroid)
-                .ok()
-                .map(|r| r.overall)
-        })
+        .filter_map(|m| comparator.compare(m, centroid).ok().map(|r| r.overall))
         .collect();
 
     if similarities.is_empty() {

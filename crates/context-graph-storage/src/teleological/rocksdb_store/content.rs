@@ -101,21 +101,19 @@ impl RocksDbTeleologicalStore {
         let cf = self.cf_content();
 
         match self.db.get_cf(cf, key) {
-            Ok(Some(bytes)) => {
-                String::from_utf8(bytes).map(Some).map_err(|e| {
-                    error!(
-                        "CONTENT ERROR: Invalid UTF-8 in stored content for fingerprint {}. \
+            Ok(Some(bytes)) => String::from_utf8(bytes).map(Some).map_err(|e| {
+                error!(
+                    "CONTENT ERROR: Invalid UTF-8 in stored content for fingerprint {}. \
                          This indicates data corruption. Error: {}. Bytes length: {}",
-                        id,
-                        e,
-                        e.as_bytes().len()
-                    );
-                    CoreError::Internal(format!(
-                        "Invalid UTF-8 in content for {}: {}. Data corruption detected.",
-                        id, e
-                    ))
-                })
-            }
+                    id,
+                    e,
+                    e.as_bytes().len()
+                );
+                CoreError::Internal(format!(
+                    "Invalid UTF-8 in content for {}: {}. Data corruption detected.",
+                    id, e
+                ))
+            }),
             Ok(None) => {
                 debug!("No content found for fingerprint {}", id);
                 Ok(None)

@@ -71,12 +71,10 @@ impl Handlers {
                         Err(e) => return self.tool_error_with_pulse(id, &e),
                     }
                 }
-                (None, Some(vector_id)) => {
-                    match self.retrieve_vector_from_store(vector_id).await {
-                        Ok(result) => result,
-                        Err(e) => return self.tool_error_with_pulse(id, &e),
-                    }
-                }
+                (None, Some(vector_id)) => match self.retrieve_vector_from_store(vector_id).await {
+                    Ok(result) => result,
+                    Err(e) => return self.tool_error_with_pulse(id, &e),
+                },
             };
 
         // =====================================================================
@@ -123,7 +121,10 @@ impl Handlers {
                     }
                     debug!(
                         result_count = search_results.len(),
-                        with_content = search_results.iter().filter(|r| r.content.is_some()).count(),
+                        with_content = search_results
+                            .iter()
+                            .filter(|r| r.content.is_some())
+                            .count(),
                         "Content hydrated for search results"
                     );
                 }

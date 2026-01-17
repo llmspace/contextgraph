@@ -112,7 +112,8 @@ impl GwtSystem {
         let self_ego_node = Arc::new(RwLock::new(SelfEgoNode::new()));
 
         // TECH-GWT-IC-001: Create TriggerManager for IC-based dream triggering
-        let trigger_manager = Arc::new(parking_lot::Mutex::new(crate::dream::TriggerManager::new()));
+        let trigger_manager =
+            Arc::new(parking_lot::Mutex::new(crate::dream::TriggerManager::new()));
 
         // Create event broadcaster
         let event_broadcaster = Arc::new(WorkspaceEventBroadcaster::new());
@@ -120,10 +121,11 @@ impl GwtSystem {
         // Create and register listeners
         // TECH-GWT-IC-001: Wire TriggerManager to DreamEventListener for IC-based dream triggering
         // AP-26: TriggerManager and callback are REQUIRED - no optional wiring
-        let dream_consolidation_callback: crate::gwt::listeners::DreamConsolidationCallback = Arc::new(|reason| {
-            // Log dream trigger for now - production may want to integrate with dream orchestrator
-            tracing::info!("Dream consolidation triggered: {:?}", reason);
-        });
+        let dream_consolidation_callback: crate::gwt::listeners::DreamConsolidationCallback =
+            Arc::new(|reason| {
+                // Log dream trigger for now - production may want to integrate with dream orchestrator
+                tracing::info!("Dream consolidation triggered: {:?}", reason);
+            });
         let dream_listener = DreamEventListener::new(
             Arc::clone(&dream_queue),
             Arc::clone(&trigger_manager),
@@ -188,7 +190,8 @@ impl GwtSystem {
     /// Reset the epistemic action flag
     pub fn reset_epistemic_action(&self) {
         use std::sync::atomic::Ordering;
-        self.epistemic_action_triggered.store(false, Ordering::SeqCst);
+        self.epistemic_action_triggered
+            .store(false, Ordering::SeqCst);
     }
 
     /// Get the number of memories pending dream replay

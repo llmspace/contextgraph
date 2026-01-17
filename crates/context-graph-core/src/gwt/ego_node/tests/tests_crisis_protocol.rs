@@ -265,7 +265,12 @@ async fn test_protocol_direct_to_critical() {
     let protocol = CrisisProtocol::new(ego.clone());
     let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
-    let detection = create_detection(0.20, IdentityStatus::Healthy, IdentityStatus::Critical, true);
+    let detection = create_detection(
+        0.20,
+        IdentityStatus::Healthy,
+        IdentityStatus::Critical,
+        true,
+    );
 
     // EXECUTE
     let result = protocol.execute(detection, &mut monitor).await.unwrap();
@@ -386,15 +391,19 @@ async fn test_cooldown_remaining_calculation() {
     let result = protocol.execute(detection, &mut monitor).await.unwrap();
 
     // Find the cooldown action
-    let cooldown_action = result.actions.iter().find(|a| {
-        matches!(a, CrisisAction::EventSkippedCooldown { .. })
-    });
+    let cooldown_action = result
+        .actions
+        .iter()
+        .find(|a| matches!(a, CrisisAction::EventSkippedCooldown { .. }));
 
     assert!(cooldown_action.is_some());
     if let Some(CrisisAction::EventSkippedCooldown { remaining }) = cooldown_action {
         println!("AFTER: remaining cooldown = {:?}", remaining);
         // Should be approximately 25 seconds (30 - 5)
         assert_eq!(*remaining, expected_remaining);
-        println!("EVIDENCE: Cooldown remaining correctly calculated as {:?}", remaining);
+        println!(
+            "EVIDENCE: Cooldown remaining correctly calculated as {:?}",
+            remaining
+        );
     }
 }

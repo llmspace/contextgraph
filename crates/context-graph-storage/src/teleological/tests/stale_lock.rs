@@ -6,11 +6,11 @@
 //! CRITICAL: Uses #[tokio::test] to prevent zombie runtime threads.
 //! DO NOT use tokio::runtime::Runtime::new() in tests.
 
-use crate::teleological::RocksDbTeleologicalStore;
 use super::helpers::create_real_fingerprint;
+use crate::teleological::RocksDbTeleologicalStore;
 use context_graph_core::traits::TeleologicalMemoryStore;
-use tempfile::TempDir;
 use std::fs;
+use tempfile::TempDir;
 
 #[tokio::test]
 async fn test_stale_lock_detection_opens_after_stale_lock() {
@@ -57,8 +57,8 @@ async fn test_stale_lock_detection_fresh_database() {
 
     // Open the database - should work normally
     println!("OPENING: Opening fresh database...");
-    let store = RocksDbTeleologicalStore::open(&db_path)
-        .expect("Should open fresh database successfully");
+    let store =
+        RocksDbTeleologicalStore::open(&db_path).expect("Should open fresh database successfully");
 
     println!("AFTER: Database opened successfully");
 
@@ -81,8 +81,7 @@ async fn test_stale_lock_detection_reopen_after_close() {
     // Step 1: Open, write, and close the database
     println!("STEP 1: Opening database and writing data...");
     {
-        let store = RocksDbTeleologicalStore::open(&db_path)
-            .expect("Should open database");
+        let store = RocksDbTeleologicalStore::open(&db_path).expect("Should open database");
 
         let fp = create_real_fingerprint();
         store.store(fp).await.expect("Should store fingerprint");
@@ -91,12 +90,15 @@ async fn test_stale_lock_detection_reopen_after_close() {
 
     // Step 2: Verify LOCK file doesn't exist (or will be cleaned if stale)
     let lock_path = db_path.join("LOCK");
-    println!("STEP 2: LOCK file exists = {} (may or may not based on RocksDB behavior)", lock_path.exists());
+    println!(
+        "STEP 2: LOCK file exists = {} (may or may not based on RocksDB behavior)",
+        lock_path.exists()
+    );
 
     // Step 3: Reopen the database
     println!("STEP 3: Reopening database...");
-    let store = RocksDbTeleologicalStore::open(&db_path)
-        .expect("Should reopen database successfully");
+    let store =
+        RocksDbTeleologicalStore::open(&db_path).expect("Should reopen database successfully");
 
     // Step 4: Verify data persisted
     let count = store.count().await.expect("Should be able to count");
@@ -119,8 +121,7 @@ async fn test_stale_lock_multiple_stale_lock_files() {
     let lock_path = db_path.join("LOCK");
     fs::write(&lock_path, "").expect("Failed to create stale LOCK");
     {
-        let _store = RocksDbTeleologicalStore::open(&db_path)
-            .expect("Iteration 1: Should open");
+        let _store = RocksDbTeleologicalStore::open(&db_path).expect("Iteration 1: Should open");
     }
     println!("ITERATION 1: Closed database");
 
@@ -147,7 +148,10 @@ async fn test_stale_lock_multiple_stale_lock_files() {
 
     // Verify database is functional
     let count = store.count().await.expect("Should be able to count");
-    println!("VERIFY: Database opened {} times with stale locks, count = {}", 3, count);
+    println!(
+        "VERIFY: Database opened {} times with stale locks, count = {}",
+        3, count
+    );
 
     println!("RESULT: PASS - Multiple stale lock scenarios handled");
 }

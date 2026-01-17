@@ -9,11 +9,11 @@ use context_graph_core::johari::NUM_EMBEDDERS;
 
 use crate::protocol::{error_codes, JsonRpcId, JsonRpcResponse};
 
+use super::super::Handlers;
 use super::constants::{
     ATTACK_DETECTION_TARGET, COHERENCE_RECOVERY_TARGET_MS, FALSE_POSITIVE_TARGET,
     LEARNING_SCORE_TARGET,
 };
-use super::super::Handlers;
 
 impl Handlers {
     /// Handle meta_utl/health_metrics request.
@@ -106,31 +106,63 @@ impl Handlers {
         };
 
         // Check against targets
-        let learning_score_status = if learning_score >= LEARNING_SCORE_TARGET { "passing" } else { "failing" };
-        let coherence_recovery_status = if coherence_recovery_time_ms < COHERENCE_RECOVERY_TARGET_MS { "passing" } else { "failing" };
-        let attack_detection_status = if attack_detection_rate >= ATTACK_DETECTION_TARGET { "passing" } else { "failing" };
-        let false_positive_status = if false_positive_rate < FALSE_POSITIVE_TARGET { "passing" } else { "failing" };
+        let learning_score_status = if learning_score >= LEARNING_SCORE_TARGET {
+            "passing"
+        } else {
+            "failing"
+        };
+        let coherence_recovery_status = if coherence_recovery_time_ms < COHERENCE_RECOVERY_TARGET_MS
+        {
+            "passing"
+        } else {
+            "failing"
+        };
+        let attack_detection_status = if attack_detection_rate >= ATTACK_DETECTION_TARGET {
+            "passing"
+        } else {
+            "failing"
+        };
+        let false_positive_status = if false_positive_rate < FALSE_POSITIVE_TARGET {
+            "passing"
+        } else {
+            "failing"
+        };
 
         // Determine failed targets
         let mut failed_targets: Vec<&str> = Vec::new();
-        if learning_score < LEARNING_SCORE_TARGET { failed_targets.push("learning_score"); }
-        if coherence_recovery_time_ms >= COHERENCE_RECOVERY_TARGET_MS { failed_targets.push("coherence_recovery_time_ms"); }
-        if attack_detection_rate < ATTACK_DETECTION_TARGET { failed_targets.push("attack_detection_rate"); }
-        if false_positive_rate >= FALSE_POSITIVE_TARGET { failed_targets.push("false_positive_rate"); }
+        if learning_score < LEARNING_SCORE_TARGET {
+            failed_targets.push("learning_score");
+        }
+        if coherence_recovery_time_ms >= COHERENCE_RECOVERY_TARGET_MS {
+            failed_targets.push("coherence_recovery_time_ms");
+        }
+        if attack_detection_rate < ATTACK_DETECTION_TARGET {
+            failed_targets.push("attack_detection_rate");
+        }
+        if false_positive_rate >= FALSE_POSITIVE_TARGET {
+            failed_targets.push("false_positive_rate");
+        }
 
-        let overall_status = if failed_targets.is_empty() { "healthy" }
-        else if failed_targets.len() <= 1 { "degraded" }
-        else { "unhealthy" };
+        let overall_status = if failed_targets.is_empty() {
+            "healthy"
+        } else if failed_targets.len() <= 1 {
+            "degraded"
+        } else {
+            "unhealthy"
+        };
 
         // Build recommendations if requested
         let recommendations: Vec<&str> = if include_recommendations && !failed_targets.is_empty() {
-            failed_targets.iter().map(|t| match *t {
-                "learning_score" => "Increase training data quality or quantity",
-                "coherence_recovery_time_ms" => "Optimize cache invalidation strategy",
-                "attack_detection_rate" => "Enhance anomaly detection thresholds",
-                "false_positive_rate" => "Adjust classification sensitivity",
-                _ => "Review system configuration",
-            }).collect()
+            failed_targets
+                .iter()
+                .map(|t| match *t {
+                    "learning_score" => "Increase training data quality or quantity",
+                    "coherence_recovery_time_ms" => "Optimize cache invalidation strategy",
+                    "attack_detection_rate" => "Enhance anomaly detection thresholds",
+                    "false_positive_rate" => "Adjust classification sensitivity",
+                    _ => "Review system configuration",
+                })
+                .collect()
         } else {
             Vec::new()
         };
@@ -154,13 +186,20 @@ impl Handlers {
             metrics["false_positive_status"] = json!(false_positive_status);
         }
 
-        debug!("meta_utl/health_metrics: overall_status={}, failed={}", overall_status, failed_targets.len());
+        debug!(
+            "meta_utl/health_metrics: overall_status={}, failed={}",
+            overall_status,
+            failed_targets.len()
+        );
 
-        JsonRpcResponse::success(id, json!({
-            "metrics": metrics,
-            "overall_status": overall_status,
-            "failed_targets": failed_targets,
-            "recommendations": recommendations,
-        }))
+        JsonRpcResponse::success(
+            id,
+            json!({
+                "metrics": metrics,
+                "overall_status": overall_status,
+                "failed_targets": failed_targets,
+                "recommendations": recommendations,
+            }),
+        )
     }
 }

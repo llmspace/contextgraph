@@ -362,10 +362,7 @@ async fn test_full_state_verification_store_search_delete_cycle() {
         retrieved_fp.content_hash.len()
     );
     println!("  - Embedding spaces: 13 (E1-E13)");
-    println!(
-        "  - Theta alignment: {:.4}",
-        retrieved_fp.alignment_score
-    );
+    println!("  - Theta alignment: {:.4}", retrieved_fp.alignment_score);
     println!("======================================================================\n");
 }
 

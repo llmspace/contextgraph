@@ -193,7 +193,10 @@ impl Handlers {
             let goal_id = match Uuid::parse_str(goal_id_str) {
                 Ok(uuid) => uuid,
                 Err(_) => {
-                    error!(goal_id = goal_id_str, "purpose/drift_check: Invalid goal UUID");
+                    error!(
+                        goal_id = goal_id_str,
+                        "purpose/drift_check: Invalid goal UUID"
+                    );
                     return Err(JsonRpcResponse::error(
                         id.clone(),
                         error_codes::INVALID_PARAMS,
@@ -214,7 +217,12 @@ impl Handlers {
             }
         } else if hierarchy.has_top_level_goals() {
             Ok(Some(
-                hierarchy.top_level_goals().first().unwrap().teleological_array.clone(),
+                hierarchy
+                    .top_level_goals()
+                    .first()
+                    .unwrap()
+                    .teleological_array
+                    .clone(),
             ))
         } else {
             Ok(None) // No Strategic goal configured
@@ -281,5 +289,4 @@ impl Handlers {
         }
         Ok(memories)
     }
-
 }

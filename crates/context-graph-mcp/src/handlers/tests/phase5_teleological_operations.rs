@@ -61,7 +61,8 @@ async fn phase5_compute_teleological_vector_handler_interface() {
 
     let (handlers, _store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
 
-    let content = "Neural network architectures for deep learning including CNNs, RNNs, and transformers";
+    let content =
+        "Neural network architectures for deep learning including CNNs, RNNs, and transformers";
 
     let request = make_tool_call(
         "compute_teleological_vector",
@@ -87,12 +88,22 @@ async fn phase5_compute_teleological_vector_handler_interface() {
         assert_ne!(err.code, -32700, "Should not be a parse error");
     } else if let Some(result) = &response.result {
         println!("  - Handler returned success");
-        println!("  - Has 'success' field: {}", result.get("success").is_some());
+        println!(
+            "  - Has 'success' field: {}",
+            result.get("success").is_some()
+        );
         println!("  - Has 'vector' field: {}", result.get("vector").is_some());
 
         // If success, verify structure
-        if result.get("success").and_then(|v| v.as_bool()).unwrap_or(false) {
-            assert!(result.get("vector").is_some(), "Success response must have vector");
+        if result
+            .get("success")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
+            assert!(
+                result.get("vector").is_some(),
+                "Success response must have vector"
+            );
             println!("  - Vector structure verified");
         }
     }
@@ -129,7 +140,9 @@ async fn phase5_compute_teleological_vector_fail_fast_empty() {
         println!("  - Handler rejected empty content: {}", err.message);
     } else {
         let result = response.result.as_ref();
-        let success = result.and_then(|r| r.get("success")).and_then(|v| v.as_bool());
+        let success = result
+            .and_then(|r| r.get("success"))
+            .and_then(|v| v.as_bool());
         println!("  - Handler accepted empty content");
         println!("  - success field: {:?}", success);
         println!("  - Note: Consider adding FAIL FAST validation for empty content");
@@ -186,7 +199,10 @@ async fn phase5_search_teleological_with_query_content() {
     let response = handlers.dispatch(request).await;
 
     if let Some(err) = &response.error {
-        println!("  - Search error (may be expected with stub): {}", err.message);
+        println!(
+            "  - Search error (may be expected with stub): {}",
+            err.message
+        );
     } else {
         let result = response.result.expect("Should have result");
         let results = result.get("results").and_then(|r| r.as_array());
@@ -223,7 +239,10 @@ async fn phase5_search_teleological_fail_fast_no_query() {
 
     // Document behavior
     if let Some(err) = &response.error {
-        println!("  - Handler correctly rejected missing query: {}", err.message);
+        println!(
+            "  - Handler correctly rejected missing query: {}",
+            err.message
+        );
     } else {
         let result = response.result.as_ref();
         println!("  - Handler did not return error (unexpected)");
@@ -279,7 +298,11 @@ async fn phase5_search_teleological_strategies() {
             println!("  - {}: Error ({})", strategy, err.message);
         } else {
             let result = response.result.expect("Should have result");
-            let count = result.get("results").and_then(|r| r.as_array()).map(|a| a.len()).unwrap_or(0);
+            let count = result
+                .get("results")
+                .and_then(|r| r.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0);
             println!("  - {}: {} results", strategy, count);
         }
     }
@@ -319,7 +342,11 @@ async fn phase5_fuse_embeddings_handler() {
         println!("  - CORRECTLY rejected: {}", err.message);
     } else {
         let result = response.result.expect("Should have result");
-        if !result.get("success").and_then(|v| v.as_bool()).unwrap_or(true) {
+        if !result
+            .get("success")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true)
+        {
             println!("  - Returned success=false (validation failed)");
         }
     }
@@ -360,8 +387,14 @@ async fn phase5_update_synergy_matrix_handler() {
     } else {
         let result = response.result.expect("Should have result");
         println!("  - Response received");
-        println!("  - Has 'success' field: {}", result.get("success").is_some());
-        println!("  - Has 'weights' field: {}", result.get("weights").is_some());
+        println!(
+            "  - Has 'success' field: {}",
+            result.get("success").is_some()
+        );
+        println!(
+            "  - Has 'weights' field: {}",
+            result.get("weights").is_some()
+        );
     }
 
     println!("\n[PHASE 5 TEST 7 PASSED] update_synergy_matrix handler works");

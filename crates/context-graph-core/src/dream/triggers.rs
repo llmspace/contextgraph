@@ -160,8 +160,8 @@ impl Default for TriggerConfig {
     /// Create config with constitution-mandated defaults.
     fn default() -> Self {
         Self {
-            ic_threshold: 0.5,        // Constitution: gwt.self_ego_node.thresholds.critical
-            entropy_threshold: 0.7,    // Constitution: dream.trigger.entropy
+            ic_threshold: 0.5,      // Constitution: gwt.self_ego_node.thresholds.critical
+            entropy_threshold: 0.7, // Constitution: dream.trigger.entropy
             cooldown: Duration::from_secs(60),
         }
     }
@@ -368,7 +368,7 @@ impl TriggerManager {
     pub fn new() -> Self {
         let config = TriggerConfig::default();
         Self {
-            trigger_history: Vec::new(), // TASK-S03: Start with empty history
+            trigger_history: Vec::new(),       // TASK-S03: Start with empty history
             trigger_cooldown: config.cooldown, // Use config cooldown
             config,
             current_ic: None,
@@ -1348,11 +1348,8 @@ impl EntropyCalculator {
             return 1.0; // Extremely rapid queries = high entropy
         }
 
-        let variance: f32 = intervals
-            .iter()
-            .map(|&x| (x - mean).powi(2))
-            .sum::<f32>()
-            / intervals.len() as f32;
+        let variance: f32 =
+            intervals.iter().map(|&x| (x - mean).powi(2)).sum::<f32>() / intervals.len() as f32;
         let std = variance.sqrt();
         let cv = std / mean;
 
@@ -1478,10 +1475,7 @@ mod tests {
         manager.update_gpu_usage(0.22);
         manager.update_gpu_usage(0.25);
 
-        assert!(
-            !manager.should_trigger(),
-            "Average ~22% should not trigger"
-        );
+        assert!(!manager.should_trigger(), "Average ~22% should not trigger");
     }
 
     // ============ Entropy Trigger Tests ============
@@ -1648,10 +1642,13 @@ mod tests {
         let mut monitor = StubGpuMonitor::unavailable();
 
         let result = monitor.get_utilization();
-        assert!(result.is_err(), "Unavailable GPU should return error, not 0.0");
+        assert!(
+            result.is_err(),
+            "Unavailable GPU should return error, not 0.0"
+        );
 
         match result {
-            Err(GpuMonitorError::NvmlNotAvailable) => {}, // Expected
+            Err(GpuMonitorError::NvmlNotAvailable) => {} // Expected
             Err(other) => panic!("Expected NvmlNotAvailable, got {:?}", other),
             Ok(val) => panic!("Expected error, got Ok({})", val),
         }
@@ -1682,10 +1679,18 @@ mod tests {
     #[test]
     fn test_stub_gpu_monitor_clamping() {
         let mut monitor = StubGpuMonitor::with_usage(1.5);
-        assert_eq!(monitor.get_utilization().unwrap(), 1.0, "Should clamp to 1.0");
+        assert_eq!(
+            monitor.get_utilization().unwrap(),
+            1.0,
+            "Should clamp to 1.0"
+        );
 
         monitor.set_usage(-0.5);
-        assert_eq!(monitor.get_utilization().unwrap(), 0.0, "Should clamp to 0.0");
+        assert_eq!(
+            monitor.get_utilization().unwrap(),
+            0.0,
+            "Should clamp to 0.0"
+        );
     }
 
     #[test]
@@ -1751,10 +1756,22 @@ mod tests {
     #[test]
     fn test_gpu_monitor_error_display() {
         let errors = [
-            (GpuMonitorError::NvmlInitFailed("test".to_string()), "NVML initialization failed"),
+            (
+                GpuMonitorError::NvmlInitFailed("test".to_string()),
+                "NVML initialization failed",
+            ),
             (GpuMonitorError::NoDevices, "No GPU devices found"),
-            (GpuMonitorError::DeviceAccessFailed { index: 0, message: "test".to_string() }, "Failed to access GPU device"),
-            (GpuMonitorError::UtilizationQueryFailed("test".to_string()), "GPU utilization query failed"),
+            (
+                GpuMonitorError::DeviceAccessFailed {
+                    index: 0,
+                    message: "test".to_string(),
+                },
+                "Failed to access GPU device",
+            ),
+            (
+                GpuMonitorError::UtilizationQueryFailed("test".to_string()),
+                "GPU utilization query failed",
+            ),
             (GpuMonitorError::NvmlNotAvailable, "NVML not available"),
             (GpuMonitorError::Disabled, "GPU monitoring is disabled"),
         ];
@@ -1764,7 +1781,8 @@ mod tests {
             assert!(
                 display.contains(expected_prefix.split(':').next().unwrap().trim()),
                 "Error display '{}' should contain '{}'",
-                display, expected_prefix
+                display,
+                expected_prefix
             );
         }
     }
@@ -1786,13 +1804,13 @@ mod tests {
         // Edge case: exactly at thresholds
         let test_cases: [(f32, bool, bool); 7] = [
             // (usage, is_eligible, should_abort)
-            (0.00, true, false),   // Minimum: eligible, don't abort
-            (0.29, true, false),   // Just under budget: eligible, don't abort
-            (0.30, true, false),   // At budget: eligible, don't abort (> not >=)
-            (0.31, true, true),    // Just over budget: eligible but should abort
-            (0.79, true, true),    // Just under eligibility: eligible but over budget
-            (0.80, false, true),   // At eligibility: NOT eligible, should abort
-            (1.00, false, true),   // Maximum: NOT eligible, should abort
+            (0.00, true, false), // Minimum: eligible, don't abort
+            (0.29, true, false), // Just under budget: eligible, don't abort
+            (0.30, true, false), // At budget: eligible, don't abort (> not >=)
+            (0.31, true, true),  // Just over budget: eligible but should abort
+            (0.79, true, true),  // Just under eligibility: eligible but over budget
+            (0.80, false, true), // At eligibility: NOT eligible, should abort
+            (1.00, false, true), // Maximum: NOT eligible, should abort
         ];
 
         for (usage, expected_eligible, expected_abort) in test_cases {
@@ -1801,12 +1819,14 @@ mod tests {
             assert_eq!(
                 monitor.is_eligible_for_dream().unwrap(),
                 expected_eligible,
-                "Usage {} eligibility mismatch", usage
+                "Usage {} eligibility mismatch",
+                usage
             );
             assert_eq!(
                 monitor.should_abort_dream().unwrap(),
                 expected_abort,
-                "Usage {} abort mismatch", usage
+                "Usage {} abort mismatch",
+                usage
             );
         }
     }
@@ -1957,7 +1977,10 @@ mod tests {
         let trigger = manager.check_triggers();
         match trigger {
             Some(ExtendedTriggerReason::IdentityCritical { .. }) => {} // Expected
-            other => panic!("Expected IdentityCritical to have priority, got {:?}", other),
+            other => panic!(
+                "Expected IdentityCritical to have priority, got {:?}",
+                other
+            ),
         }
     }
 
@@ -2182,9 +2205,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "ic_threshold must be in [0.0, 1.0]")]
     fn test_trigger_config_validated_panics_invalid() {
-        TriggerConfig::default()
-            .with_ic_threshold(-1.0)
-            .validated();
+        TriggerConfig::default().with_ic_threshold(-1.0).validated();
     }
 
     #[test]
@@ -2192,13 +2213,28 @@ mod tests {
         let config = TriggerConfig::default(); // ic_threshold = 0.5
 
         // Below threshold = crisis
-        assert!(config.is_identity_critical(0.49), "0.49 < 0.5 should be critical");
-        assert!(config.is_identity_critical(0.0), "0.0 < 0.5 should be critical");
+        assert!(
+            config.is_identity_critical(0.49),
+            "0.49 < 0.5 should be critical"
+        );
+        assert!(
+            config.is_identity_critical(0.0),
+            "0.0 < 0.5 should be critical"
+        );
 
         // At or above threshold = not crisis
-        assert!(!config.is_identity_critical(0.5), "0.5 >= 0.5 should NOT be critical");
-        assert!(!config.is_identity_critical(0.51), "0.51 > 0.5 should NOT be critical");
-        assert!(!config.is_identity_critical(1.0), "1.0 > 0.5 should NOT be critical");
+        assert!(
+            !config.is_identity_critical(0.5),
+            "0.5 >= 0.5 should NOT be critical"
+        );
+        assert!(
+            !config.is_identity_critical(0.51),
+            "0.51 > 0.5 should NOT be critical"
+        );
+        assert!(
+            !config.is_identity_critical(1.0),
+            "1.0 > 0.5 should NOT be critical"
+        );
     }
 
     #[test]
@@ -2206,13 +2242,28 @@ mod tests {
         let config = TriggerConfig::default(); // entropy_threshold = 0.7
 
         // Above threshold = high entropy
-        assert!(config.is_high_entropy(0.71), "0.71 > 0.7 should be high entropy");
-        assert!(config.is_high_entropy(1.0), "1.0 > 0.7 should be high entropy");
+        assert!(
+            config.is_high_entropy(0.71),
+            "0.71 > 0.7 should be high entropy"
+        );
+        assert!(
+            config.is_high_entropy(1.0),
+            "1.0 > 0.7 should be high entropy"
+        );
 
         // At or below threshold = not high entropy
-        assert!(!config.is_high_entropy(0.7), "0.7 <= 0.7 should NOT be high entropy");
-        assert!(!config.is_high_entropy(0.69), "0.69 < 0.7 should NOT be high entropy");
-        assert!(!config.is_high_entropy(0.0), "0.0 < 0.7 should NOT be high entropy");
+        assert!(
+            !config.is_high_entropy(0.7),
+            "0.7 <= 0.7 should NOT be high entropy"
+        );
+        assert!(
+            !config.is_high_entropy(0.69),
+            "0.69 < 0.7 should NOT be high entropy"
+        );
+        assert!(
+            !config.is_high_entropy(0.0),
+            "0.0 < 0.7 should NOT be high entropy"
+        );
     }
 
     #[test]
@@ -2303,15 +2354,14 @@ mod tests {
         #[test]
         #[ignore = "Requires NVIDIA GPU and nvml feature"]
         fn test_nvml_gpu_monitor_caching() {
-            let mut monitor = match NvmlGpuMonitor::with_cache_duration(
-                std::time::Duration::from_millis(50),
-            ) {
-                Ok(m) => m,
-                Err(_) => {
-                    println!("Skipping: NVML not available");
-                    return;
-                }
-            };
+            let mut monitor =
+                match NvmlGpuMonitor::with_cache_duration(std::time::Duration::from_millis(50)) {
+                    Ok(m) => m,
+                    Err(_) => {
+                        println!("Skipping: NVML not available");
+                        return;
+                    }
+                };
 
             // First query - populates cache
             let first = monitor.get_utilization().unwrap();
@@ -2348,7 +2398,8 @@ mod tests {
             // Verify consistency with threshold
             let expected = utilization < 0.80;
             assert_eq!(
-                eligible, expected,
+                eligible,
+                expected,
                 "Eligibility should be true when GPU < 80%: util={:.1}%",
                 utilization * 100.0
             );
@@ -2372,7 +2423,8 @@ mod tests {
             // Verify consistency with threshold
             let expected = utilization > 0.30;
             assert_eq!(
-                should_abort, expected,
+                should_abort,
+                expected,
                 "Should abort when GPU > 30%: util={:.1}%",
                 utilization * 100.0
             );

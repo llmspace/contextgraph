@@ -36,10 +36,7 @@ mod tests {
         match result {
             Err(SearchError::Store(msg)) => {
                 println!("EVIDENCE: Error message = \"{}\"", msg);
-                assert!(
-                    msg.contains("empty"),
-                    "Error message must contain 'empty'"
-                );
+                assert!(msg.contains("empty"), "Error message must contain 'empty'");
                 println!("RESULT: PASS - FAIL FAST with correct error");
             }
             Ok(_) => panic!("FAIL: Expected error for empty queries"),
@@ -132,16 +129,16 @@ mod tests {
             matrix.has_cross_correlations(),
             "Should have cross-correlations"
         );
-        assert!(
-            !matrix.is_diagonal(),
-            "Should not be diagonal-only"
-        );
+        assert!(!matrix.is_diagonal(), "Should not be diagonal-only");
 
         let registry = Arc::new(EmbedderIndexRegistry::new());
         let search = MatrixStrategySearch::new(registry);
         let analysis = search.analyze_matrix(&matrix);
 
-        println!("AFTER: analysis.cross_correlation_count = {}", analysis.cross_correlation_count);
+        println!(
+            "AFTER: analysis.cross_correlation_count = {}",
+            analysis.cross_correlation_count
+        );
         assert_eq!(
             analysis.cross_correlation_count, 2,
             "Should have 2 cross-correlations (E1-E7 and E7-E1)"
@@ -199,7 +196,10 @@ mod tests {
         let e7_weight_semantic = semantic_matrix.diagonal(EmbedderIndex::E7Code);
         let e7_weight_code = code_matrix.diagonal(EmbedderIndex::E7Code);
 
-        println!("semantic_focused: E1={}, E7={}", e1_weight_semantic, e7_weight_semantic);
+        println!(
+            "semantic_focused: E1={}, E7={}",
+            e1_weight_semantic, e7_weight_semantic
+        );
         println!("code_heavy: E1={}, E7={}", e1_weight_code, e7_weight_code);
 
         assert!(
@@ -212,8 +212,10 @@ mod tests {
         );
 
         println!("AFTER: Weight differences verified");
-        println!("EVIDENCE: semantic E1={} > code E1={}, code E7={} > semantic E7={}",
-                 e1_weight_semantic, e1_weight_code, e7_weight_code, e7_weight_semantic);
+        println!(
+            "EVIDENCE: semantic E1={} > code E1={}, code E7={} > semantic E7={}",
+            e1_weight_semantic, e1_weight_code, e7_weight_code, e7_weight_semantic
+        );
         println!("RESULT: PASS");
     }
 

@@ -301,11 +301,7 @@ mod tests {
         for (name, expected) in test_cases {
             let json = format!(r#"{{"embedder": "{}"}}"#, name);
             let config: TestConfig = serde_json::from_str(&json).unwrap();
-            assert_eq!(
-                config.embedder, expected,
-                "Failed for {}",
-                name
-            );
+            assert_eq!(config.embedder, expected, "Failed for {}", name);
         }
         println!("[PASS] All 13 embedder names deserialize correctly");
     }

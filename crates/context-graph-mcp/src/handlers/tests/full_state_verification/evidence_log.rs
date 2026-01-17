@@ -79,10 +79,7 @@ async fn verify_complete_evidence_log() {
     println!("  Direct store.retrieve() succeeded");
     println!("  Stored fingerprint fields:");
     println!("    - id: {}", stored_fp.id);
-    println!(
-        "    - alignment_score: {:.6}",
-        stored_fp.alignment_score
-    );
+    println!("    - alignment_score: {:.6}", stored_fp.alignment_score);
     println!("    - access_count: {}", stored_fp.access_count);
     println!("    - created_at: {}", stored_fp.created_at);
     println!("    - last_updated: {}", stored_fp.last_updated);

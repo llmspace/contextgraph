@@ -14,13 +14,15 @@ async fn test_pbt_all_outputs_valid_range() {
     let handlers = create_test_handlers();
 
     // Test with various input combinations
-    let test_cases = [(vec![0.0; 1024], vec![0.0; 1024]),
+    let test_cases = [
+        (vec![0.0; 1024], vec![0.0; 1024]),
         (vec![1.0; 1024], vec![1.0; 1024]),
         (vec![0.0; 1024], vec![1.0; 1024]),
         (vec![1.0; 1024], vec![0.0; 1024]),
         (vec![0.5; 1024], vec![0.5; 1024]),
         (vec![0.1; 1024], vec![0.9; 1024]),
-        (vec![0.25; 1024], vec![0.75; 1024])];
+        (vec![0.25; 1024], vec![0.75; 1024]),
+    ];
 
     for (i, (old_vals, new_vals)) in test_cases.iter().enumerate() {
         let old_fp = create_test_fingerprint_with_semantic(old_vals.clone());
@@ -40,7 +42,11 @@ async fn test_pbt_all_outputs_valid_range() {
         );
 
         let response = handlers.dispatch(request).await;
-        assert!(response.error.is_none(), "PBT-01: Test case {} should succeed", i);
+        assert!(
+            response.error.is_none(),
+            "PBT-01: Test case {} should succeed",
+            i
+        );
 
         let result = response.result.expect("result");
         let data = extract_mcp_tool_data(&result);
@@ -60,7 +66,9 @@ async fn test_pbt_all_outputs_valid_range() {
 
         let delta_s_agg = data["delta_s_aggregate"].as_f64().expect("f64");
         assert!(
-            (0.0..=1.0).contains(&delta_s_agg) && !delta_s_agg.is_nan() && !delta_s_agg.is_infinite(),
+            (0.0..=1.0).contains(&delta_s_agg)
+                && !delta_s_agg.is_nan()
+                && !delta_s_agg.is_infinite(),
             "PBT-01: Test case {} - delta_s_aggregate = {} invalid",
             i,
             delta_s_agg
@@ -76,7 +84,9 @@ async fn test_pbt_all_outputs_valid_range() {
 
         let learning_potential = data["utl_learning_potential"].as_f64().expect("f64");
         assert!(
-            (0.0..=1.0).contains(&learning_potential) && !learning_potential.is_nan() && !learning_potential.is_infinite(),
+            (0.0..=1.0).contains(&learning_potential)
+                && !learning_potential.is_nan()
+                && !learning_potential.is_infinite(),
             "PBT-01: Test case {} - utl_learning_potential = {} invalid",
             i,
             learning_potential

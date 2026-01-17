@@ -137,12 +137,7 @@ impl HammingPrototypeEntropy {
 }
 
 impl EmbedderEntropy for HammingPrototypeEntropy {
-    fn compute_delta_s(
-        &self,
-        current: &[f32],
-        history: &[Vec<f32>],
-        _k: usize,
-    ) -> UtlResult<f32> {
+    fn compute_delta_s(&self, current: &[f32], history: &[Vec<f32>], _k: usize) -> UtlResult<f32> {
         // Validate input
         if current.is_empty() {
             return Err(UtlError::EmptyInput);
@@ -302,10 +297,7 @@ mod tests {
         );
 
         println!("BEFORE: added 15 prototypes to calculator with max=10");
-        println!(
-            "AFTER: prototypes.len() = {}",
-            calculator.prototype_count()
-        );
+        println!("AFTER: prototypes.len() = {}", calculator.prototype_count());
         println!("[PASS] hamming_max_prototypes_enforced");
     }
 

@@ -17,8 +17,8 @@ use crate::error::{CudaError, CudaResult};
 use crate::ffi::cuda_driver::{
     cuCtxCreate_v2, cuCtxDestroy_v2, cuCtxSetCurrent, cuDeviceGet, cuDeviceGetAttribute,
     cuDeviceGetName, cuInit, cuMemGetInfo_v2, CUcontext, CUdevice, CUresult,
-    CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
     CUDA_ERROR_INVALID_DEVICE, CUDA_ERROR_NO_DEVICE, CUDA_SUCCESS,
+    CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
 };
 use std::ffi::CStr;
 use std::ptr;
@@ -188,13 +188,8 @@ impl GpuDevice {
         let mut name_buf = [0i8; 256];
 
         // SAFETY: buffer is valid and large enough
-        let result = unsafe {
-            cuDeviceGetName(
-                name_buf.as_mut_ptr(),
-                name_buf.len() as i32,
-                self.device,
-            )
-        };
+        let result =
+            unsafe { cuDeviceGetName(name_buf.as_mut_ptr(), name_buf.len() as i32, self.device) };
 
         if result != CUDA_SUCCESS {
             return format!("GPU {} (name query failed)", self.ordinal);
@@ -428,5 +423,4 @@ mod tests {
         // Names should match (same physical device)
         assert_eq!(d1.name(), d2.name());
     }
-
 }

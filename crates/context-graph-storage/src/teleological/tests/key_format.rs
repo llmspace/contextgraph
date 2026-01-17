@@ -213,12 +213,7 @@ fn test_content_key_format() {
 fn test_content_key_roundtrip() {
     println!("=== TEST: content_key roundtrip ===");
 
-    let test_uuids = vec![
-        Uuid::nil(),
-        Uuid::max(),
-        Uuid::new_v4(),
-        Uuid::new_v4(),
-    ];
+    let test_uuids = vec![Uuid::nil(), Uuid::max(), Uuid::new_v4(), Uuid::new_v4()];
 
     for id in test_uuids {
         let key = schema::content_key(&id);
@@ -371,11 +366,11 @@ fn test_session_temporal_key_roundtrip() {
     println!("=== TEST: session_temporal_key roundtrip (TASK-SESSION-04) ===");
 
     let test_timestamps: Vec<i64> = vec![
-        0,           // minimum
-        1,           // near minimum
-        1000,        // 1 second
+        0,             // minimum
+        1,             // near minimum
+        1000,          // 1 second
         1736899200000, // realistic timestamp
-        i64::MAX / 2, // large value
+        i64::MAX / 2,  // large value
     ];
 
     for timestamp in test_timestamps {
@@ -398,7 +393,10 @@ fn test_session_temporal_key_lexicographic_ordering() {
 
     // Keys should be lexicographically ordered by timestamp (big-endian encoding)
     let timestamps: Vec<i64> = vec![0, 100, 1000, 10000, 100000, 1000000, i64::MAX / 2];
-    let keys: Vec<Vec<u8>> = timestamps.iter().map(|&t| session_temporal_key(t)).collect();
+    let keys: Vec<Vec<u8>> = timestamps
+        .iter()
+        .map(|&t| session_temporal_key(t))
+        .collect();
 
     for i in 1..keys.len() {
         assert!(
@@ -407,11 +405,7 @@ fn test_session_temporal_key_lexicographic_ordering() {
             timestamps[i - 1],
             timestamps[i]
         );
-        println!(
-            "  {} < {} -> OK",
-            timestamps[i - 1],
-            timestamps[i]
-        );
+        println!("  {} < {} -> OK", timestamps[i - 1], timestamps[i]);
     }
 
     println!("RESULT: PASS - Lexicographic ordering maintained");

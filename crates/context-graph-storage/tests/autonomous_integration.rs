@@ -19,7 +19,9 @@ use context_graph_core::autonomous::{
     AdaptiveThresholdState, AutonomousConfig, GoalId, MemoryCurationState,
 };
 // TASK-P0-004: Removed DriftDataPoint, GoalActivityMetrics imports (used by removed CFs)
-use context_graph_storage::autonomous::{ConsolidationRecord, LineageEvent, RocksDbAutonomousStore};
+use context_graph_storage::autonomous::{
+    ConsolidationRecord, LineageEvent, RocksDbAutonomousStore,
+};
 use tempfile::TempDir;
 use uuid::Uuid;
 
@@ -158,7 +160,9 @@ fn test_persistence_across_close_reopen() {
 
         // Write lineage event (replaces drift_history for time-series testing)
         let event = LineageEvent::new("bootstrap", "Test persistence event");
-        store.store_lineage_event(&event).expect("store lineage failed");
+        store
+            .store_lineage_event(&event)
+            .expect("store lineage failed");
 
         // Write consolidation record
         let record = ConsolidationRecord::success(
@@ -204,12 +208,23 @@ fn test_persistence_across_close_reopen() {
         // Verify lineage event
         let lineage = store.get_lineage_history(None).expect("get lineage failed");
         assert!(!lineage.is_empty(), "Lineage history must persist");
-        assert_eq!(lineage[0].event_type, "bootstrap", "Lineage event type mismatch");
+        assert_eq!(
+            lineage[0].event_type, "bootstrap",
+            "Lineage event type mismatch"
+        );
 
         // Verify consolidation record
-        let consolidation = store.get_consolidation_history(None).expect("get consolidation failed");
-        assert!(!consolidation.is_empty(), "Consolidation history must persist");
-        assert!(consolidation[0].success, "Consolidation record success flag invalid");
+        let consolidation = store
+            .get_consolidation_history(None)
+            .expect("get consolidation failed");
+        assert!(
+            !consolidation.is_empty(),
+            "Consolidation history must persist"
+        );
+        assert!(
+            consolidation[0].success,
+            "Consolidation record success flag invalid"
+        );
 
         // Verify memory curation
         let curation = store
@@ -351,7 +366,11 @@ fn test_update_overwrites_previous_value() {
         .get_curation_state(memory_uuid)
         .expect("get failed")
         .expect("State should exist");
-    assert_eq!(retrieved, MemoryCurationState::Active, "Initial state wrong");
+    assert_eq!(
+        retrieved,
+        MemoryCurationState::Active,
+        "Initial state wrong"
+    );
 
     // Update to Dormant
     let updated_state = MemoryCurationState::Dormant { since: Utc::now() };

@@ -22,8 +22,8 @@ use context_graph_graph::index::gpu_memory::{GpuMemoryConfig, GpuMemoryManager, 
 fn test_allocation_deallocation_cycling() {
     println!("\n=== CHAOS TEST: 10000 Allocation/Deallocation Cycles ===");
 
-    let manager = GpuMemoryManager::new(GpuMemoryConfig::with_budget(1024 * 1024))
-        .expect("Manager creation");
+    let manager =
+        GpuMemoryManager::new(GpuMemoryConfig::with_budget(1024 * 1024)).expect("Manager creation");
 
     let baseline = manager.used();
     println!("BEFORE: baseline used={}", baseline);
@@ -70,8 +70,8 @@ fn test_allocation_deallocation_cycling() {
 fn test_fragmentation_under_pressure() {
     println!("\n=== CHAOS TEST: Fragmentation Under Pressure ===");
 
-    let manager = GpuMemoryManager::new(GpuMemoryConfig::with_budget(100 * 1024))
-        .expect("Manager creation");
+    let manager =
+        GpuMemoryManager::new(GpuMemoryConfig::with_budget(100 * 1024)).expect("Manager creation");
 
     // Allocate 20 small chunks (4KB each = 80KB total)
     let mut handles: Vec<_> = (0..20)
@@ -165,10 +165,7 @@ fn test_low_memory_threshold_warning() {
         manager.is_low_memory(),
         manager.used()
     );
-    assert!(
-        !manager.is_low_memory(),
-        "Should not be low memory at 85%"
-    );
+    assert!(!manager.is_low_memory(), "Should not be low memory at 85%");
 
     // Allocate more to pass 90% threshold (total 91%)
     let h2 = manager

@@ -136,15 +136,13 @@ pub struct Handlers {
     /// TriggerManager for manual dream triggering via MCP.
     /// TASK-35: Required for trigger_dream to call request_manual_trigger().
     /// Uses RwLock because trigger operations mutate internal state.
-    pub(in crate::handlers) trigger_manager:
-        Option<Arc<RwLock<TriggerManager>>>,
+    pub(in crate::handlers) trigger_manager: Option<Arc<RwLock<TriggerManager>>>,
 
     // ========== GPU MONITOR (TASK-37) ==========
     /// GpuMonitor for GPU utilization and dream eligibility status.
     /// TASK-37: Required for get_gpu_status MCP tool.
     /// Uses RwLock because get_utilization() is &mut self.
-    pub(in crate::handlers) gpu_monitor:
-        Option<Arc<RwLock<dyn GpuMonitor>>>,
+    pub(in crate::handlers) gpu_monitor: Option<Arc<RwLock<dyn GpuMonitor>>>,
 
     // ========== NEUROMODULATION (TASK-NEUROMOD-MCP) ==========
     /// Neuromodulation manager for controlling system behavior modulation.
@@ -170,7 +168,8 @@ pub struct Handlers {
     /// TASK-12 (GWT-006): MUST start when server starts, stop when server stops.
     /// The stepper uses the kuramoto_network field and calls step() every 10ms.
     /// Uses RwLock to allow start/stop lifecycle methods from Arc<Handlers>.
-    pub(in crate::handlers) kuramoto_stepper: Option<RwLock<super::super::kuramoto_stepper::KuramotoStepper>>,
+    pub(in crate::handlers) kuramoto_stepper:
+        Option<RwLock<super::super::kuramoto_stepper::KuramotoStepper>>,
 
     // ========== PREDICTION HISTORY (TASK-004) ==========
     /// Prediction history for autonomous learner predictions.
@@ -729,7 +728,7 @@ impl Handlers {
         // Step 4: Create GwtSystemProviderImpl with SHARED monitor (AP-40 fix)
         // This ensures MCP tools read from the same monitor that processes workspace events
         let gwt_system: Arc<dyn GwtSystemProvider> = Arc::new(
-            GwtSystemProviderImpl::with_shared_monitor(identity_listener.monitor())
+            GwtSystemProviderImpl::with_shared_monitor(identity_listener.monitor()),
         );
 
         // Create real GWT provider implementations
@@ -742,7 +741,7 @@ impl Handlers {
         use super::super::kuramoto_stepper::{KuramotoStepper, KuramotoStepperConfig};
         let kuramoto_stepper = KuramotoStepper::new(
             Arc::clone(&kuramoto_network),
-            KuramotoStepperConfig::default(),  // 10ms interval = 100Hz
+            KuramotoStepperConfig::default(), // 10ms interval = 100Hz
         );
 
         let workspace_provider: Arc<tokio::sync::RwLock<dyn WorkspaceProvider>> =
@@ -922,7 +921,9 @@ impl Handlers {
     /// - The stepper is not configured (construction error - should not happen with with_default_gwt())
     ///
     /// No silent fallbacks. No NaN returns.
-    pub fn start_kuramoto_stepper(&self) -> Result<(), super::super::kuramoto_stepper::KuramotoStepperError> {
+    pub fn start_kuramoto_stepper(
+        &self,
+    ) -> Result<(), super::super::kuramoto_stepper::KuramotoStepperError> {
         use super::super::kuramoto_stepper::KuramotoStepperError;
 
         match &self.kuramoto_stepper {
@@ -956,7 +957,9 @@ impl Handlers {
     /// - The stepper task doesn't stop within 5 seconds (task stuck - needs investigation)
     ///
     /// No silent fallbacks. Log errors for monitoring.
-    pub async fn stop_kuramoto_stepper(&self) -> Result<(), super::super::kuramoto_stepper::KuramotoStepperError> {
+    pub async fn stop_kuramoto_stepper(
+        &self,
+    ) -> Result<(), super::super::kuramoto_stepper::KuramotoStepperError> {
         match &self.kuramoto_stepper {
             Some(stepper_lock) => {
                 let mut stepper = stepper_lock.write();
@@ -965,7 +968,7 @@ impl Handlers {
             None => {
                 // FAIL FAST: No stepper configured (but this is benign during shutdown)
                 tracing::debug!("stop_kuramoto_stepper: No stepper configured - nothing to stop");
-                Ok(())  // Not an error during shutdown - stepper was never configured
+                Ok(()) // Not an error during shutdown - stepper was never configured
             }
         }
     }

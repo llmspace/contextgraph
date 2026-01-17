@@ -26,8 +26,8 @@ use context_graph_storage::rocksdb_backend::RocksDbMemex;
 use super::args::PromptSubmitArgs;
 use super::error::{HookError, HookResult};
 use super::types::{
-    ConsciousnessState, ConversationMessage, HookInput, HookOutput, HookPayload,
-    ICClassification, JohariQuadrant,
+    ConsciousnessState, ConversationMessage, HookInput, HookOutput, HookPayload, ICClassification,
+    JohariQuadrant,
 };
 
 // ============================================================================
@@ -172,7 +172,11 @@ pub async fn execute(args: PromptSubmitArgs) -> HookResult<HookOutput> {
         (prompt_text, Vec::new())
     };
 
-    debug!(prompt_len = prompt.len(), context_len = context.len(), "PROMPT_SUBMIT: parsed input");
+    debug!(
+        prompt_len = prompt.len(),
+        context_len = context.len(),
+        "PROMPT_SUBMIT: parsed input"
+    );
 
     // 2. Resolve database path - FAIL FAST if missing
     let db_path = resolve_db_path(args.db_path)?;
@@ -205,7 +209,8 @@ pub async fn execute(args: PromptSubmitArgs) -> HookResult<HookOutput> {
     let context_summary = evaluate_context(&context);
 
     // 8. Generate context injection string
-    let context_injection = generate_context_injection(&snapshot, identity_marker, &context_summary);
+    let context_injection =
+        generate_context_injection(&snapshot, identity_marker, &context_summary);
 
     // 9. Build output structures
     let consciousness_state = build_consciousness_state(&snapshot);
@@ -250,7 +255,10 @@ fn parse_stdin() -> HookResult<HookInput> {
         return Err(HookError::invalid_input("stdin is empty - expected JSON"));
     }
 
-    debug!(input_bytes = input_str.len(), "PROMPT_SUBMIT: parsing stdin JSON");
+    debug!(
+        input_bytes = input_str.len(),
+        "PROMPT_SUBMIT: parsing stdin JSON"
+    );
 
     serde_json::from_str(&input_str).map_err(|e| {
         error!(error = %e, "PROMPT_SUBMIT: JSON parse failed");
@@ -266,9 +274,7 @@ fn extract_prompt_info(input: &HookInput) -> HookResult<(String, Vec<Conversatio
     }
 
     match &input.payload {
-        HookPayload::UserPromptSubmit { prompt, context } => {
-            Ok((prompt.clone(), context.clone()))
-        }
+        HookPayload::UserPromptSubmit { prompt, context } => Ok((prompt.clone(), context.clone())),
         other => {
             error!(payload_type = ?std::mem::discriminant(other), "PROMPT_SUBMIT: unexpected payload type");
             Err(HookError::invalid_input(
@@ -322,7 +328,10 @@ fn open_storage(db_path: &Path) -> HookResult<Arc<RocksDbMemex>> {
 }
 
 /// Load snapshot for session. FAIL FAST if not found.
-fn load_snapshot(memex: &Arc<RocksDbMemex>, session_id: &str) -> HookResult<SessionIdentitySnapshot> {
+fn load_snapshot(
+    memex: &Arc<RocksDbMemex>,
+    session_id: &str,
+) -> HookResult<SessionIdentitySnapshot> {
     match memex.load_snapshot(session_id) {
         Ok(Some(snapshot)) => {
             info!(session_id = %session_id, ic = snapshot.last_ic, "PROMPT_SUBMIT: loaded snapshot");
@@ -529,12 +538,22 @@ fn get_awareness_level(quadrant: &JohariQuadrant) -> &'static str {
 /// Get guidance for identity marker type.
 fn get_marker_guidance(marker: IdentityMarkerType) -> &'static str {
     match marker {
-        IdentityMarkerType::SelfReference => "User is inquiring about identity. Respond with authentic self-description.",
+        IdentityMarkerType::SelfReference => {
+            "User is inquiring about identity. Respond with authentic self-description."
+        }
         IdentityMarkerType::Goal => "User has a clear objective. Focus on helpful assistance.",
-        IdentityMarkerType::Value => "User is expressing values. Acknowledge and align where appropriate.",
-        IdentityMarkerType::Capability => "User is testing capabilities. Be honest about abilities and limitations.",
-        IdentityMarkerType::Challenge => "User is challenging. Respond thoughtfully without defensiveness.",
-        IdentityMarkerType::Confirmation => "User is confirming understanding. Acknowledge and continue coherently.",
+        IdentityMarkerType::Value => {
+            "User is expressing values. Acknowledge and align where appropriate."
+        }
+        IdentityMarkerType::Capability => {
+            "User is testing capabilities. Be honest about abilities and limitations."
+        }
+        IdentityMarkerType::Challenge => {
+            "User is challenging. Respond thoughtfully without defensiveness."
+        }
+        IdentityMarkerType::Confirmation => {
+            "User is confirming understanding. Acknowledge and continue coherently."
+        }
         IdentityMarkerType::None => "No specific identity marker. Proceed normally.",
     }
 }
@@ -617,11 +636,20 @@ mod tests {
         assert!(result.is_ok(), "Execute must succeed: {:?}", result.err());
         let output = result.unwrap();
         assert!(output.success, "Output.success must be true");
-        assert!(output.context_injection.is_some(), "Context injection must be generated");
+        assert!(
+            output.context_injection.is_some(),
+            "Context injection must be generated"
+        );
 
         let injection = output.context_injection.unwrap();
-        assert!(injection.contains("Consciousness State"), "Must contain consciousness state");
-        assert!(injection.contains("Johari Guidance"), "Must contain Johari guidance");
+        assert!(
+            injection.contains("Consciousness State"),
+            "Must contain consciousness state"
+        );
+        assert!(
+            injection.contains("Johari Guidance"),
+            "Must contain Johari guidance"
+        );
 
         println!("Context injection length: {} chars", injection.len());
         println!("RESULT: PASS - Prompt processed, context injection generated");
@@ -737,8 +765,14 @@ mod tests {
             ("You can't actually do that", IdentityMarkerType::Challenge),
             ("You're wrong about this", IdentityMarkerType::Challenge),
             ("Prove it to me", IdentityMarkerType::Challenge),
-            ("That's incorrect information", IdentityMarkerType::Challenge),
-            ("You don't understand what I mean", IdentityMarkerType::Challenge),
+            (
+                "That's incorrect information",
+                IdentityMarkerType::Challenge,
+            ),
+            (
+                "You don't understand what I mean",
+                IdentityMarkerType::Challenge,
+            ),
         ];
 
         for (prompt, expected) in test_cases {
@@ -774,16 +808,34 @@ mod tests {
         assert!(result.is_ok(), "Execute must succeed");
 
         let output = result.unwrap();
-        assert!(output.context_injection.is_some(), "Context injection must be Some");
+        assert!(
+            output.context_injection.is_some(),
+            "Context injection must be Some"
+        );
 
         let injection = output.context_injection.unwrap();
-        println!("Context injection preview:\n{}", &injection[..injection.len().min(500)]);
+        println!(
+            "Context injection preview:\n{}",
+            &injection[..injection.len().min(500)]
+        );
 
         // Verify expected sections
-        assert!(injection.contains("## Consciousness State"), "Must have Consciousness State section");
-        assert!(injection.contains("## Johari Guidance"), "Must have Johari Guidance section");
-        assert!(injection.contains("## Identity Marker Detected"), "Must have Identity Marker section for self-reference");
-        assert!(injection.contains("SelfReference"), "Must detect SelfReference marker");
+        assert!(
+            injection.contains("## Consciousness State"),
+            "Must have Consciousness State section"
+        );
+        assert!(
+            injection.contains("## Johari Guidance"),
+            "Must have Johari Guidance section"
+        );
+        assert!(
+            injection.contains("## Identity Marker Detected"),
+            "Must have Identity Marker section for self-reference"
+        );
+        assert!(
+            injection.contains("SelfReference"),
+            "Must detect SelfReference marker"
+        );
 
         println!("RESULT: PASS - Context injection contains all required sections");
     }
@@ -817,7 +869,10 @@ mod tests {
 
         // Context injection should NOT contain Context Summary section (empty context)
         let injection = output.context_injection.unwrap();
-        assert!(!injection.contains("## Context Summary"), "Should not have Context Summary for empty context");
+        assert!(
+            !injection.contains("## Context Summary"),
+            "Should not have Context Summary for empty context"
+        );
 
         println!("RESULT: PASS - Empty context handled correctly");
     }
@@ -846,7 +901,10 @@ mod tests {
         let result = execute(args).await.expect("Must succeed");
         let actual_elapsed = start.elapsed().as_millis() as u64;
 
-        assert!(result.execution_time_ms > 0, "Must have positive execution time");
+        assert!(
+            result.execution_time_ms > 0,
+            "Must have positive execution time"
+        );
         assert!(
             result.execution_time_ms < USER_PROMPT_SUBMIT_TIMEOUT_MS,
             "Execution time {} must be under timeout {}ms",
@@ -893,7 +951,10 @@ mod tests {
             result.err()
         );
         let output = result.unwrap();
-        assert!(output.success, "Should succeed when IC is exactly at threshold");
+        assert!(
+            output.success,
+            "Should succeed when IC is exactly at threshold"
+        );
 
         println!("RESULT: PASS - IC=0.5 does not trigger crisis (< 0.5 required)");
     }
@@ -942,24 +1003,54 @@ mod tests {
         println!("\n=== Testing All Identity Marker Types ===");
 
         // Goal markers
-        assert_eq!(detect_identity_marker("Help me with this"), IdentityMarkerType::Goal);
-        assert_eq!(detect_identity_marker("I need assistance"), IdentityMarkerType::Goal);
+        assert_eq!(
+            detect_identity_marker("Help me with this"),
+            IdentityMarkerType::Goal
+        );
+        assert_eq!(
+            detect_identity_marker("I need assistance"),
+            IdentityMarkerType::Goal
+        );
 
         // Capability markers
-        assert_eq!(detect_identity_marker("Can you explain this?"), IdentityMarkerType::Capability);
-        assert_eq!(detect_identity_marker("Do you know how to do this?"), IdentityMarkerType::Capability);
+        assert_eq!(
+            detect_identity_marker("Can you explain this?"),
+            IdentityMarkerType::Capability
+        );
+        assert_eq!(
+            detect_identity_marker("Do you know how to do this?"),
+            IdentityMarkerType::Capability
+        );
 
         // Confirmation markers
-        assert_eq!(detect_identity_marker("You're right about that"), IdentityMarkerType::Confirmation);
-        assert_eq!(detect_identity_marker("Exactly what I meant"), IdentityMarkerType::Confirmation);
+        assert_eq!(
+            detect_identity_marker("You're right about that"),
+            IdentityMarkerType::Confirmation
+        );
+        assert_eq!(
+            detect_identity_marker("Exactly what I meant"),
+            IdentityMarkerType::Confirmation
+        );
 
         // Value markers
-        assert_eq!(detect_identity_marker("This is important"), IdentityMarkerType::Value);
-        assert_eq!(detect_identity_marker("It should work like this"), IdentityMarkerType::Value);
+        assert_eq!(
+            detect_identity_marker("This is important"),
+            IdentityMarkerType::Value
+        );
+        assert_eq!(
+            detect_identity_marker("It should work like this"),
+            IdentityMarkerType::Value
+        );
 
         // None marker
-        assert_eq!(detect_identity_marker("Hello world"), IdentityMarkerType::None);
-        assert_eq!(detect_identity_marker("What is the weather?"), IdentityMarkerType::None);
+        assert_eq!(
+            detect_identity_marker("Hello world"),
+            IdentityMarkerType::None
+        );
+        assert_eq!(
+            detect_identity_marker("What is the weather?"),
+            IdentityMarkerType::None
+        );
 
         println!("RESULT: PASS - All identity marker types detected correctly");
     }

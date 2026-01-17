@@ -156,7 +156,9 @@ pub trait GwtSystemProvider: Send + Sync {
     /// without triggering a new detection cycle.
     ///
     /// # TASK-IDENTITY-P0-007
-    async fn last_detection(&self) -> Option<context_graph_core::gwt::ego_node::CrisisDetectionResult>;
+    async fn last_detection(
+        &self,
+    ) -> Option<context_graph_core::gwt::ego_node::CrisisDetectionResult>;
 }
 
 /// Provider trait for workspace selection operations.

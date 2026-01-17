@@ -17,7 +17,6 @@ use uuid::Uuid;
 pub enum AlignmentError {
     // REMOVED: NoNorthStar per TASK-P0-001 (ARCH-03)
     // Renamed to NoTopLevelGoals
-
     /// No top-level (Strategic) goals defined in the hierarchy.
     ///
     /// Resolution: Goals emerge autonomously from data patterns.

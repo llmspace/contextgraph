@@ -126,8 +126,7 @@ fn test_memory_metadata_never_accessed() {
 #[test]
 fn test_pruning_candidate_new() {
     let id = MemoryId::new();
-    let candidate =
-        PruningCandidate::new(id.clone(), 60, 0.30, 2, PruneReason::LowAlignment, 1024);
+    let candidate = PruningCandidate::new(id.clone(), 60, 0.30, 2, PruneReason::LowAlignment, 1024);
 
     assert_eq!(candidate.memory_id, id);
     assert_eq!(candidate.age_days, 60);
@@ -159,8 +158,7 @@ fn test_pruning_candidate_priority_ordering() {
     println!("[PASS] Older memories have higher priority");
 
     // Fewer connections = higher priority
-    let isolated =
-        PruningCandidate::new(MemoryId::new(), 60, 0.50, 0, PruneReason::Orphaned, 100);
+    let isolated = PruningCandidate::new(MemoryId::new(), 60, 0.50, 0, PruneReason::Orphaned, 100);
     let connected =
         PruningCandidate::new(MemoryId::new(), 60, 0.50, 10, PruneReason::Orphaned, 100);
     assert!(isolated.priority_score > connected.priority_score);

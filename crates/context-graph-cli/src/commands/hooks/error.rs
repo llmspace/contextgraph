@@ -90,8 +90,8 @@ impl HookError {
     #[inline]
     pub fn exit_code(&self) -> i32 {
         match self {
-            Self::Corruption(_) => 2,  // AP-26: corruption = exit code 2
-            Self::Timeout(_) => 2,     // Legacy: also mapped to 2
+            Self::Corruption(_) => 2, // AP-26: corruption = exit code 2
+            Self::Timeout(_) => 2,    // Legacy: also mapped to 2
             Self::Storage(_) => 3,
             Self::InvalidInput(_) | Self::Serialization(_) => 4,
             Self::SessionNotFound(_) => 5,
@@ -267,12 +267,36 @@ mod tests {
     #[test]
     fn test_exit_codes_match_spec() {
         // Verify exit codes match TECH-HOOKS.md section 3.2 EXACTLY
-        assert_eq!(HookError::timeout(100).exit_code(), 2, "Timeout must be exit code 2");
-        assert_eq!(HookError::storage("db error").exit_code(), 3, "Storage must be exit code 3");
-        assert_eq!(HookError::invalid_input("bad data").exit_code(), 4, "InvalidInput must be exit code 4");
-        assert_eq!(HookError::session_not_found("test-123").exit_code(), 5, "SessionNotFound must be exit code 5");
-        assert_eq!(HookError::crisis(0.45).exit_code(), 6, "CrisisTriggered must be exit code 6");
-        assert_eq!(HookError::general("something").exit_code(), 1, "General must be exit code 1");
+        assert_eq!(
+            HookError::timeout(100).exit_code(),
+            2,
+            "Timeout must be exit code 2"
+        );
+        assert_eq!(
+            HookError::storage("db error").exit_code(),
+            3,
+            "Storage must be exit code 3"
+        );
+        assert_eq!(
+            HookError::invalid_input("bad data").exit_code(),
+            4,
+            "InvalidInput must be exit code 4"
+        );
+        assert_eq!(
+            HookError::session_not_found("test-123").exit_code(),
+            5,
+            "SessionNotFound must be exit code 5"
+        );
+        assert_eq!(
+            HookError::crisis(0.45).exit_code(),
+            6,
+            "CrisisTriggered must be exit code 6"
+        );
+        assert_eq!(
+            HookError::general("something").exit_code(),
+            1,
+            "General must be exit code 1"
+        );
     }
 
     #[test]
@@ -280,7 +304,11 @@ mod tests {
         let json_err = serde_json::from_str::<String>("invalid json");
         if let Err(e) = json_err {
             let hook_err = HookError::from(e);
-            assert_eq!(hook_err.exit_code(), 4, "Serialization errors must be exit code 4");
+            assert_eq!(
+                hook_err.exit_code(),
+                4,
+                "Serialization errors must be exit code 4"
+            );
         } else {
             panic!("Expected JSON parse error");
         }
@@ -301,8 +329,14 @@ mod tests {
     fn test_error_codes() {
         assert_eq!(HookError::timeout(100).error_code(), "ERR_TIMEOUT");
         assert_eq!(HookError::storage("db").error_code(), "ERR_DATABASE");
-        assert_eq!(HookError::invalid_input("x").error_code(), "ERR_INVALID_INPUT");
-        assert_eq!(HookError::session_not_found("x").error_code(), "ERR_SESSION_NOT_FOUND");
+        assert_eq!(
+            HookError::invalid_input("x").error_code(),
+            "ERR_INVALID_INPUT"
+        );
+        assert_eq!(
+            HookError::session_not_found("x").error_code(),
+            "ERR_SESSION_NOT_FOUND"
+        );
         assert_eq!(HookError::crisis(0.4).error_code(), "ERR_CRISIS");
         assert_eq!(HookError::general("x").error_code(), "ERR_GENERAL");
     }
@@ -330,14 +364,32 @@ mod tests {
     #[test]
     fn test_is_recoverable() {
         // Recoverable
-        assert!(HookError::timeout(100).is_recoverable(), "Timeout should be recoverable");
-        assert!(HookError::storage("db").is_recoverable(), "Storage should be recoverable");
-        assert!(HookError::crisis(0.4).is_recoverable(), "Crisis should be recoverable");
+        assert!(
+            HookError::timeout(100).is_recoverable(),
+            "Timeout should be recoverable"
+        );
+        assert!(
+            HookError::storage("db").is_recoverable(),
+            "Storage should be recoverable"
+        );
+        assert!(
+            HookError::crisis(0.4).is_recoverable(),
+            "Crisis should be recoverable"
+        );
 
         // Not recoverable
-        assert!(!HookError::invalid_input("bad").is_recoverable(), "InvalidInput should not be recoverable");
-        assert!(!HookError::session_not_found("test").is_recoverable(), "SessionNotFound should not be recoverable");
-        assert!(!HookError::general("x").is_recoverable(), "General should not be recoverable");
+        assert!(
+            !HookError::invalid_input("bad").is_recoverable(),
+            "InvalidInput should not be recoverable"
+        );
+        assert!(
+            !HookError::session_not_found("test").is_recoverable(),
+            "SessionNotFound should not be recoverable"
+        );
+        assert!(
+            !HookError::general("x").is_recoverable(),
+            "General should not be recoverable"
+        );
     }
 
     #[test]
@@ -513,10 +565,19 @@ mod tests {
     fn test_constructors() {
         // Verify all constructors create correct variants
         assert!(matches!(HookError::timeout(100), HookError::Timeout(100)));
-        assert!(matches!(HookError::invalid_input("x"), HookError::InvalidInput(_)));
+        assert!(matches!(
+            HookError::invalid_input("x"),
+            HookError::InvalidInput(_)
+        ));
         assert!(matches!(HookError::storage("x"), HookError::Storage(_)));
-        assert!(matches!(HookError::session_not_found("x"), HookError::SessionNotFound(_)));
-        assert!(matches!(HookError::crisis(0.4), HookError::CrisisTriggered(_)));
+        assert!(matches!(
+            HookError::session_not_found("x"),
+            HookError::SessionNotFound(_)
+        ));
+        assert!(matches!(
+            HookError::crisis(0.4),
+            HookError::CrisisTriggered(_)
+        ));
         assert!(matches!(HookError::general("x"), HookError::General(_)));
     }
 

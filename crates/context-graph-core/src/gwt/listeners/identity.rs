@@ -244,11 +244,8 @@ impl IdentityContinuityListenerInner {
 
                 // Compute identity continuity (requires write lock)
                 let mut monitor = self.monitor.write().await;
-                let ic_result = monitor.compute_continuity(
-                    &pv,
-                    kuramoto_r,
-                    format!("MemoryEnters:{}", id),
-                );
+                let ic_result =
+                    monitor.compute_continuity(&pv, kuramoto_r, format!("MemoryEnters:{}", id));
 
                 tracing::trace!(
                     ic = %ic_result.identity_coherence,
@@ -262,7 +259,10 @@ impl IdentityContinuityListenerInner {
 
                 // Execute crisis protocol if not Healthy
                 if detection.current_status != IdentityStatus::Healthy {
-                    let protocol_result = self.protocol.execute(detection.clone(), &mut monitor).await?;
+                    let protocol_result = self
+                        .protocol
+                        .execute(detection.clone(), &mut monitor)
+                        .await?;
 
                     // Emit IdentityCritical event if critical and cooldown allows
                     if protocol_result.event_emitted {

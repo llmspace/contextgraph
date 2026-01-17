@@ -103,7 +103,9 @@ impl HookInvocationResult {
             return false;
         }
         if let Ok(json) = self.parse_stdout() {
-            json.get("success").and_then(|v| v.as_bool()).unwrap_or(false)
+            json.get("success")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
         } else {
             false
         }
@@ -151,7 +153,8 @@ pub fn get_cli_binary() -> PathBuf {
         panic!(
             "CLI binary not found. Run `cargo build --release -p context-graph-cli` first.\n\
              Looked for:\n  - {}\n  - {}",
-            release.display(), debug.display()
+            release.display(),
+            debug.display()
         );
     }
 }
@@ -203,7 +206,10 @@ pub fn invoke_hook(
     let mut child = cmd.spawn().unwrap_or_else(|e| {
         panic!(
             "Failed to spawn CLI: {}\nBinary: {}\nCommand: hooks {} --session-id {}",
-            e, cli_binary.display(), hook_cmd, session_id
+            e,
+            cli_binary.display(),
+            hook_cmd,
+            session_id
         );
     });
 
@@ -376,10 +382,9 @@ pub fn create_session_end_input(
     });
 
     if let Some(r) = reason {
-        data.as_object_mut().unwrap().insert(
-            "reason".into(),
-            serde_json::Value::String(r.into()),
-        );
+        data.as_object_mut()
+            .unwrap()
+            .insert("reason".into(), serde_json::Value::String(r.into()));
     }
 
     json!({
@@ -429,7 +434,12 @@ pub fn load_snapshot_for_verification(
 }
 
 /// Verify snapshot IC value matches expected
-pub fn verify_snapshot_ic(db_path: &Path, session_id: &str, expected_ic: f32, tolerance: f32) -> bool {
+pub fn verify_snapshot_ic(
+    db_path: &Path,
+    session_id: &str,
+    expected_ic: f32,
+    tolerance: f32,
+) -> bool {
     if let Some(snapshot) = load_snapshot_for_verification(db_path, session_id) {
         (snapshot.last_ic - expected_ic).abs() <= tolerance
     } else {
@@ -485,7 +495,10 @@ pub fn log_test_evidence(
     if let Some(extra_data) = extra {
         if let Some(obj) = extra_data.as_object() {
             for (k, v) in obj {
-                evidence.as_object_mut().unwrap().insert(k.clone(), v.clone());
+                evidence
+                    .as_object_mut()
+                    .unwrap()
+                    .insert(k.clone(), v.clone());
             }
         }
     }
@@ -511,29 +524,55 @@ pub fn assert_timing_under_budget(result: &HookInvocationResult, budget_ms: u64,
     assert!(
         result.execution_time_ms < budget_ms,
         "{}\nExecution time {}ms exceeded budget {}ms",
-        context, result.execution_time_ms, budget_ms
+        context,
+        result.execution_time_ms,
+        budget_ms
     );
 }
 
 /// Assert that JSON output contains expected field with expected value
-pub fn assert_output_field_eq(result: &HookInvocationResult, field: &str, expected: &Value, context: &str) {
-    let json = result.parse_stdout().expect("Failed to parse stdout as JSON");
+pub fn assert_output_field_eq(
+    result: &HookInvocationResult,
+    field: &str,
+    expected: &Value,
+    context: &str,
+) {
+    let json = result
+        .parse_stdout()
+        .expect("Failed to parse stdout as JSON");
     let actual = json.get(field);
     assert_eq!(
-        actual, Some(expected),
+        actual,
+        Some(expected),
         "{}\nField '{}' mismatch.\nExpected: {:?}\nActual: {:?}\nFull output: {}",
-        context, field, expected, actual, result.stdout
+        context,
+        field,
+        expected,
+        actual,
+        result.stdout
     );
 }
 
 /// Assert that JSON output has a specific boolean field
-pub fn assert_output_bool(result: &HookInvocationResult, field: &str, expected: bool, context: &str) {
-    let json = result.parse_stdout().expect("Failed to parse stdout as JSON");
+pub fn assert_output_bool(
+    result: &HookInvocationResult,
+    field: &str,
+    expected: bool,
+    context: &str,
+) {
+    let json = result
+        .parse_stdout()
+        .expect("Failed to parse stdout as JSON");
     let actual = json.get(field).and_then(|v| v.as_bool());
     assert_eq!(
-        actual, Some(expected),
+        actual,
+        Some(expected),
         "{}\nBoolean field '{}' mismatch.\nExpected: {}\nActual: {:?}\nFull output: {}",
-        context, field, expected, actual, result.stdout
+        context,
+        field,
+        expected,
+        actual,
+        result.stdout
     );
 }
 

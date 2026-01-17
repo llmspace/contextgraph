@@ -354,8 +354,10 @@ impl UnifiedModelLoader {
     /// For accessing weights, prefer using `with_weights()` callback pattern.
     pub fn weights_lock(
         &self,
-    ) -> Result<std::sync::RwLockReadGuard<'_, std::collections::HashMap<Embedder, BertWeights>>, UnifiedLoaderError>
-    {
+    ) -> Result<
+        std::sync::RwLockReadGuard<'_, std::collections::HashMap<Embedder, BertWeights>>,
+        UnifiedLoaderError,
+    > {
         self.loaded_weights
             .read()
             .map_err(|_| UnifiedLoaderError::LockPoisoned)
@@ -375,7 +377,11 @@ impl UnifiedModelLoader {
     ///     println!("Model has {} parameters", weights.param_count());
     /// });
     /// ```
-    pub fn with_weights<F, R>(&self, model_id: ModelId, f: F) -> Result<Option<R>, UnifiedLoaderError>
+    pub fn with_weights<F, R>(
+        &self,
+        model_id: ModelId,
+        f: F,
+    ) -> Result<Option<R>, UnifiedLoaderError>
     where
         F: FnOnce(&BertWeights) -> R,
     {
@@ -536,8 +542,9 @@ impl UnifiedModelLoader {
                 .map_err(|_| UnifiedLoaderError::LockPoisoned)?;
 
             // Re-allocate with actual size (allocate_slot updates existing slots)
-            slot_manager.allocate_slot(embedder, actual_size).map_err(
-                |e| match e {
+            slot_manager
+                .allocate_slot(embedder, actual_size)
+                .map_err(|e| match e {
                     MemoryError::OutOfMemory {
                         requested,
                         available,
@@ -547,8 +554,7 @@ impl UnifiedModelLoader {
                         budget: slot_manager.budget(),
                     },
                     MemoryError::LockPoisoned => UnifiedLoaderError::LockPoisoned,
-                },
-            )?;
+                })?;
         }
 
         Ok(())

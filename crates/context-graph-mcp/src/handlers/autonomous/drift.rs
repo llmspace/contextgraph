@@ -8,10 +8,10 @@
 use serde_json::json;
 use tracing::{debug, error, info, warn};
 
-use context_graph_core::autonomous::drift::{DriftError, DriftLevel, TeleologicalDriftDetector};
 use context_graph_core::autonomous::discovery::GoalDiscoveryPipeline;
-use context_graph_core::autonomous::{DriftCorrector, DriftDetector, DriftSeverity};
 use context_graph_core::autonomous::drift::DriftState;
+use context_graph_core::autonomous::drift::{DriftError, DriftLevel, TeleologicalDriftDetector};
+use context_graph_core::autonomous::{DriftCorrector, DriftDetector, DriftSeverity};
 use context_graph_core::teleological::{SearchStrategy, TeleologicalComparator};
 
 use super::params::{GetAlignmentDriftParams, GetDriftHistoryParams, TriggerDriftCorrectionParams};
@@ -113,58 +113,56 @@ impl Handlers {
         };
 
         // Collect memories to analyze
-        let memories: Vec<context_graph_core::types::SemanticFingerprint> =
-            if let Some(ids) = memory_ids {
-                // FAIL FAST: Load specific memories
-                let mut mems = Vec::with_capacity(ids.len());
-                for mem_id in &ids {
-                    match self.teleological_store.retrieve(*mem_id).await {
-                        Ok(Some(fp)) => mems.push(fp.semantic),
-                        Ok(None) => {
-                            error!(memory_id = %mem_id, "get_alignment_drift: Memory not found");
-                            return JsonRpcResponse::error(
-                                id,
-                                error_codes::FINGERPRINT_NOT_FOUND,
-                                format!("Memory {} not found - FAIL FAST", mem_id),
-                            );
-                        }
-                        Err(e) => {
-                            error!(memory_id = %mem_id, error = %e, "get_alignment_drift: Storage error");
-                            return JsonRpcResponse::error(
-                                id,
-                                error_codes::INTERNAL_ERROR,
-                                format!(
-                                    "Storage error retrieving {}: {} - FAIL FAST",
-                                    mem_id, e
-                                ),
-                            );
-                        }
+        let memories: Vec<context_graph_core::types::SemanticFingerprint> = if let Some(ids) =
+            memory_ids
+        {
+            // FAIL FAST: Load specific memories
+            let mut mems = Vec::with_capacity(ids.len());
+            for mem_id in &ids {
+                match self.teleological_store.retrieve(*mem_id).await {
+                    Ok(Some(fp)) => mems.push(fp.semantic),
+                    Ok(None) => {
+                        error!(memory_id = %mem_id, "get_alignment_drift: Memory not found");
+                        return JsonRpcResponse::error(
+                            id,
+                            error_codes::FINGERPRINT_NOT_FOUND,
+                            format!("Memory {} not found - FAIL FAST", mem_id),
+                        );
+                    }
+                    Err(e) => {
+                        error!(memory_id = %mem_id, error = %e, "get_alignment_drift: Storage error");
+                        return JsonRpcResponse::error(
+                            id,
+                            error_codes::INTERNAL_ERROR,
+                            format!("Storage error retrieving {}: {} - FAIL FAST", mem_id, e),
+                        );
                     }
                 }
-                mems
-            } else {
-                // No specific memories - return guidance on how to use the tool
-                // Instead of returning empty, provide legacy state for backwards compatibility
-                let detector = DriftDetector::new();
-                let severity = detector.detect_drift();
-                let trend = detector.compute_trend();
+            }
+            mems
+        } else {
+            // No specific memories - return guidance on how to use the tool
+            // Instead of returning empty, provide legacy state for backwards compatibility
+            let detector = DriftDetector::new();
+            let severity = detector.detect_drift();
+            let trend = detector.compute_trend();
 
-                // TASK-P0-001: Renamed from north_star to strategic
-                let (goal_id_str, reference_type) = match &top_level_goal {
-                    Some(goal) => (goal.id.to_string(), "strategic"),
-                    None => ("none".to_string(), "no_reference"),
-                };
+            // TASK-P0-001: Renamed from north_star to strategic
+            let (goal_id_str, reference_type) = match &top_level_goal {
+                Some(goal) => (goal.id.to_string(), "strategic"),
+                None => ("none".to_string(), "no_reference"),
+            };
 
-                let current_state = json!({
-                    "severity": format!("{:?}", severity),
-                    "trend": format!("{:?}", trend),
-                    "observation_count": 0,
-                    "goal_id": goal_id_str,
-                    "reference_type": reference_type,
-                    "note": "No memory_ids provided. Pass memory_ids array for per-embedder TeleologicalDriftDetector analysis."
-                });
+            let current_state = json!({
+                "severity": format!("{:?}", severity),
+                "trend": format!("{:?}", trend),
+                "observation_count": 0,
+                "goal_id": goal_id_str,
+                "reference_type": reference_type,
+                "note": "No memory_ids provided. Pass memory_ids array for per-embedder TeleologicalDriftDetector analysis."
+            });
 
-                return self.tool_result_with_pulse(
+            return self.tool_result_with_pulse(
                     id,
                     json!({
                         "legacy_state": current_state,
@@ -174,7 +172,7 @@ impl Handlers {
                         "usage_hint": "Provide 'memory_ids' parameter with fingerprint UUIDs for per-embedder drift analysis"
                     }),
                 );
-            };
+        };
 
         // FAIL FAST: Must have memories to analyze
         if memories.is_empty() {
@@ -512,10 +510,8 @@ impl Handlers {
             Ok(p) => p,
             Err(e) => {
                 error!(error = %e, "get_drift_history: Failed to parse parameters");
-                return self.tool_error_with_pulse(
-                    id,
-                    &format!("Invalid parameters: {} - FAIL FAST", e),
-                );
+                return self
+                    .tool_error_with_pulse(id, &format!("Invalid parameters: {} - FAIL FAST", e));
             }
         };
 

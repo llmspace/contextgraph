@@ -77,10 +77,7 @@ fn test_empty_vector_error() {
     let b = vec![1.0, 2.0];
     let result = cosine_similarity(&a, &b);
     assert!(matches!(result, Err(DenseSimilarityError::EmptyVector)));
-    println!(
-        "[PASS] Empty vector correctly detected: {:?}",
-        result.err()
-    );
+    println!("[PASS] Empty vector correctly detected: {:?}", result.err());
 }
 
 #[test]
@@ -115,10 +112,7 @@ fn test_dot_product_empty_vector() {
     let b = vec![1.0, 2.0];
     let result = dot_product(&a, &b);
     assert!(matches!(result, Err(DenseSimilarityError::EmptyVector)));
-    println!(
-        "[PASS] Dot product empty vector error: {:?}",
-        result.err()
-    );
+    println!("[PASS] Dot product empty vector error: {:?}", result.err());
 }
 
 #[test]
@@ -255,5 +249,8 @@ fn test_normalize_already_normalized() {
     normalize(&mut v);
     assert!((v[0] - 1.0).abs() < 1e-6);
     assert!(v[1].abs() < 1e-6);
-    println!("[PASS] Already normalized vector unchanged: [{:.3}, {:.3}]", v[0], v[1]);
+    println!(
+        "[PASS] Already normalized vector unchanged: [{:.3}, {:.3}]",
+        v[0], v[1]
+    );
 }

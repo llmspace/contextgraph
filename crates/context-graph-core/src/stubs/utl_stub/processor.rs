@@ -130,12 +130,8 @@ impl UtlProcessor for StubUtlProcessor {
             let max_edges = context.max_edges.unwrap_or(self.default_max_edges);
 
             // Real ΔC computation using connectivity
-            let delta_c = compute_delta_c_from_embeddings(
-                input_emb,
-                ref_embs,
-                edge_threshold,
-                max_edges,
-            );
+            let delta_c =
+                compute_delta_c_from_embeddings(input_emb, ref_embs, edge_threshold, max_edges);
 
             return Ok(delta_c.clamp(0.0, 1.0));
         }

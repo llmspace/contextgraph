@@ -5,7 +5,9 @@ use uuid::Uuid;
 
 use super::similarity::cosine_similarity;
 use super::InMemoryTeleologicalStore;
-use crate::traits::{TeleologicalMemoryStore, TeleologicalSearchOptions, TeleologicalStorageBackend};
+use crate::traits::{
+    TeleologicalMemoryStore, TeleologicalSearchOptions, TeleologicalStorageBackend,
+};
 use crate::types::fingerprint::{
     JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
     NUM_EMBEDDERS,
@@ -180,8 +182,7 @@ async fn test_count_by_quadrant() {
 async fn test_sparse_search() {
     let store = InMemoryTeleologicalStore::new();
     let mut fp = create_test_fingerprint();
-    fp.semantic.e13_splade =
-        SparseVector::new(vec![100, 200, 300], vec![0.5, 0.3, 0.8]).unwrap();
+    fp.semantic.e13_splade = SparseVector::new(vec![100, 200, 300], vec![0.5, 0.3, 0.8]).unwrap();
     store.store(fp).await.unwrap();
     let query = SparseVector::new(vec![100, 200, 400], vec![0.5, 0.5, 0.5]).unwrap();
     let results = store.search_sparse(&query, 10).await.unwrap();

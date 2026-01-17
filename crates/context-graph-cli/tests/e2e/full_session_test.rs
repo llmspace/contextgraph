@@ -83,8 +83,7 @@ async fn test_e2e_full_session_workflow() {
     if let Some(consciousness) = start_result.consciousness_state() {
         println!("Consciousness state: {:?}", consciousness);
         assert!(
-            consciousness.get("identity_continuity").is_some()
-                || consciousness.get("ic").is_some(),
+            consciousness.get("identity_continuity").is_some() || consciousness.get("ic").is_some(),
             "consciousness_state missing IC field"
         );
     }
@@ -176,8 +175,10 @@ async fn test_e2e_full_session_workflow() {
 
     // 4. Execute user_prompt_submit.sh
     println!("\n[4/5] Executing user_prompt_submit.sh...");
-    let prompt_input =
-        create_claude_code_prompt_submit_input(&session_id, "Please read the file and summarize it.");
+    let prompt_input = create_claude_code_prompt_submit_input(
+        &session_id,
+        "Please read the file and summarize it.",
+    );
     let prompt_result = execute_hook_script(
         "user_prompt_submit.sh",
         &prompt_input,
@@ -233,18 +234,15 @@ async fn test_e2e_full_session_workflow() {
     println!("Snapshot exists in DB: {}", snapshot_exists);
 
     if snapshot_exists {
-        let snapshot = load_snapshot_for_verification(db_path, &session_id)
-            .expect("Snapshot should exist");
+        let snapshot =
+            load_snapshot_for_verification(db_path, &session_id).expect("Snapshot should exist");
 
         println!("Snapshot details:");
         println!("  session_id: {}", snapshot.session_id);
         println!("  last_ic: {}", snapshot.last_ic);
         println!("  kuramoto_phases: {:?}", snapshot.kuramoto_phases);
         println!("  purpose_vector len: {}", snapshot.purpose_vector.len());
-        println!(
-            "  consciousness: {}",
-            snapshot.consciousness
-        );
+        println!("  consciousness: {}", snapshot.consciousness);
 
         // Verify snapshot fields
         assert_eq!(snapshot.session_id, session_id);

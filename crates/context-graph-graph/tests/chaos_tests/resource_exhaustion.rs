@@ -23,8 +23,8 @@ use context_graph_graph::index::gpu_memory::{GpuMemoryConfig, GpuMemoryManager, 
 fn test_graceful_degradation_on_exhaustion() {
     println!("\n=== CHAOS TEST: Graceful Degradation ===");
 
-    let manager = GpuMemoryManager::new(GpuMemoryConfig::with_budget(10 * 1024))
-        .expect("Manager creation");
+    let manager =
+        GpuMemoryManager::new(GpuMemoryConfig::with_budget(10 * 1024)).expect("Manager creation");
 
     // Fill to capacity
     let _h1 = manager
@@ -42,10 +42,16 @@ fn test_graceful_degradation_on_exhaustion() {
 
     // Stats should still work
     let stats = manager.stats();
-    println!("STATS STILL WORK: allocation_count={}, total_allocated={}",
-        stats.allocation_count, stats.total_allocated);
+    println!(
+        "STATS STILL WORK: allocation_count={}, total_allocated={}",
+        stats.allocation_count, stats.total_allocated
+    );
     assert_eq!(stats.allocation_count, 1, "Should have 1 allocation");
-    assert_eq!(stats.total_allocated, 10 * 1024, "Should have 10KB allocated");
+    assert_eq!(
+        stats.total_allocated,
+        10 * 1024,
+        "Should have 10KB allocated"
+    );
 
     // New allocations should fail gracefully (not panic)
     let result = manager.allocate(1, MemoryCategory::Other);
@@ -91,15 +97,15 @@ fn test_recovery_after_resource_release() {
 
     // Fill completely with multiple allocations
     let handles: Vec<_> = (0..100)
-        .filter_map(|_| {
-            manager
-                .allocate(1024, MemoryCategory::WorkingMemory)
-                .ok()
-        })
+        .filter_map(|_| manager.allocate(1024, MemoryCategory::WorkingMemory).ok())
         .collect();
 
     let filled = handles.len();
-    println!("BEFORE RELEASE: {} allocations, used={}", filled, manager.used());
+    println!(
+        "BEFORE RELEASE: {} allocations, used={}",
+        filled,
+        manager.used()
+    );
     assert!(filled > 0, "Should have some allocations");
 
     // Release all
@@ -112,7 +118,11 @@ fn test_recovery_after_resource_release() {
         manager.available()
     );
     assert_eq!(manager.used(), 0, "All memory should be freed");
-    assert_eq!(manager.available(), budget, "Full capacity should be available");
+    assert_eq!(
+        manager.available(),
+        budget,
+        "Full capacity should be available"
+    );
 
     // Verify stats reset
     let stats = manager.stats();
@@ -167,11 +177,7 @@ fn test_category_budget_exhaustion() {
             || msg.contains("category")
             || msg.contains("1024")
             || msg.contains("exceed");
-        assert!(
-            has_context,
-            "Error should indicate category issue: {}",
-            msg
-        );
+        assert!(has_context, "Error should indicate category issue: {}", msg);
     }
 
     // But WorkingMemory should work (different category)
@@ -228,11 +234,7 @@ fn test_allocation_rejection_messages() {
                 || msg.contains("1000")
                 || msg.contains("exceed")
                 || msg.contains("budget");
-            assert!(
-                has_context,
-                "Message should be informative: {}",
-                msg
-            );
+            assert!(has_context, "Message should be informative: {}", msg);
         }
         Err(e) => panic!("Wrong error type: {:?}", e),
         Ok(_) => panic!("Should have failed"),
@@ -253,11 +255,7 @@ fn test_allocation_rejection_messages() {
                 || msg.contains("exceed")
                 || msg.contains("budget")
                 || msg.contains("bytes");
-            assert!(
-                has_context,
-                "Message should indicate exhaustion: {}",
-                msg
-            );
+            assert!(has_context, "Message should indicate exhaustion: {}", msg);
         }
         Err(e) => panic!("Wrong error type: {:?}", e),
         Ok(_) => panic!("Should have failed"),

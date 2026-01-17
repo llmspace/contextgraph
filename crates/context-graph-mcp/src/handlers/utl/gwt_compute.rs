@@ -118,8 +118,7 @@ pub(crate) fn compute_delta_s(
     }
 
     // Compute aggregate delta S (equal weights)
-    let delta_s_aggregate: f32 =
-        delta_s_per_embedder.iter().sum::<f32>() / NUM_EMBEDDERS as f32;
+    let delta_s_aggregate: f32 = delta_s_per_embedder.iter().sum::<f32>() / NUM_EMBEDDERS as f32;
     let delta_s_aggregate = delta_s_aggregate.clamp(0.0, 1.0);
 
     DeltaSResult {
@@ -160,7 +159,8 @@ pub(crate) fn compute_delta_c(
     let nearest_cluster = create_divergent_cluster(old_semantic, new_semantic);
 
     let cluster_context = ClusterContext::new(same_cluster, nearest_cluster);
-    let cluster_fit_result = compute_cluster_fit(new_semantic, &cluster_context, &cluster_fit_config);
+    let cluster_fit_result =
+        compute_cluster_fit(new_semantic, &cluster_context, &cluster_fit_config);
     let cluster_fit = cluster_fit_result.score;
 
     // 3. Consistency component: from CoherenceTracker's window variance

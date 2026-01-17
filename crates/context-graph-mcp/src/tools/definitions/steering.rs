@@ -1,8 +1,8 @@
 //! Steering tool definitions.
 //! TASK-STEERING-001: Gardener, Curator, Assessor feedback.
 
-use serde_json::json;
 use crate::tools::types::ToolDefinition;
+use serde_json::json;
 
 /// Returns Steering tool definitions (1 tool).
 pub fn definitions() -> Vec<ToolDefinition> {

@@ -1,8 +1,8 @@
 //! UTL (Unified Theory of Learning) tool definitions.
 //! TASK-UTL-P1-001: Delta-S/Delta-C computation.
 
-use serde_json::json;
 use crate::tools::types::ToolDefinition;
+use serde_json::json;
 
 /// Returns UTL tool definitions (1 tool).
 pub fn definitions() -> Vec<ToolDefinition> {

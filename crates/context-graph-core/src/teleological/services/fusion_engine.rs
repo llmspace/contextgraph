@@ -447,10 +447,7 @@ impl FusionEngine {
     /// # Panics
     ///
     /// Panics (FAIL FAST) if any alignment is outside [0.0, 1.0] range.
-    pub fn fuse_from_alignments(
-        &self,
-        alignments: &[f32; NUM_EMBEDDERS],
-    ) -> AlignmentFusionResult {
+    pub fn fuse_from_alignments(&self, alignments: &[f32; NUM_EMBEDDERS]) -> AlignmentFusionResult {
         // Validate alignments are in valid range [0.0, 1.0]
         for (i, &a) in alignments.iter().enumerate() {
             assert!(
@@ -468,10 +465,10 @@ impl FusionEngine {
         // Step 2: Aggregate to groups
         // Groups: Semantic (E1-E3), Temporal (E4-E6), Structural (E7-E9), Experiential (E10-E13)
         let group_alignments = [
-            (alignments[0] + alignments[1] + alignments[2]) / 3.0,  // Semantic
-            (alignments[3] + alignments[4] + alignments[5]) / 3.0,  // Temporal
-            (alignments[6] + alignments[7] + alignments[8]) / 3.0,  // Structural
-            (alignments[9] + alignments[10] + alignments[11] + alignments[12]) / 4.0,  // Experiential
+            (alignments[0] + alignments[1] + alignments[2]) / 3.0, // Semantic
+            (alignments[3] + alignments[4] + alignments[5]) / 3.0, // Temporal
+            (alignments[6] + alignments[7] + alignments[8]) / 3.0, // Structural
+            (alignments[9] + alignments[10] + alignments[11] + alignments[12]) / 4.0, // Experiential
         ];
         let group_score = group_alignments.iter().sum::<f32>() / 4.0;
 
@@ -670,12 +667,15 @@ mod tests {
         let result = AlignmentFusionResult::new(
             purpose_vector,
             group_alignments,
-            0.85, // confidence
-            10,   // active_embedders (10 out of 13)
+            0.85,    // confidence
+            10,      // active_embedders (10 out of 13)
             Some(0), // dominant_group: Semantic
         );
 
-        assert!(result.is_healthy(), "Should be healthy with confidence=0.85 and 10 active embedders");
+        assert!(
+            result.is_healthy(),
+            "Should be healthy with confidence=0.85 and 10 active embedders"
+        );
         assert_eq!(result.purpose_vector.len(), NUM_EMBEDDERS);
         assert_eq!(result.group_alignments.len(), 4);
         assert_eq!(result.confidence, 0.85);
@@ -695,7 +695,10 @@ mod tests {
             10,
             None,
         );
-        assert!(!low_confidence.is_healthy(), "Low confidence should not be healthy");
+        assert!(
+            !low_confidence.is_healthy(),
+            "Low confidence should not be healthy"
+        );
 
         // Test unhealthy case: too few active embedders
         let few_active = AlignmentFusionResult::new(
@@ -705,7 +708,10 @@ mod tests {
             5,   // below 7 threshold (50% of 13)
             None,
         );
-        assert!(!few_active.is_healthy(), "Too few active embedders should not be healthy");
+        assert!(
+            !few_active.is_healthy(),
+            "Too few active embedders should not be healthy"
+        );
 
         println!("[PASS] AlignmentFusionResult unhealthy edge cases");
     }
@@ -750,7 +756,10 @@ mod tests {
         // Verify group_alignments are computed correctly
         // All alignments are 0.8, so all groups should be 0.8
         for group in &result.group_alignments {
-            assert!((group - 0.8).abs() < 0.001, "Group alignment should be ~0.8");
+            assert!(
+                (group - 0.8).abs() < 0.001,
+                "Group alignment should be ~0.8"
+            );
         }
 
         // Verify active_embedders count (all are above 0.1)
@@ -776,22 +785,38 @@ mod tests {
         // Structural (E7-E9): low
         // Experiential (E10-E13): medium-high
         let alignments = [
-            0.9, 0.9, 0.9,  // Semantic: should average to 0.9
-            0.5, 0.5, 0.5,  // Temporal: should average to 0.5
-            0.2, 0.2, 0.2,  // Structural: should average to 0.2
-            0.7, 0.7, 0.7, 0.7,  // Experiential: should average to 0.7
+            0.9, 0.9, 0.9, // Semantic: should average to 0.9
+            0.5, 0.5, 0.5, // Temporal: should average to 0.5
+            0.2, 0.2, 0.2, // Structural: should average to 0.2
+            0.7, 0.7, 0.7, 0.7, // Experiential: should average to 0.7
         ];
 
         let result = engine.fuse_from_alignments(&alignments);
 
         // Verify group aggregation
-        assert!((result.group_alignments[0] - 0.9).abs() < 0.001, "Semantic should be 0.9");
-        assert!((result.group_alignments[1] - 0.5).abs() < 0.001, "Temporal should be 0.5");
-        assert!((result.group_alignments[2] - 0.2).abs() < 0.001, "Structural should be 0.2");
-        assert!((result.group_alignments[3] - 0.7).abs() < 0.001, "Experiential should be 0.7");
+        assert!(
+            (result.group_alignments[0] - 0.9).abs() < 0.001,
+            "Semantic should be 0.9"
+        );
+        assert!(
+            (result.group_alignments[1] - 0.5).abs() < 0.001,
+            "Temporal should be 0.5"
+        );
+        assert!(
+            (result.group_alignments[2] - 0.2).abs() < 0.001,
+            "Structural should be 0.2"
+        );
+        assert!(
+            (result.group_alignments[3] - 0.7).abs() < 0.001,
+            "Experiential should be 0.7"
+        );
 
         // Semantic should be dominant
-        assert_eq!(result.dominant_group, Some(0), "Semantic group should be dominant");
+        assert_eq!(
+            result.dominant_group,
+            Some(0),
+            "Semantic group should be dominant"
+        );
 
         println!("[PASS] fuse_from_alignments correctly aggregates groups");
     }
@@ -821,8 +846,8 @@ mod tests {
 
         // Test boundary values: exactly 0.0 and 1.0
         let mut alignments = [0.0f32; NUM_EMBEDDERS];
-        alignments[0] = 1.0;  // Maximum valid
-        alignments[1] = 0.0;  // Minimum valid
+        alignments[0] = 1.0; // Maximum valid
+        alignments[1] = 0.0; // Minimum valid
 
         let result = engine.fuse_from_alignments(&alignments);
 

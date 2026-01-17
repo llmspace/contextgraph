@@ -347,7 +347,12 @@ impl TriggerMentalCheckResponse {
     }
 
     /// Create an "initiated" response (trigger fired, workflow started).
-    pub fn initiated(entropy: f32, threshold: f32, reason: TriggerReasonDto, workflow_id: Option<String>) -> Self {
+    pub fn initiated(
+        entropy: f32,
+        threshold: f32,
+        reason: TriggerReasonDto,
+        workflow_id: Option<String>,
+    ) -> Self {
         Self {
             status: TriggerStatus::Initiated,
             trigger_reason: reason,
@@ -461,7 +466,10 @@ mod tests {
             TriggerMcpError::not_initialized().code(),
             "E_TRIGGER_MCP_004"
         );
-        assert_eq!(TriggerMcpError::rate_limit(5000).code(), "E_TRIGGER_MCP_005");
+        assert_eq!(
+            TriggerMcpError::rate_limit(5000).code(),
+            "E_TRIGGER_MCP_005"
+        );
         assert_eq!(
             TriggerMcpError::workflow_failed("test").code(),
             "E_TRIGGER_MCP_006"
@@ -613,11 +621,7 @@ mod tests {
 
     #[test]
     fn test_trigger_mental_check_response_queued() {
-        let resp = TriggerMentalCheckResponse::queued(
-            0.9,
-            0.7,
-            TriggerReasonDto::HighEntropy,
-        );
+        let resp = TriggerMentalCheckResponse::queued(0.9, 0.7, TriggerReasonDto::HighEntropy);
         assert_eq!(resp.status, TriggerStatus::Queued);
         assert_eq!(resp.trigger_reason, TriggerReasonDto::HighEntropy);
         assert!(resp.workflow_id.is_none());

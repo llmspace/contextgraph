@@ -23,12 +23,12 @@ use crate::handlers::Handlers;
 use crate::protocol::{JsonRpcId, JsonRpcRequest};
 
 // Re-export commonly used items for other test modules
+pub use crate::protocol::error_codes;
 pub use context_graph_core::johari::NUM_EMBEDDERS;
 pub use context_graph_core::types::JohariQuadrant;
-pub use crate::protocol::error_codes;
-pub use uuid::Uuid;
 pub use serde_json::json;
 pub use sha2::{Digest, Sha256};
+pub use uuid::Uuid;
 
 /// Comprehensive test context with shared access to all Sources of Truth.
 ///

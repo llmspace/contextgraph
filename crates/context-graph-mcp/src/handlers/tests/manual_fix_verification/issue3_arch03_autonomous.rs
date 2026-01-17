@@ -57,7 +57,10 @@ async fn test_arch03_get_autonomous_status_without_north_star() {
     println!("[VERIFY] Result field present - PASS");
 
     // VERIFY: Should NOT be an isError response
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(
         !is_error,
         "[FAIL] Returned isError=true without North Star - should still work"
@@ -71,14 +74,25 @@ async fn test_arch03_get_autonomous_status_without_north_star() {
                 if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) {
                     // VERIFY: strategic_goals.configured should be false
                     if let Some(ns) = parsed.get("strategic_goals") {
-                        let configured = ns.get("configured").and_then(|v| v.as_bool()).unwrap_or(true);
-                        assert!(!configured, "[FAIL] strategic_goals.configured should be false");
+                        let configured = ns
+                            .get("configured")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(true);
+                        assert!(
+                            !configured,
+                            "[FAIL] strategic_goals.configured should be false"
+                        );
                         println!("[VERIFY] strategic_goals.configured = false - PASS");
                     }
 
                     // VERIFY: Should have recommendations for unconfigured state
-                    if let Some(recommendations) = parsed.get("recommendations").and_then(|v| v.as_array()) {
-                        println!("[VERIFY] Has {} recommendations - PASS", recommendations.len());
+                    if let Some(recommendations) =
+                        parsed.get("recommendations").and_then(|v| v.as_array())
+                    {
+                        println!(
+                            "[VERIFY] Has {} recommendations - PASS",
+                            recommendations.len()
+                        );
 
                         // Check for store_memory recommendation
                         let has_store_recommendation = recommendations.iter().any(|r| {
@@ -96,7 +110,10 @@ async fn test_arch03_get_autonomous_status_without_north_star() {
                     if let Some(health) = parsed.get("overall_health") {
                         if let Some(status) = health.get("status").and_then(|v| v.as_str()) {
                             println!("[VERIFY] overall_health.status = \"{}\"", status);
-                            assert_eq!(status, "not_configured", "[INFO] Expected not_configured status");
+                            assert_eq!(
+                                status, "not_configured",
+                                "[INFO] Expected not_configured status"
+                            );
                         }
                     }
                 }
@@ -165,7 +182,10 @@ async fn test_arch03_get_alignment_drift_without_north_star() {
     let result = response.result.expect("[FAIL] Must have result");
 
     // Should return valid response (even if minimal without memory_ids)
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(!is_error, "[FAIL] Should not be error without North Star");
     println!("[VERIFY] Not an error response - PASS");
 

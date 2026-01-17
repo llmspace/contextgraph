@@ -12,9 +12,9 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use context_graph_core::dream::{
-    WakeController, WakeError, WakeHandle, WakeReason, WakeState,
-    DreamCycleStarted, DreamCycleCompleted, DreamEventBroadcaster,
-    LoggingBroadcaster, NoOpBroadcaster, WakeTriggered, ExtendedTriggerReason, DreamPhase,
+    DreamCycleCompleted, DreamCycleStarted, DreamEventBroadcaster, DreamPhase,
+    ExtendedTriggerReason, LoggingBroadcaster, NoOpBroadcaster, WakeController, WakeError,
+    WakeHandle, WakeReason, WakeState, WakeTriggered,
 };
 use uuid::Uuid;
 
@@ -42,19 +42,31 @@ fn fsv_source_of_truth_state_verification() {
     controller.prepare_for_dream();
     let state = controller.state();
     println!("After prepare_for_dream: {:?}", state);
-    assert_eq!(state, WakeState::Dreaming, "State must be Dreaming after prepare");
+    assert_eq!(
+        state,
+        WakeState::Dreaming,
+        "State must be Dreaming after prepare"
+    );
 
     // STATE 3: Waking (after signal_wake)
     controller.signal_wake(WakeReason::ExternalQuery).unwrap();
     let state = controller.state();
     println!("After signal_wake: {:?}", state);
-    assert_eq!(state, WakeState::Waking, "State must be Waking after signal");
+    assert_eq!(
+        state,
+        WakeState::Waking,
+        "State must be Waking after signal"
+    );
 
     // STATE 4: Completing (after complete_wake)
     controller.complete_wake().unwrap();
     let state = controller.state();
     println!("After complete_wake: {:?}", state);
-    assert_eq!(state, WakeState::Completing, "State must be Completing after completion");
+    assert_eq!(
+        state,
+        WakeState::Completing,
+        "State must be Completing after completion"
+    );
 
     // STATE 5: Idle (after reset)
     controller.reset();
@@ -114,7 +126,11 @@ fn fsv_execute_inspect_signal_wake() {
     controller.prepare_for_dream();
 
     // BEFORE
-    println!("BEFORE: state={:?}, signaled={}", controller.state(), controller.is_wake_signaled());
+    println!(
+        "BEFORE: state={:?}, signaled={}",
+        controller.state(),
+        controller.is_wake_signaled()
+    );
     assert_eq!(controller.state(), WakeState::Dreaming);
     assert!(!controller.is_wake_signaled());
 
@@ -124,7 +140,11 @@ fn fsv_execute_inspect_signal_wake() {
     assert!(result.is_ok());
 
     // AFTER - Immediately read source of truth
-    println!("AFTER: state={:?}, signaled={}", controller.state(), controller.is_wake_signaled());
+    println!(
+        "AFTER: state={:?}, signaled={}",
+        controller.state(),
+        controller.is_wake_signaled()
+    );
     assert_eq!(controller.state(), WakeState::Waking);
     assert!(controller.is_wake_signaled());
 
@@ -148,7 +168,10 @@ fn fsv_execute_inspect_complete_wake_latency() {
     assert_eq!(controller.state(), WakeState::Waking);
 
     let stats_before = controller.stats();
-    println!("BEFORE stats: wake_count={}, violations={}", stats_before.wake_count, stats_before.latency_violations);
+    println!(
+        "BEFORE stats: wake_count={}, violations={}",
+        stats_before.wake_count, stats_before.latency_violations
+    );
 
     // ACTION
     let result = controller.complete_wake();
@@ -156,14 +179,25 @@ fn fsv_execute_inspect_complete_wake_latency() {
 
     // AFTER
     let latency = result.unwrap();
-    println!("AFTER: latency={:?}, state={:?}", latency, controller.state());
+    println!(
+        "AFTER: latency={:?}, state={:?}",
+        latency,
+        controller.state()
+    );
 
     // VERIFY: Latency must be < 100ms (Constitution requirement)
-    assert!(latency < Duration::from_millis(100), "Latency {:?} exceeds 100ms Constitution limit", latency);
+    assert!(
+        latency < Duration::from_millis(100),
+        "Latency {:?} exceeds 100ms Constitution limit",
+        latency
+    );
     assert_eq!(controller.state(), WakeState::Completing);
 
     let stats_after = controller.stats();
-    println!("AFTER stats: wake_count={}, violations={}", stats_after.wake_count, stats_after.latency_violations);
+    println!(
+        "AFTER stats: wake_count={}, violations={}",
+        stats_after.wake_count, stats_after.latency_violations
+    );
     assert_eq!(stats_after.wake_count, stats_before.wake_count + 1);
     assert_eq!(stats_after.latency_violations, 0);
 
@@ -187,7 +221,10 @@ fn fsv_edge_case_1_wake_during_idle() {
     // BEFORE
     let state_before = controller.state();
     let signaled_before = controller.is_wake_signaled();
-    println!("STATE BEFORE: {:?}, signaled={}", state_before, signaled_before);
+    println!(
+        "STATE BEFORE: {:?}, signaled={}",
+        state_before, signaled_before
+    );
     assert_eq!(state_before, WakeState::Idle);
     assert!(!signaled_before);
 
@@ -198,7 +235,10 @@ fn fsv_edge_case_1_wake_during_idle() {
     // AFTER
     let state_after = controller.state();
     let signaled_after = controller.is_wake_signaled();
-    println!("STATE AFTER: {:?}, signaled={}", state_after, signaled_after);
+    println!(
+        "STATE AFTER: {:?}, signaled={}",
+        state_after, signaled_after
+    );
 
     // VERIFY: No error, state unchanged (wake ignored)
     assert!(result.is_ok(), "Should not error when waking in idle state");
@@ -225,7 +265,10 @@ fn fsv_edge_case_2_gpu_budget_exactly_30_percent() {
     // BEFORE
     let state_before = controller.state();
     let signaled_before = controller.is_wake_signaled();
-    println!("GPU: 30%, STATE BEFORE: {:?}, signaled={}", state_before, signaled_before);
+    println!(
+        "GPU: 30%, STATE BEFORE: {:?}, signaled={}",
+        state_before, signaled_before
+    );
     assert_eq!(state_before, WakeState::Dreaming);
 
     // ACTION: Check GPU budget
@@ -235,12 +278,22 @@ fn fsv_edge_case_2_gpu_budget_exactly_30_percent() {
     // AFTER
     let state_after = controller.state();
     let signaled_after = controller.is_wake_signaled();
-    println!("STATE AFTER: {:?}, signaled={}", state_after, signaled_after);
+    println!(
+        "STATE AFTER: {:?}, signaled={}",
+        state_after, signaled_after
+    );
 
     // VERIFY: Should NOT trigger wake (strict > comparison, not >=)
     // 0.30 > 0.30 is false
-    assert!(result.is_ok(), "GPU at exactly 30% should NOT trigger (strict > comparison)");
-    assert_eq!(state_after, WakeState::Dreaming, "State should remain Dreaming");
+    assert!(
+        result.is_ok(),
+        "GPU at exactly 30% should NOT trigger (strict > comparison)"
+    );
+    assert_eq!(
+        state_after,
+        WakeState::Dreaming,
+        "State should remain Dreaming"
+    );
     assert!(!signaled_after, "Should not be signaled at exactly 30%");
 
     println!("RESULT: PASS - GPU at exactly 30% does NOT trigger wake");
@@ -264,7 +317,11 @@ fn fsv_edge_case_3_double_wake_signal() {
 
     // First wake
     let result1 = controller.signal_wake(WakeReason::ExternalQuery);
-    println!("FIRST WAKE: result={:?}, state={:?}", result1, controller.state());
+    println!(
+        "FIRST WAKE: result={:?}, state={:?}",
+        result1,
+        controller.state()
+    );
     assert!(result1.is_ok());
     assert_eq!(controller.state(), WakeState::Waking);
 
@@ -282,7 +339,11 @@ fn fsv_edge_case_3_double_wake_signal() {
 
     // VERIFY: No error, state still Waking (second wake ignored)
     assert!(result2.is_ok(), "Second wake should not error");
-    assert_eq!(state_after_second, WakeState::Waking, "State should still be Waking");
+    assert_eq!(
+        state_after_second,
+        WakeState::Waking,
+        "State should still be Waking"
+    );
 
     println!("RESULT: PASS - Double wake signal correctly handled");
     println!("=== FSV EDGE CASE 3: PASSED ===\n");
@@ -307,7 +368,11 @@ fn fsv_edge_case_4_gpu_budget_above_30_percent() {
     let result = controller.check_gpu_budget();
     println!("ACTION: check_gpu_budget() -> {:?}", result);
 
-    println!("STATE AFTER: {:?}, signaled: {}", controller.state(), controller.is_wake_signaled());
+    println!(
+        "STATE AFTER: {:?}, signaled: {}",
+        controller.state(),
+        controller.is_wake_signaled()
+    );
 
     // VERIFY: Should trigger wake (0.31 > 0.30)
     assert!(matches!(result, Err(WakeError::GpuBudgetExceeded { .. })));
@@ -329,8 +394,11 @@ fn fsv_edge_case_5_wake_handle_coordination() {
     controller.prepare_for_dream();
 
     // BEFORE
-    println!("BEFORE: controller.is_wake_signaled()={}, handle.is_signaled()={}",
-             controller.is_wake_signaled(), handle.is_signaled());
+    println!(
+        "BEFORE: controller.is_wake_signaled()={}, handle.is_signaled()={}",
+        controller.is_wake_signaled(),
+        handle.is_signaled()
+    );
     assert!(!controller.is_wake_signaled());
     assert!(!handle.is_signaled());
 
@@ -338,8 +406,11 @@ fn fsv_edge_case_5_wake_handle_coordination() {
     handle.wake(WakeReason::ExternalQuery);
 
     // AFTER
-    println!("AFTER: controller.is_wake_signaled()={}, handle.is_signaled()={}",
-             controller.is_wake_signaled(), handle.is_signaled());
+    println!(
+        "AFTER: controller.is_wake_signaled()={}, handle.is_signaled()={}",
+        controller.is_wake_signaled(),
+        handle.is_signaled()
+    );
 
     // VERIFY: Both controller and handle see the signal
     assert!(controller.is_wake_signaled());
@@ -370,8 +441,12 @@ fn fsv_mcp_events_serialization_round_trip() {
 
     // Test DreamCycleCompleted
     let event2 = DreamCycleCompleted::new(
-        session_id, true, WakeReason::CycleComplete, 5,
-        Duration::from_secs(300), Duration::from_millis(45)
+        session_id,
+        true,
+        WakeReason::CycleComplete,
+        5,
+        Duration::from_secs(300),
+        Duration::from_millis(45),
     );
     let json2 = serde_json::to_string(&event2).expect("Serialization failed");
     let deser2: DreamCycleCompleted = serde_json::from_str(&json2).expect("Deserialization failed");
@@ -381,7 +456,12 @@ fn fsv_mcp_events_serialization_round_trip() {
     println!("DreamCycleCompleted: PASS (all fields preserved)");
 
     // Test WakeTriggered
-    let event3 = WakeTriggered::new(session_id, WakeReason::ExternalQuery, "nrem", Duration::from_millis(50));
+    let event3 = WakeTriggered::new(
+        session_id,
+        WakeReason::ExternalQuery,
+        "nrem",
+        Duration::from_millis(50),
+    );
     let json3 = serde_json::to_string(&event3).expect("Serialization failed");
     let deser3: WakeTriggered = serde_json::from_str(&json3).expect("Deserialization failed");
     assert_eq!(deser3.reason, "external_query");
@@ -462,12 +542,18 @@ async fn fsv_integration_full_wake_cycle() {
     let stats = controller.stats();
     assert_eq!(stats.wake_count, 1);
     assert_eq!(stats.latency_violations, 0);
-    println!("\nFINAL STATS: wake_count={}, violations={}", stats.wake_count, stats.latency_violations);
+    println!(
+        "\nFINAL STATS: wake_count={}, violations={}",
+        stats.wake_count, stats.latency_violations
+    );
 
     println!("\n=== INTEGRATION TEST PASSED ===");
     println!("All state transitions verified:");
     println!("  Idle -> Dreaming -> Waking -> Completing -> Idle");
-    println!("  Wake latency: {:?} (< 100ms Constitution requirement)", latency);
+    println!(
+        "  Wake latency: {:?} (< 100ms Constitution requirement)",
+        latency
+    );
     println!("  Subscription received correct WakeReason");
     println!("  Stats tracking operational");
 }
@@ -482,7 +568,10 @@ fn fsv_evidence_of_success_log() {
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║          WAKE CONTROLLER VERIFICATION - EVIDENCE OF SUCCESS       ║");
     println!("╠══════════════════════════════════════════════════════════════════╣");
-    println!("║ Timestamp: {} UTC                             ║", chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S"));
+    println!(
+        "║ Timestamp: {} UTC                             ║",
+        chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S")
+    );
     println!("╠══════════════════════════════════════════════════════════════════╣");
 
     let controller = WakeController::new();
@@ -491,8 +580,12 @@ fn fsv_evidence_of_success_log() {
     println!("║ TEST: wake_controller_creation                                    ║");
     println!("║   BEFORE: N/A                                                     ║");
     println!("║   ACTION: WakeController::new()                                   ║");
-    println!("║   AFTER: state={:?}, is_dreaming={}, max_latency={}ms       ║",
-             controller.state(), controller.is_dreaming(), controller.max_latency().as_millis());
+    println!(
+        "║   AFTER: state={:?}, is_dreaming={}, max_latency={}ms       ║",
+        controller.state(),
+        controller.is_dreaming(),
+        controller.max_latency().as_millis()
+    );
     println!("║   RESULT: PASS                                                    ║");
     println!("╠══════════════════════════════════════════════════════════════════╣");
 
@@ -501,8 +594,12 @@ fn fsv_evidence_of_success_log() {
     println!("║ TEST: prepare_for_dream                                           ║");
     println!("║   BEFORE: state=Idle                                              ║");
     println!("║   ACTION: prepare_for_dream()                                     ║");
-    println!("║   AFTER: state={:?}, is_dreaming={}, signaled={}          ║",
-             controller.state(), controller.is_dreaming(), controller.is_wake_signaled());
+    println!(
+        "║   AFTER: state={:?}, is_dreaming={}, signaled={}          ║",
+        controller.state(),
+        controller.is_dreaming(),
+        controller.is_wake_signaled()
+    );
     println!("║   RESULT: PASS                                                    ║");
     println!("╠══════════════════════════════════════════════════════════════════╣");
 
@@ -511,8 +608,11 @@ fn fsv_evidence_of_success_log() {
     println!("║ TEST: signal_wake                                                 ║");
     println!("║   BEFORE: state=Dreaming, signaled=false                          ║");
     println!("║   ACTION: signal_wake(ExternalQuery)                              ║");
-    println!("║   AFTER: state={:?}, signaled={}                            ║",
-             controller.state(), controller.is_wake_signaled());
+    println!(
+        "║   AFTER: state={:?}, signaled={}                            ║",
+        controller.state(),
+        controller.is_wake_signaled()
+    );
     println!("║   RESULT: PASS                                                    ║");
     println!("╠══════════════════════════════════════════════════════════════════╣");
 
@@ -522,8 +622,12 @@ fn fsv_evidence_of_success_log() {
     println!("║ TEST: complete_wake                                               ║");
     println!("║   BEFORE: state=Waking                                            ║");
     println!("║   ACTION: complete_wake()                                         ║");
-    println!("║   AFTER: state={:?}, latency={:?}, violations={}     ║",
-             controller.state(), latency, stats.latency_violations);
+    println!(
+        "║   AFTER: state={:?}, latency={:?}, violations={}     ║",
+        controller.state(),
+        latency,
+        stats.latency_violations
+    );
     println!("║   RESULT: PASS (latency < 100ms)                                  ║");
     println!("╠══════════════════════════════════════════════════════════════════╣");
 
@@ -536,10 +640,18 @@ fn fsv_evidence_of_success_log() {
     println!("║ TEST: gpu_budget_exceeded                                         ║");
     println!("║   BEFORE: state=Dreaming, gpu_usage=35%                           ║");
     println!("║   ACTION: check_gpu_budget()                                      ║");
-    println!("║   AFTER: state={:?}, signaled={}                            ║",
-             controller.state(), controller.is_wake_signaled());
-    println!("║   ERROR: {:?}                                ║",
-             gpu_result.err().map(|e| format!("{}", e)).unwrap_or("None".to_string()));
+    println!(
+        "║   AFTER: state={:?}, signaled={}                            ║",
+        controller.state(),
+        controller.is_wake_signaled()
+    );
+    println!(
+        "║   ERROR: {:?}                                ║",
+        gpu_result
+            .err()
+            .map(|e| format!("{}", e))
+            .unwrap_or("None".to_string())
+    );
     println!("║   RESULT: PASS (correctly detected budget violation)              ║");
     println!("╠══════════════════════════════════════════════════════════════════╣");
     println!("║                    ALL TESTS PASSED                               ║");

@@ -5,8 +5,10 @@
 //! - Dequantization back to approximate f32 values
 //! - Thread-safe operation via Arc-wrapped codebook
 
-use super::types::{NUM_CENTROIDS, NUM_SUBVECTORS, PQ8QuantizationError};
-use crate::quantization::types::{PQ8Codebook, QuantizationMetadata, QuantizationMethod, QuantizedEmbedding};
+use super::types::{PQ8QuantizationError, NUM_CENTROIDS, NUM_SUBVECTORS};
+use crate::quantization::types::{
+    PQ8Codebook, QuantizationMetadata, QuantizationMethod, QuantizedEmbedding,
+};
 use std::sync::Arc;
 use tracing::{debug, warn};
 

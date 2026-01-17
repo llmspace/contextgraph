@@ -21,7 +21,7 @@
 
 use serde_json::json;
 
-use super::helpers::{make_tool_call, get_tool_data};
+use super::helpers::{get_tool_data, make_tool_call};
 use crate::handlers::tests::{create_test_handlers, create_test_handlers_with_all_components};
 
 // -------------------------------------------------------------------------
@@ -43,7 +43,10 @@ async fn test_get_identity_continuity_basic_success() {
     );
 
     let result = response.result.as_ref().expect("Must have result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     // With gwt_system configured, should succeed
     assert!(
@@ -55,10 +58,7 @@ async fn test_get_identity_continuity_basic_success() {
     let data = get_tool_data(&response);
 
     // Verify required fields exist
-    assert!(
-        data.get("ic").is_some(),
-        "Response must have 'ic' field"
-    );
+    assert!(data.get("ic").is_some(), "Response must have 'ic' field");
     assert!(
         data.get("status").is_some(),
         "Response must have 'status' field"
@@ -96,7 +96,10 @@ async fn test_get_identity_continuity_fails_without_gwt() {
     );
 
     let result = response.result.as_ref().expect("Must have result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     assert!(
         is_error,
@@ -104,7 +107,8 @@ async fn test_get_identity_continuity_fails_without_gwt() {
     );
 
     // Verify error contains useful information
-    let content = result.get("content")
+    let content = result
+        .get("content")
         .and_then(|v| v.as_array())
         .and_then(|arr| arr.first())
         .and_then(|c| c.get("text"))
@@ -112,9 +116,7 @@ async fn test_get_identity_continuity_fails_without_gwt() {
         .expect("Error must have content text");
 
     assert!(
-        content.contains("GWT") ||
-        content.contains("gwt") ||
-        content.contains("not initialized"),
+        content.contains("GWT") || content.contains("gwt") || content.contains("not initialized"),
         "Error message should indicate GWT not configured: {}",
         content
     );
@@ -133,7 +135,8 @@ async fn test_get_identity_continuity_response_fields() {
     let data = get_tool_data(&response);
 
     // Verify ic is a number in [0.0, 1.0]
-    let ic = data.get("ic")
+    let ic = data
+        .get("ic")
         .and_then(|v| v.as_f64())
         .expect("ic must be a number");
     assert!(
@@ -143,7 +146,8 @@ async fn test_get_identity_continuity_response_fields() {
     );
 
     // Verify status is one of the valid strings
-    let status = data.get("status")
+    let status = data
+        .get("status")
         .and_then(|v| v.as_str())
         .expect("status must be a string");
     assert!(
@@ -153,21 +157,17 @@ async fn test_get_identity_continuity_response_fields() {
     );
 
     // Verify in_crisis is a boolean
-    let in_crisis = data.get("in_crisis")
-        .and_then(|v| v.as_bool());
-    assert!(
-        in_crisis.is_some(),
-        "in_crisis must be a boolean"
-    );
+    let in_crisis = data.get("in_crisis").and_then(|v| v.as_bool());
+    assert!(in_crisis.is_some(), "in_crisis must be a boolean");
 
     // Verify history_len is a valid integer (u64 is always non-negative)
-    let _history_len = data.get("history_len")
+    let _history_len = data
+        .get("history_len")
         .and_then(|v| v.as_u64())
         .expect("history_len must be an integer");
 
     // Verify thresholds object has all required fields
-    let thresholds = data.get("thresholds")
-        .expect("thresholds must exist");
+    let thresholds = data.get("thresholds").expect("thresholds must exist");
     assert!(
         thresholds.get("healthy").is_some(),
         "thresholds must have 'healthy' field"
@@ -215,9 +215,12 @@ async fn test_get_identity_continuity_include_history() {
     let _has_history_default = data_no_history.get("history").is_some();
 
     // Test with include_history = true
-    let request_with_history = make_tool_call("get_identity_continuity", json!({
-        "include_history": true
-    }));
+    let request_with_history = make_tool_call(
+        "get_identity_continuity",
+        json!({
+            "include_history": true
+        }),
+    );
     let response_with_history = handlers.dispatch(request_with_history).await;
     let data_with_history = get_tool_data(&response_with_history);
 
@@ -228,7 +231,8 @@ async fn test_get_identity_continuity_include_history() {
     );
 
     // history should be an array
-    let history = data_with_history.get("history")
+    let history = data_with_history
+        .get("history")
         .and_then(|v| v.as_array())
         .expect("history must be an array");
 

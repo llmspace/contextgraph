@@ -3,7 +3,7 @@
 //! Per SPEC-E12-QUANT-001 and TECH-E12-QUANT-001.
 //! TASK-L03: Implements Quantizable trait for TokenPruningEmbedding.
 
-use crate::quantization::{Precision, QuantizationError, QuantizedEmbedding, Quantizable};
+use crate::quantization::{Precision, Quantizable, QuantizationError, QuantizedEmbedding};
 
 /// E12: Token-level embedding for late interaction (ColBERT-style).
 ///
@@ -82,11 +82,8 @@ impl TokenPruningEmbedding {
 
     /// Get top-k tokens by importance.
     pub fn top_k_tokens(&self, k: usize) -> Vec<usize> {
-        let mut importance: Vec<(usize, f32)> = self
-            .token_importance()
-            .into_iter()
-            .enumerate()
-            .collect();
+        let mut importance: Vec<(usize, f32)> =
+            self.token_importance().into_iter().enumerate().collect();
         importance.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         importance.into_iter().take(k).map(|(i, _)| i).collect()
     }
@@ -244,10 +241,12 @@ impl Quantizable for TokenPruningEmbedding {
         }
 
         // 3. Compute min/max for scale calculation
-        let (min_val, max_val) = self.values.iter().fold(
-            (f32::INFINITY, f32::NEG_INFINITY),
-            |(min, max), &v| (min.min(v), max.max(v)),
-        );
+        let (min_val, max_val) = self
+            .values
+            .iter()
+            .fold((f32::INFINITY, f32::NEG_INFINITY), |(min, max), &v| {
+                (min.min(v), max.max(v))
+            });
 
         // 4. Handle edge case: all values are the same
         let range = max_val - min_val;
@@ -286,9 +285,11 @@ impl Quantizable for TokenPruningEmbedding {
         }
 
         // 2. Get token count
-        let num_tokens = quantized.token_count.ok_or_else(|| QuantizationError::InvalidData {
-            reason: "token_count required for TokenPruningEmbedding".to_string(),
-        })?;
+        let num_tokens = quantized
+            .token_count
+            .ok_or_else(|| QuantizationError::InvalidData {
+                reason: "token_count required for TokenPruningEmbedding".to_string(),
+            })?;
 
         // 3. Dequantize based on precision
         let values: Vec<f32> = match quantized.precision {
@@ -466,7 +467,10 @@ mod tests {
         let result = emb.validate();
         assert!(matches!(
             result,
-            Err(QuantizationError::Infinity { index: 100, sign: "+" })
+            Err(QuantizationError::Infinity {
+                index: 100,
+                sign: "+"
+            })
         ));
     }
 

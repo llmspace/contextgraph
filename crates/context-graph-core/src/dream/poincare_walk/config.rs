@@ -38,13 +38,17 @@ impl PoincareBallConfig {
         if self.max_norm >= 1.0 || self.max_norm <= 0.0 {
             panic!(
                 "[POINCARE_WALK] Invalid max_norm at {}:{}: expected 0 < max_norm < 1.0, got {:.6}",
-                file!(), line!(), self.max_norm
+                file!(),
+                line!(),
+                self.max_norm
             );
         }
         if self.epsilon <= 0.0 || self.epsilon >= 1e-3 {
             panic!(
                 "[POINCARE_WALK] Invalid epsilon at {}:{}: expected 0 < epsilon < 1e-3, got {:e}",
-                file!(), line!(), self.epsilon
+                file!(),
+                line!(),
+                self.epsilon
             );
         }
         if self.curvature >= 0.0 {

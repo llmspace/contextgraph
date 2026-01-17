@@ -1,7 +1,7 @@
 //! Serialization round-trip tests.
 
-use crate::teleological::*;
 use super::helpers::create_real_fingerprint;
+use crate::teleological::*;
 use uuid::Uuid;
 
 // =========================================================================

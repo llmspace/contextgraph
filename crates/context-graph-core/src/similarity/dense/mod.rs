@@ -32,8 +32,6 @@ mod tests;
 
 // Re-export public types
 pub use error::DenseSimilarityError;
-pub use primitives::{
-    cosine_similarity, dot_product, euclidean_distance, l2_norm, normalize,
-};
+pub use primitives::{cosine_similarity, dot_product, euclidean_distance, l2_norm, normalize};
 #[cfg(target_arch = "x86_64")]
 pub use simd::cosine_similarity_simd;

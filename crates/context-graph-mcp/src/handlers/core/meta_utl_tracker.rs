@@ -481,9 +481,7 @@ impl MetaUtlTracker {
     /// TASK-METAUTL-P1-001: Enables domain-specific lambda optimization.
     #[allow(dead_code)]
     pub fn record_domain_accuracy(&mut self, domain: Domain, accuracy: f32) {
-        let tracker = self.domain_accuracy
-            .entry(domain)
-            .or_default();
+        let tracker = self.domain_accuracy.entry(domain).or_default();
         tracker.record(accuracy);
 
         // Check for consecutive low accuracy in this domain
@@ -517,9 +515,7 @@ impl MetaUtlTracker {
     pub fn get_all_domain_accuracies(&self) -> HashMap<Domain, f32> {
         self.domain_accuracy
             .iter()
-            .filter_map(|(domain, tracker)| {
-                tracker.average().map(|avg| (*domain, avg))
-            })
+            .filter_map(|(domain, tracker)| tracker.average().map(|avg| (*domain, avg)))
             .collect()
     }
 
@@ -588,17 +584,15 @@ impl MetaUtlTracker {
                 Ok(())
             }
             "mature" => {
-                tracing::error!(
-                    "TASK-010: Cannot reset mature stage - requires full optimization"
-                );
+                tracing::error!("TASK-010: Cannot reset mature stage - requires full optimization");
                 Err("Cannot reset lambda weights for mature stage - requires full Bayesian optimization".to_string())
             }
             unknown => {
-                tracing::error!(
-                    stage = unknown,
-                    "TASK-010: Unknown lifecycle stage"
-                );
-                Err(format!("Unknown lifecycle stage: '{}'. Valid stages: infancy, adolescence, mature", unknown))
+                tracing::error!(stage = unknown, "TASK-010: Unknown lifecycle stage");
+                Err(format!(
+                    "Unknown lifecycle stage: '{}'. Valid stages: infancy, adolescence, mature",
+                    unknown
+                ))
             }
         }
     }
@@ -868,7 +862,10 @@ mod tests {
         let code_acc = tracker.get_domain_accuracy(Domain::Code);
         assert!(code_acc.is_some());
         let code_avg = code_acc.unwrap();
-        assert!((code_avg - 0.85).abs() < 0.01, "Code accuracy should be ~0.85");
+        assert!(
+            (code_avg - 0.85).abs() < 0.01,
+            "Code accuracy should be ~0.85"
+        );
 
         // Verify Medical domain
         let medical_acc = tracker.get_domain_accuracy(Domain::Medical);
@@ -901,11 +898,14 @@ mod tests {
         let mut tracker = MetaUtlTracker::new();
 
         // Values should be clamped to [0.0, 1.0]
-        tracker.record_domain_accuracy(Domain::Code, 1.5);  // Should clamp to 1.0
+        tracker.record_domain_accuracy(Domain::Code, 1.5); // Should clamp to 1.0
         tracker.record_domain_accuracy(Domain::Code, -0.5); // Should clamp to 0.0
 
         let avg = tracker.get_domain_accuracy(Domain::Code).unwrap();
-        assert!((avg - 0.5).abs() < 0.01, "Average of clamped 1.0 and 0.0 should be 0.5");
+        assert!(
+            (avg - 0.5).abs() < 0.01,
+            "Average of clamped 1.0 and 0.0 should be 0.5"
+        );
     }
 
     #[test]

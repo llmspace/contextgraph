@@ -2,8 +2,10 @@
 
 use serde_json::json;
 
+use crate::handlers::tests::{
+    create_test_handlers_with_rocksdb_store_access, extract_mcp_tool_data, make_request,
+};
 use crate::protocol::JsonRpcId;
-use crate::handlers::tests::{create_test_handlers_with_rocksdb_store_access, extract_mcp_tool_data, make_request};
 
 use super::helpers::create_test_fingerprint;
 
@@ -26,9 +28,9 @@ async fn test_fsv_rocksdb_steering_data_matches_store() {
 
     // Store fingerprints with known values
     let test_data = [
-        ("known_fp_1", 0.8_f32, 5_u64),  // aligned, accessed
-        ("known_fp_2", 0.3_f32, 0_u64),  // not aligned, orphan
-        ("known_fp_3", 0.6_f32, 3_u64),  // aligned, accessed
+        ("known_fp_1", 0.8_f32, 5_u64), // aligned, accessed
+        ("known_fp_2", 0.3_f32, 0_u64), // not aligned, orphan
+        ("known_fp_3", 0.6_f32, 3_u64), // aligned, accessed
     ];
 
     let mut stored_ids = Vec::new();
@@ -88,9 +90,17 @@ async fn test_fsv_rocksdb_steering_data_matches_store() {
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
 
-    let gardener = data.get("gardener_details").expect("Should have gardener_details");
-    let handler_connectivity = gardener.get("connectivity").and_then(|v| v.as_f64()).unwrap_or(-1.0);
-    let handler_orphans = gardener.get("dead_ends_removed").and_then(|v| v.as_u64()).unwrap_or(999);
+    let gardener = data
+        .get("gardener_details")
+        .expect("Should have gardener_details");
+    let handler_connectivity = gardener
+        .get("connectivity")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(-1.0);
+    let handler_orphans = gardener
+        .get("dead_ends_removed")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(999);
 
     println!("\n[HANDLER RESULT]");
     println!("  - connectivity: {:.4}", handler_connectivity);
@@ -144,7 +154,11 @@ async fn test_fsv_rocksdb_pruning_candidates_match_store() {
             id,
             theta,
             access_count,
-            if *access_count == 0 { "CANDIDATE" } else { "KEEP" }
+            if *access_count == 0 {
+                "CANDIDATE"
+            } else {
+                "KEEP"
+            }
         );
     }
 
@@ -178,7 +192,10 @@ async fn test_fsv_rocksdb_pruning_candidates_match_store() {
         .and_then(|v| v.as_array())
         .expect("Should have candidates");
 
-    println!("\n[HANDLER RESULT] {} candidates returned:", candidates.len());
+    println!(
+        "\n[HANDLER RESULT] {} candidates returned:",
+        candidates.len()
+    );
     let mut handler_ids: Vec<uuid::Uuid> = Vec::new();
     for c in candidates {
         let id_str = c.get("memory_id").and_then(|v| v.as_str()).unwrap_or("?");

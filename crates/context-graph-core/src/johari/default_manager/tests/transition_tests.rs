@@ -35,7 +35,12 @@ async fn test_transition_valid() {
     let id = store.store(fp).await.unwrap();
 
     let result = manager
-        .transition(id, 0, JohariQuadrant::Open, TransitionTrigger::ExplicitShare)
+        .transition(
+            id,
+            0,
+            JohariQuadrant::Open,
+            TransitionTrigger::ExplicitShare,
+        )
         .await
         .unwrap();
 
@@ -55,12 +60,21 @@ async fn test_transition_invalid_returns_error() {
     let id = store.store(fp).await.unwrap();
 
     let result = manager
-        .transition(id, 0, JohariQuadrant::Blind, TransitionTrigger::ExternalObservation)
+        .transition(
+            id,
+            0,
+            JohariQuadrant::Blind,
+            TransitionTrigger::ExternalObservation,
+        )
         .await;
 
     assert!(result.is_err());
     match result.unwrap_err() {
-        JohariError::InvalidTransition { from, to, embedder_idx } => {
+        JohariError::InvalidTransition {
+            from,
+            to,
+            embedder_idx,
+        } => {
             assert_eq!(from, JohariQuadrant::Open);
             assert_eq!(to, JohariQuadrant::Blind);
             assert_eq!(embedder_idx, 0);
@@ -103,8 +117,16 @@ async fn test_batch_transition_all_or_nothing() {
     let id = store.store(fp).await.unwrap();
 
     let transitions = vec![
-        (0, JohariQuadrant::Open, TransitionTrigger::DreamConsolidation),
-        (99, JohariQuadrant::Open, TransitionTrigger::DreamConsolidation),
+        (
+            0,
+            JohariQuadrant::Open,
+            TransitionTrigger::DreamConsolidation,
+        ),
+        (
+            99,
+            JohariQuadrant::Open,
+            TransitionTrigger::DreamConsolidation,
+        ),
     ];
 
     let result = manager.transition_batch(id, transitions).await;
@@ -126,9 +148,21 @@ async fn test_batch_transition_success() {
     let id = store.store(fp).await.unwrap();
 
     let transitions = vec![
-        (0, JohariQuadrant::Open, TransitionTrigger::DreamConsolidation),
-        (1, JohariQuadrant::Hidden, TransitionTrigger::DreamConsolidation),
-        (2, JohariQuadrant::Blind, TransitionTrigger::ExternalObservation),
+        (
+            0,
+            JohariQuadrant::Open,
+            TransitionTrigger::DreamConsolidation,
+        ),
+        (
+            1,
+            JohariQuadrant::Hidden,
+            TransitionTrigger::DreamConsolidation,
+        ),
+        (
+            2,
+            JohariQuadrant::Blind,
+            TransitionTrigger::ExternalObservation,
+        ),
     ];
 
     let result = manager.transition_batch(id, transitions).await.unwrap();

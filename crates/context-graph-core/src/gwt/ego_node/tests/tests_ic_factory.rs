@@ -37,7 +37,11 @@ fn test_identity_continuity_new_factory_clamps_negative_cosine() {
         "IC must be >= 0, but was {}",
         result.identity_coherence
     );
-    assert_eq!(result.status, IdentityStatus::Critical, "IC=0.0 should be Critical");
+    assert_eq!(
+        result.status,
+        IdentityStatus::Critical,
+        "IC=0.0 should be Critical"
+    );
 }
 
 #[test]
@@ -93,7 +97,10 @@ fn test_identity_continuity_is_in_crisis_boundary() {
     );
 
     let below_boundary = IdentityContinuity::new(0.699, 1.0);
-    assert!(below_boundary.is_in_crisis(), "IC=0.699 should be in crisis");
+    assert!(
+        below_boundary.is_in_crisis(),
+        "IC=0.699 should be in crisis"
+    );
 }
 
 #[test]
@@ -145,7 +152,10 @@ fn test_identity_continuity_bincode_roundtrip() {
 
     assert_eq!(original.identity_coherence, deserialized.identity_coherence);
     assert_eq!(original.recent_continuity, deserialized.recent_continuity);
-    assert_eq!(original.kuramoto_order_parameter, deserialized.kuramoto_order_parameter);
+    assert_eq!(
+        original.kuramoto_order_parameter,
+        deserialized.kuramoto_order_parameter
+    );
     assert_eq!(original.status, deserialized.status);
     assert_eq!(original.computed_at, deserialized.computed_at);
 }

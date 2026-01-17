@@ -2,8 +2,10 @@
 
 use serde_json::json;
 
+use crate::handlers::tests::{
+    create_test_handlers_with_rocksdb_store_access, extract_mcp_tool_data, make_request,
+};
 use crate::protocol::JsonRpcId;
-use crate::handlers::tests::{create_test_handlers_with_rocksdb_store_access, extract_mcp_tool_data, make_request};
 
 use super::helpers::create_test_fingerprint_with_age;
 
@@ -44,7 +46,10 @@ async fn test_pruning_candidates_empty_store_returns_empty() {
 
     let candidates = data.get("candidates").and_then(|v| v.as_array());
     let summary = data.get("summary").expect("Should have summary");
-    let total = summary.get("total_candidates").and_then(|v| v.as_u64()).unwrap_or(999);
+    let total = summary
+        .get("total_candidates")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(999);
 
     println!("[RESULT]");
     println!("  - candidates: {:?}", candidates.map(|c| c.len()));
@@ -110,7 +115,10 @@ async fn test_pruning_candidates_fresh_data_no_candidates() {
     let data = extract_mcp_tool_data(&result);
 
     let summary = data.get("summary").expect("Should have summary");
-    let total = summary.get("total_candidates").and_then(|v| v.as_u64()).unwrap_or(999);
+    let total = summary
+        .get("total_candidates")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(999);
 
     println!("\n[RESULT]");
     println!("  - total_candidates: {}", total);
@@ -141,8 +149,8 @@ async fn test_pruning_candidates_stale_data_produces_candidates() {
     // Store mix of fingerprints
     let test_data = [
         // Should be candidates (stale OR low alignment)
-        ("stale_memory_1", 0.2_f32, 0_u64, 100_i64),  // Old + low alignment + orphan
-        ("stale_memory_2", 0.3_f32, 0_u64, 120_i64),  // Old + low alignment + orphan
+        ("stale_memory_1", 0.2_f32, 0_u64, 100_i64), // Old + low alignment + orphan
+        ("stale_memory_2", 0.3_f32, 0_u64, 120_i64), // Old + low alignment + orphan
         ("low_align_memory", 0.1_f32, 1_u64, 50_i64), // Low alignment
         // Should NOT be candidates (fresh + high alignment)
         ("fresh_memory_1", 0.8_f32, 5_u64, 5_i64),
@@ -194,17 +202,32 @@ async fn test_pruning_candidates_stale_data_produces_candidates() {
         .and_then(|v| v.as_array())
         .expect("Should have candidates array");
     let summary = data.get("summary").expect("Should have summary");
-    let total = summary.get("total_candidates").and_then(|v| v.as_u64()).unwrap_or(0);
+    let total = summary
+        .get("total_candidates")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
 
     println!("\n[RESULT]");
     println!("  - total_candidates: {}", total);
     println!("  - candidates returned: {}", candidates.len());
 
     for (i, candidate) in candidates.iter().enumerate() {
-        let memory_id = candidate.get("memory_id").and_then(|v| v.as_str()).unwrap_or("?");
-        let reason = candidate.get("reason").and_then(|v| v.as_str()).unwrap_or("?");
-        let alignment = candidate.get("alignment").and_then(|v| v.as_f64()).unwrap_or(-1.0);
-        let age_days = candidate.get("age_days").and_then(|v| v.as_u64()).unwrap_or(0);
+        let memory_id = candidate
+            .get("memory_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("?");
+        let reason = candidate
+            .get("reason")
+            .and_then(|v| v.as_str())
+            .unwrap_or("?");
+        let alignment = candidate
+            .get("alignment")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(-1.0);
+        let age_days = candidate
+            .get("age_days")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
         println!(
             "    [{}] {} - reason: {}, alignment: {:.2}, age: {}d",
             i + 1,
@@ -224,13 +247,15 @@ async fn test_pruning_candidates_stale_data_produces_candidates() {
 
     // Verify each returned candidate has a valid reason
     for candidate in candidates {
-        let reason = candidate.get("reason").and_then(|v| v.as_str()).unwrap_or("");
-        assert!(
-            !reason.is_empty(),
-            "Each candidate must have a reason"
-        );
+        let reason = candidate
+            .get("reason")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        assert!(!reason.is_empty(), "Each candidate must have a reason");
     }
 
-    println!("\n[FSV-PRUNING-003 PASSED] Stale/low-alignment data produces candidates with reasons");
+    println!(
+        "\n[FSV-PRUNING-003 PASSED] Stale/low-alignment data produces candidates with reasons"
+    );
     println!("================================================================================\n");
 }

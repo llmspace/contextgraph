@@ -16,11 +16,7 @@ pub(super) fn create_divergent_cluster(old: &[f32], new: &[f32]) -> Vec<Vec<f32>
     }
 
     // Compute the difference vector: represents the change direction
-    let diff: Vec<f32> = old
-        .iter()
-        .zip(new.iter())
-        .map(|(o, n)| n - o)
-        .collect();
+    let diff: Vec<f32> = old.iter().zip(new.iter()).map(|(o, n)| n - o).collect();
 
     // Compute magnitude for normalization
     let diff_mag: f32 = diff.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -56,7 +52,7 @@ pub(super) fn create_divergent_cluster(old: &[f32], new: &[f32]) -> Vec<Vec<f32>
 /// - Unknown: ΔS > threshold, ΔC > threshold (high surprise, high coherence)
 pub(super) fn classify_johari(delta_s: f32, delta_c: f32, threshold: f32) -> JohariQuadrant {
     match (delta_s < threshold, delta_c > threshold) {
-        (true, true) => JohariQuadrant::Open,    // Low surprise, high coherence
+        (true, true) => JohariQuadrant::Open, // Low surprise, high coherence
         (false, false) => JohariQuadrant::Blind, // High surprise, low coherence
         (true, false) => JohariQuadrant::Hidden, // Low surprise, low coherence
         (false, true) => JohariQuadrant::Unknown, // High surprise, high coherence

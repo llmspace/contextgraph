@@ -118,7 +118,10 @@ fn parse_stdin(default_session_id: &str) -> HookResult<(String, Option<u64>, Ses
         ));
     }
 
-    debug!(input_bytes = input_str.len(), "SESSION_END: parsing stdin JSON");
+    debug!(
+        input_bytes = input_str.len(),
+        "SESSION_END: parsing stdin JSON"
+    );
 
     // Try to parse as HookInput
     let input: HookInput = serde_json::from_str(&input_str).map_err(|e| {
@@ -409,7 +412,10 @@ mod tests {
 
         // Verify: IC classification
         let ic_class = output.ic_classification.unwrap();
-        println!("AFTER: IC={:.2}, level={:?}", ic_class.value, ic_class.level);
+        println!(
+            "AFTER: IC={:.2}, level={:?}",
+            ic_class.value, ic_class.level
+        );
         assert!(
             (ic_class.value - 0.92).abs() < 0.01,
             "IC value should be ~0.92"
@@ -592,10 +598,7 @@ mod tests {
 
         // Verify required fields
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-        assert!(
-            parsed.get("success").is_some(),
-            "Must have 'success' field"
-        );
+        assert!(parsed.get("success").is_some(), "Must have 'success' field");
         assert!(
             parsed.get("execution_time_ms").is_some(),
             "Must have 'execution_time_ms' field"

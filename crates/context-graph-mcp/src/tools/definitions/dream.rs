@@ -3,8 +3,8 @@
 //! TASK-37: Added get_gpu_status for GPU utilization monitoring.
 //! TASK-S01: Added trigger_mental_check for entropy-based triggering.
 
-use serde_json::json;
 use crate::tools::types::ToolDefinition;
+use serde_json::json;
 
 /// Returns Dream tool definitions (6 tools).
 /// TASK-37: Added get_gpu_status tool.

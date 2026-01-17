@@ -52,10 +52,8 @@ impl RetrievalPipeline {
         Self {
             single_search: SingleEmbedderSearch::new(Arc::clone(&registry)),
             multi_search: MultiEmbedderSearch::new(registry),
-            splade_index: splade_index
-                .unwrap_or_else(|| Arc::new(InMemorySpladeIndex::new())),
-            token_storage: token_storage
-                .unwrap_or_else(|| Arc::new(InMemoryTokenStorage::new())),
+            splade_index: splade_index.unwrap_or_else(|| Arc::new(InMemorySpladeIndex::new())),
+            token_storage: token_storage.unwrap_or_else(|| Arc::new(InMemoryTokenStorage::new())),
             config: PipelineConfig::default(),
         }
     }
@@ -70,10 +68,8 @@ impl RetrievalPipeline {
         Self {
             single_search: SingleEmbedderSearch::new(Arc::clone(&registry)),
             multi_search: MultiEmbedderSearch::new(registry),
-            splade_index: splade_index
-                .unwrap_or_else(|| Arc::new(InMemorySpladeIndex::new())),
-            token_storage: token_storage
-                .unwrap_or_else(|| Arc::new(InMemoryTokenStorage::new())),
+            splade_index: splade_index.unwrap_or_else(|| Arc::new(InMemorySpladeIndex::new())),
+            token_storage: token_storage.unwrap_or_else(|| Arc::new(InMemoryTokenStorage::new())),
             config,
         }
     }
@@ -143,9 +139,7 @@ impl RetrievalPipeline {
         };
 
         // Stage 1: SPLADE Filter
-        if stage_set.contains(&PipelineStage::SpladeFilter)
-            && self.config.stages[0].enabled
-        {
+        if stage_set.contains(&PipelineStage::SpladeFilter) && self.config.stages[0].enabled {
             let result = executor.stage_splade_filter(query_splade, &self.config.stages[0])?;
             // Extract Copy fields before moving Vec
             let latency_us = result.latency_us;
@@ -165,9 +159,7 @@ impl RetrievalPipeline {
         }
 
         // Stage 2: Matryoshka ANN
-        if stage_set.contains(&PipelineStage::MatryoshkaAnn)
-            && self.config.stages[1].enabled
-        {
+        if stage_set.contains(&PipelineStage::MatryoshkaAnn) && self.config.stages[1].enabled {
             let result = executor.stage_matryoshka_ann(
                 query_matryoshka,
                 candidates,
@@ -191,14 +183,9 @@ impl RetrievalPipeline {
         }
 
         // Stage 3: RRF Rerank
-        if stage_set.contains(&PipelineStage::RrfRerank)
-            && self.config.stages[2].enabled
-        {
-            let result = executor.stage_rrf_rerank(
-                query_semantic,
-                candidates,
-                &self.config.stages[2],
-            )?;
+        if stage_set.contains(&PipelineStage::RrfRerank) && self.config.stages[2].enabled {
+            let result =
+                executor.stage_rrf_rerank(query_semantic, candidates, &self.config.stages[2])?;
             // Extract Copy fields before moving Vec
             let latency_us = result.latency_us;
             let candidates_in = result.candidates_in;
@@ -217,13 +204,8 @@ impl RetrievalPipeline {
         }
 
         // Stage 4: Alignment Filter
-        if stage_set.contains(&PipelineStage::AlignmentFilter)
-            && self.config.stages[3].enabled
-        {
-            let result = executor.stage_alignment_filter(
-                candidates,
-                &self.config.stages[3],
-            )?;
+        if stage_set.contains(&PipelineStage::AlignmentFilter) && self.config.stages[3].enabled {
+            let result = executor.stage_alignment_filter(candidates, &self.config.stages[3])?;
             // Extract Copy fields before moving Vec
             let latency_us = result.latency_us;
             let candidates_in = result.candidates_in;
@@ -243,14 +225,9 @@ impl RetrievalPipeline {
         }
 
         // Stage 5: MaxSim Rerank
-        if stage_set.contains(&PipelineStage::MaxSimRerank)
-            && self.config.stages[4].enabled
-        {
-            let result = executor.stage_maxsim_rerank(
-                query_tokens,
-                candidates,
-                &self.config.stages[4],
-            )?;
+        if stage_set.contains(&PipelineStage::MaxSimRerank) && self.config.stages[4].enabled {
+            let result =
+                executor.stage_maxsim_rerank(query_tokens, candidates, &self.config.stages[4])?;
             // Extract Copy fields before moving Vec
             let latency_us = result.latency_us;
             let candidates_in = result.candidates_in;
@@ -324,11 +301,7 @@ impl RetrievalPipeline {
                 if token.len() != 128 {
                     return Err(SearchError::InvalidVector {
                         embedder: EmbedderIndex::E12LateInteraction,
-                        message: format!(
-                            "Token {} has dimension {}, expected 128",
-                            i,
-                            token.len()
-                        ),
+                        message: format!("Token {} has dimension {}, expected 128", i, token.len()),
                     }
                     .into());
                 }
@@ -348,7 +321,11 @@ impl RetrievalPipeline {
     }
 
     /// Validate a single vector for NaN/Inf - FAIL FAST.
-    fn validate_vector(&self, vector: &[f32], embedder: EmbedderIndex) -> Result<(), PipelineError> {
+    fn validate_vector(
+        &self,
+        vector: &[f32],
+        embedder: EmbedderIndex,
+    ) -> Result<(), PipelineError> {
         for (i, &v) in vector.iter().enumerate() {
             if v.is_nan() {
                 return Err(SearchError::InvalidVector {

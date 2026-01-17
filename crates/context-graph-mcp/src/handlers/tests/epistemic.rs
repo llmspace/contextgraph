@@ -72,7 +72,10 @@ async fn test_epistemic_action_assert_happy_path() {
     let result = response.result.expect("Should have result");
 
     // Verify MCP format
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(!is_error, "isError should be false");
 
     // Extract and verify response
@@ -80,10 +83,19 @@ async fn test_epistemic_action_assert_happy_path() {
     let text = content[0].get("text").unwrap().as_str().unwrap();
     let data: serde_json::Value = serde_json::from_str(text).expect("Valid JSON");
 
-    assert!(data.get("success").unwrap().as_bool().unwrap(), "Should succeed");
+    assert!(
+        data.get("success").unwrap().as_bool().unwrap(),
+        "Should succeed"
+    );
     assert_eq!(data.get("action_type").unwrap().as_str().unwrap(), "assert");
-    assert!(data.get("belief_state").is_some(), "Assert should create belief_state");
-    assert!(data.get("workspace_state").is_some(), "Should include workspace_state");
+    assert!(
+        data.get("belief_state").is_some(),
+        "Assert should create belief_state"
+    );
+    assert!(
+        data.get("workspace_state").is_some(),
+        "Should include workspace_state"
+    );
 }
 
 #[tokio::test]
@@ -104,15 +116,24 @@ async fn test_epistemic_action_retract_happy_path() {
     assert!(response.error.is_none(), "Retract should succeed");
     let result = response.result.expect("Should have result");
 
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(!is_error, "isError should be false");
 
     let content = result.get("content").unwrap().as_array().unwrap();
     let text = content[0].get("text").unwrap().as_str().unwrap();
     let data: serde_json::Value = serde_json::from_str(text).expect("Valid JSON");
 
-    assert!(data.get("success").unwrap().as_bool().unwrap(), "Should succeed");
-    assert_eq!(data.get("action_type").unwrap().as_str().unwrap(), "retract");
+    assert!(
+        data.get("success").unwrap().as_bool().unwrap(),
+        "Should succeed"
+    );
+    assert_eq!(
+        data.get("action_type").unwrap().as_str().unwrap(),
+        "retract"
+    );
 
     // Retracted beliefs have status="retracted" and confidence=0
     let belief = data.get("belief_state").unwrap();
@@ -138,16 +159,25 @@ async fn test_epistemic_action_query_happy_path() {
     assert!(response.error.is_none(), "Query should succeed");
     let result = response.result.expect("Should have result");
 
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(!is_error, "isError should be false");
 
     let content = result.get("content").unwrap().as_array().unwrap();
     let text = content[0].get("text").unwrap().as_str().unwrap();
     let data: serde_json::Value = serde_json::from_str(text).expect("Valid JSON");
 
-    assert!(data.get("success").unwrap().as_bool().unwrap(), "Should succeed");
+    assert!(
+        data.get("success").unwrap().as_bool().unwrap(),
+        "Should succeed"
+    );
     assert_eq!(data.get("action_type").unwrap().as_str().unwrap(), "query");
-    assert!(data.get("query_result").is_some(), "Query should have query_result");
+    assert!(
+        data.get("query_result").is_some(),
+        "Query should have query_result"
+    );
 }
 
 #[tokio::test]
@@ -169,19 +199,31 @@ async fn test_epistemic_action_hypothesize_happy_path() {
     assert!(response.error.is_none(), "Hypothesize should succeed");
     let result = response.result.expect("Should have result");
 
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(!is_error, "isError should be false");
 
     let content = result.get("content").unwrap().as_array().unwrap();
     let text = content[0].get("text").unwrap().as_str().unwrap();
     let data: serde_json::Value = serde_json::from_str(text).expect("Valid JSON");
 
-    assert!(data.get("success").unwrap().as_bool().unwrap(), "Should succeed");
-    assert_eq!(data.get("action_type").unwrap().as_str().unwrap(), "hypothesize");
+    assert!(
+        data.get("success").unwrap().as_bool().unwrap(),
+        "Should succeed"
+    );
+    assert_eq!(
+        data.get("action_type").unwrap().as_str().unwrap(),
+        "hypothesize"
+    );
 
     // Hypotheses have status="hypothetical"
     let belief = data.get("belief_state").unwrap();
-    assert_eq!(belief.get("status").unwrap().as_str().unwrap(), "hypothetical");
+    assert_eq!(
+        belief.get("status").unwrap().as_str().unwrap(),
+        "hypothetical"
+    );
 }
 
 #[tokio::test]
@@ -213,7 +255,12 @@ async fn test_epistemic_action_verify_high_confidence_verified() {
     // High confidence (>0.7) should result in status="verified"
     let belief = data.get("belief_state").unwrap();
     assert_eq!(belief.get("status").unwrap().as_str().unwrap(), "verified");
-    assert!(data.get("message").unwrap().as_str().unwrap().contains("VERIFIED"));
+    assert!(data
+        .get("message")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .contains("VERIFIED"));
 }
 
 #[tokio::test]
@@ -240,7 +287,12 @@ async fn test_epistemic_action_verify_low_confidence_denied() {
     // Low confidence (<0.3) should result in status="denied"
     let belief = data.get("belief_state").unwrap();
     assert_eq!(belief.get("status").unwrap().as_str().unwrap(), "denied");
-    assert!(data.get("message").unwrap().as_str().unwrap().contains("DENIED"));
+    assert!(data
+        .get("message")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .contains("DENIED"));
 }
 
 #[tokio::test]
@@ -266,8 +318,16 @@ async fn test_epistemic_action_verify_mid_confidence_hypothetical() {
 
     // Mid confidence stays hypothetical
     let belief = data.get("belief_state").unwrap();
-    assert_eq!(belief.get("status").unwrap().as_str().unwrap(), "hypothetical");
-    assert!(data.get("message").unwrap().as_str().unwrap().contains("unverified"));
+    assert_eq!(
+        belief.get("status").unwrap().as_str().unwrap(),
+        "hypothetical"
+    );
+    assert!(data
+        .get("message")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .contains("unverified"));
 }
 
 // ============================================================================
@@ -291,12 +351,27 @@ async fn test_epistemic_action_empty_target_fails() {
 
     // Should return error (either JSON-RPC error or isError=true)
     if response.error.is_some() {
-        assert!(response.error.as_ref().unwrap().message.contains("empty") ||
-                response.error.as_ref().unwrap().message.contains("minLength") ||
-                response.error.as_ref().unwrap().message.contains("non-empty"));
+        assert!(
+            response.error.as_ref().unwrap().message.contains("empty")
+                || response
+                    .error
+                    .as_ref()
+                    .unwrap()
+                    .message
+                    .contains("minLength")
+                || response
+                    .error
+                    .as_ref()
+                    .unwrap()
+                    .message
+                    .contains("non-empty")
+        );
     } else {
         let result = response.result.expect("Should have result");
-        let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+        let is_error = result
+            .get("isError")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         assert!(is_error, "Empty target should set isError=true");
     }
 }
@@ -319,7 +394,10 @@ async fn test_epistemic_action_max_target_length_succeeds() {
 
     assert!(response.error.is_none(), "Max length target should succeed");
     let result = response.result.expect("Should have result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(!is_error, "Max length target should not error");
 }
 
@@ -341,11 +419,16 @@ async fn test_epistemic_action_exceeds_max_target_length_fails() {
 
     // Should fail with error about exceeding max length
     if response.error.is_some() {
-        assert!(response.error.as_ref().unwrap().message.contains("4096") ||
-                response.error.as_ref().unwrap().message.contains("max"));
+        assert!(
+            response.error.as_ref().unwrap().message.contains("4096")
+                || response.error.as_ref().unwrap().message.contains("max")
+        );
     } else {
         let result = response.result.expect("Should have result");
-        let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+        let is_error = result
+            .get("isError")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         assert!(is_error, "Exceeding max length should set isError=true");
     }
 }
@@ -367,11 +450,21 @@ async fn test_epistemic_action_empty_rationale_fails() {
 
     // Should return error
     if response.error.is_some() {
-        assert!(response.error.as_ref().unwrap().message.contains("empty") ||
-                response.error.as_ref().unwrap().message.contains("Rationale"));
+        assert!(
+            response.error.as_ref().unwrap().message.contains("empty")
+                || response
+                    .error
+                    .as_ref()
+                    .unwrap()
+                    .message
+                    .contains("Rationale")
+        );
     } else {
         let result = response.result.expect("Should have result");
-        let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+        let is_error = result
+            .get("isError")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         assert!(is_error, "Empty rationale should set isError=true");
     }
 }
@@ -394,11 +487,26 @@ async fn test_epistemic_action_confidence_below_zero_fails() {
 
     // Should return error
     if response.error.is_some() {
-        assert!(response.error.as_ref().unwrap().message.contains("confidence") ||
-                response.error.as_ref().unwrap().message.contains("[0.0, 1.0]"));
+        assert!(
+            response
+                .error
+                .as_ref()
+                .unwrap()
+                .message
+                .contains("confidence")
+                || response
+                    .error
+                    .as_ref()
+                    .unwrap()
+                    .message
+                    .contains("[0.0, 1.0]")
+        );
     } else {
         let result = response.result.expect("Should have result");
-        let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+        let is_error = result
+            .get("isError")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         assert!(is_error, "Negative confidence should set isError=true");
     }
 }
@@ -421,11 +529,26 @@ async fn test_epistemic_action_confidence_above_one_fails() {
 
     // Should return error
     if response.error.is_some() {
-        assert!(response.error.as_ref().unwrap().message.contains("confidence") ||
-                response.error.as_ref().unwrap().message.contains("[0.0, 1.0]"));
+        assert!(
+            response
+                .error
+                .as_ref()
+                .unwrap()
+                .message
+                .contains("confidence")
+                || response
+                    .error
+                    .as_ref()
+                    .unwrap()
+                    .message
+                    .contains("[0.0, 1.0]")
+        );
     } else {
         let result = response.result.expect("Should have result");
-        let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+        let is_error = result
+            .get("isError")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         assert!(is_error, "Confidence > 1 should set isError=true");
     }
 }
@@ -448,7 +571,10 @@ async fn test_epistemic_action_confidence_boundary_zero_succeeds() {
 
     assert!(response.error.is_none(), "Confidence 0.0 should succeed");
     let result = response.result.expect("Should have result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(!is_error, "Confidence 0.0 should not error");
 }
 
@@ -470,7 +596,10 @@ async fn test_epistemic_action_confidence_boundary_one_succeeds() {
 
     assert!(response.error.is_none(), "Confidence 1.0 should succeed");
     let result = response.result.expect("Should have result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(!is_error, "Confidence 1.0 should not error");
 }
 
@@ -490,7 +619,10 @@ async fn test_epistemic_action_default_confidence() {
 
     let response = handlers.dispatch(request).await;
 
-    assert!(response.error.is_none(), "Default confidence should succeed");
+    assert!(
+        response.error.is_none(),
+        "Default confidence should succeed"
+    );
     let result = response.result.expect("Should have result");
 
     let content = result.get("content").unwrap().as_array().unwrap();
@@ -500,7 +632,10 @@ async fn test_epistemic_action_default_confidence() {
     // Verify default confidence is 0.5
     let belief = data.get("belief_state").unwrap();
     let confidence = belief.get("confidence").unwrap().as_f64().unwrap();
-    assert!((confidence - 0.5).abs() < f64::EPSILON, "Default confidence should be 0.5");
+    assert!(
+        (confidence - 0.5).abs() < f64::EPSILON,
+        "Default confidence should be 0.5"
+    );
 }
 
 // ============================================================================
@@ -526,13 +661,18 @@ async fn test_epistemic_action_without_gwt_fails() {
     // Should fail because WorkspaceProvider is not initialized
     if let Some(ref error) = response.error {
         // GWT_NOT_INITIALIZED error code
-        assert!(error.code == crate::protocol::error_codes::GWT_NOT_INITIALIZED ||
-                error.message.contains("WorkspaceProvider") ||
-                error.message.contains("GWT"));
+        assert!(
+            error.code == crate::protocol::error_codes::GWT_NOT_INITIALIZED
+                || error.message.contains("WorkspaceProvider")
+                || error.message.contains("GWT")
+        );
     } else {
         // Or isError=true in MCP format
         let result = response.result.expect("Should have result");
-        let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+        let is_error = result
+            .get("isError")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         assert!(is_error, "Missing GWT should cause error");
     }
 }
@@ -554,11 +694,13 @@ async fn test_epistemic_action_invalid_action_type() {
 
     // Should fail with invalid params
     if let Some(ref error) = response.error {
-        assert!(error.message.contains("Invalid") ||
-                error.message.contains("action_type"));
+        assert!(error.message.contains("Invalid") || error.message.contains("action_type"));
     } else {
         let result = response.result.expect("Should have result");
-        let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+        let is_error = result
+            .get("isError")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         assert!(is_error, "Invalid action_type should error");
     }
 }
@@ -590,15 +732,30 @@ async fn test_epistemic_action_workspace_state_snapshot() {
     let data: serde_json::Value = serde_json::from_str(text).expect("Valid JSON");
 
     // Verify workspace_state snapshot is present and has correct structure
-    let ws = data.get("workspace_state").expect("Should have workspace_state");
-    assert!(ws.get("coherence_threshold").is_some(), "Should have coherence_threshold");
-    assert!(ws.get("is_broadcasting").is_some(), "Should have is_broadcasting");
+    let ws = data
+        .get("workspace_state")
+        .expect("Should have workspace_state");
+    assert!(
+        ws.get("coherence_threshold").is_some(),
+        "Should have coherence_threshold"
+    );
+    assert!(
+        ws.get("is_broadcasting").is_some(),
+        "Should have is_broadcasting"
+    );
     assert!(ws.get("has_conflict").is_some(), "Should have has_conflict");
     assert!(ws.get("timestamp").is_some(), "Should have timestamp");
 
     // Coherence threshold should be a valid float (typically 0.8)
-    let threshold = ws.get("coherence_threshold").unwrap().as_f64().expect("float");
-    assert!((0.0..=1.0).contains(&threshold), "Coherence threshold in [0,1]");
+    let threshold = ws
+        .get("coherence_threshold")
+        .unwrap()
+        .as_f64()
+        .expect("float");
+    assert!(
+        (0.0..=1.0).contains(&threshold),
+        "Coherence threshold in [0,1]"
+    );
 }
 
 #[tokio::test]
@@ -624,7 +781,10 @@ async fn test_epistemic_action_with_context() {
     // Should succeed - context is optional but valid
     assert!(response.error.is_none(), "Valid context should not error");
     let result = response.result.expect("Should have result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(!is_error, "Valid context should succeed");
 }
 
@@ -651,7 +811,10 @@ async fn test_epistemic_action_returns_success() {
     // Verify response is successful
     assert!(response.error.is_none(), "Should not have JSON-RPC error");
     let result = response.result.expect("Should have result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(!is_error, "MCP isError should be false");
 
     // Verify response has valid MCP tool content structure

@@ -24,22 +24,9 @@ pub mod sampling;
 
 // Re-export all public items for backward compatibility
 pub use config::PoincareBallConfig;
-pub use math::{
-    inner_product_64,
-    norm_64,
-    norm_squared_64,
-    project_to_ball,
-    validate_in_ball,
-};
-pub use mobius::{
-    direction_toward,
-    geodesic_distance,
-    mobius_add,
-};
+pub use math::{inner_product_64, norm_64, norm_squared_64, project_to_ball, validate_in_ball};
+pub use mobius::{direction_toward, geodesic_distance, mobius_add};
 pub use sampling::{
-    is_far_from_all,
-    random_direction,
-    sample_direction_with_temperature,
-    scale_direction,
+    is_far_from_all, random_direction, sample_direction_with_temperature, scale_direction,
     softmax_temperature,
 };

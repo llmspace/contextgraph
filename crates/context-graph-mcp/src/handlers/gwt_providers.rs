@@ -21,7 +21,10 @@ use std::time::Duration;
 use async_trait::async_trait;
 use context_graph_core::error::CoreResult;
 use context_graph_core::gwt::{
-    ego_node::{CrisisDetectionResult, IcCrisisCallback, IdentityContinuity, IdentityContinuityMonitor, IdentityStatus},
+    ego_node::{
+        CrisisDetectionResult, IcCrisisCallback, IdentityContinuity, IdentityContinuityMonitor,
+        IdentityStatus,
+    },
     ConsciousnessCalculator, ConsciousnessMetrics, ConsciousnessState, GlobalWorkspace,
     MetaCognitiveLoop, MetaCognitiveState, SelfEgoNode, StateMachineManager, StateTransition,
 };
@@ -179,9 +182,7 @@ impl GwtSystemProviderImpl {
     ///
     /// # TASK-IDENTITY-P0-001
     #[allow(dead_code)]
-    pub fn with_shared_monitor(
-        monitor: Arc<TokioRwLock<IdentityContinuityMonitor>>
-    ) -> Self {
+    pub fn with_shared_monitor(monitor: Arc<TokioRwLock<IdentityContinuityMonitor>>) -> Self {
         Self {
             calculator: ConsciousnessCalculator::new(),
             state_machine: RwLock::new(StateMachineManager::new()),
@@ -211,7 +212,7 @@ impl GwtSystemProviderImpl {
             // Create noop callback for test-only isolated monitor
             // This monitor is NOT connected to any DreamEventListener
             identity_monitor: Arc::new(TokioRwLock::new(IdentityContinuityMonitor::new(
-                noop_callback_for_tests()
+                noop_callback_for_tests(),
             ))),
         }
     }

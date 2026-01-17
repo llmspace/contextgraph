@@ -5,9 +5,9 @@ use std::time::Instant;
 
 use uuid::Uuid;
 
+use crate::teleological::indexes::{EmbedderIndex, EmbedderIndexOps, EmbedderIndexRegistry};
 use crate::teleological::search::error::{SearchError, SearchResult};
 use crate::teleological::search::result::{EmbedderSearchHit, SingleEmbedderSearchResults};
-use crate::teleological::indexes::{EmbedderIndex, EmbedderIndexOps, EmbedderIndexRegistry};
 
 use super::config::SingleEmbedderSearchConfig;
 
@@ -132,10 +132,7 @@ impl SingleEmbedderSearch {
 
         // Get the index from registry
         let index = self.registry.get(embedder).ok_or_else(|| {
-            SearchError::Store(format!(
-                "Index not found for {:?} in registry",
-                embedder
-            ))
+            SearchError::Store(format!("Index not found for {:?} in registry", embedder))
         })?;
 
         // Handle k=0 edge case
@@ -195,7 +192,12 @@ impl SingleEmbedderSearch {
         embedder: EmbedderIndex,
         query: &[f32],
     ) -> SearchResult<SingleEmbedderSearchResults> {
-        self.search(embedder, query, self.config.default_k, self.config.default_threshold)
+        self.search(
+            embedder,
+            query,
+            self.config.default_k,
+            self.config.default_threshold,
+        )
     }
 
     /// Search and return only IDs above threshold.
@@ -220,7 +222,11 @@ impl SingleEmbedderSearch {
         min_similarity: f32,
     ) -> SearchResult<Vec<(Uuid, f32)>> {
         let results = self.search(embedder, query, k, Some(min_similarity))?;
-        Ok(results.hits.into_iter().map(|h| (h.id, h.similarity)).collect())
+        Ok(results
+            .hits
+            .into_iter()
+            .map(|h| (h.id, h.similarity))
+            .collect())
     }
 
     /// Validate query vector. FAIL FAST on invalid input.

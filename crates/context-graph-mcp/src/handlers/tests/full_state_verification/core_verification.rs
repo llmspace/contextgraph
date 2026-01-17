@@ -76,10 +76,7 @@ async fn verify_store_creates_fingerprint_in_source_of_truth() {
 
     println!("\n[EVIDENCE] Stored fingerprint fields:");
     println!("  - ID: {}", stored_fp.id);
-    println!(
-        "  - alignment_score: {:.4}",
-        stored_fp.alignment_score
-    );
+    println!("  - alignment_score: {:.4}", stored_fp.alignment_score);
     println!("  - access_count: {}", stored_fp.access_count);
     println!("  - created_at: {}", stored_fp.created_at);
     println!("  - content_hash: {}", hex::encode(stored_fp.content_hash));
@@ -165,10 +162,7 @@ async fn verify_retrieve_returns_source_of_truth_data() {
     println!("\n[SOURCE OF TRUTH] Direct store.retrieve() data:");
     println!("  - ID: {}", truth_fp.id);
     println!("  - content_hash: {}", hex::encode(truth_fp.content_hash));
-    println!(
-        "  - alignment_score: {:.4}",
-        truth_fp.alignment_score
-    );
+    println!("  - alignment_score: {:.4}", truth_fp.alignment_score);
 
     // === NOW USE MCP HANDLER TO RETRIEVE ===
     let retrieve_params = json!({ "fingerprintId": fingerprint_id_str });

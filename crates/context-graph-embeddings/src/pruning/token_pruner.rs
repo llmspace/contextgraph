@@ -161,8 +161,7 @@ impl TokenPruningQuantizer {
         let scores = self.score_tokens(embeddings, attention_weights);
 
         // Step 6: Rank tokens by importance (descending)
-        let mut indexed_scores: Vec<(usize, f32)> =
-            scores.into_iter().enumerate().collect();
+        let mut indexed_scores: Vec<(usize, f32)> = scores.into_iter().enumerate().collect();
         indexed_scores.sort_by(|a, b| {
             // Sort by score descending (highest first)
             b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
@@ -196,11 +195,7 @@ impl TokenPruningQuantizer {
     }
 
     /// Score tokens by their importance using the configured method.
-    fn score_tokens(
-        &self,
-        embeddings: &[Vec<f32>],
-        attention_weights: Option<&[f32]>,
-    ) -> Vec<f32> {
+    fn score_tokens(&self, embeddings: &[Vec<f32>], attention_weights: Option<&[f32]>) -> Vec<f32> {
         match self.config.scoring_method {
             ImportanceScoringMethod::AttentionBased => {
                 // Use attention weights if available, otherwise fall back to magnitude
@@ -397,9 +392,8 @@ mod tests {
         let quantizer = TokenPruningQuantizer::new(config).unwrap();
 
         // Create embeddings with increasing magnitudes
-        let embeddings: Vec<Vec<f32>> = (0..10)
-            .map(|i| vec![(i as f32 + 1.0) * 0.1; 128])
-            .collect();
+        let embeddings: Vec<Vec<f32>> =
+            (0..10).map(|i| vec![(i as f32 + 1.0) * 0.1; 128]).collect();
 
         let result = quantizer.prune(&embeddings, None).unwrap();
 
@@ -426,9 +420,7 @@ mod tests {
         let embeddings = make_embeddings(10);
 
         // Attention weights: first 5 tokens have high scores
-        let attention: Vec<f32> = (0..10)
-            .map(|i| if i < 5 { 1.0 } else { 0.1 })
-            .collect();
+        let attention: Vec<f32> = (0..10).map(|i| if i < 5 { 1.0 } else { 0.1 }).collect();
 
         let result = quantizer.prune(&embeddings, Some(&attention)).unwrap();
 
@@ -532,9 +524,8 @@ mod tests {
         let quantizer = TokenPruningQuantizer::new(config).unwrap();
 
         // Create embeddings with increasing magnitudes
-        let embeddings: Vec<Vec<f32>> = (0..10)
-            .map(|i| vec![(i as f32 + 1.0) * 0.1; 128])
-            .collect();
+        let embeddings: Vec<Vec<f32>> =
+            (0..10).map(|i| vec![(i as f32 + 1.0) * 0.1; 128]).collect();
 
         // No attention weights provided - should fall back to magnitude
         let result = quantizer.prune(&embeddings, None).unwrap();

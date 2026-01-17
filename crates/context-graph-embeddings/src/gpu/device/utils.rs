@@ -19,9 +19,9 @@ use crate::gpu::GpuInfo;
 
 // Use consolidated CUDA FFI from context-graph-cuda
 use context_graph_cuda::ffi::{
-    cuDeviceGet, cuDeviceGetAttribute, cuDeviceGetName, cuDeviceTotalMem_v2,
-    cuDriverGetVersion, cuInit, decode_driver_version, is_cuda_success,
-    CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
+    cuDeviceGet, cuDeviceGetAttribute, cuDeviceGetName, cuDeviceTotalMem_v2, cuDriverGetVersion,
+    cuInit, decode_driver_version, is_cuda_success, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
+    CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
 };
 
 /// Query REAL GPU information using CUDA Driver API.

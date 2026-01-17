@@ -588,10 +588,7 @@ impl Handlers {
     /// - coupling: Coupling strength K
     /// - order_parameter: r in [0, 1]
     /// - mean_phase: psi in [0, 2pi]
-    pub(crate) async fn call_get_kuramoto_state(
-        &self,
-        id: Option<JsonRpcId>,
-    ) -> JsonRpcResponse {
+    pub(crate) async fn call_get_kuramoto_state(&self, id: Option<JsonRpcId>) -> JsonRpcResponse {
         debug!("Handling get_kuramoto_state tool call");
 
         // FAIL FAST: Check kuramoto provider

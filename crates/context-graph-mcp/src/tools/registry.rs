@@ -233,7 +233,11 @@ mod tests {
 
         println!("FSV-1: Tool count = {}", registry.len());
         // TASK-P0-001: Removed auto_bootstrap_north_star per ARCH-03 (59 → 58)
-        assert_eq!(registry.len(), 58, "Must have exactly 58 tools (after TASK-P0-001 removal)");
+        assert_eq!(
+            registry.len(),
+            58,
+            "Must have exactly 58 tools (after TASK-P0-001 removal)"
+        );
 
         // Verify critical tools exist
         let critical_tools = [
@@ -347,7 +351,12 @@ mod tests {
 
         // Verify sorted
         for i in 1..names.len() {
-            assert!(names[i - 1] <= names[i], "Names not sorted: {} > {}", names[i - 1], names[i]);
+            assert!(
+                names[i - 1] <= names[i],
+                "Names not sorted: {} > {}",
+                names[i - 1],
+                names[i]
+            );
         }
     }
 
@@ -389,12 +398,12 @@ mod tests {
             ("Steering", "get_steering_feedback"),
             ("Causal", "omni_infer"),
             ("Teleological", "search_teleological"),
-            ("Autonomous", "get_autonomous_status"),  // Changed from auto_bootstrap_north_star per TASK-P0-001
+            ("Autonomous", "get_autonomous_status"), // Changed from auto_bootstrap_north_star per TASK-P0-001
             ("Meta-UTL", "get_meta_learning_status"),
             ("Epistemic", "epistemic_action"),
             ("Merge", "merge_concepts"),
             ("Johari", "get_johari_classification"),
-            ("Session", "session_start"),  // TASK-013
+            ("Session", "session_start"), // TASK-013
         ];
 
         for (category, tool_name) in category_representatives {

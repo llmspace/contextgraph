@@ -18,15 +18,31 @@ async fn test_10_system_status() {
     let request = make_request("system/status", 1, None);
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Should not have error: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Should not have error: {:?}",
+        response.error
+    );
     let result = response.result.expect("Should have result");
 
     println!("\n[VERIFICATION]");
-    println!("  fingerprintCount: {}", result.get("fingerprintCount").unwrap_or(&json!("?")));
-    println!("  coherence: {}", result.get("coherence").unwrap_or(&json!("?")));
-    println!("  entropy: {}", result.get("entropy").unwrap_or(&json!("?")));
+    println!(
+        "  fingerprintCount: {}",
+        result.get("fingerprintCount").unwrap_or(&json!("?"))
+    );
+    println!(
+        "  coherence: {}",
+        result.get("coherence").unwrap_or(&json!("?"))
+    );
+    println!(
+        "  entropy: {}",
+        result.get("entropy").unwrap_or(&json!("?"))
+    );
 
     // Check quadrant distribution
     if let Some(quadrants) = result.get("quadrantDistribution") {
@@ -48,15 +64,28 @@ async fn test_11_system_health() {
     let request = make_request("system/health", 1, None);
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Should not have error: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Should not have error: {:?}",
+        response.error
+    );
     let result = response.result.expect("Should have result");
 
     println!("\n[VERIFICATION]");
     println!("  status: {}", result.get("status").unwrap_or(&json!("?")));
-    println!("  storageHealthy: {}", result.get("storageHealthy").unwrap_or(&json!("?")));
-    println!("  embeddingHealthy: {}", result.get("embeddingHealthy").unwrap_or(&json!("?")));
+    println!(
+        "  storageHealthy: {}",
+        result.get("storageHealthy").unwrap_or(&json!("?"))
+    );
+    println!(
+        "  embeddingHealthy: {}",
+        result.get("embeddingHealthy").unwrap_or(&json!("?"))
+    );
 
     println!("\n[PASSED] system/health works correctly");
 }

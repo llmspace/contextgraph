@@ -281,7 +281,11 @@ async fn test_corruption_detection_missing_sst_file() {
 
     // Step 3: Delete an SST file to simulate corruption
     let deleted_file = &sst_files[0];
-    let deleted_name = deleted_file.file_name().unwrap().to_string_lossy().to_string();
+    let deleted_name = deleted_file
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
     std::fs::remove_file(deleted_file).expect("Should delete SST file");
 
     // Step 4: Attempt to reopen - should fail with CorruptionDetected
@@ -302,7 +306,9 @@ async fn test_corruption_detection_missing_sst_file() {
             let file_list: Vec<&str> = missing_files.split(", ").collect();
             let deleted_without_ext = deleted_name.replace(".sst", "");
             assert!(
-                file_list.iter().any(|f| *f == deleted_name || *f == deleted_without_ext),
+                file_list
+                    .iter()
+                    .any(|f| *f == deleted_name || *f == deleted_without_ext),
                 "Missing files should include the deleted file '{}', got: {:?}",
                 deleted_name,
                 file_list
@@ -490,9 +496,9 @@ async fn test_corruption_detection_error_details() {
     // Verify error message contains FAIL FAST debugging info
     // Either our custom CorruptionDetected or RocksDB's error
     assert!(
-        err_string.contains("CORRUPTION") ||
-        err_string.contains("Corruption") ||
-        err_string.contains("No such file"),
+        err_string.contains("CORRUPTION")
+            || err_string.contains("Corruption")
+            || err_string.contains("No such file"),
         "Error should indicate corruption, got: {}",
         err_string
     );
@@ -508,8 +514,14 @@ async fn test_corruption_detection_error_details() {
         // Verify all fields are populated
         assert!(!err_path.is_empty(), "Path should not be empty");
         assert!(missing_count >= 1, "Should have at least 1 missing file");
-        assert!(!missing_files.is_empty(), "Missing files list should not be empty");
-        assert!(!manifest_file.is_empty(), "Manifest file should be identified");
+        assert!(
+            !missing_files.is_empty(),
+            "Missing files list should not be empty"
+        );
+        assert!(
+            !manifest_file.is_empty(),
+            "Manifest file should be identified"
+        );
 
         // Verify path matches
         assert!(

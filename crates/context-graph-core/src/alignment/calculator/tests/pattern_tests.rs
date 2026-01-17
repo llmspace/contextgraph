@@ -71,17 +71,21 @@ fn test_detect_patterns_strategic_drift() {
     let patterns = calculator.detect_patterns(&score, &flags, &config);
 
     println!("\n=== Strategic Drift Detection ===");
-    println!("strategic_alignment = {:.2} (below WARNING 0.55)", score.strategic_alignment);
+    println!(
+        "strategic_alignment = {:.2} (below WARNING 0.55)",
+        score.strategic_alignment
+    );
     for p in &patterns {
-        println!(
-            "pattern = {:?}, severity = {}",
-            p.pattern_type, p.severity
-        );
+        println!("pattern = {:?}, severity = {}", p.pattern_type, p.severity);
     }
 
     let has_drift = patterns
         .iter()
         .any(|p| p.pattern_type == PatternType::StrategicDrift);
-    assert!(has_drift, "Should detect StrategicDrift pattern when strategic_alignment ({:.2}) < WARNING (0.55)", score.strategic_alignment);
+    assert!(
+        has_drift,
+        "Should detect StrategicDrift pattern when strategic_alignment ({:.2}) < WARNING (0.55)",
+        score.strategic_alignment
+    );
     println!("[VERIFIED] detect_patterns identifies StrategicDrift");
 }

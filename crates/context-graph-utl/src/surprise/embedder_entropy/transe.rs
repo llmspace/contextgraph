@@ -221,12 +221,7 @@ impl TransEEntropy {
 }
 
 impl EmbedderEntropy for TransEEntropy {
-    fn compute_delta_s(
-        &self,
-        current: &[f32],
-        history: &[Vec<f32>],
-        k: usize,
-    ) -> UtlResult<f32> {
+    fn compute_delta_s(&self, current: &[f32], history: &[Vec<f32>], k: usize) -> UtlResult<f32> {
         // Validate input: empty current is an error per spec
         if current.is_empty() {
             return Err(UtlError::EmptyInput);
@@ -366,7 +361,10 @@ mod tests {
         assert!(result.is_ok());
         let delta_s = result.unwrap();
 
-        println!("AFTER: delta_s = {} (expected < 0.5 for perfect translation)", delta_s);
+        println!(
+            "AFTER: delta_s = {} (expected < 0.5 for perfect translation)",
+            delta_s
+        );
         assert!(
             delta_s < 0.5,
             "Perfect translation should have low surprise, got {}",
@@ -552,10 +550,7 @@ mod tests {
         let delta_s_l1 = result_l1.unwrap();
         let delta_s_l2 = result_l2.unwrap();
 
-        println!(
-            "L1 delta_s = {}, L2 delta_s = {}",
-            delta_s_l1, delta_s_l2
-        );
+        println!("L1 delta_s = {}, L2 delta_s = {}", delta_s_l1, delta_s_l2);
 
         // Both should be valid, but may differ
         assert!((0.0..=1.0).contains(&delta_s_l1));
@@ -662,10 +657,7 @@ mod tests {
             calculator.running_variance, 0.1,
             "running_variance should reset to 0.1"
         );
-        assert_eq!(
-            calculator.sample_count, 0,
-            "sample_count should reset to 0"
-        );
+        assert_eq!(calculator.sample_count, 0, "sample_count should reset to 0");
 
         println!("[PASS] test_transe_reset - State cleared properly");
     }

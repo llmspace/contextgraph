@@ -21,7 +21,9 @@ use tracing::debug;
 
 use super::bayesian_optimizer::{EscalationHandler, EscalationManager, EscalationStatus};
 use super::event_log::{EventLogQuery, EventLogStats, MetaLearningEventLog, MetaLearningLogger};
-use super::lambda_correction::{AdaptiveLambdaWeights, SelfCorrectingLambda, ACH_BASELINE, ACH_MAX};
+use super::lambda_correction::{
+    AdaptiveLambdaWeights, SelfCorrectingLambda, ACH_BASELINE, ACH_MAX,
+};
 use super::types::{Domain, LambdaAdjustment, MetaLearningEvent, SelfCorrectionConfig};
 
 /// Number of embedders in the system.
@@ -425,7 +427,9 @@ impl MetaLearningService {
             }
 
             // Apply gradient adjustment
-            let adjustment = self.adaptive_weights.adjust_lambdas(synthetic_error, ach_level);
+            let adjustment = self
+                .adaptive_weights
+                .adjust_lambdas(synthetic_error, ach_level);
 
             if let Some(adj) = adjustment {
                 let new_weights = self.current_lambdas();

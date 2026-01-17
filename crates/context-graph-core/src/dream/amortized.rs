@@ -223,7 +223,10 @@ impl std::fmt::Debug for AmortizedLearner {
             .field("min_hops", &self.min_hops)
             .field("min_traversals", &self.min_traversals)
             .field("confidence_threshold", &self.confidence_threshold)
-            .field("shortcuts_created_this_cycle", &self.shortcuts_created_this_cycle)
+            .field(
+                "shortcuts_created_this_cycle",
+                &self.shortcuts_created_this_cycle,
+            )
             .field("total_shortcuts_created", &self.total_shortcuts_created)
             .field("edge_creator", &self.edge_creator.is_some())
             .finish()
@@ -823,7 +826,10 @@ mod tests {
         };
 
         let edge = ShortcutEdge::from_candidate(&candidate);
-        assert!(edge.is_shortcut, "ShortcutEdge.is_shortcut must always be true");
+        assert!(
+            edge.is_shortcut,
+            "ShortcutEdge.is_shortcut must always be true"
+        );
     }
 
     #[test]
@@ -920,7 +926,10 @@ mod tests {
 
         // Must fail when no EdgeCreator is set - no backwards compatibility
         let result = learner.create_shortcut(&candidate);
-        assert!(result.is_err(), "Shortcut creation MUST fail without EdgeCreator");
+        assert!(
+            result.is_err(),
+            "Shortcut creation MUST fail without EdgeCreator"
+        );
 
         let err = result.unwrap_err();
         let err_msg = format!("{}", err);
@@ -931,7 +940,10 @@ mod tests {
         );
 
         // Counter should NOT be incremented on failure
-        assert_eq!(learner.shortcuts_created_this_cycle, 0, "Counter must not increment on error");
+        assert_eq!(
+            learner.shortcuts_created_this_cycle, 0,
+            "Counter must not increment on error"
+        );
     }
 
     /// Edge creator that returns false (edge already exists)
@@ -961,7 +973,10 @@ mod tests {
         // Should return false when creator returns false
         let result = learner.create_shortcut(&candidate).unwrap();
         assert!(!result, "Should return false when creator returns false");
-        assert_eq!(learner.shortcuts_created_this_cycle, 0, "Counter should not increment");
+        assert_eq!(
+            learner.shortcuts_created_this_cycle, 0,
+            "Counter should not increment"
+        );
     }
 
     /// Edge creator that returns an error
@@ -969,7 +984,9 @@ mod tests {
 
     impl EdgeCreator for FailingEdgeCreator {
         fn create_edge(&self, _edge: &ShortcutEdge) -> CoreResult<bool> {
-            Err(crate::error::CoreError::Internal("Edge creation failed".into()))
+            Err(crate::error::CoreError::Internal(
+                "Edge creation failed".into(),
+            ))
         }
     }
 
@@ -1013,7 +1030,10 @@ mod tests {
         assert!(!result, "Should fail quality gate");
 
         let edges = creator.get_created_edges();
-        assert!(edges.is_empty(), "Creator should NOT be called for failed quality gate");
+        assert!(
+            edges.is_empty(),
+            "Creator should NOT be called for failed quality gate"
+        );
     }
 
     #[test]

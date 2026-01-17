@@ -23,13 +23,13 @@
 //! - `manager`: Core ProfileManager implementation
 //! - `tests`: Comprehensive test suite
 
-mod types;
 pub mod builtin;
 mod manager;
+mod types;
 
 #[cfg(test)]
 mod tests;
 
 // Re-export all public types for backwards compatibility
-pub use self::types::{ProfileManagerConfig, ProfileMatch, ProfileStats};
 pub use self::manager::ProfileManager;
+pub use self::types::{ProfileManagerConfig, ProfileMatch, ProfileStats};

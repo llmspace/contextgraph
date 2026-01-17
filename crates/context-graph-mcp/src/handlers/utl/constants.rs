@@ -11,19 +11,19 @@ use context_graph_core::johari::NUM_EMBEDDERS;
 /// CANONICAL SOURCE: `Embedder::name()` in `context-graph-core/src/teleological/embedder.rs`
 /// These names MUST match exactly. See TASK-FIX-003 for rationale.
 pub(super) const EMBEDDER_NAMES: [&str; NUM_EMBEDDERS] = [
-    "E1_Semantic",          // E1
-    "E2_Temporal_Recent",   // E2
-    "E3_Temporal_Periodic", // E3
+    "E1_Semantic",            // E1
+    "E2_Temporal_Recent",     // E2
+    "E3_Temporal_Periodic",   // E3
     "E4_Temporal_Positional", // E4
-    "E5_Causal",            // E5
-    "E6_Sparse_Lexical",    // E6
-    "E7_Code",              // E7
-    "E8_Emotional",         // E8
-    "E9_HDC",               // E9
-    "E10_Multimodal",       // E10
-    "E11_Entity",           // E11
-    "E12_Late_Interaction", // E12
-    "E13_SPLADE",           // E13
+    "E5_Causal",              // E5
+    "E6_Sparse_Lexical",      // E6
+    "E7_Code",                // E7
+    "E8_Emotional",           // E8
+    "E9_HDC",                 // E9
+    "E10_Multimodal",         // E10
+    "E11_Entity",             // E11
+    "E12_Late_Interaction",   // E12
+    "E13_SPLADE",             // E13
 ];
 
 /// Constitution.yaml targets (hardcoded per TASK-S005 spec).
@@ -34,5 +34,5 @@ pub(super) const FALSE_POSITIVE_TARGET: f32 = 0.02;
 
 /// ΔC formula weights per constitution.yaml line 166.
 pub(super) const ALPHA: f32 = 0.4; // Connectivity weight
-pub(super) const BETA: f32 = 0.4;  // ClusterFit weight
+pub(super) const BETA: f32 = 0.4; // ClusterFit weight
 pub(super) const GAMMA: f32 = 0.2; // Consistency weight

@@ -1,8 +1,8 @@
 //! Causal inference tool definitions.
 //! TASK-CAUSAL-001: Omni-directional causal inference.
 
-use serde_json::json;
 use crate::tools::types::ToolDefinition;
+use serde_json::json;
 
 /// Returns Causal tool definitions (1 tool).
 pub fn definitions() -> Vec<ToolDefinition> {

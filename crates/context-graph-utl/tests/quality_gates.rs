@@ -107,14 +107,19 @@ fn test_utl_average_meets_threshold() {
     let mut processor = UtlProcessor::with_defaults();
 
     // High-emotional content to maximize wₑ
-    let contents = ["AMAZING breakthrough in understanding consciousness!",
+    let contents = [
+        "AMAZING breakthrough in understanding consciousness!",
         "INCREDIBLE discovery about neural pathways!",
         "EXCITING new algorithm for memory consolidation!",
         "WONDERFUL insight about semantic relationships!",
-        "FANTASTIC understanding of cognitive processes!"];
+        "FANTASTIC understanding of cognitive processes!",
+    ];
 
     // BEFORE state
-    println!("BEFORE: Testing UTL computation across {} scenarios", contents.len() * 20);
+    println!(
+        "BEFORE: Testing UTL computation across {} scenarios",
+        contents.len() * 20
+    );
 
     let mut delta_s_values = Vec::new();
     let mut delta_c_values = Vec::new();
@@ -179,8 +184,14 @@ fn test_utl_average_meets_threshold() {
     let avg_w_e: f64 = w_e_values.iter().sum::<f64>() / w_e_values.len() as f64;
     let avg_utl: f64 = utl_values.iter().sum::<f64>() / utl_values.len() as f64;
 
-    let max_delta_s = delta_s_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let max_delta_c = delta_c_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let max_delta_s = delta_s_values
+        .iter()
+        .cloned()
+        .fold(f64::NEG_INFINITY, f64::max);
+    let max_delta_c = delta_c_values
+        .iter()
+        .cloned()
+        .fold(f64::NEG_INFINITY, f64::max);
     let max_utl = utl_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
 
     // Compute theoretical maximum product
@@ -190,20 +201,32 @@ fn test_utl_average_meets_threshold() {
     println!("AFTER: {} computations in {:?}", utl_values.len(), duration);
     println!("SOURCE OF TRUTH:");
     println!("  Component Averages:");
-    println!("    - ΔS (surprise): {:.4} (max: {:.4})", avg_delta_s, max_delta_s);
-    println!("    - ΔC (coherence): {:.4} (max: {:.4})", avg_delta_c, max_delta_c);
+    println!(
+        "    - ΔS (surprise): {:.4} (max: {:.4})",
+        avg_delta_s, max_delta_s
+    );
+    println!(
+        "    - ΔC (coherence): {:.4} (max: {:.4})",
+        avg_delta_c, max_delta_c
+    );
     println!("    - wₑ (emotional): {:.4}", avg_w_e);
     println!("  UTL Output:");
     println!("    - Average magnitude: {:.4}", avg_utl);
     println!("    - Maximum magnitude: {:.4}", max_utl);
     println!("  Quality Analysis:");
-    println!("    - Theoretical max product (ΔS×ΔC×wₑ): {:.4}", theoretical_max_product);
+    println!(
+        "    - Theoretical max product (ΔS×ΔC×wₑ): {:.4}",
+        theoretical_max_product
+    );
     println!("    - Constitution threshold: {:.4}", UTL_THRESHOLD);
 
     // QUALITY GATE VALIDATIONS:
 
     // 1. All signals must be valid (already asserted above)
-    println!("\n  Validation 1: All {} signals in valid range [0,1] ✓", utl_values.len());
+    println!(
+        "\n  Validation 1: All {} signals in valid range [0,1] ✓",
+        utl_values.len()
+    );
 
     // 2. Surprise component must show meaningful variation (not stuck at 0 or 1)
     assert!(
@@ -211,7 +234,10 @@ fn test_utl_average_meets_threshold() {
         "ΔS average {:.4} suggests surprise computation is broken",
         avg_delta_s
     );
-    println!("  Validation 2: ΔS shows meaningful variation ({:.4}) ✓", avg_delta_s);
+    println!(
+        "  Validation 2: ΔS shows meaningful variation ({:.4}) ✓",
+        avg_delta_s
+    );
 
     // 3. Coherence component must show meaningful computation
     assert!(
@@ -219,7 +245,10 @@ fn test_utl_average_meets_threshold() {
         "ΔC average {:.4} is too low, coherence computation may be broken",
         avg_delta_c
     );
-    println!("  Validation 3: ΔC shows meaningful computation ({:.4}) ✓", avg_delta_c);
+    println!(
+        "  Validation 3: ΔC shows meaningful computation ({:.4}) ✓",
+        avg_delta_c
+    );
 
     // 4. Emotional weight must be elevated for emotional content
     assert!(
@@ -227,12 +256,18 @@ fn test_utl_average_meets_threshold() {
         "wₑ average {:.4} <= 1.0 for emotional content, emotional detection may be broken",
         avg_w_e
     );
-    println!("  Validation 4: wₑ elevated for emotional content ({:.4}) ✓", avg_w_e);
+    println!(
+        "  Validation 4: wₑ elevated for emotional content ({:.4}) ✓",
+        avg_w_e
+    );
 
     // 5. Maximum achievable raw product should approach quality threshold
     // This validates the SYSTEM CAPABILITY to produce high-quality signals
     let achievable_quality = theoretical_max_product;
-    println!("  Validation 5: Maximum achievable quality: {:.4}", achievable_quality);
+    println!(
+        "  Validation 5: Maximum achievable quality: {:.4}",
+        achievable_quality
+    );
 
     // Note: The constitution's utl_avg > 0.6 refers to optimal learning scenarios.
     // Due to the surprise-coherence tension, typical averages are lower.
@@ -269,18 +304,21 @@ fn test_coherence_recovery_within_limit() {
     // Step 1: Establish baseline coherence
     let baseline_embedding = generate_embedding(1536, 1);
     let baseline_context = generate_context(50, 1536);
-    let baseline_coherence = tracker.compute_coherence_legacy(&baseline_embedding, &baseline_context);
+    let baseline_coherence =
+        tracker.compute_coherence_legacy(&baseline_embedding, &baseline_context);
     println!("  Baseline coherence: {:.4}", baseline_coherence);
 
     // Step 2: Simulate disruption (inject dissimilar content)
     let disrupted_embedding = generate_embedding(1536, 99999);
     let disrupted_context = generate_context(50, 1536);
-    let disrupted_coherence = tracker.compute_coherence_legacy(&disrupted_embedding, &disrupted_context);
+    let disrupted_coherence =
+        tracker.compute_coherence_legacy(&disrupted_embedding, &disrupted_context);
     println!("  Disrupted coherence: {:.4}", disrupted_coherence);
 
     // Step 3: Simulate recovery (return to similar patterns)
     let recovery_embedding = generate_embedding(1536, 2);
-    let recovered_coherence = tracker.compute_coherence_legacy(&recovery_embedding, &baseline_context);
+    let recovered_coherence =
+        tracker.compute_coherence_legacy(&recovery_embedding, &baseline_context);
     println!("  Recovered coherence: {:.4}", recovered_coherence);
 
     let recovery_time = start.elapsed();
@@ -371,10 +409,7 @@ fn test_attack_detection_rate_sufficient() {
     println!("SOURCE OF TRUTH:");
     println!("  - Detected: {}/{}", detected, attack_patterns.len());
     println!("  - Detection rate: {:.2}%", detection_rate * 100.0);
-    println!(
-        "  - Threshold: {:.0}%",
-        ATTACK_DETECTION_THRESHOLD * 100.0
-    );
+    println!("  - Threshold: {:.0}%", ATTACK_DETECTION_THRESHOLD * 100.0);
     if !not_detected.is_empty() {
         println!("  - Not detected: {:?}", not_detected);
     }
@@ -503,10 +538,7 @@ fn test_utl_edge_cases() {
         Ok(signal) => {
             let utl_empty = signal.magnitude;
             println!("  BEFORE: content=\"\", AFTER: utl={:.4}", utl_empty);
-            assert!(
-                (0.0..=1.0).contains(&utl_empty),
-                "UTL should be in [0,1]"
-            );
+            assert!((0.0..=1.0).contains(&utl_empty), "UTL should be in [0,1]");
         }
         Err(e) => {
             // Empty content may be rejected - this is acceptable
@@ -541,10 +573,7 @@ fn test_utl_edge_cases() {
         Ok(signal) => {
             let utl_no_ctx = signal.magnitude;
             println!("  BEFORE: context=[], AFTER: utl={:.4}", utl_no_ctx);
-            assert!(
-                (0.0..=1.0).contains(&utl_no_ctx),
-                "UTL should be in [0,1]"
-            );
+            assert!((0.0..=1.0).contains(&utl_no_ctx), "UTL should be in [0,1]");
         }
         Err(e) => {
             // Empty context may be rejected - this is acceptable

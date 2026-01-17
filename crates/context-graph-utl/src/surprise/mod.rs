@@ -31,8 +31,8 @@
 //! ```
 
 mod calculator;
-mod embedding_distance;
 pub mod embedder_entropy;
+mod embedding_distance;
 mod kl_divergence;
 
 pub use calculator::SurpriseCalculator;

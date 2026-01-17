@@ -27,12 +27,12 @@
 //! - `rocksdb_integration` - RocksDB integration tests
 //! - `real_embedding_fsv` - Real GPU embedding FSV tests (feature-gated: cuda)
 
-mod helpers;
 mod core_verification;
-mod search_verification;
 mod edge_cases;
 mod evidence_log;
+mod helpers;
 mod rocksdb_integration;
+mod search_verification;
 
 #[cfg(feature = "cuda")]
 mod real_embedding_fsv;

@@ -4,8 +4,8 @@
 //! TASK-38: Identity continuity focused tool.
 //! TASK-39: Kuramoto state with stepper status tool.
 
-use serde_json::json;
 use crate::tools::types::ToolDefinition;
+use serde_json::json;
 
 /// Returns GWT tool definitions (9 tools).
 pub fn definitions() -> Vec<ToolDefinition> {

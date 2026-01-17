@@ -56,7 +56,7 @@ async fn test_search_returns_correct_results() {
         include_deleted: false,
         johari_quadrant_filter: None,
         embedder_indices: vec![],
-        semantic_query: None, // No semantic query for this test
+        semantic_query: None,   // No semantic query for this test
         include_content: false, // TASK-CONTENT-005
     };
 

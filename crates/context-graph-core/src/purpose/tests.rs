@@ -108,12 +108,7 @@ fn test_full_hierarchy_construction() {
     hierarchy.add_goal(strategic2).unwrap();
 
     // Add Tactical goal under Strategic 1
-    let tactical1 = create_child_goal(
-        "Learn deep learning",
-        GoalLevel::Tactical,
-        strat1_id,
-        0.6,
-    );
+    let tactical1 = create_child_goal("Learn deep learning", GoalLevel::Tactical, strat1_id, 0.6);
     let tact1_id = tactical1.id;
     hierarchy.add_goal(tactical1).unwrap();
 
@@ -149,7 +144,10 @@ fn test_hierarchy_validation_multiple_strategic_goals_allowed() {
     let result = hierarchy.add_goal(s2);
 
     // ARCH-03: Multiple Strategic goals are now allowed
-    assert!(result.is_ok(), "Multiple Strategic goals should be allowed per ARCH-03");
+    assert!(
+        result.is_ok(),
+        "Multiple Strategic goals should be allowed per ARCH-03"
+    );
     assert_eq!(hierarchy.top_level_goals().len(), 2);
     println!("[VERIFIED] Multiple Strategic goals allowed (ARCH-03)");
 }

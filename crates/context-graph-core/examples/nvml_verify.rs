@@ -35,13 +35,18 @@ fn main() {
 
     // Step 2: Query utilization
     println!("\n[2] Querying GPU utilization...");
-    let our_util = monitor.get_utilization().expect("Failed to get utilization");
+    let our_util = monitor
+        .get_utilization()
+        .expect("Failed to get utilization");
     println!("   Our implementation: {:.1}%", our_util * 100.0);
 
     // Step 3: Compare with nvidia-smi
     println!("\n[3] Comparing with nvidia-smi...");
     let output = Command::new("nvidia-smi")
-        .args(["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"])
+        .args([
+            "--query-gpu=utilization.gpu",
+            "--format=csv,noheader,nounits",
+        ])
         .output()
         .expect("Failed to run nvidia-smi");
 
@@ -66,7 +71,10 @@ fn main() {
         if diff < 20.0 {
             println!("   ✓ Values within tolerance (diff: {:.1}%)", diff);
         } else {
-            println!("   ! Values differ by {:.1}% (GPU utilization fluctuates)", diff);
+            println!(
+                "   ! Values differ by {:.1}% (GPU utilization fluctuates)",
+                diff
+            );
         }
     }
 

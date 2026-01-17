@@ -375,7 +375,8 @@ mod tests {
             "Zero delta should not change value"
         );
         assert_eq!(
-            modulator.level().last_trigger, initial_trigger,
+            modulator.level().last_trigger,
+            initial_trigger,
             "Zero delta should not update last_trigger"
         );
     }

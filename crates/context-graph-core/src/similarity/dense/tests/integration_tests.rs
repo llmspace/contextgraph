@@ -37,7 +37,9 @@ fn test_high_dimensional_512() {
 fn test_high_dimensional_768() {
     // Simulate E5/E10_DIM = 768
     let a: Vec<f32> = (0..768).map(|i| (i as f32) * 0.001 + 0.1).collect();
-    let b: Vec<f32> = (0..768).map(|i| ((i as f32) * 0.001).tan().clamp(-10.0, 10.0)).collect();
+    let b: Vec<f32> = (0..768)
+        .map(|i| ((i as f32) * 0.001).tan().clamp(-10.0, 10.0))
+        .collect();
     let sim = cosine_similarity(&a, &b).unwrap();
     assert!((-1.0..=1.0).contains(&sim));
     assert!(!sim.is_nan() && !sim.is_infinite());
@@ -48,7 +50,9 @@ fn test_high_dimensional_768() {
 fn test_high_dimensional_1536() {
     // Simulate E7_DIM = 1536
     let a: Vec<f32> = (0..1536).map(|i| (i as f32) * 0.0005).collect();
-    let b: Vec<f32> = (0..1536).map(|i| ((i as f32) * 0.0005).exp().min(10.0)).collect();
+    let b: Vec<f32> = (0..1536)
+        .map(|i| ((i as f32) * 0.0005).exp().min(10.0))
+        .collect();
     let sim = cosine_similarity(&a, &b).unwrap();
     assert!((-1.0..=1.0).contains(&sim));
     assert!(!sim.is_nan() && !sim.is_infinite());

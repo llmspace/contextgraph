@@ -48,14 +48,12 @@ pub struct SurpriseConfig {
 
     // === Per-Embedder Entropy Configuration ===
     // These fields configure specialized entropy methods per constitution.yaml delta_sc.ΔS_methods
-
     /// Number of nearest neighbors for KNN-based entropy methods.
     /// Used by: DefaultKnnEntropy, AsymmetricKnnEntropy
     /// Range: `[1, 100]`
     pub k_neighbors: usize,
 
     // --- GMM Mahalanobis (E1 Semantic) ---
-
     /// Number of GMM components for semantic entropy.
     /// Range: `[1, 20]`
     pub gmm_n_components: usize,
@@ -65,7 +63,6 @@ pub struct SurpriseConfig {
     pub gmm_regularization: f32,
 
     // --- Asymmetric KNN (E5 Causal) ---
-
     /// Direction modifier for cause→effect relationships.
     /// Higher values increase surprise for forward causal queries.
     /// Range: `[0.5, 2.0]`
@@ -77,7 +74,6 @@ pub struct SurpriseConfig {
     pub causal_effect_to_cause_mod: f32,
 
     // --- Hamming Prototype (E9 HDC) ---
-
     /// Maximum number of prototypes for HDC entropy.
     /// Range: `[10, 1000]`
     pub hdc_max_prototypes: usize,
@@ -87,7 +83,6 @@ pub struct SurpriseConfig {
     pub hdc_binarization_threshold: f32,
 
     // --- Jaccard Active (E13 SPLADE) ---
-
     /// Activation threshold for SPLADE active dimensions.
     /// Values above this threshold are considered "active".
     /// Range: `[0.0, 0.1]`
@@ -98,7 +93,6 @@ pub struct SurpriseConfig {
     pub splade_smoothing: f32,
 
     // --- Hybrid GMM+KNN (E7 Code) ---
-
     /// GMM component weight for Code entropy.
     /// Constitution: 0.5 (GMM+KNN hybrid uses equal weights)
     /// Range: `[0.0, 1.0]`
@@ -118,7 +112,6 @@ pub struct SurpriseConfig {
     pub code_k_neighbors: usize,
 
     // --- Cross-Modal (E10 Multimodal) ---
-
     /// Weight for intra-modal comparisons (same modality).
     /// Constitution: 0.7 (prefer same-modality similarity)
     /// Range: `[0.0, 1.0]`
@@ -134,7 +127,6 @@ pub struct SurpriseConfig {
     pub multimodal_k_neighbors: usize,
 
     // --- TransE (E11 Entity) ---
-
     /// L-norm for TransE distance (1 = L1, 2 = L2).
     /// Default: 2 (L2 per original TransE paper)
     /// Range: `[1, 2]`
@@ -150,7 +142,6 @@ pub struct SurpriseConfig {
     pub entity_k_neighbors: usize,
 
     // --- MaxSim Token (E12 LateInteraction) ---
-
     /// Token dimension for E12 late interaction embeddings.
     /// Constitution: 128D per token (ColBERT standard)
     /// Range: `[64, 256]`
@@ -181,8 +172,8 @@ impl Default for SurpriseConfig {
             k_neighbors: 5,
             gmm_n_components: 3,
             gmm_regularization: 1e-6,
-            causal_cause_to_effect_mod: 1.2,  // constitution.yaml: cause_to_effect=1.2
-            causal_effect_to_cause_mod: 0.8,  // constitution.yaml: effect_to_cause=0.8
+            causal_cause_to_effect_mod: 1.2, // constitution.yaml: cause_to_effect=1.2
+            causal_effect_to_cause_mod: 0.8, // constitution.yaml: effect_to_cause=0.8
             hdc_max_prototypes: 100,
             hdc_binarization_threshold: 0.5,
             splade_activation_threshold: 0.0,

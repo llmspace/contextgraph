@@ -6,7 +6,7 @@
 //! - File format versioning for compatibility
 
 use super::types::{
-    CODEBOOK_MAGIC, CODEBOOK_VERSION, NUM_CENTROIDS, NUM_SUBVECTORS, PQ8QuantizationError,
+    PQ8QuantizationError, CODEBOOK_MAGIC, CODEBOOK_VERSION, NUM_CENTROIDS, NUM_SUBVECTORS,
 };
 use crate::quantization::types::PQ8Codebook;
 use std::fs::File;
@@ -67,11 +67,9 @@ impl PQ8Codebook {
             }
         }
 
-        writer
-            .flush()
-            .map_err(|e| PQ8QuantizationError::IoError {
-                message: format!("Failed to flush codebook file: {}", e),
-            })?;
+        writer.flush().map_err(|e| PQ8QuantizationError::IoError {
+            message: format!("Failed to flush codebook file: {}", e),
+        })?;
 
         info!(
             target: "quantization::pq8",

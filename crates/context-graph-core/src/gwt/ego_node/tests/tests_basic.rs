@@ -9,9 +9,7 @@ use crate::types::fingerprint::{
     JohariFingerprint, PurposeVector, SemanticFingerprint, TeleologicalFingerprint,
 };
 
-use super::super::{
-    IdentityContinuity, IdentityStatus, SelfAwarenessLoop, SelfEgoNode,
-};
+use super::super::{IdentityContinuity, IdentityStatus, SelfAwarenessLoop, SelfEgoNode};
 
 #[test]
 fn test_self_ego_node_creation() {
@@ -188,9 +186,14 @@ fn create_test_fingerprint(alignments: [f32; 13]) -> TeleologicalFingerprint {
 #[test]
 fn test_update_from_fingerprint_copies_purpose_vector() {
     let mut ego = SelfEgoNode::new();
-    assert_eq!(ego.purpose_vector, [0.0; 13], "Initial purpose_vector should be zeros");
+    assert_eq!(
+        ego.purpose_vector, [0.0; 13],
+        "Initial purpose_vector should be zeros"
+    );
 
-    let alignments = [0.8, 0.75, 0.9, 0.6, 0.7, 0.65, 0.85, 0.72, 0.78, 0.68, 0.82, 0.71, 0.76];
+    let alignments = [
+        0.8, 0.75, 0.9, 0.6, 0.7, 0.65, 0.85, 0.72, 0.78, 0.68, 0.82, 0.71, 0.76,
+    ];
     let fingerprint = create_test_fingerprint(alignments);
 
     ego.update_from_fingerprint(&fingerprint).unwrap();
@@ -204,7 +207,10 @@ fn test_update_from_fingerprint_copies_purpose_vector() {
 #[test]
 fn test_update_from_fingerprint_updates_coherence() {
     let mut ego = SelfEgoNode::new();
-    assert_eq!(ego.coherence_with_actions, 0.0, "Initial coherence should be 0.0");
+    assert_eq!(
+        ego.coherence_with_actions, 0.0,
+        "Initial coherence should be 0.0"
+    );
 
     let alignments = [0.8; 13]; // Uniform = coherence = 1.0
     let fingerprint = create_test_fingerprint(alignments);
@@ -221,7 +227,10 @@ fn test_update_from_fingerprint_updates_coherence() {
 #[test]
 fn test_update_from_fingerprint_stores_fingerprint() {
     let mut ego = SelfEgoNode::new();
-    assert!(ego.fingerprint.is_none(), "Initial fingerprint should be None");
+    assert!(
+        ego.fingerprint.is_none(),
+        "Initial fingerprint should be None"
+    );
 
     let alignments = [0.5; 13];
     let fingerprint = create_test_fingerprint(alignments);
@@ -229,7 +238,10 @@ fn test_update_from_fingerprint_stores_fingerprint() {
 
     ego.update_from_fingerprint(&fingerprint).unwrap();
 
-    assert!(ego.fingerprint.is_some(), "Fingerprint must be stored after update");
+    assert!(
+        ego.fingerprint.is_some(),
+        "Fingerprint must be stored after update"
+    );
     assert_eq!(
         ego.fingerprint.as_ref().unwrap().id,
         fingerprint_id,

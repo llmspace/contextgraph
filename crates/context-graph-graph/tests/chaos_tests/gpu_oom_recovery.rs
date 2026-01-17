@@ -181,11 +181,7 @@ fn test_gpu_cascading_oom_prevention() {
         .unwrap_or(0);
 
     assert_eq!(faiss_usage, 2 * 1024 * 1024, "FaissIndex should be 2MB");
-    assert_eq!(
-        working_usage,
-        1024 * 1024,
-        "WorkingMemory should be 1MB"
-    );
+    assert_eq!(working_usage, 1024 * 1024, "WorkingMemory should be 1MB");
 
     drop(h1);
     drop(h2);
@@ -206,10 +202,7 @@ fn test_gpu_oom_error_propagation() {
     let manager =
         GpuMemoryManager::new(GpuMemoryConfig::with_budget(100)).expect("Manager creation");
 
-    println!(
-        "BEFORE: budget={}, requesting 1000 bytes",
-        manager.budget()
-    );
+    println!("BEFORE: budget={}, requesting 1000 bytes", manager.budget());
 
     // TRIGGER: Request more than available
     let result = manager.allocate(1000, MemoryCategory::Other);

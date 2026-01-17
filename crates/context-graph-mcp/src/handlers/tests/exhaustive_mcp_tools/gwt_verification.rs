@@ -5,9 +5,9 @@
 
 use serde_json::json;
 
-use crate::handlers::tests::{create_test_handlers, create_test_handlers_with_warm_gwt};
-use super::helpers::{make_tool_call, assert_success, get_tool_data};
+use super::helpers::{assert_success, get_tool_data, make_tool_call};
 use super::synthetic_data;
+use crate::handlers::tests::{create_test_handlers, create_test_handlers_with_warm_gwt};
 
 /// Verify the consciousness equation C = I x R x D
 /// where I = Integration, R = Resonance (Kuramoto r), D = Differentiation
@@ -58,11 +58,7 @@ async fn test_kuramoto_13_embedder_alignment() {
     }
 
     if let Some(frequencies) = data.get("natural_frequencies").and_then(|v| v.as_array()) {
-        assert_eq!(
-            frequencies.len(),
-            13,
-            "Must have 13 natural frequencies"
-        );
+        assert_eq!(frequencies.len(), 13, "Must have 13 natural frequencies");
     }
 }
 
@@ -173,5 +169,8 @@ async fn test_utl_learning_metrics() {
     // All values in [0, 1]
     assert!((0.0..=1.0).contains(&entropy), "entropy in [0,1]");
     assert!((0.0..=1.0).contains(&coherence), "coherence in [0,1]");
-    assert!((0.0..=1.0).contains(&learning_score), "learning_score in [0,1]");
+    assert!(
+        (0.0..=1.0).contains(&learning_score),
+        "learning_score in [0,1]"
+    );
 }

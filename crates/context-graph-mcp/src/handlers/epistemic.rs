@@ -337,10 +337,7 @@ impl Handlers {
             success: true,
             action_type: EpistemicActionType::Retract,
             target: input.target.clone(),
-            message: format!(
-                "Belief retracted: {}",
-                truncate_target(&input.target)
-            ),
+            message: format!("Belief retracted: {}", truncate_target(&input.target)),
             belief_state: Some(BeliefState {
                 belief_id,
                 confidence: 0.0, // Retracted beliefs have 0 confidence
@@ -369,10 +366,7 @@ impl Handlers {
             }
         };
 
-        info!(
-            "QUERY target='{}'",
-            truncate_target(&input.target)
-        );
+        info!("QUERY target='{}'", truncate_target(&input.target));
 
         // Query returns whether belief exists
         // NOTE: Full implementation requires belief storage integration
@@ -503,23 +497,28 @@ mod tests {
     #[test]
     fn test_epistemic_action_type_deserialization() {
         let json = r#""assert""#;
-        let action: EpistemicActionType = serde_json::from_str(json).expect("Failed to deserialize assert");
+        let action: EpistemicActionType =
+            serde_json::from_str(json).expect("Failed to deserialize assert");
         assert_eq!(action, EpistemicActionType::Assert);
 
         let json = r#""hypothesize""#;
-        let action: EpistemicActionType = serde_json::from_str(json).expect("Failed to deserialize hypothesize");
+        let action: EpistemicActionType =
+            serde_json::from_str(json).expect("Failed to deserialize hypothesize");
         assert_eq!(action, EpistemicActionType::Hypothesize);
 
         let json = r#""retract""#;
-        let action: EpistemicActionType = serde_json::from_str(json).expect("Failed to deserialize retract");
+        let action: EpistemicActionType =
+            serde_json::from_str(json).expect("Failed to deserialize retract");
         assert_eq!(action, EpistemicActionType::Retract);
 
         let json = r#""query""#;
-        let action: EpistemicActionType = serde_json::from_str(json).expect("Failed to deserialize query");
+        let action: EpistemicActionType =
+            serde_json::from_str(json).expect("Failed to deserialize query");
         assert_eq!(action, EpistemicActionType::Query);
 
         let json = r#""verify""#;
-        let action: EpistemicActionType = serde_json::from_str(json).expect("Failed to deserialize verify");
+        let action: EpistemicActionType =
+            serde_json::from_str(json).expect("Failed to deserialize verify");
         assert_eq!(action, EpistemicActionType::Verify);
     }
 
@@ -531,7 +530,8 @@ mod tests {
             "confidence": 0.9,
             "rationale": "Visual observation"
         }"#;
-        let input: EpistemicActionInput = serde_json::from_str(json).expect("Failed to deserialize input");
+        let input: EpistemicActionInput =
+            serde_json::from_str(json).expect("Failed to deserialize input");
         assert_eq!(input.action_type, EpistemicActionType::Assert);
         assert_eq!(input.target, "The sky is blue");
         assert!((input.confidence - 0.9).abs() < f64::EPSILON);
@@ -545,18 +545,21 @@ mod tests {
             "target": "Test",
             "rationale": "Testing"
         }"#;
-        let input: EpistemicActionInput = serde_json::from_str(json).expect("Failed to deserialize input");
+        let input: EpistemicActionInput =
+            serde_json::from_str(json).expect("Failed to deserialize input");
         assert!((input.confidence - 0.5).abs() < f64::EPSILON); // Default value
     }
 
     #[test]
     fn test_uncertainty_type_deserialization() {
         let json = r#""epistemic""#;
-        let ut: UncertaintyType = serde_json::from_str(json).expect("Failed to deserialize epistemic");
+        let ut: UncertaintyType =
+            serde_json::from_str(json).expect("Failed to deserialize epistemic");
         assert_eq!(ut, UncertaintyType::Epistemic);
 
         let json = r#""aleatory""#;
-        let ut: UncertaintyType = serde_json::from_str(json).expect("Failed to deserialize aleatory");
+        let ut: UncertaintyType =
+            serde_json::from_str(json).expect("Failed to deserialize aleatory");
         assert_eq!(ut, UncertaintyType::Aleatory);
 
         let json = r#""mixed""#;
@@ -616,7 +619,8 @@ mod tests {
             "source_nodes": ["550e8400-e29b-41d4-a716-446655440000"],
             "uncertainty_type": "epistemic"
         }"#;
-        let ctx: EpistemicContext = serde_json::from_str(json).expect("Failed to deserialize context");
+        let ctx: EpistemicContext =
+            serde_json::from_str(json).expect("Failed to deserialize context");
         assert_eq!(ctx.source_nodes.len(), 1);
         assert_eq!(ctx.uncertainty_type, Some(UncertaintyType::Epistemic));
     }
@@ -633,7 +637,8 @@ mod tests {
                 "uncertainty_type": "epistemic"
             }
         }"#;
-        let input: EpistemicActionInput = serde_json::from_str(json).expect("Failed to deserialize full input");
+        let input: EpistemicActionInput =
+            serde_json::from_str(json).expect("Failed to deserialize full input");
         assert_eq!(input.action_type, EpistemicActionType::Hypothesize);
         assert!(input.context.is_some());
         let ctx = input.context.as_ref().expect("Context should exist");
@@ -686,7 +691,9 @@ mod tests {
     #[test]
     fn test_workspace_state_snapshot_serialization() {
         let snapshot = WorkspaceStateSnapshot {
-            active_memory: Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("Valid UUID")),
+            active_memory: Some(
+                Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("Valid UUID"),
+            ),
             coherence_threshold: 0.8,
             is_broadcasting: true,
             has_conflict: false,
@@ -715,7 +722,9 @@ mod tests {
     fn test_query_result_serialization() {
         let result = QueryResult {
             found: true,
-            belief_id: Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").expect("Valid UUID")),
+            belief_id: Some(
+                Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").expect("Valid UUID"),
+            ),
             confidence: Some(0.9),
             status: Some(BeliefStatus::Verified),
             last_updated: Some("2026-01-13T12:00:00Z".to_string()),
@@ -735,7 +744,8 @@ mod tests {
             EpistemicActionType::Hypothesize,
             EpistemicActionType::Verify,
         ] {
-            let json = serde_json::to_string(&action_type).expect("Failed to serialize action type");
+            let json =
+                serde_json::to_string(&action_type).expect("Failed to serialize action type");
             assert!(!json.is_empty());
         }
     }

@@ -91,8 +91,7 @@ async fn test_get_ego_state_returns_valid_data() {
     assert!(
         status_valid,
         "[FSV] Invalid identity_status: {}, expected one containing {:?}",
-        status,
-        valid_statuses
+        status, valid_statuses
     );
 
     // FSV: Verify coherence_with_actions is in [0, 1]
@@ -182,7 +181,10 @@ async fn test_get_ego_state_warm_has_non_zero_purpose_vector() {
     );
 
     println!("[FSV] Phase 3 - get_ego_state WARM state verification PASSED");
-    println!("[FSV]   Non-zero purpose vector elements: {}/13", non_zero_count);
+    println!(
+        "[FSV]   Non-zero purpose vector elements: {}/13",
+        non_zero_count
+    );
 }
 
 // =============================================================================

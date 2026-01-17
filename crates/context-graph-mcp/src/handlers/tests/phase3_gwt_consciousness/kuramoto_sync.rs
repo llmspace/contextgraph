@@ -43,7 +43,10 @@ async fn test_get_kuramoto_sync_returns_13_oscillators() {
     let data = extract_mcp_tool_data(&result);
 
     // FSV: Verify r (order parameter) is in [0, 1]
-    let r = data.get("r").and_then(|v| v.as_f64()).expect("r must exist");
+    let r = data
+        .get("r")
+        .and_then(|v| v.as_f64())
+        .expect("r must exist");
     assert!(
         (0.0..=1.0).contains(&r),
         "[FSV] r must be in [0, 1], got {}",
@@ -58,7 +61,10 @@ async fn test_get_kuramoto_sync_returns_13_oscillators() {
     );
 
     // FSV: Verify psi (mean phase) is in [0, 2*PI] (allowing some tolerance)
-    let psi = data.get("psi").and_then(|v| v.as_f64()).expect("psi must exist");
+    let psi = data
+        .get("psi")
+        .and_then(|v| v.as_f64())
+        .expect("psi must exist");
     assert!(
         (0.0..=2.0 * std::f64::consts::PI + 0.01).contains(&psi),
         "[FSV] psi must be in [0, 2*PI], got {}",
@@ -146,7 +152,13 @@ async fn test_get_kuramoto_sync_returns_13_oscillators() {
         .get("state")
         .and_then(|v| v.as_str())
         .expect("state must exist");
-    let valid_states = ["DORMANT", "FRAGMENTED", "EMERGING", "CONSCIOUS", "HYPERSYNC"];
+    let valid_states = [
+        "DORMANT",
+        "FRAGMENTED",
+        "EMERGING",
+        "CONSCIOUS",
+        "HYPERSYNC",
+    ];
     assert!(
         valid_states.contains(&state),
         "[FSV] Invalid state: {}",
@@ -250,7 +262,10 @@ async fn test_adjust_coupling_modifies_k() {
         })),
     };
     let verify_response = handlers.dispatch(verify_request).await;
-    assert!(verify_response.error.is_none(), "Verify sync should succeed");
+    assert!(
+        verify_response.error.is_none(),
+        "Verify sync should succeed"
+    );
     let verify_data = extract_mcp_tool_data(&verify_response.result.unwrap());
     let persisted_k = verify_data
         .get("coupling")

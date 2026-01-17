@@ -34,7 +34,10 @@ async fn test_fail_fast_empty_query_content() {
     let result = response.result.expect("Must have result");
 
     // VERIFY: Should be isError=true with FAIL FAST message
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(is_error, "[FAIL] Empty query_content should trigger error");
     println!("[VERIFY] isError=true for empty content - PASS");
 
@@ -79,7 +82,10 @@ async fn test_fail_fast_invalid_uuid() {
     let result = response.result.expect("Must have result");
 
     // VERIFY: Should be isError=true with FAIL FAST message
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(is_error, "[FAIL] Invalid UUID should trigger error");
     println!("[VERIFY] isError=true for invalid UUID - PASS");
 
@@ -125,7 +131,10 @@ async fn test_fail_fast_no_query_provided() {
     let result = response.result.expect("Must have result");
 
     // VERIFY: Should be isError=true with FAIL FAST message
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(is_error, "[FAIL] Missing query should trigger error");
     println!("[VERIFY] isError=true for missing query - PASS");
 
@@ -133,7 +142,8 @@ async fn test_fail_fast_no_query_provided() {
         if let Some(first) = content.first() {
             if let Some(text) = first.get("text").and_then(|v| v.as_str()) {
                 let has_fail_fast = text.contains("FAIL FAST");
-                let mentions_params = text.contains("query_content") || text.contains("query_vector_id");
+                let mentions_params =
+                    text.contains("query_content") || text.contains("query_vector_id");
                 assert!(has_fail_fast, "[FAIL] Should mention FAIL FAST");
                 assert!(mentions_params, "[FAIL] Should mention required parameters");
                 println!("[VERIFY] FAIL FAST message mentions required params - PASS");

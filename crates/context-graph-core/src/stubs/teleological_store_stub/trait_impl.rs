@@ -56,9 +56,11 @@ impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
         let new_size = Self::estimate_fingerprint_size(&fingerprint);
         self.data.insert(id, fingerprint);
         if new_size > old_size {
-            self.size_bytes.fetch_add(new_size - old_size, Ordering::Relaxed);
+            self.size_bytes
+                .fetch_add(new_size - old_size, Ordering::Relaxed);
         } else {
-            self.size_bytes.fetch_sub(old_size - new_size, Ordering::Relaxed);
+            self.size_bytes
+                .fetch_sub(old_size - new_size, Ordering::Relaxed);
         }
         debug!("Updated fingerprint {}", id);
         Ok(true)
@@ -173,7 +175,9 @@ impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
 
     async fn checkpoint(&self) -> CoreResult<PathBuf> {
         warn!("Checkpoint requested but InMemoryTeleologicalStore does not persist data");
-        Err(CoreError::FeatureDisabled { feature: "checkpoint".to_string() })
+        Err(CoreError::FeatureDisabled {
+            feature: "checkpoint".to_string(),
+        })
     }
 
     async fn restore(&self, checkpoint_path: &Path) -> CoreResult<()> {
@@ -181,7 +185,9 @@ impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
             "Restore from {:?} requested but InMemoryTeleologicalStore does not persist data",
             checkpoint_path
         );
-        Err(CoreError::FeatureDisabled { feature: "restore".to_string() })
+        Err(CoreError::FeatureDisabled {
+            feature: "restore".to_string(),
+        })
     }
 
     async fn compact(&self) -> CoreResult<()> {
@@ -193,7 +199,10 @@ impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
             }
             self.deleted.remove(&id);
         }
-        info!("Compaction complete: removed {} soft-deleted entries", self.deleted.len());
+        info!(
+            "Compaction complete: removed {} soft-deleted entries",
+            self.deleted.len()
+        );
         Ok(())
     }
 
@@ -230,10 +239,7 @@ impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
         Ok(results)
     }
 
-    async fn list_all_johari(
-        &self,
-        limit: usize,
-    ) -> CoreResult<Vec<(Uuid, JohariFingerprint)>> {
+    async fn list_all_johari(&self, limit: usize) -> CoreResult<Vec<(Uuid, JohariFingerprint)>> {
         debug!("list_all_johari: limit={}", limit);
         let mut results = Vec::new();
         let deleted_ids: HashSet<Uuid> = self.deleted.iter().map(|r| *r.key()).collect();

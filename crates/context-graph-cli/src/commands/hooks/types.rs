@@ -183,13 +183,20 @@ mod tests {
             (HookEventType::SessionStart, 5000_u64, "session_start"),
             (HookEventType::PreToolUse, 100_u64, "pre_tool_use"),
             (HookEventType::PostToolUse, 3000_u64, "post_tool_use"),
-            (HookEventType::UserPromptSubmit, 2000_u64, "user_prompt_submit"),
+            (
+                HookEventType::UserPromptSubmit,
+                2000_u64,
+                "user_prompt_submit",
+            ),
             (HookEventType::SessionEnd, 30000_u64, "session_end"),
         ];
 
         for (hook, expected_timeout, name) in expected_timeouts {
             let actual = hook.timeout_ms();
-            println!("  {}: expected={}ms, actual={}ms", name, expected_timeout, actual);
+            println!(
+                "  {}: expected={}ms, actual={}ms",
+                name, expected_timeout, actual
+            );
             assert_eq!(
                 actual, expected_timeout,
                 "FAIL: {} timeout must be {}ms, got {}ms",
@@ -218,8 +225,8 @@ mod tests {
         ];
 
         for (hook, expected_json) in test_cases {
-            let actual_json = serde_json::to_string(&hook)
-                .expect("serialization MUST succeed - fail fast");
+            let actual_json =
+                serde_json::to_string(&hook).expect("serialization MUST succeed - fail fast");
             println!("  {:?} -> {}", hook, actual_json);
             assert_eq!(
                 actual_json, expected_json,
@@ -249,8 +256,8 @@ mod tests {
         ];
 
         for (json, expected_hook) in test_cases {
-            let actual_hook: HookEventType = serde_json::from_str(json)
-                .expect("deserialization MUST succeed - fail fast");
+            let actual_hook: HookEventType =
+                serde_json::from_str(json).expect("deserialization MUST succeed - fail fast");
             println!("  {} -> {:?}", json, actual_hook);
             assert_eq!(
                 actual_hook, expected_hook,
@@ -275,7 +282,8 @@ mod tests {
         println!("  Variant count: {}", all_variants.len());
 
         assert_eq!(
-            all_variants.len(), 5,
+            all_variants.len(),
+            5,
             "FAIL: Must have exactly 5 variants, got {}",
             all_variants.len()
         );
@@ -306,7 +314,7 @@ mod tests {
 
         let fast_path_expected = [
             (HookEventType::SessionStart, false),
-            (HookEventType::PreToolUse, true),  // ONLY fast path
+            (HookEventType::PreToolUse, true), // ONLY fast path
             (HookEventType::PostToolUse, false),
             (HookEventType::UserPromptSubmit, false),
             (HookEventType::SessionEnd, false),
@@ -316,7 +324,10 @@ mod tests {
             let actual_fast = hook.is_fast_path();
             println!(
                 "  {:?}: timeout={}ms, is_fast_path={} (expected={})",
-                hook, hook.timeout_ms(), actual_fast, expected_fast
+                hook,
+                hook.timeout_ms(),
+                actual_fast,
+                expected_fast
             );
             assert_eq!(
                 actual_fast, expected_fast,
@@ -338,8 +349,8 @@ mod tests {
         println!("SOURCE OF TRUTH: Rust type system requirements");
 
         let original = HookEventType::PreToolUse;
-        let copied = original;  // Copy
-        let cloned = original.clone();  // Clone
+        let copied = original; // Copy
+        let cloned = original.clone(); // Clone
 
         assert_eq!(original, copied, "FAIL: Copy must preserve value");
         assert_eq!(original, cloned, "FAIL: Clone must preserve value");
@@ -377,7 +388,10 @@ mod tests {
         );
 
         println!("  HashMap size: {}", map.len());
-        println!("  PreToolUse lookup: {:?}", map.get(&HookEventType::PreToolUse));
+        println!(
+            "  PreToolUse lookup: {:?}",
+            map.get(&HookEventType::PreToolUse)
+        );
         println!("RESULT: PASS - Hash trait works for HashMap");
     }
 
@@ -393,8 +407,14 @@ mod tests {
         let expected_commands = [
             (HookEventType::SessionStart, "session restore-identity"),
             (HookEventType::PreToolUse, "consciousness brief"),
-            (HookEventType::PostToolUse, "consciousness check-identity --auto-dream"),
-            (HookEventType::UserPromptSubmit, "consciousness inject-context --format standard"),
+            (
+                HookEventType::PostToolUse,
+                "consciousness check-identity --auto-dream",
+            ),
+            (
+                HookEventType::UserPromptSubmit,
+                "consciousness inject-context --format standard",
+            ),
             (HookEventType::SessionEnd, "session persist-identity"),
         ];
 
@@ -423,10 +443,7 @@ mod tests {
             let display = format!("{}", hook);
             let description = hook.description();
             println!("  {:?} displays as: \"{}\"", hook, display);
-            assert_eq!(
-                display, description,
-                "FAIL: Display must equal description"
-            );
+            assert_eq!(display, description, "FAIL: Display must equal description");
             assert!(!display.is_empty(), "FAIL: Display must not be empty");
         }
 
@@ -443,13 +460,13 @@ mod tests {
         println!("SOURCE OF TRUTH: NO BACKWARDS COMPATIBILITY requirement");
 
         let invalid_inputs = [
-            r#""SessionStart""#,      // PascalCase - INVALID
-            r#""sessionstart""#,      // lowercase no underscore - INVALID
-            r#""SESSIONSTART""#,      // UPPERCASE - INVALID
-            r#""session-start""#,     // kebab-case - INVALID
-            r#""unknown_hook""#,      // non-existent variant - INVALID
-            r#"0"#,                   // numeric - INVALID
-            r#"null"#,                // null - INVALID
+            r#""SessionStart""#,  // PascalCase - INVALID
+            r#""sessionstart""#,  // lowercase no underscore - INVALID
+            r#""SESSIONSTART""#,  // UPPERCASE - INVALID
+            r#""session-start""#, // kebab-case - INVALID
+            r#""unknown_hook""#,  // non-existent variant - INVALID
+            r#"0"#,               // numeric - INVALID
+            r#"null"#,            // null - INVALID
         ];
 
         for invalid in invalid_inputs {
@@ -1215,11 +1232,15 @@ mod hook_io_tests {
 
         for (value, expected, description) in boundary_tests {
             let actual = ICLevel::from_value(value);
-            println!("  {} ({}): expected={:?}, actual={:?}",
-                     description, value, expected, actual);
-            assert_eq!(actual, expected,
+            println!(
+                "  {} ({}): expected={:?}, actual={:?}",
+                description, value, expected, actual
+            );
+            assert_eq!(
+                actual, expected,
                 "FAIL: IC={} ({}) must be {:?}, got {:?}",
-                value, description, expected, actual);
+                value, description, expected, actual
+            );
         }
 
         println!("RESULT: PASS - All IC thresholds match constitution");
@@ -1242,11 +1263,14 @@ mod hook_io_tests {
         ];
 
         for (level, expected_json) in test_cases {
-            let json = serde_json::to_string(&level)
-                .expect("serialization MUST succeed - fail fast");
+            let json =
+                serde_json::to_string(&level).expect("serialization MUST succeed - fail fast");
             println!("  {:?} -> {}", level, json);
-            assert_eq!(json, expected_json,
-                "FAIL: {:?} must serialize to {}, got {}", level, expected_json, json);
+            assert_eq!(
+                json, expected_json,
+                "FAIL: {:?} must serialize to {}, got {}",
+                level, expected_json, json
+            );
         }
 
         println!("RESULT: PASS - ICLevel serializes to snake_case");
@@ -1268,11 +1292,14 @@ mod hook_io_tests {
         ];
 
         for (json, expected) in test_cases {
-            let actual: ICLevel = serde_json::from_str(json)
-                .expect("deserialization MUST succeed - fail fast");
+            let actual: ICLevel =
+                serde_json::from_str(json).expect("deserialization MUST succeed - fail fast");
             println!("  {} -> {:?}", json, actual);
-            assert_eq!(actual, expected,
-                "FAIL: {} must deserialize to {:?}, got {:?}", json, expected, actual);
+            assert_eq!(
+                actual, expected,
+                "FAIL: {} must deserialize to {:?}, got {:?}",
+                json, expected, actual
+            );
         }
 
         println!("RESULT: PASS - ICLevel deserializes from snake_case");
@@ -1292,10 +1319,22 @@ mod hook_io_tests {
         assert!(!ICLevel::Normal.is_crisis(), "Normal MUST NOT be crisis");
         assert!(!ICLevel::Healthy.is_crisis(), "Healthy MUST NOT be crisis");
 
-        assert!(ICLevel::Critical.needs_attention(), "Critical needs attention");
-        assert!(ICLevel::Warning.needs_attention(), "Warning needs attention");
-        assert!(!ICLevel::Normal.needs_attention(), "Normal does NOT need attention");
-        assert!(!ICLevel::Healthy.needs_attention(), "Healthy does NOT need attention");
+        assert!(
+            ICLevel::Critical.needs_attention(),
+            "Critical needs attention"
+        );
+        assert!(
+            ICLevel::Warning.needs_attention(),
+            "Warning needs attention"
+        );
+        assert!(
+            !ICLevel::Normal.needs_attention(),
+            "Normal does NOT need attention"
+        );
+        assert!(
+            !ICLevel::Healthy.needs_attention(),
+            "Healthy does NOT need attention"
+        );
 
         println!("RESULT: PASS - Crisis detection matches constitution");
     }
@@ -1312,20 +1351,39 @@ mod hook_io_tests {
         // Exact boundary tests
         let boundary_tests = [
             (0.7_f32, 0.7_f32, JohariQuadrant::Open, "both at threshold"),
-            (0.699_f32, 0.7_f32, JohariQuadrant::Blind, "C below, I at threshold"),
-            (0.7_f32, 0.699_f32, JohariQuadrant::Hidden, "C at threshold, I below"),
-            (0.699_f32, 0.699_f32, JohariQuadrant::Unknown, "both below threshold"),
+            (
+                0.699_f32,
+                0.7_f32,
+                JohariQuadrant::Blind,
+                "C below, I at threshold",
+            ),
+            (
+                0.7_f32,
+                0.699_f32,
+                JohariQuadrant::Hidden,
+                "C at threshold, I below",
+            ),
+            (
+                0.699_f32,
+                0.699_f32,
+                JohariQuadrant::Unknown,
+                "both below threshold",
+            ),
             (1.0_f32, 1.0_f32, JohariQuadrant::Open, "max values"),
             (0.0_f32, 0.0_f32, JohariQuadrant::Unknown, "min values"),
         ];
 
         for (c, i, expected, description) in boundary_tests {
             let actual = JohariQuadrant::classify(c, i);
-            println!("  {} (C={}, I={}): expected={:?}, actual={:?}",
-                     description, c, i, expected, actual);
-            assert_eq!(actual, expected,
+            println!(
+                "  {} (C={}, I={}): expected={:?}, actual={:?}",
+                description, c, i, expected, actual
+            );
+            assert_eq!(
+                actual, expected,
                 "FAIL: ({}) C={}, I={} must be {:?}, got {:?}",
-                description, c, i, expected, actual);
+                description, c, i, expected, actual
+            );
         }
 
         println!("RESULT: PASS - Johari classification matches spec");
@@ -1347,11 +1405,13 @@ mod hook_io_tests {
         ];
 
         for (quadrant, expected_json) in test_cases {
-            let json = serde_json::to_string(&quadrant)
-                .expect("serialization MUST succeed");
+            let json = serde_json::to_string(&quadrant).expect("serialization MUST succeed");
             println!("  {:?} -> {}", quadrant, json);
-            assert_eq!(json, expected_json,
-                "FAIL: {:?} must serialize to {}", quadrant, expected_json);
+            assert_eq!(
+                json, expected_json,
+                "FAIL: {:?} must serialize to {}",
+                quadrant, expected_json
+            );
         }
 
         println!("RESULT: PASS - JohariQuadrant serializes to snake_case");
@@ -1371,9 +1431,19 @@ mod hook_io_tests {
         assert_eq!(state.consciousness, 0.0, "Default C must be 0.0");
         assert_eq!(state.integration, 0.0, "Default r must be 0.0");
         assert_eq!(state.reflection, 0.0, "Default reflection must be 0.0");
-        assert_eq!(state.differentiation, 0.0, "Default differentiation must be 0.0");
-        assert_eq!(state.identity_continuity, 1.0, "Default IC must be 1.0 (fresh)");
-        assert_eq!(state.johari_quadrant, JohariQuadrant::Unknown, "Default quadrant must be Unknown");
+        assert_eq!(
+            state.differentiation, 0.0,
+            "Default differentiation must be 0.0"
+        );
+        assert_eq!(
+            state.identity_continuity, 1.0,
+            "Default IC must be 1.0 (fresh)"
+        );
+        assert_eq!(
+            state.johari_quadrant,
+            JohariQuadrant::Unknown,
+            "Default quadrant must be Unknown"
+        );
 
         println!("RESULT: PASS - Default state matches DOR definition");
     }
@@ -1393,8 +1463,11 @@ mod hook_io_tests {
         let parsed: ConsciousnessState = serde_json::from_str(&json).expect("deserialize");
 
         assert_eq!(state, parsed, "Round-trip MUST preserve all values");
-        assert_eq!(parsed.johari_quadrant, JohariQuadrant::Open,
-            "C=0.73, I=0.85 must classify as Open");
+        assert_eq!(
+            parsed.johari_quadrant,
+            JohariQuadrant::Open,
+            "C=0.73, I=0.85 must classify as Open"
+        );
 
         println!("RESULT: PASS - JSON round-trip preserves all values");
     }
@@ -1413,11 +1486,17 @@ mod hook_io_tests {
         assert_eq!(crisis.level, ICLevel::Critical, "0.45 MUST be Critical");
 
         let no_crisis = ICClassification::new(0.55, 0.5);
-        assert!(!no_crisis.crisis_triggered, "0.55 >= 0.5 MUST NOT trigger crisis");
+        assert!(
+            !no_crisis.crisis_triggered,
+            "0.55 >= 0.5 MUST NOT trigger crisis"
+        );
         assert_eq!(no_crisis.level, ICLevel::Warning, "0.55 MUST be Warning");
 
         let boundary = ICClassification::new(0.5, 0.5);
-        assert!(!boundary.crisis_triggered, "0.5 >= 0.5 MUST NOT trigger crisis");
+        assert!(
+            !boundary.crisis_triggered,
+            "0.5 >= 0.5 MUST NOT trigger crisis"
+        );
         assert_eq!(boundary.level, ICLevel::Warning, "0.5 MUST be Warning");
 
         println!("RESULT: PASS - Crisis trigger matches constitution threshold");
@@ -1440,19 +1519,28 @@ mod hook_io_tests {
                 tool_use_id: "tool-use-001".into(),
             },
         };
-        assert!(valid.validate().is_none(), "Valid input MUST pass validation");
+        assert!(
+            valid.validate().is_none(),
+            "Valid input MUST pass validation"
+        );
 
         let empty_session = HookInput {
             session_id: "".into(),
             ..valid.clone()
         };
-        assert!(empty_session.validate().is_some(), "Empty session_id MUST fail");
+        assert!(
+            empty_session.validate().is_some(),
+            "Empty session_id MUST fail"
+        );
 
         let bad_timestamp = HookInput {
             timestamp_ms: 0,
             ..valid.clone()
         };
-        assert!(bad_timestamp.validate().is_some(), "Zero timestamp MUST fail");
+        assert!(
+            bad_timestamp.validate().is_some(),
+            "Zero timestamp MUST fail"
+        );
 
         println!("RESULT: PASS - Input validation catches invalid data");
     }
@@ -1468,9 +1556,18 @@ mod hook_io_tests {
 
         assert!(output.success, "Default output MUST be success=true");
         assert!(output.error.is_none(), "Default MUST have no error");
-        assert!(output.consciousness_state.is_none(), "Default MUST have no state");
-        assert!(output.ic_classification.is_none(), "Default MUST have no classification");
-        assert!(output.context_injection.is_none(), "Default MUST have no injection");
+        assert!(
+            output.consciousness_state.is_none(),
+            "Default MUST have no state"
+        );
+        assert!(
+            output.ic_classification.is_none(),
+            "Default MUST have no classification"
+        );
+        assert!(
+            output.context_injection.is_none(),
+            "Default MUST have no injection"
+        );
         assert_eq!(output.execution_time_ms, 0, "Default time MUST be 0");
 
         println!("RESULT: PASS - Default output is minimal success");
@@ -1537,20 +1634,33 @@ mod hook_io_tests {
 
         // Required fields
         assert!(json.get("success").is_some(), "success is REQUIRED");
-        assert!(json.get("execution_time_ms").is_some(), "execution_time_ms is REQUIRED");
+        assert!(
+            json.get("execution_time_ms").is_some(),
+            "execution_time_ms is REQUIRED"
+        );
 
         // Optional fields omitted when None
-        assert!(json.get("error").is_none(), "error MUST be omitted when None");
-        assert!(json.get("context_injection").is_none(), "context_injection MUST be omitted when None");
+        assert!(
+            json.get("error").is_none(),
+            "error MUST be omitted when None"
+        );
+        assert!(
+            json.get("context_injection").is_none(),
+            "context_injection MUST be omitted when None"
+        );
 
         // Nested structure
-        let cs = json.get("consciousness_state").expect("consciousness_state present");
+        let cs = json
+            .get("consciousness_state")
+            .expect("consciousness_state present");
         assert!(cs.get("consciousness").is_some());
         assert!(cs.get("integration").is_some());
         assert!(cs.get("johari_quadrant").is_some());
         assert_eq!(cs.get("johari_quadrant").unwrap(), "open");
 
-        let ic = json.get("ic_classification").expect("ic_classification present");
+        let ic = json
+            .get("ic_classification")
+            .expect("ic_classification present");
         assert!(ic.get("value").is_some());
         assert!(ic.get("level").is_some());
         assert_eq!(ic.get("level").unwrap(), "healthy");
@@ -1567,20 +1677,27 @@ mod hook_io_tests {
         println!("SOURCE: NO BACKWARDS COMPATIBILITY requirement");
 
         let invalid_inputs = [
-            r#""Healthy""#,      // PascalCase ICLevel
-            r#""CRITICAL""#,     // UPPERCASE ICLevel
-            r#""Open""#,         // PascalCase JohariQuadrant
-            r#""UNKNOWN""#,      // UPPERCASE JohariQuadrant
+            r#""Healthy""#,  // PascalCase ICLevel
+            r#""CRITICAL""#, // UPPERCASE ICLevel
+            r#""Open""#,     // PascalCase JohariQuadrant
+            r#""UNKNOWN""#,  // UPPERCASE JohariQuadrant
         ];
 
         for input in invalid_inputs {
             let result_ic: Result<ICLevel, _> = serde_json::from_str(input);
             let result_johari: Result<JohariQuadrant, _> = serde_json::from_str(input);
-            println!("  {} -> ICLevel: {:?}, Johari: {:?}",
-                     input, result_ic.is_err(), result_johari.is_err());
+            println!(
+                "  {} -> ICLevel: {:?}, Johari: {:?}",
+                input,
+                result_ic.is_err(),
+                result_johari.is_err()
+            );
             // At least one should fail
-            assert!(result_ic.is_err() || result_johari.is_err(),
-                "FAIL: Invalid input {} should fail deserialization", input);
+            assert!(
+                result_ic.is_err() || result_johari.is_err(),
+                "FAIL: Invalid input {} should fail deserialization",
+                input
+            );
         }
 
         println!("RESULT: PASS - Invalid inputs fail fast");
@@ -1605,7 +1722,11 @@ mod hook_io_tests {
 
         for (status, expected_json) in statuses {
             let json = serde_json::to_string(&status).expect("serialize");
-            assert_eq!(json, expected_json, "SessionEndStatus::{:?} MUST serialize to {}", status, expected_json);
+            assert_eq!(
+                json, expected_json,
+                "SessionEndStatus::{:?} MUST serialize to {}",
+                status, expected_json
+            );
             println!("  {:?} -> {}", status, json);
 
             // Round-trip
@@ -1626,17 +1747,21 @@ mod hook_io_tests {
 
         let invalid_inputs = [
             "\"unknown\"",
-            "\"NORMAL\"",        // Wrong case
-            "\"Normal\"",        // PascalCase
-            "\"abort\"",         // Missing 'user_' prefix
-            "\"\"",              // Empty
-            "null",              // Null
-            "123",               // Number
+            "\"NORMAL\"", // Wrong case
+            "\"Normal\"", // PascalCase
+            "\"abort\"",  // Missing 'user_' prefix
+            "\"\"",       // Empty
+            "null",       // Null
+            "123",        // Number
         ];
 
         for input in invalid_inputs {
             let result: Result<SessionEndStatus, _> = serde_json::from_str(input);
-            assert!(result.is_err(), "Invalid input {} MUST fail deserialization", input);
+            assert!(
+                result.is_err(),
+                "Invalid input {} MUST fail deserialization",
+                input
+            );
             println!("  {} -> Err (expected)", input);
         }
 
@@ -1668,7 +1793,10 @@ mod hook_io_tests {
 
         let json2 = serde_json::to_value(&assistant_msg).expect("serialize");
         assert_eq!(json2["role"], "assistant");
-        println!("  Assistant message: {}", serde_json::to_string(&json2).unwrap());
+        println!(
+            "  Assistant message: {}",
+            serde_json::to_string(&json2).unwrap()
+        );
 
         // Round-trip
         let roundtrip: ConversationMessage = serde_json::from_value(json).expect("deserialize");
@@ -1698,7 +1826,10 @@ mod hook_io_tests {
         assert_eq!(json["type"], "session_start");
         assert_eq!(json["data"]["cwd"], "/home/user/project");
         assert_eq!(json["data"]["source"], "cli");
-        assert!(json["data"].get("previous_session_id").is_none(), "None field MUST be omitted");
+        assert!(
+            json["data"].get("previous_session_id").is_none(),
+            "None field MUST be omitted"
+        );
 
         // With previous session
         let payload_with_prev = HookPayload::SessionStart {
@@ -1712,7 +1843,12 @@ mod hook_io_tests {
 
         // Round-trip
         let roundtrip: HookPayload = serde_json::from_value(json).expect("deserialize");
-        if let HookPayload::SessionStart { cwd, source, previous_session_id } = roundtrip {
+        if let HookPayload::SessionStart {
+            cwd,
+            source,
+            previous_session_id,
+        } = roundtrip
+        {
             assert_eq!(cwd, "/home/user/project");
             assert_eq!(source, "cli");
             assert!(previous_session_id.is_none());
@@ -1747,11 +1883,19 @@ mod hook_io_tests {
         assert_eq!(json["type"], "pre_tool_use");
         assert_eq!(json["data"]["tool_name"], "Read");
         assert_eq!(json["data"]["tool_use_id"], "toolu_01ABC123");
-        assert_eq!(json["data"]["tool_input"]["file_path"], "/home/user/test.rs");
+        assert_eq!(
+            json["data"]["tool_input"]["file_path"],
+            "/home/user/test.rs"
+        );
 
         // Round-trip
         let roundtrip: HookPayload = serde_json::from_value(json).expect("deserialize");
-        if let HookPayload::PreToolUse { tool_name, tool_use_id, .. } = roundtrip {
+        if let HookPayload::PreToolUse {
+            tool_name,
+            tool_use_id,
+            ..
+        } = roundtrip
+        {
             assert_eq!(tool_name, "Read");
             assert_eq!(tool_use_id, "toolu_01ABC123");
         } else {
@@ -1785,11 +1929,19 @@ mod hook_io_tests {
         assert_eq!(json["type"], "post_tool_use");
         assert_eq!(json["data"]["tool_name"], "Bash");
         assert_eq!(json["data"]["tool_use_id"], "toolu_02DEF456");
-        assert!(json["data"]["tool_response"].as_str().unwrap().contains("Compiling"));
+        assert!(json["data"]["tool_response"]
+            .as_str()
+            .unwrap()
+            .contains("Compiling"));
 
         // Round-trip
         let roundtrip: HookPayload = serde_json::from_value(json).expect("deserialize");
-        if let HookPayload::PostToolUse { tool_name, tool_response, .. } = roundtrip {
+        if let HookPayload::PostToolUse {
+            tool_name,
+            tool_response,
+            ..
+        } = roundtrip
+        {
             assert_eq!(tool_name, "Bash");
             assert!(tool_response.contains("Compiling"));
         } else {
@@ -1872,7 +2024,10 @@ mod hook_io_tests {
         assert_eq!(json["type"], "session_end");
         assert_eq!(json["data"]["duration_ms"], 3600000);
         assert_eq!(json["data"]["status"], "normal");
-        assert!(json["data"].get("reason").is_none(), "None reason MUST be omitted");
+        assert!(
+            json["data"].get("reason").is_none(),
+            "None reason MUST be omitted"
+        );
 
         // With reason
         let payload_with_reason = HookPayload::SessionEnd {
@@ -1886,7 +2041,12 @@ mod hook_io_tests {
 
         // Round-trip
         let roundtrip: HookPayload = serde_json::from_value(json).expect("deserialize");
-        if let HookPayload::SessionEnd { duration_ms, status, reason } = roundtrip {
+        if let HookPayload::SessionEnd {
+            duration_ms,
+            status,
+            reason,
+        } = roundtrip
+        {
             assert_eq!(duration_ms, 3600000);
             assert_eq!(status, SessionEndStatus::Normal);
             assert!(reason.is_none());
@@ -1907,17 +2067,21 @@ mod hook_io_tests {
 
         let invalid_inputs = [
             r#"{"type": "unknown_event", "data": {}}"#,
-            r#"{"type": "SessionStart", "data": {"cwd": "/"}}"#,  // PascalCase
-            r#"{"type": "PRE_TOOL_USE", "data": {}}"#,            // UPPERCASE
-            r#"{"data": {"cwd": "/"}}"#,                           // Missing type
-            r#"{"type": "session_start"}"#,                        // Missing data
+            r#"{"type": "SessionStart", "data": {"cwd": "/"}}"#, // PascalCase
+            r#"{"type": "PRE_TOOL_USE", "data": {}}"#,           // UPPERCASE
+            r#"{"data": {"cwd": "/"}}"#,                         // Missing type
+            r#"{"type": "session_start"}"#,                      // Missing data
             r#"null"#,
             r#"[]"#,
         ];
 
         for input in invalid_inputs {
             let result: Result<HookPayload, _> = serde_json::from_str(input);
-            assert!(result.is_err(), "Invalid input {} MUST fail deserialization", input);
+            assert!(
+                result.is_err(),
+                "Invalid input {} MUST fail deserialization",
+                input
+            );
             println!("  {} -> Err (expected)", input);
         }
 
@@ -1955,7 +2119,10 @@ mod hook_io_tests {
         let roundtrip: HookInput = serde_json::from_value(json).expect("deserialize");
         assert_eq!(roundtrip.hook_type, HookEventType::SessionStart);
         assert_eq!(roundtrip.session_id, "session-abc123");
-        assert!(roundtrip.validate().is_none(), "Valid input MUST pass validation");
+        assert!(
+            roundtrip.validate().is_none(),
+            "Valid input MUST pass validation"
+        );
 
         println!("RESULT: PASS - HookInput integrates with typed payload");
     }
@@ -1982,7 +2149,12 @@ mod hook_io_tests {
 
         // Round-trip preserves empty strings
         let roundtrip: HookPayload = serde_json::from_value(json).expect("deserialize");
-        if let HookPayload::SessionStart { cwd, source, previous_session_id } = roundtrip {
+        if let HookPayload::SessionStart {
+            cwd,
+            source,
+            previous_session_id,
+        } = roundtrip
+        {
             assert_eq!(cwd, "");
             assert_eq!(source, "");
             assert_eq!(previous_session_id, Some("".into()));
@@ -2042,12 +2214,10 @@ mod hook_io_tests {
 
         let payload = HookPayload::UserPromptSubmit {
             prompt: "Hello \u{1F600} World \u{4E2D}\u{6587} \u{0391}\u{03B2}\u{03B3}".into(),
-            context: vec![
-                ConversationMessage {
-                    role: "user".into(),
-                    content: "\u{1F389} Party! \u{1F3C6}".into(),
-                },
-            ],
+            context: vec![ConversationMessage {
+                role: "user".into(),
+                content: "\u{1F389} Party! \u{1F3C6}".into(),
+            }],
         };
 
         let json = serde_json::to_value(&payload).expect("serialize unicode");

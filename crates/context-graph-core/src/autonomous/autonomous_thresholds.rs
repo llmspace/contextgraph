@@ -396,7 +396,10 @@ pub enum ObsolescenceLevel {
 impl ObsolescenceLevel {
     /// Check if the level requires any action.
     pub fn requires_action(&self) -> bool {
-        matches!(self, ObsolescenceLevel::AtRisk | ObsolescenceLevel::Obsolete)
+        matches!(
+            self,
+            ObsolescenceLevel::AtRisk | ObsolescenceLevel::Obsolete
+        )
     }
 
     /// Check if the level is critical (obsolete).
@@ -501,10 +504,7 @@ mod tests {
             drift_slope_warning: 0.02,
             drift_slope_critical: 0.05,
         };
-        assert!(
-            !invalid.is_valid(),
-            "should fail when high < mid"
-        );
+        assert!(!invalid.is_valid(), "should fail when high < mid");
     }
 
     #[test]
@@ -516,10 +516,7 @@ mod tests {
             drift_slope_warning: 0.05,
             drift_slope_critical: 0.02, // < warning!
         };
-        assert!(
-            !invalid.is_valid(),
-            "should fail when critical < warning"
-        );
+        assert!(!invalid.is_valid(), "should fail when critical < warning");
     }
 
     #[test]
@@ -606,18 +603,10 @@ mod tests {
             Domain::General,
         ] {
             let result = AutonomousThresholds::from_atc(&atc, domain);
-            assert!(
-                result.is_ok(),
-                "Domain {:?} should be available",
-                domain
-            );
+            assert!(result.is_ok(), "Domain {:?} should be available", domain);
 
             let t = result.unwrap();
-            assert!(
-                t.is_valid(),
-                "Domain {:?} thresholds must be valid",
-                domain
-            );
+            assert!(t.is_valid(), "Domain {:?} thresholds must be valid", domain);
         }
     }
 
@@ -760,11 +749,26 @@ mod tests {
         // Print legacy defaults first
         let legacy = AutonomousThresholds::default_general();
         println!("Legacy Defaults:");
-        println!("  obsolescence_low: {:.3} (DEFAULT_RELEVANCE_THRESHOLD)", legacy.obsolescence_low);
-        println!("  obsolescence_mid: {:.3} (MEDIUM_CONFIDENCE_THRESHOLD)", legacy.obsolescence_mid);
-        println!("  obsolescence_high: {:.3} (HIGH_CONFIDENCE_THRESHOLD)", legacy.obsolescence_high);
-        println!("  drift_slope_warning: {:.4} (WARNING_SLOPE)", legacy.drift_slope_warning);
-        println!("  drift_slope_critical: {:.4} (CRITICAL_SLOPE)", legacy.drift_slope_critical);
+        println!(
+            "  obsolescence_low: {:.3} (DEFAULT_RELEVANCE_THRESHOLD)",
+            legacy.obsolescence_low
+        );
+        println!(
+            "  obsolescence_mid: {:.3} (MEDIUM_CONFIDENCE_THRESHOLD)",
+            legacy.obsolescence_mid
+        );
+        println!(
+            "  obsolescence_high: {:.3} (HIGH_CONFIDENCE_THRESHOLD)",
+            legacy.obsolescence_high
+        );
+        println!(
+            "  drift_slope_warning: {:.4} (WARNING_SLOPE)",
+            legacy.drift_slope_warning
+        );
+        println!(
+            "  drift_slope_critical: {:.4} (CRITICAL_SLOPE)",
+            legacy.drift_slope_critical
+        );
         println!();
 
         for domain in [

@@ -23,24 +23,45 @@ async fn test_01_memory_store() {
     let request = make_request("memory/store", 1, Some(params));
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Should not have error: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Should not have error: {:?}",
+        response.error
+    );
     let result = response.result.expect("Should have result");
 
     // Verify required fields from memory/store response
     // API returns: fingerprintId, embeddingLatencyMs, storageLatencyMs, embedderCount
-    let fingerprint_id = result.get("fingerprintId").expect("Should have fingerprintId");
-    let embedder_count = result.get("embedderCount").expect("Should have embedderCount");
+    let fingerprint_id = result
+        .get("fingerprintId")
+        .expect("Should have fingerprintId");
+    let embedder_count = result
+        .get("embedderCount")
+        .expect("Should have embedderCount");
 
     println!("\n[VERIFICATION]");
     println!("  fingerprintId: {}", fingerprint_id);
     println!("  embedderCount: {}", embedder_count);
-    println!("  embeddingLatencyMs: {}", result.get("embeddingLatencyMs").unwrap_or(&json!(0)));
-    println!("  storageLatencyMs: {}", result.get("storageLatencyMs").unwrap_or(&json!(0)));
+    println!(
+        "  embeddingLatencyMs: {}",
+        result.get("embeddingLatencyMs").unwrap_or(&json!(0))
+    );
+    println!(
+        "  storageLatencyMs: {}",
+        result.get("storageLatencyMs").unwrap_or(&json!(0))
+    );
 
     assert!(fingerprint_id.is_string(), "fingerprintId should be string");
-    assert_eq!(embedder_count.as_u64().unwrap(), 13, "Should have 13 embedders");
+    assert_eq!(
+        embedder_count.as_u64().unwrap(),
+        13,
+        "Should have 13 embedders"
+    );
     println!("\n[PASSED] memory/store works correctly");
 }
 
@@ -58,10 +79,16 @@ async fn test_02_memory_retrieve() {
         "content": "Memory to retrieve for testing",
         "importance": 0.9
     });
-    let store_response = handlers.dispatch(make_request("memory/store", 1, Some(store_params))).await;
-    let fingerprint_id = store_response.result.unwrap()
-        .get("fingerprintId").unwrap()
-        .as_str().unwrap()
+    let store_response = handlers
+        .dispatch(make_request("memory/store", 1, Some(store_params)))
+        .await;
+    let fingerprint_id = store_response
+        .result
+        .unwrap()
+        .get("fingerprintId")
+        .unwrap()
+        .as_str()
+        .unwrap()
         .to_string();
 
     println!("Stored fingerprint: {}", fingerprint_id);
@@ -73,22 +100,41 @@ async fn test_02_memory_retrieve() {
     let request = make_request("memory/retrieve", 2, Some(retrieve_params));
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Should not have error: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Should not have error: {:?}",
+        response.error
+    );
     let result = response.result.expect("Should have result");
     let fingerprint = result.get("fingerprint").expect("Should have fingerprint");
 
     println!("\n[VERIFICATION]");
     println!("  id: {}", fingerprint.get("id").unwrap());
-    println!("  alignmentScore: {}", fingerprint.get("alignmentScore").unwrap());
+    println!(
+        "  alignmentScore: {}",
+        fingerprint.get("alignmentScore").unwrap()
+    );
     println!("  accessCount: {}", fingerprint.get("accessCount").unwrap());
-    println!("  contentHashHex: {}", fingerprint.get("contentHashHex").unwrap());
+    println!(
+        "  contentHashHex: {}",
+        fingerprint.get("contentHashHex").unwrap()
+    );
 
     // Check purpose vector
     if let Some(pv) = fingerprint.get("purposeVector") {
-        println!("  purposeVector.coherence: {}", pv.get("coherence").unwrap_or(&json!(null)));
-        println!("  purposeVector.dominantEmbedder: {}", pv.get("dominantEmbedder").unwrap_or(&json!(null)));
+        println!(
+            "  purposeVector.coherence: {}",
+            pv.get("coherence").unwrap_or(&json!(null))
+        );
+        println!(
+            "  purposeVector.dominantEmbedder: {}",
+            pv.get("dominantEmbedder").unwrap_or(&json!(null))
+        );
     }
 
     println!("\n[PASSED] memory/retrieve works correctly");
@@ -104,9 +150,18 @@ async fn test_03_memory_search() {
     let (handlers, _store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
 
     // Store some memories first
-    for (i, content) in ["neural network optimization", "distributed systems consensus", "machine learning algorithms"].iter().enumerate() {
+    for (i, content) in [
+        "neural network optimization",
+        "distributed systems consensus",
+        "machine learning algorithms",
+    ]
+    .iter()
+    .enumerate()
+    {
         let params = json!({ "content": content, "importance": 0.8 });
-        handlers.dispatch(make_request("memory/store", i as i64, Some(params))).await;
+        handlers
+            .dispatch(make_request("memory/store", i as i64, Some(params)))
+            .await;
     }
 
     // Search - MUST include minSimilarity per constitution FAIL FAST policy
@@ -118,9 +173,16 @@ async fn test_03_memory_search() {
     let request = make_request("memory/search", 10, Some(search_params));
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Should not have error: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Should not have error: {:?}",
+        response.error
+    );
     let result = response.result.expect("Should have result");
     let results = result.get("results").expect("Should have results");
 
@@ -128,7 +190,8 @@ async fn test_03_memory_search() {
     if let Some(arr) = results.as_array() {
         println!("  Found {} results", arr.len());
         for (i, r) in arr.iter().take(3).enumerate() {
-            println!("  [{}] id={}, similarity={}",
+            println!(
+                "  [{}] id={}, similarity={}",
                 i,
                 r.get("fingerprintId").unwrap_or(&json!("?")),
                 r.get("similarity").unwrap_or(&json!(0))
@@ -153,10 +216,16 @@ async fn test_04_memory_delete() {
         "content": "Memory to be deleted",
         "importance": 0.5
     });
-    let store_response = handlers.dispatch(make_request("memory/store", 1, Some(store_params))).await;
-    let fingerprint_id = store_response.result.unwrap()
-        .get("fingerprintId").unwrap()
-        .as_str().unwrap()
+    let store_response = handlers
+        .dispatch(make_request("memory/store", 1, Some(store_params)))
+        .await;
+    let fingerprint_id = store_response
+        .result
+        .unwrap()
+        .get("fingerprintId")
+        .unwrap()
+        .as_str()
+        .unwrap()
         .to_string();
 
     println!("Stored fingerprint: {}", fingerprint_id);
@@ -173,21 +242,50 @@ async fn test_04_memory_delete() {
     let request = make_request("memory/delete", 2, Some(delete_params));
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Should not have error: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Should not have error: {:?}",
+        response.error
+    );
     let result = response.result.expect("Should have result");
 
     let count_after = store.count().await.unwrap();
     println!("Count after delete: {}", count_after);
 
     println!("\n[VERIFICATION]");
-    println!("  deleted: {}", result.get("deleted").unwrap_or(&json!(false)));
-    println!("  deleteType: {}", result.get("deleteType").unwrap_or(&json!("?")));
+    println!(
+        "  deleted: {}",
+        result.get("deleted").unwrap_or(&json!(false))
+    );
+    println!(
+        "  deleteType: {}",
+        result.get("deleteType").unwrap_or(&json!("?"))
+    );
     println!("  count decreased: {} -> {}", count_before, count_after);
 
-    assert!(result.get("deleted").and_then(|v| v.as_bool()).unwrap_or(false), "Delete should return true");
-    assert_eq!(result.get("deleteType").and_then(|v| v.as_str()).unwrap_or("?"), "hard", "Should be hard delete");
-    assert!(count_after < count_before, "Count should decrease after hard delete");
+    assert!(
+        result
+            .get("deleted")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        "Delete should return true"
+    );
+    assert_eq!(
+        result
+            .get("deleteType")
+            .and_then(|v| v.as_str())
+            .unwrap_or("?"),
+        "hard",
+        "Should be hard delete"
+    );
+    assert!(
+        count_after < count_before,
+        "Count should decrease after hard delete"
+    );
     println!("\n[PASSED] memory/delete works correctly");
 }

@@ -31,12 +31,12 @@
 //! - search/weight_profiles returns all profiles with 13 weights each
 //! - Error handling for invalid parameters
 
-mod multi;
-mod single_space;
 mod by_purpose;
-mod weight_profiles;
 mod full_state_verification;
+mod multi;
 mod rocksdb_integration;
+mod single_space;
+mod weight_profiles;
 
 #[cfg(feature = "cuda")]
 mod real_embedding_tests;

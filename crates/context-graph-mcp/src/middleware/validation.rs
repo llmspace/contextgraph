@@ -388,8 +388,7 @@ mod tests {
 
     #[test]
     fn test_validate_13_element_array_valid() {
-        let args =
-            json!({"weights": [0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.04]});
+        let args = json!({"weights": [0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.04]});
         let result = validate_13_element_array("weights", args.get("weights"));
         assert!(result.is_ok());
         let arr = result.unwrap();
@@ -422,9 +421,7 @@ mod tests {
     #[test]
     fn test_error_code_always_invalid_params() {
         let errors = vec![
-            ValidationError::MissingRequired {
-                field: "x".into(),
-            },
+            ValidationError::MissingRequired { field: "x".into() },
             ValidationError::InvalidFormat {
                 field: "x".into(),
                 expected: "y".into(),

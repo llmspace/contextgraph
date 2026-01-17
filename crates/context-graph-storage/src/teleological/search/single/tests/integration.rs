@@ -15,7 +15,7 @@ fn test_full_state_verification() {
     println!("\n=== FULL STATE VERIFICATION TEST ===");
     println!();
 
-    let dim = 384;  // E8Graph dimension
+    let dim = 384; // E8Graph dimension
     let id_a = Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap();
     let id_b = Uuid::parse_str("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb").unwrap();
     let id_c = Uuid::parse_str("cccccccc-cccc-cccc-cccc-cccccccccccc").unwrap();
@@ -52,11 +52,17 @@ fn test_full_state_verification() {
     println!();
     println!("AFTER INSERT:");
     println!("  index.len() = {}", index.len());
-    assert_eq!(index.len(), 3, "Source of truth: index should have 3 vectors");
+    assert_eq!(
+        index.len(),
+        3,
+        "Source of truth: index should have 3 vectors"
+    );
 
     // Search with query = A
     let search = SingleEmbedderSearch::new(Arc::clone(&registry));
-    let results = search.search(EmbedderIndex::E8Graph, &vec_a, 10, None).unwrap();
+    let results = search
+        .search(EmbedderIndex::E8Graph, &vec_a, 10, None)
+        .unwrap();
 
     println!();
     println!("SEARCH RESULTS (query = A):");
@@ -64,8 +70,10 @@ fn test_full_state_verification() {
     assert_eq!(results.len(), 3, "Should find all 3 vectors");
 
     for (i, hit) in results.iter().enumerate() {
-        println!("  [{}] ID={} distance={:.4} similarity={:.4}",
-                 i, hit.id, hit.distance, hit.similarity);
+        println!(
+            "  [{}] ID={} distance={:.4} similarity={:.4}",
+            i, hit.id, hit.distance, hit.similarity
+        );
     }
 
     // Verify ordering: A and C should be top (identical to query)
@@ -86,8 +94,14 @@ fn test_full_state_verification() {
     println!("  Top similarity: {:.4}", results.top().unwrap().similarity);
     println!("  Lowest similarity: {:.4}", last.similarity);
 
-    assert!(results.top().unwrap().similarity > 0.99, "Top should be ~1.0");
-    assert!(last.similarity < 0.1, "B should have low similarity (orthogonal)");
+    assert!(
+        results.top().unwrap().similarity > 0.99,
+        "Top should be ~1.0"
+    );
+    assert!(
+        last.similarity < 0.1,
+        "B should have low similarity (orthogonal)"
+    );
 
     // Verify IDs in source of truth
     println!();
@@ -106,8 +120,10 @@ fn test_full_state_verification() {
     let found_a = index.search(&vec_a, 2, None).unwrap();
     assert!(found_a.len() >= 2, "Should find both identical vectors");
     let found_ids: Vec<Uuid> = found_a.iter().map(|(id, _)| *id).collect();
-    assert!(found_ids.contains(&id_a) || found_ids.contains(&id_c),
-            "Identical vectors A/C should be found");
+    assert!(
+        found_ids.contains(&id_a) || found_ids.contains(&id_c),
+        "Identical vectors A/C should be found"
+    );
     println!("  IDs for identical vectors (A, C) found: OK");
 
     println!();

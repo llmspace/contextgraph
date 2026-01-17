@@ -118,7 +118,10 @@ impl UtlProcessorAdapter {
     fn get_embedding(context: &UtlContext) -> CoreResult<Vec<f32>> {
         // Use goal_vector if present, otherwise default to zero vector
         // This enables autonomous operation without requiring North Star configuration
-        Ok(context.goal_vector.clone().unwrap_or_else(|| vec![0.0; 128]))
+        Ok(context
+            .goal_vector
+            .clone()
+            .unwrap_or_else(|| vec![0.0; 128]))
     }
 
     /// Build context embeddings from UtlContext.

@@ -49,8 +49,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, warn};
 
 use context_graph_core::gwt::session_identity::{
-    classify_ic, compute_kuramoto_r, is_ic_crisis, is_ic_warning,
-    update_cache, SessionIdentityManager, SessionIdentitySnapshot,
+    classify_ic, compute_kuramoto_r, is_ic_crisis, is_ic_warning, update_cache,
+    SessionIdentityManager, SessionIdentitySnapshot,
 };
 use context_graph_core::gwt::state_machine::ConsciousnessState;
 use context_graph_storage::rocksdb_backend::{RocksDbMemex, StandaloneSessionIdentityManager};
@@ -612,14 +612,14 @@ mod tests {
         // Note: is_ic_warning only returns true for 0.5 <= IC < 0.7 (Warning zone)
         // Crisis zone (IC < 0.5) is NOT warning, it's worse than warning
         let test_cases = [
-            (0.95, "Healthy", false, false),  // >= 0.9: healthy, no crisis, no warning
-            (0.90, "Healthy", false, false),  // boundary: healthy
-            (0.85, "Good", false, false),     // >= 0.7: good, no crisis, no warning
-            (0.70, "Good", false, false),     // boundary: good
-            (0.65, "Warning", false, true),   // >= 0.5: warning zone
-            (0.50, "Warning", false, true),   // boundary: warning zone
-            (0.45, "Degraded", true, false),  // < 0.5 = crisis (NOT warning - it's worse)
-            (0.10, "Degraded", true, false),  // severe crisis (NOT warning - it's worse)
+            (0.95, "Healthy", false, false), // >= 0.9: healthy, no crisis, no warning
+            (0.90, "Healthy", false, false), // boundary: healthy
+            (0.85, "Good", false, false),    // >= 0.7: good, no crisis, no warning
+            (0.70, "Good", false, false),    // boundary: good
+            (0.65, "Warning", false, true),  // >= 0.5: warning zone
+            (0.50, "Warning", false, true),  // boundary: warning zone
+            (0.45, "Degraded", true, false), // < 0.5 = crisis (NOT warning - it's worse)
+            (0.10, "Degraded", true, false), // severe crisis (NOT warning - it's worse)
         ];
 
         for (ic, expected_status, expected_crisis, expected_warning) in test_cases {

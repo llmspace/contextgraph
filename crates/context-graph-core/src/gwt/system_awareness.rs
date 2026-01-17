@@ -47,7 +47,9 @@ impl GwtSystem {
         let mut loop_mgr = self.self_awareness_loop.write().await;
 
         // 6. Execute self-awareness cycle
-        let result = loop_mgr.cycle(&mut ego_node, &action_embedding, kuramoto_r).await?;
+        let result = loop_mgr
+            .cycle(&mut ego_node, &action_embedding, kuramoto_r)
+            .await?;
 
         // 7. Log the result
         tracing::info!(
@@ -62,7 +64,8 @@ impl GwtSystem {
             // Drop locks before async call to prevent deadlock
             drop(ego_node);
             drop(loop_mgr);
-            self.trigger_identity_dream("Identity coherence critical").await?;
+            self.trigger_identity_dream("Identity coherence critical")
+                .await?;
         }
 
         // 9. Return result
@@ -81,7 +84,10 @@ impl GwtSystem {
     /// From constitution.yaml line 391: "dream<0.5" triggers introspective dream
     pub(crate) async fn trigger_identity_dream(&self, reason: &str) -> crate::CoreResult<()> {
         // 1. Log critical warning
-        tracing::warn!("IDENTITY CRITICAL: Triggering dream consolidation. Reason: {}", reason);
+        tracing::warn!(
+            "IDENTITY CRITICAL: Triggering dream consolidation. Reason: {}",
+            reason
+        );
 
         // 2. Record purpose snapshot with dream trigger context
         {
@@ -97,13 +103,15 @@ impl GwtSystem {
 
         // 4. Broadcast workspace event for dream trigger
         // (DreamController will be wired in TASK-GWT-P1-002)
-        self.event_broadcaster.broadcast(WorkspaceEvent::IdentityCritical {
-            identity_coherence,
-            previous_status: "Unknown".to_string(), // System awareness doesn't track status transitions
-            current_status: "Critical".to_string(),
-            reason: reason.to_string(),
-            timestamp: chrono::Utc::now(),
-        }).await;
+        self.event_broadcaster
+            .broadcast(WorkspaceEvent::IdentityCritical {
+                identity_coherence,
+                previous_status: "Unknown".to_string(), // System awareness doesn't track status transitions
+                current_status: "Critical".to_string(),
+                reason: reason.to_string(),
+                timestamp: chrono::Utc::now(),
+            })
+            .await;
 
         // 5. TASK-009: Wire to TriggerManager for dream consolidation
         // Per AP-26, AP-38, IDENTITY-007: IC < 0.5 MUST trigger dream

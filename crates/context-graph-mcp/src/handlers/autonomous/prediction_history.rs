@@ -244,7 +244,7 @@ mod tests {
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
 
-        history.store(id1, 1.5, None, None);  // Should clamp to 1.0
+        history.store(id1, 1.5, None, None); // Should clamp to 1.0
         history.store(id2, -0.5, None, None); // Should clamp to 0.0
 
         assert!((history.get(&id1).unwrap().predicted_value - 1.0).abs() < f32::EPSILON);

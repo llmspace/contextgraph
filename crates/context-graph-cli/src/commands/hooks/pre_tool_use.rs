@@ -17,9 +17,7 @@
 
 use super::args::PreToolArgs;
 use super::error::{HookError, HookResult};
-use super::types::{
-    ConsciousnessState, HookInput, HookOutput, HookPayload, ICClassification,
-};
+use super::types::{ConsciousnessState, HookInput, HookOutput, HookPayload, ICClassification};
 use std::io::{self, BufRead};
 use std::time::Instant;
 
@@ -61,9 +59,10 @@ pub fn handle_pre_tool_use(args: &PreToolArgs) -> HookResult<HookOutput> {
         if input_str.is_empty() {
             None
         } else {
-            Some(serde_json::from_str(&input_str).map_err(|e| {
-                HookError::invalid_input(format!("Invalid JSON input: {}", e))
-            })?)
+            Some(
+                serde_json::from_str(&input_str)
+                    .map_err(|e| HookError::invalid_input(format!("Invalid JSON input: {}", e)))?,
+            )
         }
     } else {
         None
@@ -285,15 +284,26 @@ mod tests {
         println!("  - error: None");
 
         // consciousness_state (should be Some)
-        assert!(output.consciousness_state.is_some(), "consciousness_state MUST be Some");
+        assert!(
+            output.consciousness_state.is_some(),
+            "consciousness_state MUST be Some"
+        );
         let cs = output.consciousness_state.as_ref().unwrap();
-        println!("  - consciousness_state: Some(C={:.2}, r={:.2}, IC={:.2})",
-            cs.consciousness, cs.integration, cs.identity_continuity);
+        println!(
+            "  - consciousness_state: Some(C={:.2}, r={:.2}, IC={:.2})",
+            cs.consciousness, cs.integration, cs.identity_continuity
+        );
 
         // ic_classification (should be Some)
-        assert!(output.ic_classification.is_some(), "ic_classification MUST be Some");
+        assert!(
+            output.ic_classification.is_some(),
+            "ic_classification MUST be Some"
+        );
         let ic = output.ic_classification.as_ref().unwrap();
-        println!("  - ic_classification: Some(value={:.2}, level={:?})", ic.value, ic.level);
+        println!(
+            "  - ic_classification: Some(value={:.2}, level={:?})",
+            ic.value, ic.level
+        );
 
         // execution_time_ms (REQUIRED)
         println!("  - execution_time_ms: {}ms", output.execution_time_ms);
@@ -335,7 +345,10 @@ mod tests {
         println!("\nEdge Case 4: Case sensitivity 'read' vs 'Read'");
         let lower = get_tool_guidance("read");
         let upper = get_tool_guidance("Read");
-        assert!(lower.is_none(), "Lowercase 'read' MUST return None (case-sensitive)");
+        assert!(
+            lower.is_none(),
+            "Lowercase 'read' MUST return None (case-sensitive)"
+        );
         assert!(upper.is_some(), "Uppercase 'Read' MUST return Some");
         println!("  - 'read': None (case-sensitive match)");
         println!("  - 'Read': {:?}", upper);
@@ -359,12 +372,17 @@ mod tests {
         let result = handle_pre_tool_use(&args);
 
         // AFTER: Verify behavior
-        assert!(result.is_ok(), "Handler MUST succeed even without tool_name");
+        assert!(
+            result.is_ok(),
+            "Handler MUST succeed even without tool_name"
+        );
         let output = result.unwrap();
 
         // No context_injection since no tool_name
-        assert!(output.context_injection.is_none(),
-            "context_injection MUST be None when tool_name is missing");
+        assert!(
+            output.context_injection.is_none(),
+            "context_injection MUST be None when tool_name is missing"
+        );
 
         println!("AFTER: Handler succeeded, context_injection=None (as expected)");
         println!("RESULT: PASS - Graceful handling of missing tool_name");
@@ -389,22 +407,41 @@ mod tests {
         assert!(result.is_ok());
         let output = result.unwrap();
 
-        let cs = output.consciousness_state.expect("consciousness_state MUST be Some");
+        let cs = output
+            .consciousness_state
+            .expect("consciousness_state MUST be Some");
 
         // AFTER: Verify defaults match types.rs Default impl
         println!("AFTER: Verifying default values...");
-        println!("  - consciousness: {:.2} (expected: 0.00 for DOR state)", cs.consciousness);
+        println!(
+            "  - consciousness: {:.2} (expected: 0.00 for DOR state)",
+            cs.consciousness
+        );
         println!("  - integration: {:.2} (expected: 0.00)", cs.integration);
         println!("  - reflection: {:.2} (expected: 0.00)", cs.reflection);
-        println!("  - differentiation: {:.2} (expected: 0.00)", cs.differentiation);
-        println!("  - identity_continuity: {:.2} (expected: 1.00 for fresh identity)", cs.identity_continuity);
-        println!("  - johari_quadrant: {:?} (expected: Unknown)", cs.johari_quadrant);
+        println!(
+            "  - differentiation: {:.2} (expected: 0.00)",
+            cs.differentiation
+        );
+        println!(
+            "  - identity_continuity: {:.2} (expected: 1.00 for fresh identity)",
+            cs.identity_continuity
+        );
+        println!(
+            "  - johari_quadrant: {:?} (expected: Unknown)",
+            cs.johari_quadrant
+        );
 
         // Default is DOR state: C=0, r=0, IC=1.0, Johari=Unknown
         assert_eq!(cs.consciousness, 0.0, "Default consciousness MUST be 0.0");
-        assert_eq!(cs.identity_continuity, 1.0, "Default IC MUST be 1.0 (fresh identity)");
-        assert!(matches!(cs.johari_quadrant, JohariQuadrant::Unknown),
-            "Default Johari MUST be Unknown");
+        assert_eq!(
+            cs.identity_continuity, 1.0,
+            "Default IC MUST be 1.0 (fresh identity)"
+        );
+        assert!(
+            matches!(cs.johari_quadrant, JohariQuadrant::Unknown),
+            "Default Johari MUST be Unknown"
+        );
 
         println!("RESULT: PASS - Defaults match ConsciousnessState::default()");
     }
@@ -419,7 +456,15 @@ mod tests {
 
         // High-impact tools
         println!("\nHigh-impact tools (state-modifying):");
-        for tool in &["Write", "Edit", "MultiEdit", "Bash", "Git", "NotebookEdit", "Task"] {
+        for tool in &[
+            "Write",
+            "Edit",
+            "MultiEdit",
+            "Bash",
+            "Git",
+            "NotebookEdit",
+            "Task",
+        ] {
             let is_high = is_high_impact_tool(tool);
             let is_ro = is_read_only_tool(tool);
             println!("  - {}: high_impact={}, read_only={}", tool, is_high, is_ro);
@@ -429,7 +474,15 @@ mod tests {
 
         // Read-only tools
         println!("\nRead-only tools (no state modification):");
-        for tool in &["Read", "Glob", "Grep", "LSP", "WebFetch", "WebSearch", "TodoRead"] {
+        for tool in &[
+            "Read",
+            "Glob",
+            "Grep",
+            "LSP",
+            "WebFetch",
+            "WebSearch",
+            "TodoRead",
+        ] {
             let is_high = is_high_impact_tool(tool);
             let is_ro = is_read_only_tool(tool);
             println!("  - {}: high_impact={}, read_only={}", tool, is_high, is_ro);
@@ -466,9 +519,15 @@ mod tests {
         println!("AFTER: Average execution time: {}us", avg_us);
 
         // Fast path without DB should average well under 1ms
-        assert!(avg_us < 1000,
-            "FAIL: Average {}us suggests database access (expected <1000us)", avg_us);
+        assert!(
+            avg_us < 1000,
+            "FAIL: Average {}us suggests database access (expected <1000us)",
+            avg_us
+        );
 
-        println!("RESULT: PASS - No database access detected (avg {}us)", avg_us);
+        println!(
+            "RESULT: PASS - No database access detected (avg {}us)",
+            avg_us
+        );
     }
 }

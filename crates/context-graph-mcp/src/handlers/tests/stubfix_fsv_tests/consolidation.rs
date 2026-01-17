@@ -2,8 +2,10 @@
 
 use serde_json::json;
 
+use crate::handlers::tests::{
+    create_test_handlers_with_rocksdb_store_access, extract_mcp_tool_data, make_request,
+};
 use crate::protocol::JsonRpcId;
-use crate::handlers::tests::{create_test_handlers_with_rocksdb_store_access, extract_mcp_tool_data, make_request};
 
 use super::helpers::create_test_fingerprint;
 
@@ -84,7 +86,11 @@ async fn test_consolidation_orthogonal_no_candidates() {
     for content in test_data.iter() {
         let fp = create_test_fingerprint(content, 0.7, 5);
         let id = store.store(fp).await.expect("Store must succeed");
-        println!("  - {} (content: {}...)", id, &content[..30.min(content.len())]);
+        println!(
+            "  - {} (content: {}...)",
+            id,
+            &content[..30.min(content.len())]
+        );
     }
 
     let request = make_request(
@@ -110,7 +116,9 @@ async fn test_consolidation_orthogonal_no_candidates() {
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
 
-    let result_status = data.get("consolidation_result").expect("Should have result");
+    let result_status = data
+        .get("consolidation_result")
+        .expect("Should have result");
     let candidate_count = result_status
         .get("candidate_count")
         .and_then(|v| v.as_u64())
@@ -186,7 +194,9 @@ async fn test_consolidation_identical_produces_candidates() {
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
 
-    let result_status = data.get("consolidation_result").expect("Should have result");
+    let result_status = data
+        .get("consolidation_result")
+        .expect("Should have result");
     let candidate_count = result_status
         .get("candidate_count")
         .and_then(|v| v.as_u64())
@@ -211,10 +221,7 @@ async fn test_consolidation_identical_produces_candidates() {
     }
 
     // With 3 identical items, we have 3 pairs, and all should have similarity = 1.0
-    assert!(
-        pairs_evaluated > 0,
-        "Should evaluate some pairs"
-    );
+    assert!(pairs_evaluated > 0, "Should evaluate some pairs");
 
     // Identical content should produce candidates
     assert!(
@@ -223,7 +230,9 @@ async fn test_consolidation_identical_produces_candidates() {
         candidate_count
     );
 
-    println!("\n[FSV-CONSOLIDATION-003 PASSED] Identical content produces consolidation candidates");
+    println!(
+        "\n[FSV-CONSOLIDATION-003 PASSED] Identical content produces consolidation candidates"
+    );
     println!("================================================================================\n");
 }
 
@@ -278,10 +287,7 @@ async fn test_consolidation_limit_respected() {
     println!("\n[RESULT]");
     println!("  - max_memories_limit in response: {}", max_memories_limit);
 
-    assert_eq!(
-        max_memories_limit, 5,
-        "max_memories_limit should be 5"
-    );
+    assert_eq!(max_memories_limit, 5, "max_memories_limit should be 5");
 
     println!("\n[FSV-CONSOLIDATION-004 PASSED] Limit parameter is respected");
     println!("================================================================================\n");

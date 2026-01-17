@@ -8,7 +8,7 @@
 
 use crate::quantization::pq8::encoder::PQ8Encoder;
 use crate::quantization::pq8::training::generate_realistic_embeddings;
-use crate::quantization::pq8::types::{NUM_CENTROIDS, NUM_SUBVECTORS, PQ8QuantizationError};
+use crate::quantization::pq8::types::{PQ8QuantizationError, NUM_CENTROIDS, NUM_SUBVECTORS};
 use crate::quantization::types::{PQ8Codebook, QuantizationMethod};
 use std::sync::Arc;
 
@@ -152,7 +152,9 @@ fn test_trained_codebook_quantization_roundtrip() {
 
         // Test with default codebook for comparison
         let default_q = default_encoder.quantize(sample).expect("quantize default");
-        let default_r = default_encoder.dequantize(&default_q).expect("dequantize default");
+        let default_r = default_encoder
+            .dequantize(&default_q)
+            .expect("dequantize default");
         let dot: f32 = sample
             .iter()
             .zip(default_r.iter())

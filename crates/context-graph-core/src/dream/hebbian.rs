@@ -116,7 +116,10 @@ impl HebbianEngine {
         for (source, target, weight) in edges {
             self.edge_weights.insert((*source, *target), *weight);
         }
-        debug!("Loaded {} edges for Hebbian update", self.edge_weights.len());
+        debug!(
+            "Loaded {} edges for Hebbian update",
+            self.edge_weights.len()
+        );
     }
 
     /// Compute Hebbian updates for all loaded edges.
@@ -331,7 +334,10 @@ pub fn kuramoto_coupling(
     let mut new_phases = HashMap::new();
 
     for (node_i, &theta_i) in phases {
-        let coupling_sum: f32 = phases.values().map(|&theta_j| (theta_j - theta_i).sin()).sum();
+        let coupling_sum: f32 = phases
+            .values()
+            .map(|&theta_j| (theta_j - theta_i).sin())
+            .sum();
 
         let d_theta = (coupling_strength / n) * coupling_sum;
         let new_theta = theta_i + d_theta * dt;

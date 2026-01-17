@@ -26,7 +26,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 mod commands;
 mod error;
 
-pub use error::{CliExitCode, exit_code_for_error, is_corruption_indicator};
+pub use error::{exit_code_for_error, is_corruption_indicator, CliExitCode};
 
 /// Context Graph CLI - Session Identity and Consciousness Management
 #[derive(Parser)]
@@ -69,8 +69,7 @@ async fn main() {
 
     // Setup logging based on verbosity
     let filter = match cli.verbose {
-        0 => EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| EnvFilter::new("warn")),
+        0 => EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn")),
         1 => EnvFilter::new("info"),
         2 => EnvFilter::new("debug"),
         _ => EnvFilter::new("trace"),
@@ -88,12 +87,8 @@ async fn main() {
         Commands::Consciousness { action } => {
             commands::consciousness::handle_consciousness_command(action).await
         }
-        Commands::Session { action } => {
-            commands::session::handle_session_command(action).await
-        }
-        Commands::Hooks { action } => {
-            commands::hooks::handle_hooks_command(action).await
-        }
+        Commands::Session { action } => commands::session::handle_session_command(action).await,
+        Commands::Hooks { action } => commands::hooks::handle_hooks_command(action).await,
     };
 
     std::process::exit(exit_code);

@@ -42,7 +42,10 @@ async fn test_get_consciousness_state_returns_valid_data() {
     let data = extract_mcp_tool_data(&result);
 
     // FSV: Verify C (consciousness level) is in valid range [0, 1]
-    let c_value = data.get("C").and_then(|v| v.as_f64()).expect("C must exist");
+    let c_value = data
+        .get("C")
+        .and_then(|v| v.as_f64())
+        .expect("C must exist");
     assert!(
         (0.0..=1.0).contains(&c_value),
         "[FSV] C must be in [0, 1], got {}",
@@ -50,7 +53,10 @@ async fn test_get_consciousness_state_returns_valid_data() {
     );
 
     // FSV: Verify r (order parameter) is in valid range [0, 1]
-    let r = data.get("r").and_then(|v| v.as_f64()).expect("r must exist");
+    let r = data
+        .get("r")
+        .and_then(|v| v.as_f64())
+        .expect("r must exist");
     assert!(
         (0.0..=1.0).contains(&r),
         "[FSV] r must be in [0, 1], got {}",
@@ -69,7 +75,13 @@ async fn test_get_consciousness_state_returns_valid_data() {
         .get("state")
         .and_then(|v| v.as_str())
         .expect("state must exist");
-    let valid_states = ["DORMANT", "FRAGMENTED", "EMERGING", "CONSCIOUS", "HYPERSYNC"];
+    let valid_states = [
+        "DORMANT",
+        "FRAGMENTED",
+        "EMERGING",
+        "CONSCIOUS",
+        "HYPERSYNC",
+    ];
     assert!(
         valid_states.contains(&state),
         "[FSV] Invalid state: {}, expected one of {:?}",
@@ -140,7 +152,9 @@ async fn test_get_consciousness_state_returns_valid_data() {
         "[FSV] component_analysis.reflection_sufficient must exist"
     );
     assert!(
-        component_analysis.get("differentiation_sufficient").is_some(),
+        component_analysis
+            .get("differentiation_sufficient")
+            .is_some(),
         "[FSV] component_analysis.differentiation_sufficient must exist"
     );
 

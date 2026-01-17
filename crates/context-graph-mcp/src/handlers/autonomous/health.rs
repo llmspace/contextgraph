@@ -110,39 +110,41 @@ impl Handlers {
         if params.subsystem == "gwt" || params.subsystem == "all" {
             // Get GWT state from providers if available
             // ConsciousnessState is an enum - use async trait methods for metrics
-            let (gwt_status, kuramoto_r, identity_continuity) =
-                if let (Some(ref gwt_system), Some(ref kuramoto)) =
-                    (&self.gwt_system, &self.kuramoto_network)
-                {
-                    // Get Kuramoto order parameter (r)
-                    let r = kuramoto.read().synchronization();
+            let (gwt_status, kuramoto_r, identity_continuity) = if let (
+                Some(ref gwt_system),
+                Some(ref kuramoto),
+            ) =
+                (&self.gwt_system, &self.kuramoto_network)
+            {
+                // Get Kuramoto order parameter (r)
+                let r = kuramoto.read().synchronization();
 
-                    // Get identity continuity from GwtSystemProvider async method
-                    let ic = gwt_system.identity_coherence().await;
+                // Get identity continuity from GwtSystemProvider async method
+                let ic = gwt_system.identity_coherence().await;
 
-                    // Health based on identity continuity and Kuramoto r
-                    let health_score = (ic + r as f32) / 2.0;
-                    let status = get_status(health_score as f64);
+                // Health based on identity continuity and Kuramoto r
+                let health_score = (ic + r as f32) / 2.0;
+                let status = get_status(health_score as f64);
 
-                    if status != "healthy" {
-                        overall_healthy = false;
-                        if status == "critical" {
-                            any_critical = true;
-                        }
-                        if ic < 0.5 {
-                            recommendations.push(json!({
+                if status != "healthy" {
+                    overall_healthy = false;
+                    if status == "critical" {
+                        any_critical = true;
+                    }
+                    if ic < 0.5 {
+                        recommendations.push(json!({
                                 "subsystem": "gwt",
                                 "action": "trigger_dream",
                                 "description": format!("Identity continuity ({:.2}) below 0.5 - dream consolidation required", ic)
                             }));
-                        }
                     }
+                }
 
-                    (status, r, ic)
-                } else {
-                    // No GWT provider - report as unknown (EC-AUTO-09)
-                    ("unknown", 0.0, 0.0)
-                };
+                (status, r, ic)
+            } else {
+                // No GWT provider - report as unknown (EC-AUTO-09)
+                ("unknown", 0.0, 0.0)
+            };
 
             if gwt_status == "unknown" {
                 recommendations.push(json!({
@@ -223,29 +225,29 @@ impl Handlers {
             // Query storage metrics
             // NOTE: TeleologicalMemoryStore trait doesn't expose health metrics.
             // We check basic functionality by attempting to count nodes.
-            let (storage_status, node_count) = match self.teleological_store.list_all_johari(1).await
-            {
-                Ok(_) => {
-                    // Storage is accessible
-                    // Try to get total count (limit high)
-                    let count = match self.teleological_store.list_all_johari(100000).await {
-                        Ok(list) => list.len(),
-                        Err(_) => 0,
-                    };
-                    ("healthy", count)
-                }
-                Err(e) => {
-                    error!(error = %e, "get_health_status: Storage health check failed");
-                    overall_healthy = false;
-                    any_critical = true;
-                    recommendations.push(json!({
-                        "subsystem": "storage",
-                        "action": "check_rocksdb",
-                        "description": format!("Storage access failed: {}", e)
-                    }));
-                    ("critical", 0)
-                }
-            };
+            let (storage_status, node_count) =
+                match self.teleological_store.list_all_johari(1).await {
+                    Ok(_) => {
+                        // Storage is accessible
+                        // Try to get total count (limit high)
+                        let count = match self.teleological_store.list_all_johari(100000).await {
+                            Ok(list) => list.len(),
+                            Err(_) => 0,
+                        };
+                        ("healthy", count)
+                    }
+                    Err(e) => {
+                        error!(error = %e, "get_health_status: Storage health check failed");
+                        overall_healthy = false;
+                        any_critical = true;
+                        recommendations.push(json!({
+                            "subsystem": "storage",
+                            "action": "check_rocksdb",
+                            "description": format!("Storage access failed: {}", e)
+                        }));
+                        ("critical", 0)
+                    }
+                };
 
             subsystems.insert(
                 "storage_health".to_string(),
@@ -375,7 +377,10 @@ impl Handlers {
                         actions_taken.push("Cleared stale prediction cache".to_string());
                         match tracker.reset_lambdas_to_stage("adolescence") {
                             Ok(()) => {
-                                actions_taken.push("Reset lambda weights to adolescence defaults (0.5/0.5)".to_string());
+                                actions_taken.push(
+                                    "Reset lambda weights to adolescence defaults (0.5/0.5)"
+                                        .to_string(),
+                                );
                             }
                             Err(e) => {
                                 warn!(error = %e, "trigger_healing: Failed to reset lambdas to adolescence");
@@ -393,7 +398,10 @@ impl Handlers {
                         // Then reset lambda weights to infancy (most conservative)
                         match tracker.reset_lambdas_to_stage("infancy") {
                             Ok(()) => {
-                                actions_taken.push("Reset lambda weights to infancy defaults (0.7/0.3)".to_string());
+                                actions_taken.push(
+                                    "Reset lambda weights to infancy defaults (0.7/0.3)"
+                                        .to_string(),
+                                );
                             }
                             Err(e) => {
                                 warn!(error = %e, "trigger_healing: Failed to reset lambdas to infancy");
@@ -428,10 +436,13 @@ impl Handlers {
                         // Reset Kuramoto oscillator phases to uniform distribution
                         if let Some(ref kuramoto) = self.kuramoto_network {
                             kuramoto.write().reset();
-                            actions_taken.push("Reset Kuramoto oscillator phases to uniform".to_string());
+                            actions_taken
+                                .push("Reset Kuramoto oscillator phases to uniform".to_string());
                         } else {
                             warn!("trigger_healing: Kuramoto network not available for GWT reset");
-                            actions_taken.push("Kuramoto network not available - skipped phase reset".to_string());
+                            actions_taken.push(
+                                "Kuramoto network not available - skipped phase reset".to_string(),
+                            );
                         }
 
                         actions_taken.push("Cleared workspace queue".to_string());
@@ -439,7 +450,8 @@ impl Handlers {
                         // Trigger dream consolidation for identity healing
                         // Note: Actual dream trigger goes through TriggerManager (wired in TASK-009)
                         // This healing action notes the intent; IC-based triggers handle the actual dream
-                        actions_taken.push("Requested dream consolidation for identity healing".to_string());
+                        actions_taken
+                            .push("Requested dream consolidation for identity healing".to_string());
                     }
                     _ => {}
                 }

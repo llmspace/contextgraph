@@ -62,7 +62,10 @@ async fn test_fsv_dream_listener_memory_exits() {
     assert_eq!(queued_id, Some(memory_id), "Queued ID must match");
 
     // EVIDENCE
-    println!("EVIDENCE: Memory {:?} correctly queued for dream replay", memory_id);
+    println!(
+        "EVIDENCE: Memory {:?} correctly queued for dream replay",
+        memory_id
+    );
 }
 
 #[tokio::test]
@@ -94,7 +97,10 @@ async fn test_dream_listener_ignores_other_events() {
         queue.len()
     };
 
-    assert_eq!(queue_len, 0, "Queue should remain empty for non-MemoryExits events");
+    assert_eq!(
+        queue_len, 0,
+        "Queue should remain empty for non-MemoryExits events"
+    );
     println!("EVIDENCE: DreamEventListener correctly ignores non-MemoryExits events");
 }
 
@@ -123,6 +129,9 @@ async fn test_dream_listener_identity_critical_above_threshold() {
         queue.len()
     };
 
-    assert_eq!(queue_len, 0, "Queue should remain empty for IdentityCritical");
+    assert_eq!(
+        queue_len, 0,
+        "Queue should remain empty for IdentityCritical"
+    );
     println!("EVIDENCE: IdentityCritical event handled without queuing (IC above threshold)");
 }

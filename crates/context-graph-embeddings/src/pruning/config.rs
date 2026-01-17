@@ -217,7 +217,10 @@ mod tests {
         assert!(config.validate().is_ok());
         assert_eq!(config.target_compression, 0.5);
         assert_eq!(config.min_tokens, 64);
-        assert_eq!(config.scoring_method, ImportanceScoringMethod::AttentionBased);
+        assert_eq!(
+            config.scoring_method,
+            ImportanceScoringMethod::AttentionBased
+        );
     }
 
     #[test]

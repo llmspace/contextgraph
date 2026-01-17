@@ -203,11 +203,17 @@ async fn test_full_state_verification_store_alignment_drift_cycle() {
     println!("   - Goal count: {}", hierarchy_len);
     // TASK-P0-001: Now 4 goals (2 Strategic + 1 Tactical + 1 Immediate)
     println!("   - Expected: 4 (2 Strategic + 1 Tactical + 1 Immediate)");
-    println!("   - Has top-level goals: {}", hierarchy.read().has_top_level_goals());
+    println!(
+        "   - Has top-level goals: {}",
+        hierarchy.read().has_top_level_goals()
+    );
 
     assert_eq!(initial_count, 0, "Store must start empty");
     assert_eq!(hierarchy_len, 4, "Hierarchy must have 4 goals");
-    assert!(hierarchy.read().has_top_level_goals(), "Must have top-level goals");
+    assert!(
+        hierarchy.read().has_top_level_goals(),
+        "Must have top-level goals"
+    );
     println!("   ✓ VERIFIED: Store is empty, hierarchy has 4 goals\n");
 
     // =========================================================================
@@ -258,10 +264,7 @@ async fn test_full_state_verification_store_alignment_drift_cycle() {
         .expect("Fingerprint must exist in store");
 
     println!("   - Fingerprint ID in store: {}", retrieved_fp.id);
-    println!(
-        "   - Alignment score: {:.4}",
-        retrieved_fp.alignment_score
-    );
+    println!("   - Alignment score: {:.4}", retrieved_fp.alignment_score);
     println!(
         "   - Purpose vector coherence: {:.4}",
         retrieved_fp.purpose_vector.coherence
@@ -311,7 +314,9 @@ async fn test_full_state_verification_store_alignment_drift_cycle() {
     let drift_result = drift_response.result.expect("Must have result");
 
     // TASK-INTEG-002: Verify NEW response structure with TeleologicalDriftDetector
-    let overall_drift = drift_result.get("overall_drift").expect("Must have overall_drift");
+    let overall_drift = drift_result
+        .get("overall_drift")
+        .expect("Must have overall_drift");
     let drift_level = overall_drift.get("level").and_then(|v| v.as_str());
     let drift_score = overall_drift.get("drift_score").and_then(|v| v.as_f64());
     let has_drifted = overall_drift.get("has_drifted").and_then(|v| v.as_bool());
@@ -320,8 +325,14 @@ async fn test_full_state_verification_store_alignment_drift_cycle() {
 
     println!("   Handler returned (TASK-INTEG-002 TeleologicalDriftDetector format):");
     println!("   - overall_drift.level: {}", drift_level.unwrap_or("?"));
-    println!("   - overall_drift.drift_score: {:.4}", drift_score.unwrap_or(0.0));
-    println!("   - overall_drift.has_drifted: {}", has_drifted.unwrap_or(false));
+    println!(
+        "   - overall_drift.drift_score: {:.4}",
+        drift_score.unwrap_or(0.0)
+    );
+    println!(
+        "   - overall_drift.has_drifted: {}",
+        has_drifted.unwrap_or(false)
+    );
     println!("   - analyzed_count: {}", analyzed_count.unwrap_or(0));
     println!("   - check_time_ms: {}ms", check_time_ms.unwrap_or(0));
 
@@ -332,7 +343,11 @@ async fn test_full_state_verification_store_alignment_drift_cycle() {
         .get("per_embedder_drift")
         .and_then(|v| v.as_array())
         .expect("Must have per_embedder_drift");
-    assert_eq!(per_embedder.len(), 13, "Must have 13 per-embedder drift entries");
+    assert_eq!(
+        per_embedder.len(),
+        13,
+        "Must have 13 per-embedder drift entries"
+    );
 
     // Verify most_drifted_embedders exists
     assert!(
@@ -504,7 +519,7 @@ async fn test_full_state_verification_goal_hierarchy_navigation() {
         let s1 = top_level.first().expect("Must have Strategic");
         hierarchy_guard.children(&s1.id).len()
     }; // guard dropped here
-    // Note: direct_children_len may be 1 (Tactical child) for the first Strategic goal
+       // Note: direct_children_len may be 1 (Tactical child) for the first Strategic goal
     println!(
         "   ✓ VERIFIED: get_children returns {} children",
         children.len()
@@ -674,7 +689,10 @@ async fn test_edge_case_autonomous_operation_no_north_star() {
 
     // BEFORE STATE
     println!("📊 BEFORE STATE:");
-    println!("   Has North Star: {}", hierarchy.read().has_top_level_goals());
+    println!(
+        "   Has North Star: {}",
+        hierarchy.read().has_top_level_goals()
+    );
     assert!(
         !hierarchy.read().has_top_level_goals(),
         "Must NOT have North Star"
@@ -813,7 +831,8 @@ async fn test_edge_case_north_star_update_returns_method_not_found() {
 
     let existing_ns_id = hierarchy
         .read()
-        .top_level_goals().first()
+        .top_level_goals()
+        .first()
         .map(|g| g.id.to_string())
         .expect("Must have NS");
     println!("   Existing North Star ID: {}", existing_ns_id);
@@ -847,7 +866,8 @@ async fn test_edge_case_north_star_update_returns_method_not_found() {
     // AFTER STATE - original North Star unchanged
     let after_ns_id = hierarchy
         .read()
-        .top_level_goals().first()
+        .top_level_goals()
+        .first()
         .map(|g| g.id.to_string())
         .expect("Must still have NS");
     assert_eq!(

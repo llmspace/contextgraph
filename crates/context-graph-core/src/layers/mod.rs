@@ -35,23 +35,23 @@ pub use coherence::{
 // Re-export deprecated constants with warning suppression for backwards compatibility
 #[allow(deprecated)]
 pub use coherence::{FRAGMENTATION_THRESHOLD, GW_THRESHOLD, HYPERSYNC_THRESHOLD};
-pub use learning::{
-    LearningLayer, UtlWeightComputer, WeightDelta,
-    DEFAULT_LEARNING_RATE, GRADIENT_CLIP, TARGET_FREQUENCY_HZ,
-};
 #[allow(deprecated)]
 pub use learning::DEFAULT_CONSOLIDATION_THRESHOLD;
+pub use learning::{
+    LearningLayer, UtlWeightComputer, WeightDelta, DEFAULT_LEARNING_RATE, GRADIENT_CLIP,
+    TARGET_FREQUENCY_HZ,
+};
+#[allow(deprecated)]
+pub use memory::MIN_MEMORY_SIMILARITY;
 pub use memory::{
     AssociativeMemory, MemoryContent, MemoryLayer, ScoredMemory, StoredMemory,
     DECAY_HALF_LIFE_HOURS, DEFAULT_MAX_RETRIEVE, DEFAULT_MHN_BETA, MEMORY_PATTERN_DIM,
 };
 #[allow(deprecated)]
-pub use memory::MIN_MEMORY_SIMILARITY;
+pub use reflex::MIN_HIT_SIMILARITY;
 pub use reflex::{
     CacheStats, CachedResponse, ModernHopfieldCache, ReflexLayer, DEFAULT_BETA,
     DEFAULT_CACHE_CAPACITY, PATTERN_DIM,
 };
-#[allow(deprecated)]
-pub use reflex::MIN_HIT_SIMILARITY;
-pub use thresholds::LayerThresholds;
 pub use sensing::{PiiPattern, PiiScrubber, ScrubbedContent, SensingLayer, SensingMetrics};
+pub use thresholds::LayerThresholds;

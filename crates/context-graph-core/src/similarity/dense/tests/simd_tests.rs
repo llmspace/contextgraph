@@ -42,10 +42,7 @@ fn test_simd_with_different_dimensions() {
 
         let diff = (scalar - simd).abs();
         assert!(diff < 1e-5, "SIMD differs at dim={}: diff={}", dim, diff);
-        println!(
-            "[PASS] dim={}: scalar={:.6}, simd={:.6}",
-            dim, scalar, simd
-        );
+        println!("[PASS] dim={}: scalar={:.6}, simd={:.6}", dim, scalar, simd);
     }
 }
 
@@ -84,11 +81,7 @@ fn test_simd_remainder_handling() {
     let simd = cosine_similarity_simd(&a, &b).unwrap();
 
     let diff = (scalar - simd).abs();
-    assert!(
-        diff < 1e-5,
-        "SIMD remainder handling failed: diff={}",
-        diff
-    );
+    assert!(diff < 1e-5, "SIMD remainder handling failed: diff={}", diff);
     println!(
         "[PASS] Remainder handling (dim={}): scalar={:.6}, simd={:.6}",
         dim, scalar, simd

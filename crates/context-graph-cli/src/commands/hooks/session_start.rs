@@ -131,7 +131,10 @@ fn parse_stdin() -> HookResult<HookInput> {
         return Err(HookError::invalid_input("stdin is empty - expected JSON"));
     }
 
-    debug!(input_bytes = input_str.len(), "SESSION_START: parsing stdin JSON");
+    debug!(
+        input_bytes = input_str.len(),
+        "SESSION_START: parsing stdin JSON"
+    );
 
     serde_json::from_str(&input_str).map_err(|e| {
         error!(error = %e, input_preview = %&input_str[..input_str.len().min(100)], "SESSION_START: JSON parse failed");
@@ -654,8 +657,14 @@ mod tests {
         );
 
         println!("PASS: Session linked to previous with identity state restored");
-        println!("  purpose_vector restored: {:?}", &loaded.purpose_vector[0..3]);
-        println!("  kuramoto_phases restored: {:?}", &loaded.kuramoto_phases[0..3]);
+        println!(
+            "  purpose_vector restored: {:?}",
+            &loaded.purpose_vector[0..3]
+        );
+        println!(
+            "  kuramoto_phases restored: {:?}",
+            &loaded.kuramoto_phases[0..3]
+        );
         println!("  cross_session_ic: {}", loaded.cross_session_ic);
     }
 
@@ -787,10 +796,7 @@ mod tests {
 
         // Verify required fields
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-        assert!(
-            parsed.get("success").is_some(),
-            "Must have 'success' field"
-        );
+        assert!(parsed.get("success").is_some(), "Must have 'success' field");
         assert!(
             parsed.get("execution_time_ms").is_some(),
             "Must have 'execution_time_ms' field"
@@ -952,7 +958,10 @@ mod tests {
         println!("  ic_delta: {} (MUST be ~0.0, not -1.0)", drift.ic_delta);
         println!("  purpose_drift: {} (MUST be ~0.0)", drift.purpose_drift);
         println!("  time_since_snapshot_ms: {}", drift.time_since_snapshot_ms);
-        println!("  kuramoto_phase_drift: {} (MUST be ~0.0)", drift.kuramoto_phase_drift);
+        println!(
+            "  kuramoto_phase_drift: {} (MUST be ~0.0)",
+            drift.kuramoto_phase_drift
+        );
     }
 
     // =========================================================================
@@ -1006,7 +1015,10 @@ mod tests {
         };
 
         let result = execute(args).await;
-        assert!(result.is_ok(), "Execute must succeed despite missing previous");
+        assert!(
+            result.is_ok(),
+            "Execute must succeed despite missing previous"
+        );
         let output = result.unwrap();
 
         // Verify: No drift metrics when previous not found
@@ -1028,8 +1040,12 @@ mod tests {
         println!("\n=== TC-HOOKS-013-04: Cosine Distance Edge Cases ===");
 
         // Test 1: Identical vectors -> distance 0.0
-        let a = [1.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        let b = [1.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let a = [
+            1.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        ];
+        let b = [
+            1.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        ];
         let dist = cosine_distance(&a, &b);
         assert!(
             (dist - 0.0).abs() < 0.001,
@@ -1039,8 +1055,12 @@ mod tests {
         println!("  Identical vectors: distance = {}", dist);
 
         // Test 2: Opposite vectors -> distance 2.0
-        let a = [1.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        let b = [-1.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let a = [
+            1.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        ];
+        let b = [
+            -1.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        ];
         let dist = cosine_distance(&a, &b);
         assert!(
             (dist - 2.0).abs() < 0.001,
@@ -1176,12 +1196,12 @@ mod tests {
             "ic_delta {} should be crisis (< -0.3)",
             drift.ic_delta
         );
-        assert!(
-            drift.is_warning_drift(),
-            "crisis is also warning level"
-        );
+        assert!(drift.is_warning_drift(), "crisis is also warning level");
 
-        println!("PASS: Crisis drift correctly detected for ic_delta = {}", drift.ic_delta);
+        println!(
+            "PASS: Crisis drift correctly detected for ic_delta = {}",
+            drift.ic_delta
+        );
     }
 
     // =========================================================================
@@ -1210,8 +1230,10 @@ mod tests {
             "ic_delta {} should NOT be crisis (>= -0.3)",
             warning_drift.ic_delta
         );
-        println!("  Warning drift: ic_delta = {}, is_warning = true, is_crisis = false",
-            warning_drift.ic_delta);
+        println!(
+            "  Warning drift: ic_delta = {}, is_warning = true, is_crisis = false",
+            warning_drift.ic_delta
+        );
 
         // Test healthy level: -0.05 (5% drop)
         let healthy_drift = DriftMetrics {
@@ -1231,8 +1253,10 @@ mod tests {
             "ic_delta {} should NOT be crisis (>= -0.3)",
             healthy_drift.ic_delta
         );
-        println!("  Healthy drift: ic_delta = {}, is_warning = false, is_crisis = false",
-            healthy_drift.ic_delta);
+        println!(
+            "  Healthy drift: ic_delta = {}, is_warning = false, is_crisis = false",
+            healthy_drift.ic_delta
+        );
 
         // Test positive drift (improvement)
         let positive_drift = DriftMetrics {
@@ -1252,8 +1276,10 @@ mod tests {
             "positive ic_delta {} should NOT be crisis",
             positive_drift.ic_delta
         );
-        println!("  Positive drift: ic_delta = {}, is_warning = false, is_crisis = false",
-            positive_drift.ic_delta);
+        println!(
+            "  Positive drift: ic_delta = {}, is_warning = false, is_crisis = false",
+            positive_drift.ic_delta
+        );
 
         println!("PASS: Warning drift correctly detected at threshold boundaries");
     }
@@ -1278,8 +1304,12 @@ mod tests {
         let new_id = "restored-session";
 
         // Setup: Create previous session with FULL identity state
-        let prev_purpose = [0.3_f32, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.1, 0.2, 0.35, 0.45, 0.55];
-        let prev_phases = [0.1_f64, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3];
+        let prev_purpose = [
+            0.3_f32, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.1, 0.2, 0.35, 0.45, 0.55,
+        ];
+        let prev_phases = [
+            0.1_f64, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3,
+        ];
         let prev_coupling = 0.75;
         let prev_consciousness = 0.85;
         let prev_integration = 0.72;
@@ -1341,42 +1371,48 @@ mod tests {
         assert!(
             (new_snapshot.coupling - prev_coupling).abs() < 0.001,
             "coupling MUST be restored, got {} expected {}",
-            new_snapshot.coupling, prev_coupling
+            new_snapshot.coupling,
+            prev_coupling
         );
 
         // Verify consciousness
         assert!(
             (new_snapshot.consciousness - prev_consciousness).abs() < 0.001,
             "consciousness MUST be restored, got {} expected {}",
-            new_snapshot.consciousness, prev_consciousness
+            new_snapshot.consciousness,
+            prev_consciousness
         );
 
         // Verify integration
         assert!(
             (new_snapshot.integration - prev_integration).abs() < 0.001,
             "integration MUST be restored, got {} expected {}",
-            new_snapshot.integration, prev_integration
+            new_snapshot.integration,
+            prev_integration
         );
 
         // Verify reflection
         assert!(
             (new_snapshot.reflection - prev_reflection).abs() < 0.001,
             "reflection MUST be restored, got {} expected {}",
-            new_snapshot.reflection, prev_reflection
+            new_snapshot.reflection,
+            prev_reflection
         );
 
         // Verify differentiation
         assert!(
             (new_snapshot.differentiation - prev_differentiation).abs() < 0.001,
             "differentiation MUST be restored, got {} expected {}",
-            new_snapshot.differentiation, prev_differentiation
+            new_snapshot.differentiation,
+            prev_differentiation
         );
 
         // Verify crisis_threshold
         assert!(
             (new_snapshot.crisis_threshold - prev_crisis_threshold).abs() < 0.001,
             "crisis_threshold MUST be restored, got {} expected {}",
-            new_snapshot.crisis_threshold, prev_crisis_threshold
+            new_snapshot.crisis_threshold,
+            prev_crisis_threshold
         );
 
         // Verify trajectory copied
@@ -1387,8 +1423,14 @@ mod tests {
         );
 
         println!("PASS: All 9 identity state fields restored from previous session");
-        println!("  purpose_vector: {:?}...", &new_snapshot.purpose_vector[0..3]);
-        println!("  kuramoto_phases: {:?}...", &new_snapshot.kuramoto_phases[0..3]);
+        println!(
+            "  purpose_vector: {:?}...",
+            &new_snapshot.purpose_vector[0..3]
+        );
+        println!(
+            "  kuramoto_phases: {:?}...",
+            &new_snapshot.kuramoto_phases[0..3]
+        );
         println!("  coupling: {}", new_snapshot.coupling);
         println!("  consciousness: {}", new_snapshot.consciousness);
         println!("  integration: {}", new_snapshot.integration);
@@ -1455,7 +1497,8 @@ mod tests {
         assert!(
             ic_class.level.to_string().contains("Healthy") || ic_class.value >= 0.9,
             "IC level MUST be Healthy, got {} with value {}",
-            ic_class.level, ic_class.value
+            ic_class.level,
+            ic_class.value
         );
 
         // VERIFY: Database shows healthy IC

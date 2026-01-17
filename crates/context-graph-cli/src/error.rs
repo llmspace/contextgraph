@@ -7,8 +7,8 @@
 //!
 //! NO BACKWARDS COMPATIBILITY - FAIL FAST WITH ROBUST LOGGING.
 
-use std::process::ExitCode;
 use context_graph_storage::StorageError;
+use std::process::ExitCode;
 
 /// Exit codes for CLI commands per AP-26 constitution.
 ///
@@ -52,9 +52,7 @@ impl From<&StorageError> for CliExitCode {
             StorageError::Serialization(msg) if is_corruption_indicator(msg) => {
                 CliExitCode::Blocking
             }
-            StorageError::ReadFailed(msg) if is_corruption_indicator(msg) => {
-                CliExitCode::Blocking
-            }
+            StorageError::ReadFailed(msg) if is_corruption_indicator(msg) => CliExitCode::Blocking,
 
             // NotFound is NOT an error - fresh install is valid
             StorageError::NotFound { .. } => CliExitCode::Success,
@@ -79,7 +77,9 @@ impl From<&StorageError> for CliExitCode {
 #[inline]
 pub fn is_corruption_indicator(msg: &str) -> bool {
     let lower = msg.to_lowercase();
-    CORRUPTION_INDICATORS.iter().any(|&indicator| lower.contains(indicator))
+    CORRUPTION_INDICATORS
+        .iter()
+        .any(|&indicator| lower.contains(indicator))
 }
 
 /// Corruption indicator strings (lowercase).
@@ -171,21 +171,35 @@ mod tests {
         println!("BEFORE: IndexCorrupted error");
         let code = CliExitCode::from(&corruption);
         println!("AFTER: exit_code={:?}", code);
-        assert_eq!(code, CliExitCode::Blocking, "IndexCorrupted must return Blocking");
+        assert_eq!(
+            code,
+            CliExitCode::Blocking,
+            "IndexCorrupted must return Blocking"
+        );
 
         // NotFound is NOT an error
-        let not_found = StorageError::NotFound { id: "test".to_string() };
+        let not_found = StorageError::NotFound {
+            id: "test".to_string(),
+        };
         println!("BEFORE: NotFound error");
         let code = CliExitCode::from(&not_found);
         println!("AFTER: exit_code={:?}", code);
-        assert_eq!(code, CliExitCode::Success, "NotFound must return Success (fresh install)");
+        assert_eq!(
+            code,
+            CliExitCode::Success,
+            "NotFound must return Success (fresh install)"
+        );
 
         // Other errors are Warning
         let io_err = StorageError::WriteFailed("disk full".to_string());
         println!("BEFORE: WriteFailed error");
         let code = CliExitCode::from(&io_err);
         println!("AFTER: exit_code={:?}", code);
-        assert_eq!(code, CliExitCode::Warning, "WriteFailed must return Warning");
+        assert_eq!(
+            code,
+            CliExitCode::Warning,
+            "WriteFailed must return Warning"
+        );
 
         println!("EVIDENCE: IndexCorrupted=Blocking, NotFound=Success, WriteFailed=Warning");
         println!("RESULT: PASS - StorageError conversion correct");
@@ -221,13 +235,21 @@ mod tests {
         for (msg, expected) in corruption_messages {
             let result = is_corruption_indicator(msg);
             println!("  '{}': corruption={} (expected={})", msg, result, expected);
-            assert_eq!(result, expected, "Message '{}' should be corruption={}", msg, expected);
+            assert_eq!(
+                result, expected,
+                "Message '{}' should be corruption={}",
+                msg, expected
+            );
         }
 
         for (msg, expected) in non_corruption_messages {
             let result = is_corruption_indicator(msg);
             println!("  '{}': corruption={} (expected={})", msg, result, expected);
-            assert_eq!(result, expected, "Message '{}' should be corruption={}", msg, expected);
+            assert_eq!(
+                result, expected,
+                "Message '{}' should be corruption={}",
+                msg, expected
+            );
         }
 
         println!("RESULT: PASS - Corruption indicators detected correctly");
@@ -319,7 +341,9 @@ mod tests {
         let code = exit_code_for_error(&index_err);
         assert_eq!(code, CliExitCode::Blocking);
 
-        let not_found = StorageError::NotFound { id: "test".to_string() };
+        let not_found = StorageError::NotFound {
+            id: "test".to_string(),
+        };
         let code = exit_code_for_error(&not_found);
         assert_eq!(code, CliExitCode::Success);
 
@@ -338,18 +362,13 @@ mod tests {
         println!("\n=== Test exit_code_for_error with generic error ===");
 
         // Use std::io::Error as a generic error type
-        let corruption_err = std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "data corruption detected"
-        );
+        let corruption_err =
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "data corruption detected");
         let code = exit_code_for_error(&corruption_err);
         println!("  'data corruption detected': exit_code={:?}", code);
         assert_eq!(code, CliExitCode::Blocking);
 
-        let normal_err = std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "file not found"
-        );
+        let normal_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
         let code = exit_code_for_error(&normal_err);
         println!("  'file not found': exit_code={:?}", code);
         assert_eq!(code, CliExitCode::Warning);
@@ -381,19 +400,28 @@ mod tests {
         // Serialization with corruption indicator
         let err = StorageError::Serialization("data corruption in record".to_string());
         let code = CliExitCode::from(&err);
-        println!("  Serialization('data corruption in record'): exit_code={:?}", code);
+        println!(
+            "  Serialization('data corruption in record'): exit_code={:?}",
+            code
+        );
         assert_eq!(code, CliExitCode::Blocking);
 
         // Serialization without corruption indicator
         let err = StorageError::Serialization("invalid json format".to_string());
         let code = CliExitCode::from(&err);
-        println!("  Serialization('invalid json format'): exit_code={:?}", code);
+        println!(
+            "  Serialization('invalid json format'): exit_code={:?}",
+            code
+        );
         assert_eq!(code, CliExitCode::Blocking); // 'invalid' is a corruption indicator
 
         // Serialization with no indicators
         let err = StorageError::Serialization("unexpected end of input".to_string());
         let code = CliExitCode::from(&err);
-        println!("  Serialization('unexpected end of input'): exit_code={:?}", code);
+        println!(
+            "  Serialization('unexpected end of input'): exit_code={:?}",
+            code
+        );
         assert_eq!(code, CliExitCode::Warning);
 
         println!("RESULT: PASS - Serialization errors classified correctly");
@@ -415,7 +443,10 @@ mod tests {
         // ReadFailed without corruption indicator
         let err = StorageError::ReadFailed("io error: connection reset".to_string());
         let code = CliExitCode::from(&err);
-        println!("  ReadFailed('io error: connection reset'): exit_code={:?}", code);
+        println!(
+            "  ReadFailed('io error: connection reset'): exit_code={:?}",
+            code
+        );
         assert_eq!(code, CliExitCode::Warning);
 
         println!("RESULT: PASS - ReadFailed errors classified correctly");
@@ -429,16 +460,64 @@ mod tests {
         println!("\n=== Test all StorageError variants ===");
 
         let variants: Vec<(StorageError, CliExitCode, &str)> = vec![
-            (StorageError::OpenFailed { path: "test".into(), message: "err".into() }, CliExitCode::Warning, "OpenFailed"),
-            (StorageError::ColumnFamilyNotFound { name: "test".into() }, CliExitCode::Warning, "ColumnFamilyNotFound"),
-            (StorageError::WriteFailed("err".into()), CliExitCode::Warning, "WriteFailed"),
-            (StorageError::ReadFailed("err".into()), CliExitCode::Warning, "ReadFailed (normal)"),
-            (StorageError::FlushFailed("err".into()), CliExitCode::Warning, "FlushFailed"),
-            (StorageError::NotFound { id: "test".into() }, CliExitCode::Success, "NotFound"),
-            (StorageError::Serialization("err".into()), CliExitCode::Warning, "Serialization (normal)"),
-            (StorageError::ValidationFailed("err".into()), CliExitCode::Warning, "ValidationFailed"),
-            (StorageError::IndexCorrupted { index_name: "test".into(), details: "err".into() }, CliExitCode::Blocking, "IndexCorrupted"),
-            (StorageError::Internal("err".into()), CliExitCode::Warning, "Internal"),
+            (
+                StorageError::OpenFailed {
+                    path: "test".into(),
+                    message: "err".into(),
+                },
+                CliExitCode::Warning,
+                "OpenFailed",
+            ),
+            (
+                StorageError::ColumnFamilyNotFound {
+                    name: "test".into(),
+                },
+                CliExitCode::Warning,
+                "ColumnFamilyNotFound",
+            ),
+            (
+                StorageError::WriteFailed("err".into()),
+                CliExitCode::Warning,
+                "WriteFailed",
+            ),
+            (
+                StorageError::ReadFailed("err".into()),
+                CliExitCode::Warning,
+                "ReadFailed (normal)",
+            ),
+            (
+                StorageError::FlushFailed("err".into()),
+                CliExitCode::Warning,
+                "FlushFailed",
+            ),
+            (
+                StorageError::NotFound { id: "test".into() },
+                CliExitCode::Success,
+                "NotFound",
+            ),
+            (
+                StorageError::Serialization("err".into()),
+                CliExitCode::Warning,
+                "Serialization (normal)",
+            ),
+            (
+                StorageError::ValidationFailed("err".into()),
+                CliExitCode::Warning,
+                "ValidationFailed",
+            ),
+            (
+                StorageError::IndexCorrupted {
+                    index_name: "test".into(),
+                    details: "err".into(),
+                },
+                CliExitCode::Blocking,
+                "IndexCorrupted",
+            ),
+            (
+                StorageError::Internal("err".into()),
+                CliExitCode::Warning,
+                "Internal",
+            ),
         ];
 
         for (err, expected, name) in variants {

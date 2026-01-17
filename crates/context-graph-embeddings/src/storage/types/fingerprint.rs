@@ -55,7 +55,6 @@ pub struct StoredQuantizedFingerprint {
 
     // REMOVED: alignment_score per TASK-P0-001 (ARCH-03)
     // North Star alignment was a manual goal metric - goals now emerge autonomously
-
     /// Johari quadrant weights [Open, Hidden, Blind, Unknown].
     /// Aggregated from per-embedder JohariFingerprint.
     /// Used for fast filtering without loading full fingerprint.
@@ -183,7 +182,7 @@ impl StoredQuantizedFingerprint {
         size += 16; // id (UUID)
         size += 1; // version
         size += 52; // purpose_vector (13 × 4 bytes)
-        // REMOVED: alignment_score (4 bytes) per TASK-P0-001
+                    // REMOVED: alignment_score (4 bytes) per TASK-P0-001
         size += 16; // johari_quadrants (4 × 4 bytes)
         size += 1; // dominant_quadrant
         size += 4; // johari_confidence

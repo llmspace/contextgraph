@@ -99,6 +99,8 @@ pub use teleological::{
     parse_e1_matryoshka_key,
     parse_fingerprint_key,
     parse_purpose_vector_key,
+    parse_session_identity_key,
+    parse_session_temporal_key,
     parse_teleological_profile_key,
     parse_teleological_vector_key,
     purpose_vector_cf_options,
@@ -110,6 +112,9 @@ pub use teleological::{
     serialize_purpose_vector,
     // Serialization functions
     serialize_teleological_fingerprint,
+    session_identity_cf_options,
+    session_identity_key,
+    session_temporal_key,
     synergy_matrix_cf_options,
     teleological_profile_key,
     teleological_profiles_cf_options,
@@ -146,6 +151,8 @@ pub use teleological::{
     CF_EMB_9,
     CF_FINGERPRINTS,
     CF_PURPOSE_VECTORS,
+    // TASK-SESSION-04: Session identity column family and key helpers
+    CF_SESSION_IDENTITY,
     // TASK-TELEO-006: New teleological vector column families
     CF_SYNERGY_MATRIX,
     CF_TELEOLOGICAL_PROFILES,
@@ -168,19 +175,12 @@ pub use teleological::{
     PURPOSE_VECTOR_DIM,
     QUANTIZED_EMBEDDER_CFS,
     QUANTIZED_EMBEDDER_CF_COUNT,
+    SESSION_LATEST_KEY,
     // TASK-TELEO-006: New key format functions
     SYNERGY_MATRIX_KEY,
     TELEOLOGICAL_CFS,
     TELEOLOGICAL_CF_COUNT,
     TELEOLOGICAL_VERSION,
-    // TASK-SESSION-04: Session identity column family and key helpers
-    CF_SESSION_IDENTITY,
-    SESSION_LATEST_KEY,
-    parse_session_identity_key,
-    parse_session_temporal_key,
-    session_identity_cf_options,
-    session_identity_key,
-    session_temporal_key,
 };
 
 // Re-export autonomous storage types (TASK-NORTH-007)
@@ -190,25 +190,25 @@ pub use autonomous::{
     adaptive_threshold_state_cf_options,
     autonomous_config_cf_options,
     autonomous_lineage_cf_options,
-    consolidation_history_cf_options,
-    memory_curation_cf_options,
-    // Descriptor getter
-    get_autonomous_cf_descriptors,
     // Key format functions (remaining after TASK-P0-004)
     autonomous_lineage_key,
     autonomous_lineage_timestamp_prefix,
+    consolidation_history_cf_options,
     consolidation_history_key,
     consolidation_history_timestamp_prefix,
+    // Descriptor getter
+    get_autonomous_cf_descriptors,
+    memory_curation_cf_options,
     memory_curation_key,
     parse_autonomous_lineage_key,
     parse_consolidation_history_key,
     parse_memory_curation_key,
     // Singleton key constants
     ADAPTIVE_THRESHOLD_STATE_KEY,
-    AUTONOMOUS_CONFIG_KEY,
     // CF arrays and counts
     AUTONOMOUS_CFS,
     AUTONOMOUS_CF_COUNT,
+    AUTONOMOUS_CONFIG_KEY,
     // Column family names (5 after TASK-P0-004)
     CF_ADAPTIVE_THRESHOLD_STATE,
     CF_AUTONOMOUS_CONFIG,

@@ -6,14 +6,17 @@
 //! Tests that include IdentityCritical events below threshold MUST use
 //! the full `new()` constructor with proper callback handling.
 
+use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-use parking_lot::Mutex;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::dream::TriggerManager;
-use crate::gwt::listeners::{DreamConsolidationCallback, DreamEventListener, MetaCognitiveEventListener, NeuromodulationEventListener};
+use crate::gwt::listeners::{
+    DreamConsolidationCallback, DreamEventListener, MetaCognitiveEventListener,
+    NeuromodulationEventListener,
+};
 use crate::gwt::meta_cognitive::MetaCognitiveLoop;
 use crate::gwt::workspace::{WorkspaceEvent, WorkspaceEventListener};
 use crate::neuromod::{NeuromodulationManager, DA_BASELINE};
@@ -36,18 +39,16 @@ async fn test_all_listeners_receive_all_events() {
     let dream_callback: DreamConsolidationCallback = Arc::new(move |_| {
         dtc.fetch_add(1, Ordering::SeqCst);
     });
-    let dream_listener = DreamEventListener::new(
-        dream_queue.clone(),
-        trigger_manager,
-        dream_callback,
-    );
+    let dream_listener =
+        DreamEventListener::new(dream_queue.clone(), trigger_manager, dream_callback);
 
     let neuromod = Arc::new(RwLock::new(NeuromodulationManager::new()));
     let neuromod_listener = NeuromodulationEventListener::new(neuromod.clone());
 
     let meta_cognitive = Arc::new(RwLock::new(MetaCognitiveLoop::new()));
     let epistemic_flag = Arc::new(AtomicBool::new(false));
-    let meta_listener = MetaCognitiveEventListener::new(meta_cognitive.clone(), epistemic_flag.clone());
+    let meta_listener =
+        MetaCognitiveEventListener::new(meta_cognitive.clone(), epistemic_flag.clone());
 
     // Create events - IC=0.4 < 0.5 threshold will trigger dream consolidation
     let events = vec![
@@ -106,8 +107,14 @@ async fn test_all_listeners_receive_all_events() {
 
     // AP-26: Verify dream consolidation was triggered by IC < 0.5
     let triggers = dream_trigger_count.load(Ordering::SeqCst);
-    assert_eq!(triggers, 1, "Dream should trigger once for IC=0.4 < 0.5 threshold");
+    assert_eq!(
+        triggers, 1,
+        "Dream should trigger once for IC=0.4 < 0.5 threshold"
+    );
 
     println!("EVIDENCE: All listeners correctly processed all event types without panic");
-    println!("EVIDENCE: Dream consolidation triggered {} time(s) per AP-26", triggers);
+    println!(
+        "EVIDENCE: Dream consolidation triggered {} time(s) per AP-26",
+        triggers
+    );
 }

@@ -371,7 +371,10 @@ fn test_find_parent_goal_strategic_top_level() {
 
     let parent = discovery.find_parent_goal(&candidate, &goals);
 
-    assert!(parent.is_none(), "Strategic goals are top-level and should have no parent");
+    assert!(
+        parent.is_none(),
+        "Strategic goals are top-level and should have no parent"
+    );
 
     println!("[PASS] test_find_parent_goal_strategic_top_level");
 }

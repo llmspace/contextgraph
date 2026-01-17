@@ -21,10 +21,10 @@
 
 mod helpers;
 
-mod fingerprint_creation;
-mod serialization_roundtrip;
-mod index_entry;
-mod rrf_formula;
-mod query_result;
-mod edge_cases;
 mod comprehensive_validation;
+mod edge_cases;
+mod fingerprint_creation;
+mod index_entry;
+mod query_result;
+mod rrf_formula;
+mod serialization_roundtrip;

@@ -97,12 +97,12 @@ pub struct DomainThresholds {
     pub domain: Domain,
 
     // === Existing fields (6) ===
-    pub theta_opt: f32,           // [0.60, 0.90] Optimal alignment
-    pub theta_acc: f32,           // [0.55, 0.85] Acceptable alignment
-    pub theta_warn: f32,          // [0.40, 0.70] Warning alignment
-    pub theta_dup: f32,           // [0.80, 0.98] Duplicate detection
-    pub theta_edge: f32,          // [0.50, 0.85] Edge creation
-    pub confidence_bias: f32,     // Domain confidence adjustment
+    pub theta_opt: f32,       // [0.60, 0.90] Optimal alignment
+    pub theta_acc: f32,       // [0.55, 0.85] Acceptable alignment
+    pub theta_warn: f32,      // [0.40, 0.70] Warning alignment
+    pub theta_dup: f32,       // [0.80, 0.98] Duplicate detection
+    pub theta_edge: f32,      // [0.50, 0.85] Edge creation
+    pub confidence_bias: f32, // Domain confidence adjustment
 
     // === NEW: GWT thresholds (3) ===
     pub theta_gate: f32,          // [0.65, 0.95] GW broadcast gate
@@ -115,13 +115,13 @@ pub struct DomainThresholds {
     pub theta_consolidation: f32, // [0.05, 0.30] Consolidation trigger
 
     // === NEW: Dream thresholds (3) ===
-    pub theta_dream_activity: f32,  // [0.05, 0.30] Dream trigger
-    pub theta_semantic_leap: f32,   // [0.50, 0.90] REM exploration
-    pub theta_shortcut_conf: f32,   // [0.50, 0.85] Shortcut confidence
+    pub theta_dream_activity: f32, // [0.05, 0.30] Dream trigger
+    pub theta_semantic_leap: f32,  // [0.50, 0.90] REM exploration
+    pub theta_shortcut_conf: f32,  // [0.50, 0.85] Shortcut confidence
 
     // === NEW: Classification thresholds (2) ===
-    pub theta_johari: f32,          // [0.35, 0.65] Johari boundary
-    pub theta_blind_spot: f32,      // [0.35, 0.65] Blind spot detection
+    pub theta_johari: f32,     // [0.35, 0.65] Johari boundary
+    pub theta_blind_spot: f32, // [0.35, 0.65] Blind spot detection
 
     // === NEW: Autonomous thresholds (4) ===
     pub theta_obsolescence_low: f32,  // [0.20, 0.50] Low relevance
@@ -142,26 +142,26 @@ impl DomainThresholds {
         let strictness = domain.strictness();
 
         // === Existing thresholds (unchanged logic) ===
-        let theta_opt = 0.75 + (strictness * 0.1);  // [0.75, 0.85]
+        let theta_opt = 0.75 + (strictness * 0.1); // [0.75, 0.85]
         let theta_acc = 0.70 + (strictness * 0.08); // [0.70, 0.78]
         let theta_warn = 0.55 + (strictness * 0.05); // [0.55, 0.60]
 
         // === NEW: GWT thresholds ===
         // Stricter domains have higher gates (harder to broadcast)
-        let theta_gate = 0.75 + (strictness * 0.15);           // [0.75, 0.90]
-        let theta_hypersync = 0.93 + (strictness * 0.04);      // [0.93, 0.97]
-        let theta_fragmentation = 0.50 - (strictness * 0.10);  // [0.40, 0.50]
+        let theta_gate = 0.75 + (strictness * 0.15); // [0.75, 0.90]
+        let theta_hypersync = 0.93 + (strictness * 0.04); // [0.93, 0.97]
+        let theta_fragmentation = 0.50 - (strictness * 0.10); // [0.40, 0.50]
 
         // === NEW: Layer thresholds ===
-        let theta_memory_sim = 0.50 + (strictness * 0.15);     // [0.50, 0.65]
-        let theta_reflex_hit = 0.80 + (strictness * 0.10);     // [0.80, 0.90]
-        let theta_consolidation = 0.10 + (strictness * 0.10);  // [0.10, 0.20]
+        let theta_memory_sim = 0.50 + (strictness * 0.15); // [0.50, 0.65]
+        let theta_reflex_hit = 0.80 + (strictness * 0.10); // [0.80, 0.90]
+        let theta_consolidation = 0.10 + (strictness * 0.10); // [0.10, 0.20]
 
         // === NEW: Dream thresholds ===
         // Creative domains dream more aggressively (lower trigger threshold)
-        let theta_dream_activity = 0.15 - (strictness * 0.05);  // [0.10, 0.15]
-        let theta_semantic_leap = 0.70 - (strictness * 0.10);   // [0.60, 0.70]
-        let theta_shortcut_conf = 0.70 + (strictness * 0.10);   // [0.70, 0.80]
+        let theta_dream_activity = 0.15 - (strictness * 0.05); // [0.10, 0.15]
+        let theta_semantic_leap = 0.70 - (strictness * 0.10); // [0.60, 0.70]
+        let theta_shortcut_conf = 0.70 + (strictness * 0.10); // [0.70, 0.80]
 
         // === NEW: Classification thresholds ===
         // Fixed per constitution (may later be domain-tuned)
@@ -170,16 +170,16 @@ impl DomainThresholds {
 
         // === NEW: Autonomous thresholds ===
         // Stricter domains require higher confidence for autonomous actions
-        let theta_obsolescence_low = 0.30 + (strictness * 0.10);  // [0.30, 0.40]
+        let theta_obsolescence_low = 0.30 + (strictness * 0.10); // [0.30, 0.40]
         let theta_obsolescence_high = 0.75 + (strictness * 0.10); // [0.75, 0.85]
 
         // theta_obsolescence_mid: between low and high
-        let theta_obsolescence_mid = theta_obsolescence_low +
-            (theta_obsolescence_high - theta_obsolescence_low) * 0.5;
+        let theta_obsolescence_mid =
+            theta_obsolescence_low + (theta_obsolescence_high - theta_obsolescence_low) * 0.5;
 
         // theta_drift_slope: stricter domains need smaller slopes to trigger
         // Range [0.001, 0.01], inverse of strictness (more strict = smaller threshold)
-        let theta_drift_slope = 0.01 - (strictness * 0.009);  // [0.001, 0.01]
+        let theta_drift_slope = 0.01 - (strictness * 0.009); // [0.001, 0.01]
 
         Self {
             domain,
@@ -212,9 +212,8 @@ impl DomainThresholds {
     /// Formula: θ_new = α × θ_similar + (1 - α) × θ_self
     pub fn blend_with_similar(&mut self, similar: &DomainThresholds, alpha: f32) {
         let alpha = alpha.clamp(0.0, 1.0);
-        let blend = |self_val: f32, other_val: f32| -> f32 {
-            alpha * other_val + (1.0 - alpha) * self_val
-        };
+        let blend =
+            |self_val: f32, other_val: f32| -> f32 { alpha * other_val + (1.0 - alpha) * self_val };
 
         // Existing fields
         self.theta_opt = blend(self.theta_opt, similar.theta_opt);
@@ -243,9 +242,14 @@ impl DomainThresholds {
         self.theta_blind_spot = blend(self.theta_blind_spot, similar.theta_blind_spot);
 
         // NEW: Autonomous thresholds
-        self.theta_obsolescence_low = blend(self.theta_obsolescence_low, similar.theta_obsolescence_low);
-        self.theta_obsolescence_high = blend(self.theta_obsolescence_high, similar.theta_obsolescence_high);
-        self.theta_obsolescence_mid = blend(self.theta_obsolescence_mid, similar.theta_obsolescence_mid);
+        self.theta_obsolescence_low =
+            blend(self.theta_obsolescence_low, similar.theta_obsolescence_low);
+        self.theta_obsolescence_high = blend(
+            self.theta_obsolescence_high,
+            similar.theta_obsolescence_high,
+        );
+        self.theta_obsolescence_mid =
+            blend(self.theta_obsolescence_mid, similar.theta_obsolescence_mid);
         self.theta_drift_slope = blend(self.theta_drift_slope, similar.theta_drift_slope);
     }
 
@@ -260,44 +264,89 @@ impl DomainThresholds {
         }
 
         // === Existing range checks ===
-        if !(0.60..=0.90).contains(&self.theta_opt) { return false; }
-        if !(0.55..=0.85).contains(&self.theta_acc) { return false; }
-        if !(0.40..=0.70).contains(&self.theta_warn) { return false; }
-        if !(0.80..=0.98).contains(&self.theta_dup) { return false; }
-        if !(0.50..=0.85).contains(&self.theta_edge) { return false; }
+        if !(0.60..=0.90).contains(&self.theta_opt) {
+            return false;
+        }
+        if !(0.55..=0.85).contains(&self.theta_acc) {
+            return false;
+        }
+        if !(0.40..=0.70).contains(&self.theta_warn) {
+            return false;
+        }
+        if !(0.80..=0.98).contains(&self.theta_dup) {
+            return false;
+        }
+        if !(0.50..=0.85).contains(&self.theta_edge) {
+            return false;
+        }
 
         // === NEW: GWT thresholds ===
-        if !(0.65..=0.95).contains(&self.theta_gate) { return false; }
-        if !(0.90..=0.99).contains(&self.theta_hypersync) { return false; }
-        if !(0.35..=0.65).contains(&self.theta_fragmentation) { return false; }
+        if !(0.65..=0.95).contains(&self.theta_gate) {
+            return false;
+        }
+        if !(0.90..=0.99).contains(&self.theta_hypersync) {
+            return false;
+        }
+        if !(0.35..=0.65).contains(&self.theta_fragmentation) {
+            return false;
+        }
 
         // === NEW: Layer thresholds ===
-        if !(0.35..=0.75).contains(&self.theta_memory_sim) { return false; }
-        if !(0.70..=0.95).contains(&self.theta_reflex_hit) { return false; }
-        if !(0.05..=0.30).contains(&self.theta_consolidation) { return false; }
+        if !(0.35..=0.75).contains(&self.theta_memory_sim) {
+            return false;
+        }
+        if !(0.70..=0.95).contains(&self.theta_reflex_hit) {
+            return false;
+        }
+        if !(0.05..=0.30).contains(&self.theta_consolidation) {
+            return false;
+        }
 
         // === NEW: Dream thresholds ===
-        if !(0.05..=0.30).contains(&self.theta_dream_activity) { return false; }
-        if !(0.50..=0.90).contains(&self.theta_semantic_leap) { return false; }
-        if !(0.50..=0.85).contains(&self.theta_shortcut_conf) { return false; }
+        if !(0.05..=0.30).contains(&self.theta_dream_activity) {
+            return false;
+        }
+        if !(0.50..=0.90).contains(&self.theta_semantic_leap) {
+            return false;
+        }
+        if !(0.50..=0.85).contains(&self.theta_shortcut_conf) {
+            return false;
+        }
 
         // === NEW: Classification thresholds ===
-        if !(0.35..=0.65).contains(&self.theta_johari) { return false; }
-        if !(0.35..=0.65).contains(&self.theta_blind_spot) { return false; }
+        if !(0.35..=0.65).contains(&self.theta_johari) {
+            return false;
+        }
+        if !(0.35..=0.65).contains(&self.theta_blind_spot) {
+            return false;
+        }
 
         // === NEW: Autonomous thresholds - MUST enforce monotonicity ===
-        if !(0.20..=0.50).contains(&self.theta_obsolescence_low) { return false; }
-        if !(0.65..=0.90).contains(&self.theta_obsolescence_high) { return false; }
-        if self.theta_obsolescence_high <= self.theta_obsolescence_low { return false; }
+        if !(0.20..=0.50).contains(&self.theta_obsolescence_low) {
+            return false;
+        }
+        if !(0.65..=0.90).contains(&self.theta_obsolescence_high) {
+            return false;
+        }
+        if self.theta_obsolescence_high <= self.theta_obsolescence_low {
+            return false;
+        }
 
         // theta_obsolescence_mid
-        if !(0.45..=0.75).contains(&self.theta_obsolescence_mid) { return false; }
+        if !(0.45..=0.75).contains(&self.theta_obsolescence_mid) {
+            return false;
+        }
         // Must be between low and high
         if !(self.theta_obsolescence_mid > self.theta_obsolescence_low
-            && self.theta_obsolescence_mid < self.theta_obsolescence_high) { return false; }
+            && self.theta_obsolescence_mid < self.theta_obsolescence_high)
+        {
+            return false;
+        }
 
         // theta_drift_slope
-        if !(0.001..=0.01).contains(&self.theta_drift_slope) { return false; }
+        if !(0.001..=0.01).contains(&self.theta_drift_slope) {
+            return false;
+        }
 
         true
     }
@@ -693,7 +742,7 @@ mod tests {
         // First clamp to valid ranges
         t.theta_obsolescence_high = 0.70; // Valid range
         t.theta_obsolescence_low = 0.40; // Valid range
-        // Now break monotonicity by swapping conceptually
+                                         // Now break monotonicity by swapping conceptually
         t.theta_obsolescence_high = 0.30; // Now out of range, will fail range check
         t.theta_obsolescence_low = 0.40;
         assert!(!t.is_valid(), "Should fail monotonicity/range check");
@@ -867,12 +916,19 @@ mod tests {
             println!("  theta_johari: {:.3}", t.theta_johari);
             println!("  theta_blind_spot: {:.3}", t.theta_blind_spot);
             println!("  theta_obsolescence_low: {:.3}", t.theta_obsolescence_low);
-            println!("  theta_obsolescence_high: {:.3}", t.theta_obsolescence_high);
+            println!(
+                "  theta_obsolescence_high: {:.3}",
+                t.theta_obsolescence_high
+            );
             println!("  theta_obsolescence_mid: {:.3}", t.theta_obsolescence_mid);
             println!("  theta_drift_slope: {:.6}", t.theta_drift_slope);
             println!();
 
-            assert!(t.is_valid(), "Domain {:?} thresholds should be valid", domain);
+            assert!(
+                t.is_valid(),
+                "Domain {:?} thresholds should be valid",
+                domain
+            );
         }
     }
 
@@ -978,7 +1034,10 @@ mod tests {
     fn test_is_valid_fails_invalid_mid_below_range() {
         let mut t = DomainThresholds::new(Domain::General);
         t.theta_obsolescence_mid = 0.40; // Below min 0.45
-        assert!(!t.is_valid(), "Should fail for theta_obsolescence_mid below min");
+        assert!(
+            !t.is_valid(),
+            "Should fail for theta_obsolescence_mid below min"
+        );
     }
 
     #[test]

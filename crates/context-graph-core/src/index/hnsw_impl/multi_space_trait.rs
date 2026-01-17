@@ -33,7 +33,10 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
                 );
 
                 let index = RealHnswIndex::new(config.clone()).map_err(|e| {
-                    error!("FATAL: Failed to create RealHnswIndex for {:?}: {}", embedder, e);
+                    error!(
+                        "FATAL: Failed to create RealHnswIndex for {:?}: {}",
+                        embedder, e
+                    );
                     e
                 })?;
 
@@ -73,7 +76,9 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
             if vector.len() != expected_dim {
                 error!(
                     "FATAL: Dimension mismatch for {:?}: expected {}, got {}",
-                    embedder, expected_dim, vector.len()
+                    embedder,
+                    expected_dim,
+                    vector.len()
                 );
                 return Err(IndexError::DimensionMismatch {
                     embedder,
@@ -83,9 +88,13 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
             }
 
             index.add(memory_id, vector).map_err(|e| match e {
-                IndexError::DimensionMismatch { expected, actual, .. } => {
-                    IndexError::DimensionMismatch { embedder, expected, actual }
-                }
+                IndexError::DimensionMismatch {
+                    expected, actual, ..
+                } => IndexError::DimensionMismatch {
+                    embedder,
+                    expected,
+                    actual,
+                },
                 IndexError::ZeroNormVector { memory_id } => {
                     IndexError::ZeroNormVector { memory_id }
                 }
@@ -95,7 +104,10 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
             return Ok(());
         }
 
-        error!("FATAL: No HNSW index found for {:?} - not initialized", embedder);
+        error!(
+            "FATAL: No HNSW index found for {:?} - not initialized",
+            embedder
+        );
         Err(IndexError::NotInitialized { embedder })
     }
 
@@ -111,24 +123,55 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
         }
 
         // E1 Semantic
-        self.add_vector(EmbedderIndex::E1Semantic, memory_id, &fingerprint.e1_semantic).await?;
+        self.add_vector(
+            EmbedderIndex::E1Semantic,
+            memory_id,
+            &fingerprint.e1_semantic,
+        )
+        .await?;
 
         // E1 Matryoshka 128D
         let matryoshka: Vec<f32> = fingerprint.e1_semantic.iter().take(128).copied().collect();
-        self.add_vector(EmbedderIndex::E1Matryoshka128, memory_id, &matryoshka).await?;
+        self.add_vector(EmbedderIndex::E1Matryoshka128, memory_id, &matryoshka)
+            .await?;
 
         // E2-E5 Temporal embeddings
-        self.add_vector(EmbedderIndex::E2TemporalRecent, memory_id, &fingerprint.e2_temporal_recent).await?;
-        self.add_vector(EmbedderIndex::E3TemporalPeriodic, memory_id, &fingerprint.e3_temporal_periodic).await?;
-        self.add_vector(EmbedderIndex::E4TemporalPositional, memory_id, &fingerprint.e4_temporal_positional).await?;
-        self.add_vector(EmbedderIndex::E5Causal, memory_id, &fingerprint.e5_causal).await?;
+        self.add_vector(
+            EmbedderIndex::E2TemporalRecent,
+            memory_id,
+            &fingerprint.e2_temporal_recent,
+        )
+        .await?;
+        self.add_vector(
+            EmbedderIndex::E3TemporalPeriodic,
+            memory_id,
+            &fingerprint.e3_temporal_periodic,
+        )
+        .await?;
+        self.add_vector(
+            EmbedderIndex::E4TemporalPositional,
+            memory_id,
+            &fingerprint.e4_temporal_positional,
+        )
+        .await?;
+        self.add_vector(EmbedderIndex::E5Causal, memory_id, &fingerprint.e5_causal)
+            .await?;
 
         // E7-E11
-        self.add_vector(EmbedderIndex::E7Code, memory_id, &fingerprint.e7_code).await?;
-        self.add_vector(EmbedderIndex::E8Graph, memory_id, &fingerprint.e8_graph).await?;
-        self.add_vector(EmbedderIndex::E9HDC, memory_id, &fingerprint.e9_hdc).await?;
-        self.add_vector(EmbedderIndex::E10Multimodal, memory_id, &fingerprint.e10_multimodal).await?;
-        self.add_vector(EmbedderIndex::E11Entity, memory_id, &fingerprint.e11_entity).await?;
+        self.add_vector(EmbedderIndex::E7Code, memory_id, &fingerprint.e7_code)
+            .await?;
+        self.add_vector(EmbedderIndex::E8Graph, memory_id, &fingerprint.e8_graph)
+            .await?;
+        self.add_vector(EmbedderIndex::E9HDC, memory_id, &fingerprint.e9_hdc)
+            .await?;
+        self.add_vector(
+            EmbedderIndex::E10Multimodal,
+            memory_id,
+            &fingerprint.e10_multimodal,
+        )
+        .await?;
+        self.add_vector(EmbedderIndex::E11Entity, memory_id, &fingerprint.e11_entity)
+            .await?;
 
         // E13 SPLADE -> inverted index
         let splade_pairs: Vec<(usize, f32)> = fingerprint
@@ -152,7 +195,8 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
             });
         }
 
-        self.add_vector(EmbedderIndex::PurposeVector, memory_id, purpose).await
+        self.add_vector(EmbedderIndex::PurposeVector, memory_id, purpose)
+            .await
     }
 
     async fn add_splade(&mut self, memory_id: Uuid, sparse: &[(usize, f32)]) -> IndexResult<()> {
@@ -179,7 +223,9 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
         if query.len() != expected_dim {
             error!(
                 "FATAL: Query dimension mismatch for {:?}: expected {}, got {}",
-                embedder, expected_dim, query.len()
+                embedder,
+                expected_dim,
+                query.len()
             );
             return Err(IndexError::DimensionMismatch {
                 embedder,
@@ -190,14 +236,21 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
 
         if let Some(index) = self.get_hnsw_index(&embedder) {
             return index.search(query, k).map_err(|e| match e {
-                IndexError::DimensionMismatch { expected, actual, .. } => {
-                    IndexError::DimensionMismatch { embedder, expected, actual }
-                }
+                IndexError::DimensionMismatch {
+                    expected, actual, ..
+                } => IndexError::DimensionMismatch {
+                    embedder,
+                    expected,
+                    actual,
+                },
                 other => other,
             });
         }
 
-        error!("FATAL: No HNSW index found for {:?} during search", embedder);
+        error!(
+            "FATAL: No HNSW index found for {:?} during search",
+            embedder
+        );
         Err(IndexError::NotInitialized { embedder })
     }
 
@@ -220,7 +273,8 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
         query_128d: &[f32],
         k: usize,
     ) -> IndexResult<Vec<(Uuid, f32)>> {
-        self.search(EmbedderIndex::E1Matryoshka128, query_128d, k).await
+        self.search(EmbedderIndex::E1Matryoshka128, query_128d, k)
+            .await
     }
 
     async fn search_purpose(
@@ -228,7 +282,8 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
         purpose_query: &[f32],
         k: usize,
     ) -> IndexResult<Vec<(Uuid, f32)>> {
-        self.search(EmbedderIndex::PurposeVector, purpose_query, k).await
+        self.search(EmbedderIndex::PurposeVector, purpose_query, k)
+            .await
     }
 
     async fn remove(&mut self, memory_id: Uuid) -> IndexResult<()> {
@@ -277,7 +332,11 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
             let file_name = format!("{:?}.real_hnsw.bin", embedder);
             let file_path = path.join(&file_name);
             index.persist(&file_path)?;
-            debug!("Persisted RealHnswIndex for {:?} with {} vectors", embedder, index.len());
+            debug!(
+                "Persisted RealHnswIndex for {:?} with {} vectors",
+                embedder,
+                index.len()
+            );
         }
 
         let splade_path = path.join("splade.bin");
@@ -292,11 +351,16 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
             "index_type": "RealHnswIndex",
             "note": "RealHnswIndex only - legacy SimpleHnswIndex support removed"
         });
-        let meta_file = File::create(&meta_path).map_err(|e| IndexError::io("creating metadata file", e))?;
+        let meta_file =
+            File::create(&meta_path).map_err(|e| IndexError::io("creating metadata file", e))?;
         serde_json::to_writer_pretty(meta_file, &meta)
             .map_err(|e| IndexError::serialization("serializing metadata", e))?;
 
-        info!("Persisted {} HNSW indexes, {} SPLADE entries", self.hnsw_count(), self.splade_len());
+        info!(
+            "Persisted {} HNSW indexes, {} SPLADE entries",
+            self.hnsw_count(),
+            self.splade_len()
+        );
 
         Ok(())
     }
@@ -312,11 +376,15 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
 
         info!("Loading HnswMultiSpaceIndex from {:?}", path);
 
-        let meta_file = File::open(&meta_path).map_err(|e| IndexError::io("opening metadata file", e))?;
+        let meta_file =
+            File::open(&meta_path).map_err(|e| IndexError::io("opening metadata file", e))?;
         let meta: serde_json::Value = serde_json::from_reader(meta_file)
             .map_err(|e| IndexError::serialization("parsing metadata", e))?;
 
-        let version = meta.get("version").and_then(|v| v.as_str()).unwrap_or("1.0.0");
+        let version = meta
+            .get("version")
+            .and_then(|v| v.as_str())
+            .unwrap_or("1.0.0");
         debug!("Index version: {}", version);
 
         for embedder in EmbedderIndex::all_hnsw() {
@@ -326,14 +394,21 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
             if file_path.exists() {
                 match RealHnswIndex::load(&file_path) {
                     Ok(index) => {
-                        info!("Loaded RealHnswIndex for {:?} with {} vectors", embedder, index.len());
+                        info!(
+                            "Loaded RealHnswIndex for {:?} with {} vectors",
+                            embedder,
+                            index.len()
+                        );
                         self.insert_hnsw_index(embedder, index);
                         if let Some(config) = Self::config_for_embedder(embedder) {
                             self.insert_config(embedder, config);
                         }
                     }
                     Err(e) => {
-                        warn!("Could not load RealHnswIndex for {:?}: {} - creating empty index", embedder, e);
+                        warn!(
+                            "Could not load RealHnswIndex for {:?}: {} - creating empty index",
+                            embedder, e
+                        );
                         if let Some(config) = Self::config_for_embedder(embedder) {
                             if let Ok(index) = RealHnswIndex::new(config.clone()) {
                                 self.insert_hnsw_index(embedder, index);
@@ -380,7 +455,11 @@ impl MultiSpaceIndexManager for HnswMultiSpaceIndex {
 
         self.set_initialized(true);
 
-        info!("Loaded HnswMultiSpaceIndex: {} HNSW, {} SPLADE", self.hnsw_count(), self.splade_len());
+        info!(
+            "Loaded HnswMultiSpaceIndex: {} HNSW, {} SPLADE",
+            self.hnsw_count(),
+            self.splade_len()
+        );
 
         Ok(())
     }

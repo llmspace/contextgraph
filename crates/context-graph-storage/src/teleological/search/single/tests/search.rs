@@ -91,7 +91,7 @@ fn test_search_returns_inserted_vector() {
     let results = result.unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results.top().unwrap().id, id);
-    assert!(results.top().unwrap().similarity > 0.99);  // Identical vector
+    assert!(results.top().unwrap().similarity > 0.99); // Identical vector
 
     println!("RESULT: PASS");
 }
@@ -109,7 +109,9 @@ fn test_search_identical_vectors_high_similarity() {
     let index = registry.get(EmbedderIndex::E8Graph).unwrap();
     index.insert(id, &vector).unwrap();
 
-    let result = search.search(EmbedderIndex::E8Graph, &vector, 1, None).unwrap();
+    let result = search
+        .search(EmbedderIndex::E8Graph, &vector, 1, None)
+        .unwrap();
 
     assert_eq!(result.len(), 1);
     let hit = result.top().unwrap();
@@ -138,12 +140,14 @@ fn test_search_orthogonal_vectors_low_similarity() {
     let index = registry.get(EmbedderIndex::E8Graph).unwrap();
     index.insert(id, &vec_b).unwrap();
 
-    let result = search.search(EmbedderIndex::E8Graph, &vec_a, 1, None).unwrap();
+    let result = search
+        .search(EmbedderIndex::E8Graph, &vec_a, 1, None)
+        .unwrap();
 
     assert_eq!(result.len(), 1);
     let hit = result.top().unwrap();
     println!("Similarity: {}", hit.similarity);
-    assert!(hit.similarity < 0.01);  // Orthogonal
+    assert!(hit.similarity < 0.01); // Orthogonal
 
     println!("RESULT: PASS");
 }
@@ -180,7 +184,9 @@ fn test_search_with_threshold_filters() {
     index.insert(id_low, &vec_low).unwrap();
 
     // Search without threshold - should return all
-    let result = search.search(EmbedderIndex::E8Graph, &query, 10, None).unwrap();
+    let result = search
+        .search(EmbedderIndex::E8Graph, &query, 10, None)
+        .unwrap();
     println!("Without threshold: {} results", result.len());
     for (i, hit) in result.iter().enumerate() {
         println!("  [{}] similarity={:.4}", i, hit.similarity);
@@ -188,9 +194,15 @@ fn test_search_with_threshold_filters() {
     assert_eq!(result.len(), 3);
 
     // Search with high threshold - should filter to only the identical vector
-    let result = search.search(EmbedderIndex::E8Graph, &query, 10, Some(0.99)).unwrap();
+    let result = search
+        .search(EmbedderIndex::E8Graph, &query, 10, Some(0.99))
+        .unwrap();
     println!("With threshold 0.99: {} results", result.len());
-    assert_eq!(result.len(), 1, "Only the identical vector should pass 0.99 threshold");
+    assert_eq!(
+        result.len(),
+        1,
+        "Only the identical vector should pass 0.99 threshold"
+    );
 
     println!("RESULT: PASS");
 }
@@ -211,7 +223,9 @@ fn test_k_greater_than_index_size() {
 
     // Request k=1000, but only 5 exist
     let query = vec![0.5f32; 384];
-    let result = search.search(EmbedderIndex::E8Graph, &query, 1000, None).unwrap();
+    let result = search
+        .search(EmbedderIndex::E8Graph, &query, 1000, None)
+        .unwrap();
 
     println!("Requested k=1000, got {} results", result.len());
     assert_eq!(result.len(), 5);
@@ -235,9 +249,14 @@ fn test_threshold_filters_all() {
 
     // Use completely different query with threshold 0.99
     let query = vec![0.0f32; 384];
-    let result = search.search(EmbedderIndex::E8Graph, &query, 10, Some(0.99)).unwrap();
+    let result = search
+        .search(EmbedderIndex::E8Graph, &query, 10, Some(0.99))
+        .unwrap();
 
-    println!("With threshold 0.99 on orthogonal vectors: {} results", result.len());
+    println!(
+        "With threshold 0.99 on orthogonal vectors: {} results",
+        result.len()
+    );
     // All should be filtered because query is [0,0,0...] which is orthogonal
     assert!(result.is_empty());
 
@@ -309,12 +328,9 @@ fn test_search_ids_above_threshold() {
     let vector = vec![0.5f32; 384];
     index.insert(id, &vector).unwrap();
 
-    let pairs = search.search_ids_above_threshold(
-        EmbedderIndex::E8Graph,
-        &vector,
-        10,
-        0.5,
-    ).unwrap();
+    let pairs = search
+        .search_ids_above_threshold(EmbedderIndex::E8Graph, &vector, 10, 0.5)
+        .unwrap();
 
     assert_eq!(pairs.len(), 1);
     assert_eq!(pairs[0].0, id);
@@ -330,10 +346,12 @@ fn test_latency_recorded() {
     let search = create_test_search();
     let query = vec![0.5f32; 384];
 
-    let result = search.search(EmbedderIndex::E8Graph, &query, 10, None).unwrap();
+    let result = search
+        .search(EmbedderIndex::E8Graph, &query, 10, None)
+        .unwrap();
 
     println!("Latency: {} us", result.latency_us);
-    assert!(result.latency_us > 0);  // Should be at least 1 microsecond
+    assert!(result.latency_us > 0); // Should be at least 1 microsecond
 
     println!("RESULT: PASS");
 }

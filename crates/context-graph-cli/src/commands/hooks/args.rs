@@ -354,15 +354,21 @@ mod tests {
         let cli = TestCli::parse_from([
             "test",
             "session-start",
-            "--session-id", "session-12345",
-            "--previous-session-id", "prev-session-98765",
+            "--session-id",
+            "session-12345",
+            "--previous-session-id",
+            "prev-session-98765",
             "--stdin",
-            "--format", "json-compact",
+            "--format",
+            "json-compact",
         ]);
 
         if let HooksCommands::SessionStart(args) = cli.command {
             assert_eq!(args.session_id, Some("session-12345".to_string()));
-            assert_eq!(args.previous_session_id, Some("prev-session-98765".to_string()));
+            assert_eq!(
+                args.previous_session_id,
+                Some("prev-session-98765".to_string())
+            );
             assert!(args.stdin);
             assert_eq!(args.format, OutputFormat::JsonCompact);
             println!("  session_id: {:?}", args.session_id);
@@ -385,19 +391,25 @@ mod tests {
         println!("\n=== TC-HOOKS-ARGS-002: Pre-Tool Default fast_path=true ===");
         println!("SOURCE: TECH-HOOKS.md 100ms timeout - MUST use cache only");
 
-        let cli = TestCli::parse_from([
-            "test",
-            "pre-tool",
-            "--session-id", "session-abc",
-        ]);
+        let cli = TestCli::parse_from(["test", "pre-tool", "--session-id", "session-abc"]);
 
         if let HooksCommands::PreTool(args) = cli.command {
             assert_eq!(args.session_id, "session-abc");
-            assert!(args.fast_path, "FAIL: fast_path MUST default to true for 100ms timeout");
+            assert!(
+                args.fast_path,
+                "FAIL: fast_path MUST default to true for 100ms timeout"
+            );
             assert!(!args.stdin, "FAIL: stdin MUST default to false");
-            assert_eq!(args.format, OutputFormat::Json, "FAIL: format MUST default to json");
+            assert_eq!(
+                args.format,
+                OutputFormat::Json,
+                "FAIL: format MUST default to json"
+            );
             println!("  session_id: {}", args.session_id);
-            println!("  fast_path: {} (default=true for 100ms timeout)", args.fast_path);
+            println!(
+                "  fast_path: {} (default=true for 100ms timeout)",
+                args.fast_path
+            );
             println!("  stdin: {} (default=false)", args.stdin);
             println!("  format: {:?} (default=json)", args.format);
         } else {
@@ -418,12 +430,17 @@ mod tests {
         let cli = TestCli::parse_from([
             "test",
             "pre-tool",
-            "--session-id", "session-xyz",
-            "--fast-path", "false",
+            "--session-id",
+            "session-xyz",
+            "--fast-path",
+            "false",
         ]);
 
         if let HooksCommands::PreTool(args) = cli.command {
-            assert!(!args.fast_path, "fast_path should be false when explicitly set");
+            assert!(
+                !args.fast_path,
+                "fast_path should be false when explicitly set"
+            );
             println!("  fast_path: {} (explicitly set to false)", args.fast_path);
         } else {
             panic!("Expected PreTool command");
@@ -444,9 +461,12 @@ mod tests {
         let cli = TestCli::parse_from([
             "test",
             "post-tool",
-            "--session-id", "session-post",
-            "--tool-name", "Read",
-            "--success", "true",
+            "--session-id",
+            "session-post",
+            "--tool-name",
+            "Read",
+            "--success",
+            "true",
         ]);
 
         if let HooksCommands::PostTool(args) = cli.command {
@@ -475,10 +495,14 @@ mod tests {
         let cli = TestCli::parse_from([
             "test",
             "generate-config",
-            "--output-dir", "/custom/hooks",
-            "--force", "true",
-            "--hooks", "session-start,pre-tool-use,session-end",
-            "--shell", "zsh",
+            "--output-dir",
+            "/custom/hooks",
+            "--force",
+            "true",
+            "--hooks",
+            "session-start,pre-tool-use,session-end",
+            "--shell",
+            "zsh",
         ]);
 
         if let HooksCommands::GenerateConfig(args) = cli.command {
@@ -510,14 +534,14 @@ mod tests {
         println!("\n=== TC-HOOKS-ARGS-006: OutputFormat Default is Json ===");
         println!("SOURCE: Claude Code hook integration requires JSON");
 
-        let cli = TestCli::parse_from([
-            "test",
-            "session-end",
-            "--session-id", "session-end-test",
-        ]);
+        let cli = TestCli::parse_from(["test", "session-end", "--session-id", "session-end-test"]);
 
         if let HooksCommands::SessionEnd(args) = cli.command {
-            assert_eq!(args.format, OutputFormat::Json, "FAIL: format MUST default to Json");
+            assert_eq!(
+                args.format,
+                OutputFormat::Json,
+                "FAIL: format MUST default to Json"
+            );
             println!("  format: {:?} (default)", args.format);
         } else {
             panic!("Expected SessionEnd command");
@@ -595,7 +619,11 @@ mod tests {
         let cli = TestCli::parse_from(["test", "generate-config"]);
 
         if let HooksCommands::GenerateConfig(args) = cli.command {
-            assert_eq!(args.shell, ShellType::Bash, "FAIL: shell MUST default to Bash");
+            assert_eq!(
+                args.shell,
+                ShellType::Bash,
+                "FAIL: shell MUST default to Bash"
+            );
             println!("  shell: {:?} (default)", args.shell);
         } else {
             panic!("Expected GenerateConfig command");
@@ -616,8 +644,10 @@ mod tests {
         let cli = TestCli::parse_from([
             "test",
             "prompt-submit",
-            "--session-id", "session-prompt",
-            "--prompt", "Help me fix this bug",
+            "--session-id",
+            "session-prompt",
+            "--prompt",
+            "Help me fix this bug",
         ]);
 
         if let HooksCommands::PromptSubmit(args) = cli.command {
@@ -641,15 +671,18 @@ mod tests {
         println!("\n=== TC-HOOKS-ARGS-011: Session End generate_summary Default ===");
         println!("SOURCE: REQ-HOOKS-21");
 
-        let cli = TestCli::parse_from([
-            "test",
-            "session-end",
-            "--session-id", "session-end-summary",
-        ]);
+        let cli =
+            TestCli::parse_from(["test", "session-end", "--session-id", "session-end-summary"]);
 
         if let HooksCommands::SessionEnd(args) = cli.command {
-            assert!(args.generate_summary, "FAIL: generate_summary MUST default to true");
-            println!("  generate_summary: {} (default=true)", args.generate_summary);
+            assert!(
+                args.generate_summary,
+                "FAIL: generate_summary MUST default to true"
+            );
+            println!(
+                "  generate_summary: {} (default=true)",
+                args.generate_summary
+            );
         } else {
             panic!("Expected SessionEnd command");
         }
@@ -669,15 +702,21 @@ mod tests {
         let cli = TestCli::parse_from([
             "test",
             "session-end",
-            "--session-id", "session-end-duration",
-            "--duration-ms", "3600000",
-            "--generate-summary", "false",
+            "--session-id",
+            "session-end-duration",
+            "--duration-ms",
+            "3600000",
+            "--generate-summary",
+            "false",
         ]);
 
         if let HooksCommands::SessionEnd(args) = cli.command {
             assert_eq!(args.session_id, "session-end-duration");
             assert_eq!(args.duration_ms, Some(3600000));
-            assert!(!args.generate_summary, "generate_summary should be false when explicitly set");
+            assert!(
+                !args.generate_summary,
+                "generate_summary should be false when explicitly set"
+            );
             println!("  session_id: {}", args.session_id);
             println!("  duration_ms: {:?}", args.duration_ms);
             println!("  generate_summary: {}", args.generate_summary);
@@ -700,10 +739,16 @@ mod tests {
         let cli = TestCli::parse_from(["test", "generate-config"]);
 
         if let HooksCommands::GenerateConfig(args) = cli.command {
-            assert_eq!(args.output_dir, PathBuf::from(".claude/hooks"),
-                "FAIL: output_dir MUST default to .claude/hooks");
+            assert_eq!(
+                args.output_dir,
+                PathBuf::from(".claude/hooks"),
+                "FAIL: output_dir MUST default to .claude/hooks"
+            );
             assert!(!args.force, "FAIL: force MUST default to false");
-            println!("  output_dir: {:?} (default=.claude/hooks)", args.output_dir);
+            println!(
+                "  output_dir: {:?} (default=.claude/hooks)",
+                args.output_dir
+            );
             println!("  force: {} (default=false)", args.force);
         } else {
             panic!("Expected GenerateConfig command");
@@ -722,7 +767,10 @@ mod tests {
         println!("SOURCE: PreToolArgs.session_id is REQUIRED");
 
         let result = TestCli::try_parse_from(["test", "pre-tool"]);
-        assert!(result.is_err(), "FAIL: pre-tool without session_id MUST fail");
+        assert!(
+            result.is_err(),
+            "FAIL: pre-tool without session_id MUST fail"
+        );
         println!("  pre-tool without --session-id: Err (expected)");
 
         println!("RESULT: PASS - Missing session_id fails fast");
@@ -737,16 +785,22 @@ mod tests {
         println!("\n=== TC-HOOKS-ARGS-015: All Shell Types Parse ===");
 
         let shells = ["bash", "zsh", "fish", "powershell"];
-        let expected = [ShellType::Bash, ShellType::Zsh, ShellType::Fish, ShellType::Powershell];
+        let expected = [
+            ShellType::Bash,
+            ShellType::Zsh,
+            ShellType::Fish,
+            ShellType::Powershell,
+        ];
 
         for (shell_str, expected_shell) in shells.iter().zip(expected.iter()) {
-            let cli = TestCli::parse_from([
-                "test", "generate-config", "--shell", shell_str
-            ]);
+            let cli = TestCli::parse_from(["test", "generate-config", "--shell", shell_str]);
 
             if let HooksCommands::GenerateConfig(args) = cli.command {
-                assert_eq!(args.shell, *expected_shell,
-                    "FAIL: shell {} must parse to {:?}", shell_str, expected_shell);
+                assert_eq!(
+                    args.shell, *expected_shell,
+                    "FAIL: shell {} must parse to {:?}",
+                    shell_str, expected_shell
+                );
                 println!("  {} -> {:?}", shell_str, args.shell);
             } else {
                 panic!("Expected GenerateConfig command");
@@ -765,16 +819,21 @@ mod tests {
         println!("\n=== TC-HOOKS-ARGS-016: All Output Formats Parse ===");
 
         let formats = ["json", "json-compact", "text"];
-        let expected = [OutputFormat::Json, OutputFormat::JsonCompact, OutputFormat::Text];
+        let expected = [
+            OutputFormat::Json,
+            OutputFormat::JsonCompact,
+            OutputFormat::Text,
+        ];
 
         for (format_str, expected_format) in formats.iter().zip(expected.iter()) {
-            let cli = TestCli::parse_from([
-                "test", "session-start", "--format", format_str
-            ]);
+            let cli = TestCli::parse_from(["test", "session-start", "--format", format_str]);
 
             if let HooksCommands::SessionStart(args) = cli.command {
-                assert_eq!(args.format, *expected_format,
-                    "FAIL: format {} must parse to {:?}", format_str, expected_format);
+                assert_eq!(
+                    args.format, *expected_format,
+                    "FAIL: format {} must parse to {:?}",
+                    format_str, expected_format
+                );
                 println!("  {} -> {:?}", format_str, args.format);
             } else {
                 panic!("Expected SessionStart command");
@@ -795,12 +854,18 @@ mod tests {
         let cli = TestCli::parse_from([
             "test",
             "post-tool",
-            "--session-id", "session-fail",
-            "--success", "false",
+            "--session-id",
+            "session-fail",
+            "--success",
+            "false",
         ]);
 
         if let HooksCommands::PostTool(args) = cli.command {
-            assert_eq!(args.success, Some(false), "FAIL: success=false must parse correctly");
+            assert_eq!(
+                args.success,
+                Some(false),
+                "FAIL: success=false must parse correctly"
+            );
             println!("  success: {:?}", args.success);
         } else {
             panic!("Expected PostTool command");

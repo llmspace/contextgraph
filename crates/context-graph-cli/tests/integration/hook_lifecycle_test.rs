@@ -47,13 +47,8 @@ async fn test_session_lifecycle_full_flow() {
 
     // STEP 2: SessionStart
     let start_input = create_session_start_input(&session_id, "/tmp/test", "cli", None);
-    let start_result = invoke_hook_with_stdin(
-        "session-start",
-        &session_id,
-        &[],
-        &start_input,
-        db_path,
-    );
+    let start_result =
+        invoke_hook_with_stdin("session-start", &session_id, &[], &start_input, db_path);
 
     assert_exit_code(&start_result, EXIT_SUCCESS, "SessionStart failed");
     assert_output_bool(&start_result, "success", true, "SessionStart success=false");
@@ -79,12 +74,7 @@ async fn test_session_lifecycle_full_flow() {
     let pre_result = invoke_hook_with_stdin(
         "pre-tool",
         &session_id,
-        &[
-            "--tool-name",
-            "Read",
-            "--fast-path",
-            "true",
-        ],
+        &["--tool-name", "Read", "--fast-path", "true"],
         &pre_tool_input,
         db_path,
     );
@@ -113,12 +103,7 @@ async fn test_session_lifecycle_full_flow() {
     let post_result = invoke_hook_with_stdin(
         "post-tool",
         &session_id,
-        &[
-            "--tool-name",
-            "Read",
-            "--success",
-            "true",
-        ],
+        &["--tool-name", "Read", "--success", "true"],
         &post_tool_input,
         db_path,
     );
@@ -142,13 +127,8 @@ async fn test_session_lifecycle_full_flow() {
         "Please read the file and summarize it.",
         vec![("user", "Hello"), ("assistant", "Hi there!")],
     );
-    let prompt_result = invoke_hook_with_stdin(
-        "prompt-submit",
-        &session_id,
-        &[],
-        &prompt_input,
-        db_path,
-    );
+    let prompt_result =
+        invoke_hook_with_stdin("prompt-submit", &session_id, &[], &prompt_input, db_path);
 
     assert_exit_code(&prompt_result, EXIT_SUCCESS, "PromptSubmit failed");
     assert_timing_under_budget(&prompt_result, TIMEOUT_USER_PROMPT_MS, "UserPromptSubmit");
@@ -168,10 +148,7 @@ async fn test_session_lifecycle_full_flow() {
     let end_result = invoke_hook_with_stdin(
         "session-end",
         &session_id,
-        &[
-            "--duration-ms",
-            "60000",
-        ],
+        &["--duration-ms", "60000"],
         &end_input,
         db_path,
     );
@@ -241,13 +218,8 @@ async fn test_multiple_tool_uses_in_session() {
 
     // SessionStart
     let start_input = create_session_start_input(&session_id, "/tmp", "cli", None);
-    let start_result = invoke_hook_with_stdin(
-        "session-start",
-        &session_id,
-        &[],
-        &start_input,
-        db_path,
-    );
+    let start_result =
+        invoke_hook_with_stdin("session-start", &session_id, &[], &start_input, db_path);
     assert_exit_code(&start_result, EXIT_SUCCESS, "SessionStart failed");
 
     // Execute 5 tool cycles (PreTool + PostTool)
@@ -257,21 +229,12 @@ async fn test_multiple_tool_uses_in_session() {
         let tool_use_id = format!("tool-use-{:03}", i);
 
         // PreToolUse
-        let pre_input = create_pre_tool_input(
-            &session_id,
-            tool_name,
-            json!({"arg": i}),
-            &tool_use_id,
-        );
+        let pre_input =
+            create_pre_tool_input(&session_id, tool_name, json!({"arg": i}), &tool_use_id);
         let pre_result = invoke_hook_with_stdin(
             "pre-tool",
             &session_id,
-            &[
-                "--tool-name",
-                tool_name,
-                "--fast-path",
-                "true",
-            ],
+            &["--tool-name", tool_name, "--fast-path", "true"],
             &pre_input,
             db_path,
         );
@@ -288,16 +251,15 @@ async fn test_multiple_tool_uses_in_session() {
         let post_result = invoke_hook_with_stdin(
             "post-tool",
             &session_id,
-            &[
-                "--tool-name",
-                tool_name,
-                "--success",
-                "true",
-            ],
+            &["--tool-name", tool_name, "--success", "true"],
             &post_input,
             db_path,
         );
-        assert_exit_code(&post_result, EXIT_SUCCESS, &format!("PostTool {} failed", i));
+        assert_exit_code(
+            &post_result,
+            EXIT_SUCCESS,
+            &format!("PostTool {} failed", i),
+        );
 
         log_test_evidence(
             "test_multiple_tool_uses_in_session",
@@ -357,13 +319,8 @@ async fn test_consciousness_state_injection() {
 
     // SessionStart
     let start_input = create_session_start_input(&session_id, "/tmp", "cli", None);
-    let start_result = invoke_hook_with_stdin(
-        "session-start",
-        &session_id,
-        &[],
-        &start_input,
-        db_path,
-    );
+    let start_result =
+        invoke_hook_with_stdin("session-start", &session_id, &[], &start_input, db_path);
     assert_exit_code(&start_result, EXIT_SUCCESS, "SessionStart failed");
 
     // Check consciousness_state in SessionStart output
@@ -384,12 +341,7 @@ async fn test_consciousness_state_injection() {
     let post_result = invoke_hook_with_stdin(
         "post-tool",
         &session_id,
-        &[
-            "--tool-name",
-            "Read",
-            "--success",
-            "true",
-        ],
+        &["--tool-name", "Read", "--success", "true"],
         &post_input,
         db_path,
     );
@@ -401,13 +353,8 @@ async fn test_consciousness_state_injection() {
 
     // UserPromptSubmit - should have consciousness_state
     let prompt_input = create_prompt_submit_input(&session_id, "test prompt", vec![]);
-    let prompt_result = invoke_hook_with_stdin(
-        "prompt-submit",
-        &session_id,
-        &[],
-        &prompt_input,
-        db_path,
-    );
+    let prompt_result =
+        invoke_hook_with_stdin("prompt-submit", &session_id, &[], &prompt_input, db_path);
     assert_exit_code(&prompt_result, EXIT_SUCCESS, "PromptSubmit failed");
 
     if let Some(consciousness) = prompt_result.consciousness_state() {
@@ -439,12 +386,18 @@ async fn test_consciousness_state_injection() {
 /// Helper: Verify consciousness_state structure
 fn verify_consciousness_state_structure(consciousness: &Value, context: &str) {
     // Must have numeric fields
-    let fields = ["consciousness", "integration", "reflection", "differentiation"];
+    let fields = [
+        "consciousness",
+        "integration",
+        "reflection",
+        "differentiation",
+    ];
     for field in fields {
         assert!(
             consciousness.get(field).is_some(),
             "{}: consciousness_state missing field '{}'",
-            context, field
+            context,
+            field
         );
     }
 
@@ -454,7 +407,8 @@ fn verify_consciousness_state_structure(consciousness: &Value, context: &str) {
         assert!(
             (0.0..=1.0).contains(&ic_val),
             "{}: identity_continuity {} out of range [0, 1]",
-            context, ic_val
+            context,
+            ic_val
         );
     }
 
@@ -465,7 +419,9 @@ fn verify_consciousness_state_structure(consciousness: &Value, context: &str) {
         assert!(
             valid_quadrants.contains(&johari_str),
             "{}: invalid johari_quadrant '{}', expected one of {:?}",
-            context, johari_str, valid_quadrants
+            context,
+            johari_str,
+            valid_quadrants
         );
     }
 }
@@ -488,13 +444,8 @@ async fn test_concurrent_tool_hooks() {
 
     // SessionStart first
     let start_input = create_session_start_input(&session_id, "/tmp", "cli", None);
-    let start_result = invoke_hook_with_stdin(
-        "session-start",
-        &session_id,
-        &[],
-        &start_input,
-        db_path,
-    );
+    let start_result =
+        invoke_hook_with_stdin("session-start", &session_id, &[], &start_input, db_path);
     assert_exit_code(&start_result, EXIT_SUCCESS, "SessionStart failed");
 
     // Spawn 10 parallel PreToolUse hooks
@@ -505,21 +456,12 @@ async fn test_concurrent_tool_hooks() {
             tokio::spawn(async move {
                 let tool_use_id = format!("concurrent-tool-{:03}", i);
                 let tool_name = format!("Tool{}", i);
-                let input = create_pre_tool_input(
-                    &sid,
-                    &tool_name,
-                    json!({"index": i}),
-                    &tool_use_id,
-                );
+                let input =
+                    create_pre_tool_input(&sid, &tool_name, json!({"index": i}), &tool_use_id);
                 invoke_hook_with_stdin(
                     "pre-tool",
                     &sid,
-                    &[
-                        "--tool-name",
-                        &tool_name,
-                        "--fast-path",
-                        "true",
-                    ],
+                    &["--tool-name", &tool_name, "--fast-path", "true"],
                     &input,
                     &db,
                 )

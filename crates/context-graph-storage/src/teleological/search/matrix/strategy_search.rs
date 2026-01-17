@@ -242,9 +242,7 @@ impl MatrixStrategySearch {
                 // Build contributing_embedders
                 let contributing: Vec<(EmbedderIndex, f32, f32)> = scores
                     .iter()
-                    .filter_map(|(&idx, &sim)| {
-                        self.index_to_embedder(idx).map(|e| (e, sim, sim))
-                    })
+                    .filter_map(|(&idx, &sim)| self.index_to_embedder(idx).map(|e| (e, sim, sim)))
                     .collect();
 
                 AggregatedHit {
@@ -403,10 +401,7 @@ impl MatrixStrategySearch {
                     .collect();
                 if scores.len() > 1 {
                     let mean = scores.iter().sum::<f32>() / scores.len() as f32;
-                    let variance = scores
-                        .iter()
-                        .map(|&s| (s - mean).powi(2))
-                        .sum::<f32>()
+                    let variance = scores.iter().map(|&s| (s - mean).powi(2)).sum::<f32>()
                         / scores.len() as f32;
                     Some(1.0 / (1.0 + variance.sqrt()))
                 } else {
@@ -433,7 +428,10 @@ impl MatrixStrategySearch {
 }
 
 /// Pearson correlation for matched ID scores.
-pub(crate) fn pearson_correlation_matched(scores_a: &[(Uuid, f32)], scores_b: &[(Uuid, f32)]) -> f32 {
+pub(crate) fn pearson_correlation_matched(
+    scores_a: &[(Uuid, f32)],
+    scores_b: &[(Uuid, f32)],
+) -> f32 {
     // Find common IDs
     let a_map: HashMap<Uuid, f32> = scores_a.iter().cloned().collect();
     let common: Vec<(f32, f32)> = scores_b

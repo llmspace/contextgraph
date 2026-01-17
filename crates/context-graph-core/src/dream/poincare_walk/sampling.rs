@@ -36,7 +36,9 @@ pub fn random_direction<R: Rng>(rng: &mut R) -> [f32; 64] {
     if norm < 1e-10 {
         panic!(
             "[POINCARE_WALK] Degenerate random direction at {}:{}: norm = {:e}",
-            file!(), line!(), norm
+            file!(),
+            line!(),
+            norm
         );
     }
 
@@ -66,14 +68,17 @@ pub fn softmax_temperature(scores: &[f32], temperature: f32) -> Vec<f32> {
     if scores.is_empty() {
         panic!(
             "[POINCARE_WALK] Empty scores array at {}:{}",
-            file!(), line!()
+            file!(),
+            line!()
         );
     }
 
     if temperature <= 0.0 {
         panic!(
             "[POINCARE_WALK] Invalid temperature at {}:{}: expected > 0, got {:.6}",
-            file!(), line!(), temperature
+            file!(),
+            line!(),
+            temperature
         );
     }
 
@@ -91,7 +96,9 @@ pub fn softmax_temperature(scores: &[f32], temperature: f32) -> Vec<f32> {
     if sum < 1e-10 {
         panic!(
             "[POINCARE_WALK] Softmax sum underflow at {}:{}: sum = {:e}",
-            file!(), line!(), sum
+            file!(),
+            line!(),
+            sum
         );
     }
 
@@ -125,7 +132,8 @@ pub fn sample_direction_with_temperature<R: Rng>(
     if n_samples == 0 {
         panic!(
             "[POINCARE_WALK] n_samples must be > 0 at {}:{}",
-            file!(), line!()
+            file!(),
+            line!()
         );
     }
 
@@ -134,15 +142,16 @@ pub fn sample_direction_with_temperature<R: Rng>(
         if s.len() != n_samples {
             panic!(
                 "[POINCARE_WALK] Scores length mismatch at {}:{}: expected {}, got {}",
-                file!(), line!(), n_samples, s.len()
+                file!(),
+                line!(),
+                n_samples,
+                s.len()
             );
         }
     }
 
     // Generate candidate directions
-    let candidates: Vec<[f32; 64]> = (0..n_samples)
-        .map(|_| random_direction(rng))
-        .collect();
+    let candidates: Vec<[f32; 64]> = (0..n_samples).map(|_| random_direction(rng)).collect();
 
     // Use provided scores or uniform
     let scores_vec: Vec<f32> = match scores {
@@ -195,7 +204,9 @@ pub fn scale_direction(
     if (dir_norm - 1.0).abs() > 1e-4 {
         panic!(
             "[POINCARE_WALK] Direction not unit length at {}:{}: norm = {:.6}",
-            file!(), line!(), dir_norm
+            file!(),
+            line!(),
+            dir_norm
         );
     }
 
@@ -203,7 +214,9 @@ pub fn scale_direction(
     if current_norm >= config.max_norm {
         panic!(
             "[POINCARE_WALK] Current position outside ball at {}:{}: norm = {:.6}",
-            file!(), line!(), current_norm
+            file!(),
+            line!(),
+            current_norm
         );
     }
 
@@ -273,8 +286,11 @@ mod tests {
             let dir = random_direction(&mut rng);
             let norm = norm_64(&dir);
 
-            assert!((norm - 1.0).abs() < 1e-5,
-                "direction should be unit length, got {}", norm);
+            assert!(
+                (norm - 1.0).abs() < 1e-5,
+                "direction should be unit length, got {}",
+                norm
+            );
         }
     }
 
@@ -295,7 +311,11 @@ mod tests {
         let probs = softmax_temperature(&scores, 2.0); // Constitution temperature
 
         let sum: f32 = probs.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-6, "softmax should sum to 1, got {}", sum);
+        assert!(
+            (sum - 1.0).abs() < 1e-6,
+            "softmax should sum to 1, got {}",
+            sum
+        );
     }
 
     #[test]
@@ -304,7 +324,10 @@ mod tests {
         let probs = softmax_temperature(&scores, 2.0);
 
         for p in &probs {
-            assert!((*p - 0.25).abs() < 0.01, "uniform scores should give uniform probs");
+            assert!(
+                (*p - 0.25).abs() < 0.01,
+                "uniform scores should give uniform probs"
+            );
         }
     }
 
@@ -320,8 +343,12 @@ mod tests {
         let range_low = probs_low.iter().cloned().fold(f32::NEG_INFINITY, f32::max)
             - probs_low.iter().cloned().fold(f32::INFINITY, f32::min);
 
-        assert!(range_high < range_low,
-            "high temp range {} should be < low temp range {}", range_high, range_low);
+        assert!(
+            range_high < range_low,
+            "high temp range {} should be < low temp range {}",
+            range_high,
+            range_low
+        );
     }
 
     #[test]
@@ -377,9 +404,12 @@ mod tests {
         let norm_origin = norm_64(&scaled_origin);
         let norm_boundary = norm_64(&scaled_boundary);
 
-        assert!(norm_origin > norm_boundary,
+        assert!(
+            norm_origin > norm_boundary,
             "step near origin ({}) should be larger than near boundary ({})",
-            norm_origin, norm_boundary);
+            norm_origin,
+            norm_boundary
+        );
     }
 
     #[test]
@@ -396,8 +426,10 @@ mod tests {
         let point = point_at_norm(0.5);
         let refs: Vec<[f32; 64]> = vec![];
 
-        assert!(is_far_from_all(&point, &refs, 0.7, &config),
-            "should be far from empty reference set");
+        assert!(
+            is_far_from_all(&point, &refs, 0.7, &config),
+            "should be far from empty reference set"
+        );
     }
 
     #[test]
@@ -407,8 +439,10 @@ mod tests {
         let ref_point = point_at_norm(0.51); // Very close
         let refs = vec![ref_point];
 
-        assert!(!is_far_from_all(&point, &refs, 0.7, &config),
-            "should NOT be far from close reference");
+        assert!(
+            !is_far_from_all(&point, &refs, 0.7, &config),
+            "should NOT be far from close reference"
+        );
     }
 
     #[test]
@@ -426,8 +460,12 @@ mod tests {
 
         // Point should be classified based on 0.7 threshold
         let result = is_far_from_all(&origin, &refs, 0.7, &config);
-        assert_eq!(result, dist >= 0.7,
+        assert_eq!(
+            result,
+            dist >= 0.7,
             "is_far_from_all result {} inconsistent with distance {} vs threshold 0.7",
-            result, dist);
+            result,
+            dist
+        );
     }
 }

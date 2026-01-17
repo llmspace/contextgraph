@@ -338,8 +338,7 @@ impl Handlers {
                         // Purpose alignment
                         if include_alignment {
                             result["purpose_alignment"] = json!(r.purpose_alignment);
-                            result["alignment_score"] =
-                                json!(r.fingerprint.alignment_score);
+                            result["alignment_score"] = json!(r.fingerprint.alignment_score);
                         }
 
                         // Johari quadrant

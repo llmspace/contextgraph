@@ -341,12 +341,8 @@ fn test_trend_requires_minimum_samples() {
 
     // Add only 2 samples
     for _ in 0..2 {
-        let _ = detector.check_drift_with_history(
-            &memories,
-            &goal,
-            "goal-1",
-            SearchStrategy::Cosine,
-        );
+        let _ =
+            detector.check_drift_with_history(&memories, &goal, "goal-1", SearchStrategy::Cosine);
     }
 
     let trend = detector.get_trend("goal-1");
@@ -362,12 +358,8 @@ fn test_trend_available_with_enough_samples() {
 
     // Add 5 samples
     for _ in 0..5 {
-        let _ = detector.check_drift_with_history(
-            &memories,
-            &goal,
-            "goal-1",
-            SearchStrategy::Cosine,
-        );
+        let _ =
+            detector.check_drift_with_history(&memories, &goal, "goal-1", SearchStrategy::Cosine);
     }
 
     let trend = detector.get_trend("goal-1");
@@ -384,12 +376,8 @@ fn test_trend_direction_stable_for_identical() {
 
     // Add identical samples (should be stable)
     for _ in 0..5 {
-        let _ = detector.check_drift_with_history(
-            &memories,
-            &goal,
-            "goal-1",
-            SearchStrategy::Cosine,
-        );
+        let _ =
+            detector.check_drift_with_history(&memories, &goal, "goal-1", SearchStrategy::Cosine);
     }
 
     let trend = detector.get_trend("goal-1").unwrap();
@@ -476,22 +464,14 @@ fn test_history_per_goal_isolation() {
 
     // Add to goal-1
     for _ in 0..3 {
-        let _ = detector.check_drift_with_history(
-            &memories,
-            &goal1,
-            "goal-1",
-            SearchStrategy::Cosine,
-        );
+        let _ =
+            detector.check_drift_with_history(&memories, &goal1, "goal-1", SearchStrategy::Cosine);
     }
 
     // Add to goal-2
     for _ in 0..5 {
-        let _ = detector.check_drift_with_history(
-            &memories,
-            &goal2,
-            "goal-2",
-            SearchStrategy::Cosine,
-        );
+        let _ =
+            detector.check_drift_with_history(&memories, &goal2, "goal-2", SearchStrategy::Cosine);
     }
 
     let trend1 = detector.get_trend("goal-1");

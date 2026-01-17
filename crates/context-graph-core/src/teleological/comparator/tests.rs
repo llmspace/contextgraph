@@ -3,8 +3,13 @@
 #[cfg(test)]
 mod tests {
     use crate::teleological::comparator::{BatchComparator, TeleologicalComparator};
-    use crate::teleological::{ComparisonValidationError, MatrixSearchConfig, SearchStrategy, SynergyMatrix};
-    use crate::types::fingerprint::{SparseVector, E1_DIM, E2_DIM, E3_DIM, E4_DIM, E5_DIM, E7_DIM, E8_DIM, E9_DIM, E10_DIM, E11_DIM};
+    use crate::teleological::{
+        ComparisonValidationError, MatrixSearchConfig, SearchStrategy, SynergyMatrix,
+    };
+    use crate::types::fingerprint::{
+        SparseVector, E10_DIM, E11_DIM, E1_DIM, E2_DIM, E3_DIM, E4_DIM, E5_DIM, E7_DIM, E8_DIM,
+        E9_DIM,
+    };
     use crate::types::SemanticFingerprint;
 
     /// Create a test fingerprint with known values for dense embeddings.
@@ -65,7 +70,9 @@ mod tests {
         let fp = create_test_fingerprint(1.0);
         let comparator = TeleologicalComparator::new();
 
-        let result = comparator.compare(&fp, &fp).expect("comparison should succeed");
+        let result = comparator
+            .compare(&fp, &fp)
+            .expect("comparison should succeed");
 
         // Self-similarity should be ~1.0
         assert!(
@@ -76,7 +83,11 @@ mod tests {
 
         // All available embedders should have scores
         let valid_count = result.valid_score_count();
-        assert!(valid_count >= 10, "Expected at least 10 valid scores, got {}", valid_count);
+        assert!(
+            valid_count >= 10,
+            "Expected at least 10 valid scores, got {}",
+            valid_count
+        );
     }
 
     #[test]
@@ -84,7 +95,9 @@ mod tests {
         let (fp_a, fp_b) = create_orthogonal_fingerprints();
         let comparator = TeleologicalComparator::new();
 
-        let result = comparator.compare(&fp_a, &fp_b).expect("comparison should succeed");
+        let result = comparator
+            .compare(&fp_a, &fp_b)
+            .expect("comparison should succeed");
 
         // Orthogonal vectors should have low similarity
         // Note: Only E1 is truly orthogonal in this test
@@ -130,7 +143,9 @@ mod tests {
         };
 
         let comparator = TeleologicalComparator::new();
-        let result = comparator.compare(&fp_a, &fp_b).expect("comparison should succeed");
+        let result = comparator
+            .compare(&fp_a, &fp_b)
+            .expect("comparison should succeed");
 
         // No overlapping embedders = 0 similarity
         assert_eq!(result.overall, 0.0, "No overlap should give 0 similarity");
@@ -178,7 +193,10 @@ mod tests {
 
         assert!(result.is_err(), "Invalid weights should return error");
         assert!(
-            matches!(result.unwrap_err(), ComparisonValidationError::WeightOutOfRange { .. }),
+            matches!(
+                result.unwrap_err(),
+                ComparisonValidationError::WeightOutOfRange { .. }
+            ),
             "Error should be WeightOutOfRange"
         );
     }
@@ -206,7 +224,9 @@ mod tests {
         let fp = create_test_fingerprint(1.0);
         let comparator = TeleologicalComparator::new();
 
-        let result = comparator.compare(&fp, &fp).expect("comparison should succeed");
+        let result = comparator
+            .compare(&fp, &fp)
+            .expect("comparison should succeed");
 
         // High self-similarity = high coherence
         assert!(
@@ -220,7 +240,9 @@ mod tests {
         let fp = create_test_fingerprint(1.0);
         let comparator = TeleologicalComparator::new();
 
-        let result = comparator.compare(&fp, &fp).expect("comparison should succeed");
+        let result = comparator
+            .compare(&fp, &fp)
+            .expect("comparison should succeed");
 
         // Should have a dominant embedder
         assert!(
@@ -239,7 +261,9 @@ mod tests {
         };
 
         let comparator = TeleologicalComparator::with_config(config);
-        let result = comparator.compare(&fp, &fp).expect("comparison should succeed");
+        let result = comparator
+            .compare(&fp, &fp)
+            .expect("comparison should succeed");
 
         assert!(result.breakdown.is_some(), "Breakdown should be generated");
 
@@ -256,7 +280,9 @@ mod tests {
         let fp_b = create_test_fingerprint(0.5);
         let comparator = TeleologicalComparator::new();
 
-        let result = comparator.compare(&fp_a, &fp_b).expect("comparison should succeed");
+        let result = comparator
+            .compare(&fp_a, &fp_b)
+            .expect("comparison should succeed");
 
         // Overall must be in [0, 1]
         assert!(
@@ -339,7 +365,9 @@ mod tests {
         };
 
         let comparator = TeleologicalComparator::with_config(config);
-        let result = comparator.compare(&fp_a, &fp_b).expect("comparison should succeed");
+        let result = comparator
+            .compare(&fp_a, &fp_b)
+            .expect("comparison should succeed");
 
         // Per-embedder scores should reflect same-type comparisons only
         // E1 (index 0) compared with E1, E2 with E2, etc.
@@ -360,7 +388,9 @@ mod tests {
                 assert!(
                     (0.0..=1.0).contains(s),
                     "Embedder {} ({}) score {} should be in [0,1] from same-type comparison",
-                    idx, name, s
+                    idx,
+                    name,
+                    s
                 );
             }
         }
@@ -391,7 +421,10 @@ mod tests {
 
         // Should not panic
         let result = comparator.compare(&empty_fp, &empty_fp);
-        assert!(result.is_ok(), "Empty fingerprint comparison should not panic");
+        assert!(
+            result.is_ok(),
+            "Empty fingerprint comparison should not panic"
+        );
     }
 
     #[test]

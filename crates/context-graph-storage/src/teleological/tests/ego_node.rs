@@ -5,10 +5,10 @@
 //! CRITICAL: Uses #[tokio::test] to prevent zombie runtime threads.
 //! DO NOT use tokio::runtime::Runtime::new() in tests.
 
-use crate::teleological::{RocksDbTeleologicalStore, serialization};
+use crate::teleological::{serialization, RocksDbTeleologicalStore};
+use chrono::Utc;
 use context_graph_core::gwt::ego_node::{PurposeSnapshot as EgoPurposeSnapshot, SelfEgoNode};
 use context_graph_core::traits::TeleologicalMemoryStore;
-use chrono::Utc;
 use uuid::Uuid;
 
 /// Create a REAL SelfEgoNode for testing.
@@ -25,13 +25,11 @@ fn create_real_ego_node() -> SelfEgoNode {
         fingerprint: None, // No initial fingerprint
         purpose_vector,
         coherence_with_actions: 0.85,
-        identity_trajectory: vec![
-            EgoPurposeSnapshot {
-                timestamp: now,
-                vector: purpose_vector,
-                context: "initial_creation".to_string(),
-            },
-        ],
+        identity_trajectory: vec![EgoPurposeSnapshot {
+            timestamp: now,
+            vector: purpose_vector,
+            context: "initial_creation".to_string(),
+        }],
         last_updated: now,
     }
 }
@@ -68,9 +66,18 @@ fn test_serialize_ego_node_roundtrip() {
 
     let original = create_real_ego_node();
     println!("BEFORE: Created SelfEgoNode with ID: {}", original.id);
-    println!("  - purpose_vector[0..3]: {:?}", &original.purpose_vector[..3]);
-    println!("  - coherence_with_actions: {:.4}", original.coherence_with_actions);
-    println!("  - identity_trajectory length: {}", original.identity_trajectory.len());
+    println!(
+        "  - purpose_vector[0..3]: {:?}",
+        &original.purpose_vector[..3]
+    );
+    println!(
+        "  - coherence_with_actions: {:.4}",
+        original.coherence_with_actions
+    );
+    println!(
+        "  - identity_trajectory length: {}",
+        original.identity_trajectory.len()
+    );
 
     let serialized = serialization::serialize_ego_node(&original);
     println!("SERIALIZED: {} bytes", serialized.len());
@@ -79,16 +86,27 @@ fn test_serialize_ego_node_roundtrip() {
 
     let deserialized = serialization::deserialize_ego_node(&serialized);
     println!("AFTER: Deserialized SelfEgoNode ID: {}", deserialized.id);
-    println!("  - purpose_vector[0..3]: {:?}", &deserialized.purpose_vector[..3]);
-    println!("  - coherence_with_actions: {:.4}", deserialized.coherence_with_actions);
+    println!(
+        "  - purpose_vector[0..3]: {:?}",
+        &deserialized.purpose_vector[..3]
+    );
+    println!(
+        "  - coherence_with_actions: {:.4}",
+        deserialized.coherence_with_actions
+    );
 
     // Verify all fields match
     assert_eq!(original.id, deserialized.id, "ID mismatch");
-    assert_eq!(original.fingerprint.is_none(), deserialized.fingerprint.is_none(), "Fingerprint mismatch");
+    assert_eq!(
+        original.fingerprint.is_none(),
+        deserialized.fingerprint.is_none(),
+        "Fingerprint mismatch"
+    );
     for i in 0..13 {
         assert!(
             (original.purpose_vector[i] - deserialized.purpose_vector[i]).abs() < 1e-6,
-            "purpose_vector[{}] mismatch", i
+            "purpose_vector[{}] mismatch",
+            i
         );
     }
     assert!(
@@ -109,10 +127,17 @@ fn test_serialize_ego_node_with_large_trajectory() {
     println!("=== TEST: SelfEgoNode with 100 identity snapshots ===");
 
     let original = create_ego_node_with_trajectory(100);
-    println!("BEFORE: Created SelfEgoNode with {} snapshots", original.identity_trajectory.len());
+    println!(
+        "BEFORE: Created SelfEgoNode with {} snapshots",
+        original.identity_trajectory.len()
+    );
 
     let serialized = serialization::serialize_ego_node(&original);
-    println!("SERIALIZED: {} bytes ({:.2}KB)", serialized.len(), serialized.len() as f64 / 1024.0);
+    println!(
+        "SERIALIZED: {} bytes ({:.2}KB)",
+        serialized.len(),
+        serialized.len() as f64 / 1024.0
+    );
 
     let deserialized = serialization::deserialize_ego_node(&serialized);
     assert_eq!(
@@ -122,10 +147,17 @@ fn test_serialize_ego_node_with_large_trajectory() {
     );
 
     // Verify context strings
-    for (i, (orig, deser)) in original.identity_trajectory.iter()
+    for (i, (orig, deser)) in original
+        .identity_trajectory
+        .iter()
         .zip(deserialized.identity_trajectory.iter())
-        .enumerate() {
-        assert_eq!(orig.context, deser.context, "Context mismatch at snapshot {}", i);
+        .enumerate()
+    {
+        assert_eq!(
+            orig.context, deser.context,
+            "Context mismatch at snapshot {}",
+            i
+        );
     }
 
     println!("RESULT: PASS - Large trajectory (100 snapshots) preserved");
@@ -139,7 +171,11 @@ fn test_ego_node_version_constant() {
 
     let ego = create_real_ego_node();
     let serialized = serialization::serialize_ego_node(&ego);
-    assert_eq!(serialized[0], serialization::EGO_NODE_VERSION, "First byte should be version");
+    assert_eq!(
+        serialized[0],
+        serialization::EGO_NODE_VERSION,
+        "First byte should be version"
+    );
 
     println!("RESULT: PASS - EGO_NODE_VERSION is 1");
 }
@@ -149,8 +185,7 @@ async fn test_ego_node_save_load_roundtrip() {
     println!("=== TEST: save_ego_node / load_ego_node round-trip (TASK-GWT-P1-001) ===");
 
     let temp_dir = tempfile::TempDir::new().expect("Failed to create temp dir");
-    let store = RocksDbTeleologicalStore::open(temp_dir.path())
-        .expect("Failed to open store");
+    let store = RocksDbTeleologicalStore::open(temp_dir.path()).expect("Failed to open store");
 
     // Initially no ego node
     let initial = store.load_ego_node().await.expect("Should query");
@@ -161,25 +196,37 @@ async fn test_ego_node_save_load_roundtrip() {
     let original = create_real_ego_node();
     let original_id = original.id;
     println!("SAVING: SelfEgoNode id={}", original_id);
-    println!("  - purpose_vector[0..3]: {:?}", &original.purpose_vector[..3]);
+    println!(
+        "  - purpose_vector[0..3]: {:?}",
+        &original.purpose_vector[..3]
+    );
     println!("  - coherence: {:.4}", original.coherence_with_actions);
 
-    store.save_ego_node(&original).await.expect("Should save ego node");
+    store
+        .save_ego_node(&original)
+        .await
+        .expect("Should save ego node");
 
     // Load and verify
-    let loaded = store.load_ego_node().await
+    let loaded = store
+        .load_ego_node()
+        .await
         .expect("Should load")
         .expect("Ego node should exist");
 
     println!("AFTER: Loaded SelfEgoNode id={}", loaded.id);
-    println!("  - purpose_vector[0..3]: {:?}", &loaded.purpose_vector[..3]);
+    println!(
+        "  - purpose_vector[0..3]: {:?}",
+        &loaded.purpose_vector[..3]
+    );
     println!("  - coherence: {:.4}", loaded.coherence_with_actions);
 
     assert_eq!(original_id, loaded.id, "ID mismatch");
     for i in 0..13 {
         assert!(
             (original.purpose_vector[i] - loaded.purpose_vector[i]).abs() < 1e-6,
-            "purpose_vector[{}] mismatch", i
+            "purpose_vector[{}] mismatch",
+            i
         );
     }
     assert_eq!(
@@ -206,12 +253,18 @@ async fn test_ego_node_persistence_across_reopen() {
 
     // Step 1: Open store, save ego node, close
     {
-        let store = RocksDbTeleologicalStore::open(&db_path)
-            .expect("Failed to open store (first open)");
+        let store =
+            RocksDbTeleologicalStore::open(&db_path).expect("Failed to open store (first open)");
 
-        println!("STEP 1: Saving ego node id={} with {} snapshots", original_id, original_trajectory_len);
+        println!(
+            "STEP 1: Saving ego node id={} with {} snapshots",
+            original_id, original_trajectory_len
+        );
 
-        store.save_ego_node(&ego).await.expect("Should save ego node");
+        store
+            .save_ego_node(&ego)
+            .await
+            .expect("Should save ego node");
         store.flush().await.expect("Should flush");
 
         println!("STEP 1: Closing store...");
@@ -220,14 +273,20 @@ async fn test_ego_node_persistence_across_reopen() {
     // Step 2: Reopen store, load ego node, verify
     {
         println!("STEP 2: Reopening store...");
-        let store = RocksDbTeleologicalStore::open(&db_path)
-            .expect("Failed to open store (second open)");
+        let store =
+            RocksDbTeleologicalStore::open(&db_path).expect("Failed to open store (second open)");
 
-        let loaded = store.load_ego_node().await
+        let loaded = store
+            .load_ego_node()
+            .await
             .expect("Should load")
             .expect("Ego node should persist");
 
-        println!("STEP 2: Loaded ego node id={} with {} snapshots", loaded.id, loaded.identity_trajectory.len());
+        println!(
+            "STEP 2: Loaded ego node id={} with {} snapshots",
+            loaded.id,
+            loaded.identity_trajectory.len()
+        );
 
         assert_eq!(original_id, loaded.id, "ID should persist");
         assert!(
@@ -249,8 +308,7 @@ async fn test_ego_node_overwrite() {
     println!("=== TEST: save_ego_node overwrites previous value ===");
 
     let temp_dir = tempfile::TempDir::new().expect("Failed to create temp dir");
-    let store = RocksDbTeleologicalStore::open(temp_dir.path())
-        .expect("Failed to open store");
+    let store = RocksDbTeleologicalStore::open(temp_dir.path()).expect("Failed to open store");
 
     // Save first ego node
     let ego1 = create_real_ego_node();
@@ -266,12 +324,18 @@ async fn test_ego_node_overwrite() {
     println!("STEP 2: Saved second ego node id={}", id2);
 
     // Load - should get ego2
-    let loaded = store.load_ego_node().await
+    let loaded = store
+        .load_ego_node()
+        .await
         .expect("Should load")
         .expect("Ego node should exist");
 
     assert_eq!(loaded.id, id2, "Should load the second (latest) ego node");
-    assert_eq!(loaded.identity_trajectory.len(), 10, "Should have 10 snapshots from ego2");
+    assert_eq!(
+        loaded.identity_trajectory.len(),
+        10,
+        "Should have 10 snapshots from ego2"
+    );
 
     println!("RESULT: PASS - save_ego_node overwrites correctly");
 }
@@ -294,7 +358,9 @@ async fn test_in_memory_store_ego_node_roundtrip() {
 
     store.save_ego_node(&original).await.expect("Should save");
 
-    let loaded = store.load_ego_node().await
+    let loaded = store
+        .load_ego_node()
+        .await
         .expect("Should load")
         .expect("Should exist");
 

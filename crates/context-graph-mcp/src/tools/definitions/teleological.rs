@@ -1,8 +1,8 @@
 //! Teleological (13-embedder fusion) tool definitions.
 //! TELEO-007 through TELEO-011: Search, compute, fuse, update synergy, manage profiles.
 
-use serde_json::json;
 use crate::tools::types::ToolDefinition;
+use serde_json::json;
 
 /// Returns Teleological tool definitions (5 tools).
 pub fn definitions() -> Vec<ToolDefinition> {
@@ -94,7 +94,6 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "required": []
             }),
         ),
-
         // compute_teleological_vector - Compute full 13-embedder teleological vector
         ToolDefinition::new(
             "compute_teleological_vector",
@@ -134,7 +133,6 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "required": ["content"]
             }),
         ),
-
         // fuse_embeddings - Fuse multiple embeddings using synergy matrix
         ToolDefinition::new(
             "fuse_embeddings",
@@ -178,7 +176,6 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "required": ["memory_id"]
             }),
         ),
-
         // update_synergy_matrix - Adaptively update synergy matrix from feedback
         ToolDefinition::new(
             "update_synergy_matrix",
@@ -223,7 +220,6 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "required": ["query_vector_id", "result_vector_id", "feedback"]
             }),
         ),
-
         // manage_teleological_profile - CRUD for task-specific profiles
         ToolDefinition::new(
             "manage_teleological_profile",

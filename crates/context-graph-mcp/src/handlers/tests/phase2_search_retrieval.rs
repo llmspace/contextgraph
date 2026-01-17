@@ -89,7 +89,10 @@ async fn phase2_search_graph_finds_stored_memories() {
     let (handlers, store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
 
     // === SETUP: Store all 5 synthetic memories ===
-    println!("\n[SETUP] Storing {} synthetic memories...", SYNTHETIC_MEMORIES.len());
+    println!(
+        "\n[SETUP] Storing {} synthetic memories...",
+        SYNTHETIC_MEMORIES.len()
+    );
 
     let mut stored_fingerprint_ids: Vec<String> = Vec::new();
 
@@ -140,7 +143,10 @@ async fn phase2_search_graph_finds_stored_memories() {
     let search_response = handlers.dispatch(search_request).await;
 
     if let Some(error) = &search_response.error {
-        println!("  - Search returned error: {} - {}", error.code, error.message);
+        println!(
+            "  - Search returned error: {} - {}",
+            error.code, error.message
+        );
     } else if let Some(result) = extract_tool_result(&search_response) {
         let results = result.get("results").and_then(|v| v.as_array());
         let count = result.get("count").and_then(|v| v.as_u64()).unwrap_or(0);
@@ -149,9 +155,15 @@ async fn phase2_search_graph_finds_stored_memories() {
 
         if let Some(results) = results {
             for (i, r) in results.iter().enumerate() {
-                let fp_id = r.get("fingerprintId").and_then(|v| v.as_str()).unwrap_or("unknown");
+                let fp_id = r
+                    .get("fingerprintId")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
                 let similarity = r.get("similarity").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                println!("    [{}] fingerprintId: {}, similarity: {:.4}", i, fp_id, similarity);
+                println!(
+                    "    [{}] fingerprintId: {}, similarity: {:.4}",
+                    i, fp_id, similarity
+                );
             }
         }
 
@@ -171,7 +183,10 @@ async fn phase2_search_graph_finds_stored_memories() {
     let search_response = handlers.dispatch(search_request).await;
 
     if let Some(error) = &search_response.error {
-        println!("  - Search returned error: {} - {}", error.code, error.message);
+        println!(
+            "  - Search returned error: {} - {}",
+            error.code, error.message
+        );
     } else if let Some(result) = extract_tool_result(&search_response) {
         let count = result.get("count").and_then(|v| v.as_u64()).unwrap_or(0);
         println!("  - Results count: {}", count);
@@ -191,7 +206,10 @@ async fn phase2_search_graph_finds_stored_memories() {
     let search_response = handlers.dispatch(search_request).await;
 
     if let Some(error) = &search_response.error {
-        println!("  - Search returned error: {} - {}", error.code, error.message);
+        println!(
+            "  - Search returned error: {} - {}",
+            error.code, error.message
+        );
     } else if let Some(result) = extract_tool_result(&search_response) {
         let count = result.get("count").and_then(|v| v.as_u64()).unwrap_or(0);
         println!("  - Results count: {}", count);
@@ -218,7 +236,10 @@ async fn phase2_search_teleological_strategies() {
     let (handlers, store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
 
     // === SETUP: Store all 5 synthetic memories ===
-    println!("\n[SETUP] Storing {} synthetic memories...", SYNTHETIC_MEMORIES.len());
+    println!(
+        "\n[SETUP] Storing {} synthetic memories...",
+        SYNTHETIC_MEMORIES.len()
+    );
 
     for (i, content) in SYNTHETIC_MEMORIES.iter().enumerate() {
         let params = json!({
@@ -257,15 +278,21 @@ async fn phase2_search_teleological_strategies() {
     let search_response = handlers.dispatch(search_request).await;
 
     if let Some(error) = &search_response.error {
-        println!("  - Search returned error: {} - {}", error.code, error.message);
+        println!(
+            "  - Search returned error: {} - {}",
+            error.code, error.message
+        );
     } else if let Some(result) = extract_tool_result(&search_response) {
         let count = result.get("count").and_then(|v| v.as_u64()).unwrap_or(0);
         println!("  - Results count: {}", count);
 
         if let Some(results) = result.get("results").and_then(|v| v.as_array()) {
             for (i, r) in results.iter().take(3).enumerate() {
-                let fp_id = r.get("id").or_else(|| r.get("fingerprintId"))
-                    .and_then(|v| v.as_str()).unwrap_or("unknown");
+                let fp_id = r
+                    .get("id")
+                    .or_else(|| r.get("fingerprintId"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
                 let similarity = r.get("similarity").and_then(|v| v.as_f64()).unwrap_or(0.0);
                 println!("    [{}] id: {}, similarity: {:.4}", i, fp_id, similarity);
             }
@@ -289,7 +316,10 @@ async fn phase2_search_teleological_strategies() {
     let search_response = handlers.dispatch(search_request).await;
 
     if let Some(error) = &search_response.error {
-        println!("  - Search returned error: {} - {}", error.code, error.message);
+        println!(
+            "  - Search returned error: {} - {}",
+            error.code, error.message
+        );
     } else if let Some(result) = extract_tool_result(&search_response) {
         let count = result.get("count").and_then(|v| v.as_u64()).unwrap_or(0);
         println!("  - Results count: {} (rrf strategy)", count);
@@ -312,7 +342,10 @@ async fn phase2_search_teleological_strategies() {
     let search_response = handlers.dispatch(search_request).await;
 
     if let Some(error) = &search_response.error {
-        println!("  - Search returned error: {} - {}", error.code, error.message);
+        println!(
+            "  - Search returned error: {} - {}",
+            error.code, error.message
+        );
     } else if let Some(result) = extract_tool_result(&search_response) {
         let count = result.get("count").and_then(|v| v.as_u64()).unwrap_or(0);
         println!("  - Results count: {} (max_results=2)", count);
@@ -339,7 +372,10 @@ async fn phase2_memory_retrieve_by_fingerprint_id() {
     let (handlers, store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
 
     // === SETUP: Store all 5 synthetic memories and collect IDs ===
-    println!("\n[SETUP] Storing {} synthetic memories...", SYNTHETIC_MEMORIES.len());
+    println!(
+        "\n[SETUP] Storing {} synthetic memories...",
+        SYNTHETIC_MEMORIES.len()
+    );
 
     let mut stored_fingerprint_ids: Vec<String> = Vec::new();
 
@@ -375,13 +411,20 @@ async fn phase2_memory_retrieve_by_fingerprint_id() {
     println!("  - Stored {} fingerprints", stored_fingerprint_ids.len());
 
     // === TEST: Retrieve each fingerprint via MCP handler ===
-    println!("\n[RETRIEVAL TESTS] Testing memory/retrieve for all {} fingerprints:", stored_fingerprint_ids.len());
+    println!(
+        "\n[RETRIEVAL TESTS] Testing memory/retrieve for all {} fingerprints:",
+        stored_fingerprint_ids.len()
+    );
 
     let mut retrievals_tested = 0;
     let mut all_verified = true;
 
     for (i, fingerprint_id_str) in stored_fingerprint_ids.iter().enumerate() {
-        println!("\n  [{}] Retrieving fingerprint: {}", i + 1, fingerprint_id_str);
+        println!(
+            "\n  [{}] Retrieving fingerprint: {}",
+            i + 1,
+            fingerprint_id_str
+        );
 
         let retrieve_params = json!({
             "fingerprintId": fingerprint_id_str
@@ -403,7 +446,10 @@ async fn phase2_memory_retrieve_by_fingerprint_id() {
         let fingerprint = result.get("fingerprint").expect("Should have fingerprint");
 
         // Verify ID matches
-        let retrieved_id = fingerprint.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let retrieved_id = fingerprint
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
         assert_eq!(
             retrieved_id, fingerprint_id_str,
             "Retrieved ID must match requested ID"
@@ -461,7 +507,10 @@ async fn phase2_memory_retrieve_by_fingerprint_id() {
         "All fingerprints must be retrieved"
     );
 
-    println!("\n[PHASE 2 - MEMORY RETRIEVE PASSED] All {} fingerprints retrieved and verified", retrievals_tested);
+    println!(
+        "\n[PHASE 2 - MEMORY RETRIEVE PASSED] All {} fingerprints retrieved and verified",
+        retrievals_tested
+    );
     println!("================================================================================\n");
 }
 
@@ -481,7 +530,10 @@ async fn phase2_comprehensive_search_retrieval() {
     let (handlers, store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
 
     // === SETUP: Store all 5 synthetic memories ===
-    println!("\n[SETUP] Storing {} synthetic memories...", SYNTHETIC_MEMORIES.len());
+    println!(
+        "\n[SETUP] Storing {} synthetic memories...",
+        SYNTHETIC_MEMORIES.len()
+    );
 
     let mut stored_fingerprint_ids: Vec<String> = Vec::new();
 
@@ -499,7 +551,12 @@ async fn phase2_comprehensive_search_retrieval() {
         assert!(response.error.is_none(), "Store {} failed", i + 1);
 
         let result = response.result.expect("Should have result");
-        let fingerprint_id_str = result.get("fingerprintId").unwrap().as_str().unwrap().to_string();
+        let fingerprint_id_str = result
+            .get("fingerprintId")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
         stored_fingerprint_ids.push(fingerprint_id_str);
     }
 
@@ -518,10 +575,18 @@ async fn phase2_comprehensive_search_retrieval() {
     let mut searches_tested = 0;
     let mut searches_found_results = 0;
 
-    println!("\n[SEARCH TESTS] Running {} search queries:", search_queries.len());
+    println!(
+        "\n[SEARCH TESTS] Running {} search queries:",
+        search_queries.len()
+    );
 
     for (i, (query, description)) in search_queries.iter().enumerate() {
-        println!("\n  [{}] Query: '{}' (should find: {})", i + 1, query, description);
+        println!(
+            "\n  [{}] Query: '{}' (should find: {})",
+            i + 1,
+            query,
+            description
+        );
 
         let search_request = make_tool_call(
             "search_graph",
@@ -552,9 +617,18 @@ async fn phase2_comprehensive_search_retrieval() {
                 // Print first result
                 if let Some(results) = results {
                     if let Some(first) = results.first() {
-                        let fp_id = first.get("fingerprintId").and_then(|v| v.as_str()).unwrap_or("unknown");
-                        let similarity = first.get("similarity").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                        println!("    - Top result: {} (similarity: {:.4})", fp_id, similarity);
+                        let fp_id = first
+                            .get("fingerprintId")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown");
+                        let similarity = first
+                            .get("similarity")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(0.0);
+                        println!(
+                            "    - Top result: {} (similarity: {:.4})",
+                            fp_id, similarity
+                        );
 
                         // Verify top result is in our stored set
                         let found_in_stored = stored_fingerprint_ids.iter().any(|id| id == fp_id);
@@ -568,7 +642,10 @@ async fn phase2_comprehensive_search_retrieval() {
     }
 
     // === RETRIEVAL TESTS ===
-    println!("\n[RETRIEVAL TESTS] Verifying all {} stored fingerprints:", stored_fingerprint_ids.len());
+    println!(
+        "\n[RETRIEVAL TESTS] Verifying all {} stored fingerprints:",
+        stored_fingerprint_ids.len()
+    );
 
     let mut retrievals_tested = 0;
 
@@ -586,7 +663,11 @@ async fn phase2_comprehensive_search_retrieval() {
         }
     }
 
-    println!("  - {} of {} retrievals succeeded", retrievals_tested, stored_fingerprint_ids.len());
+    println!(
+        "  - {} of {} retrievals succeeded",
+        retrievals_tested,
+        stored_fingerprint_ids.len()
+    );
 
     // === SUMMARY ===
     let all_verified = searches_found_results == search_queries.len()

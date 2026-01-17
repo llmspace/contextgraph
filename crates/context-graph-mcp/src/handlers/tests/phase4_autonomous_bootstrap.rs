@@ -35,7 +35,7 @@
 
 use serde_json::json;
 
-#[allow(unused_imports)]  // Some imports used by commented-out tests
+#[allow(unused_imports)] // Some imports used by commented-out tests
 use crate::handlers::tests::{
     create_test_handlers_no_goals, create_test_handlers_with_rocksdb_no_goals,
     extract_mcp_tool_data,
@@ -255,18 +255,19 @@ async fn test_get_autonomous_status_without_north_star() {
     let data = extract_mcp_tool_data(&result);
 
     // FSV: Verify north_star shows not configured
-    let north_star = data.get("strategic_goals").expect("strategic_goals must exist");
+    let north_star = data
+        .get("strategic_goals")
+        .expect("strategic_goals must exist");
     let configured = north_star
         .get("configured")
         .and_then(|v| v.as_bool())
         .expect("configured must exist");
-    assert!(
-        !configured,
-        "[FSV] North Star should NOT be configured"
-    );
+    assert!(!configured, "[FSV] North Star should NOT be configured");
 
     // FSV: Verify overall_health shows not_configured
-    let overall_health = data.get("overall_health").expect("overall_health must exist");
+    let overall_health = data
+        .get("overall_health")
+        .expect("overall_health must exist");
     let health_status = overall_health
         .get("status")
         .and_then(|v| v.as_str())
@@ -343,7 +344,9 @@ async fn test_get_autonomous_status_with_metrics() {
     let data = extract_mcp_tool_data(&result);
 
     // FSV: Verify metrics section exists when requested
-    let metrics = data.get("metrics").expect("metrics must exist when include_metrics=true");
+    let metrics = data
+        .get("metrics")
+        .expect("metrics must exist when include_metrics=true");
     assert!(
         metrics.get("drift_rolling_mean").is_some(),
         "[FSV] metrics.drift_rolling_mean must exist"
@@ -604,12 +607,14 @@ async fn test_full_autonomous_flow_with_rocksdb() {
     );
 
     let status_data = extract_mcp_tool_data(&status_response.result.unwrap());
-    let north_star = status_data.get("strategic_goals").expect("strategic_goals must exist");
-    let configured = north_star.get("configured").and_then(|v| v.as_bool()).unwrap_or(true);
-    assert!(
-        !configured,
-        "[FSV] North Star should still be unconfigured"
-    );
+    let north_star = status_data
+        .get("strategic_goals")
+        .expect("strategic_goals must exist");
+    let configured = north_star
+        .get("configured")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    assert!(!configured, "[FSV] North Star should still be unconfigured");
 
     // STEP 3: Check alignment drift (should work without North Star)
     let drift_request = JsonRpcRequest {
@@ -680,7 +685,10 @@ async fn test_all_autonomous_tools_integration() {
         tests_passed += 1;
         println!("[Phase 4] store_memory (without North Star): PASSED");
     } else {
-        println!("[Phase 4] store_memory (without North Star): FAILED - {:?}", resp1.error);
+        println!(
+            "[Phase 4] store_memory (without North Star): FAILED - {:?}",
+            resp1.error
+        );
     }
 
     // TEST 2: get_autonomous_status
@@ -744,7 +752,10 @@ async fn test_all_autonomous_tools_integration() {
         tests_passed += 1;
         println!("[Phase 4] trigger_drift_correction (ARCH-03): PASSED");
     } else {
-        println!("[Phase 4] trigger_drift_correction: FAILED - {:?}", resp4.error);
+        println!(
+            "[Phase 4] trigger_drift_correction: FAILED - {:?}",
+            resp4.error
+        );
     }
 
     // TEST 5: discover_sub_goals (ARCH-03)
@@ -775,8 +786,22 @@ async fn test_all_autonomous_tools_integration() {
     println!("\n[Phase 4] AUTONOMOUS BOOTSTRAP TOOLS SUMMARY");
     println!("=============================================");
     println!("Tests passed: {}/{}", tests_passed, total_tests);
-    println!("Circular dependency fix: {}", if tests_passed >= 1 { "VERIFIED" } else { "BROKEN" });
-    println!("ARCH-03 compliance: {}", if tests_passed >= 4 { "VERIFIED" } else { "INCOMPLETE" });
+    println!(
+        "Circular dependency fix: {}",
+        if tests_passed >= 1 {
+            "VERIFIED"
+        } else {
+            "BROKEN"
+        }
+    );
+    println!(
+        "ARCH-03 compliance: {}",
+        if tests_passed >= 4 {
+            "VERIFIED"
+        } else {
+            "INCOMPLETE"
+        }
+    );
     println!("=============================================");
 
     // Critical: store_memory must work (test 1)

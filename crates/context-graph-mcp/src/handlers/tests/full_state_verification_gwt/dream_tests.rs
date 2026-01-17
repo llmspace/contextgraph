@@ -49,7 +49,10 @@ async fn test_trigger_dream_initiates_real_consolidation() {
         .as_str()
         .expect("trigger_reason must be string");
     if triggered {
-        assert_eq!(trigger_reason, "Manual", "trigger_reason should be Manual when triggered");
+        assert_eq!(
+            trigger_reason, "Manual",
+            "trigger_reason should be Manual when triggered"
+        );
     }
 
     // FSV-3: Must have gpu_eligible flag (TASK-35 addition)
@@ -69,7 +72,10 @@ async fn test_trigger_dream_initiates_real_consolidation() {
 
     println!(
         "FSV PASSED: trigger_dream - triggered={}, trigger_reason='{}', gpu={}%, eligible={}",
-        triggered, trigger_reason, (gpu_utilization * 100.0).round(), gpu_eligible
+        triggered,
+        trigger_reason,
+        (gpu_utilization * 100.0).round(),
+        gpu_eligible
     );
 
     // EXECUTE: Call trigger_dream with force=true (TASK-35: still requires rationale)
@@ -93,7 +99,10 @@ async fn test_trigger_dream_initiates_real_consolidation() {
         .expect("forced must be bool");
 
     // TASK-35: Verify forced field is true when force=true
-    assert!(forced_flag, "forced field should be true when force=true parameter used");
+    assert!(
+        forced_flag,
+        "forced field should be true when force=true parameter used"
+    );
 
     println!(
         "FSV PASSED: trigger_dream force=true - triggered={}, forced={}",

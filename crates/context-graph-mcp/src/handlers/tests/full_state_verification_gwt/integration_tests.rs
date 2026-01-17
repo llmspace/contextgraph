@@ -2,10 +2,7 @@
 //!
 //! Verifies RocksDB column families and warm GWT state with non-zero values.
 
-use super::{
-    create_handlers_with_rocksdb_and_gwt, extract_tool_content,
-    make_tool_call_request,
-};
+use super::{create_handlers_with_rocksdb_and_gwt, extract_tool_content, make_tool_call_request};
 use crate::handlers::tests::{
     create_test_handlers_with_warm_gwt, create_test_handlers_with_warm_gwt_rocksdb,
     extract_mcp_tool_data,

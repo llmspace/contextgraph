@@ -7,9 +7,9 @@
 //! - Event wiring integration
 //! - Edge cases and concurrent access
 
-mod common;
-mod system_tests;
-mod kuramoto_tests;
-mod awareness_tests;
 mod awareness_edge_tests;
+mod awareness_tests;
+mod common;
 mod event_tests;
+mod kuramoto_tests;
+mod system_tests;

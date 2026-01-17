@@ -7,9 +7,7 @@
 //! 3. Interrupt signal mid-walk - Clean termination with partial results
 
 use context_graph_core::dream::{
-    HyperbolicExplorer, HyperbolicWalkConfig,
-    sample_starting_positions,
-    position_to_query,
+    position_to_query, sample_starting_positions, HyperbolicExplorer, HyperbolicWalkConfig,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -29,13 +27,12 @@ fn edge_case_1_single_walk_single_start() {
     let config = HyperbolicWalkConfig {
         step_size: 0.1,
         max_steps: 100,
-        temperature: 2.0,           // Constitution
+        temperature: 2.0,             // Constitution
         min_blind_spot_distance: 0.7, // Constitution semantic_leap
         direction_samples: 8,
     };
 
-    let mut explorer = HyperbolicExplorer::new(config)
-        .with_seed(123);
+    let mut explorer = HyperbolicExplorer::new(config).with_seed(123);
 
     let interrupt = make_interrupt_flag();
     let start_positions: Vec<[f32; 64]> = vec![[0.0; 64]];
@@ -46,17 +43,30 @@ fn edge_case_1_single_walk_single_start() {
     println!("  - Queries generated: {}", result.queries_generated);
     println!("  - Blind spots found: {}", result.all_blind_spots.len());
     println!("  - Coverage estimate: {:.4}", result.coverage_estimate);
-    println!("  - Average semantic leap: {:.4}", result.average_semantic_leap);
+    println!(
+        "  - Average semantic leap: {:.4}",
+        result.average_semantic_leap
+    );
 
     // Verify walk completed from single starting position
-    assert!(!result.walks.is_empty(), "Should complete at least one walk");
+    assert!(
+        !result.walks.is_empty(),
+        "Should complete at least one walk"
+    );
     assert!(result.queries_generated > 0, "Should generate queries");
-    assert!(result.queries_generated <= 100, "Should respect query limit");
+    assert!(
+        result.queries_generated <= 100,
+        "Should respect query limit"
+    );
 
     // Log walk trajectory lengths
     for (i, walk) in result.walks.iter().enumerate() {
-        println!("  - Walk {} trajectory length: {}, completed: {}",
-                 i, walk.trajectory.len(), walk.completed);
+        println!(
+            "  - Walk {} trajectory length: {}, completed: {}",
+            i,
+            walk.trajectory.len(),
+            walk.completed
+        );
     }
 
     println!("  ✓ PASSED: Single walk from single start completed correctly");
@@ -70,14 +80,13 @@ fn edge_case_2_many_starting_positions_high_temp() {
 
     let config = HyperbolicWalkConfig {
         step_size: 0.1,
-        max_steps: 20, // Shorter walks to test more starting positions
-        temperature: 2.0,           // Constitution
+        max_steps: 20,                // Shorter walks to test more starting positions
+        temperature: 2.0,             // Constitution
         min_blind_spot_distance: 0.7, // Constitution semantic_leap
         direction_samples: 8,
     };
 
-    let mut explorer = HyperbolicExplorer::new(config)
-        .with_seed(456);
+    let mut explorer = HyperbolicExplorer::new(config).with_seed(456);
 
     let interrupt = make_interrupt_flag();
 
@@ -104,20 +113,33 @@ fn edge_case_2_many_starting_positions_high_temp() {
 
     // Verify exploration occurred from multiple starting positions
     assert!(!result.walks.is_empty(), "Should complete walks");
-    assert!(result.queries_generated <= 100, "Must respect query limit (100)");
+    assert!(
+        result.queries_generated <= 100,
+        "Must respect query limit (100)"
+    );
 
     // Check distribution: walks should start from different positions
-    let unique_starts: std::collections::HashSet<_> = result.walks.iter()
+    let unique_starts: std::collections::HashSet<_> = result
+        .walks
+        .iter()
         .map(|w| format!("{:.3}_{:.3}", w.start_position[0], w.start_position[1]))
         .collect();
 
-    println!("  - Unique starting positions explored: {}", unique_starts.len());
-    assert!(!unique_starts.is_empty(), "Should explore from at least one starting position");
+    println!(
+        "  - Unique starting positions explored: {}",
+        unique_starts.len()
+    );
+    assert!(
+        !unique_starts.is_empty(),
+        "Should explore from at least one starting position"
+    );
 
     // Log some blind spot details if found
     for (i, blind_spot) in result.all_blind_spots.iter().take(5).enumerate() {
-        println!("  - Blind spot {}: distance={:.4}, confidence={:.4}",
-                 i, blind_spot.distance_from_nearest, blind_spot.confidence);
+        println!(
+            "  - Blind spot {}: distance={:.4}, confidence={:.4}",
+            i, blind_spot.distance_from_nearest, blind_spot.confidence
+        );
     }
 
     println!("  ✓ PASSED: Many starting positions explored with high temperature");
@@ -131,14 +153,13 @@ fn edge_case_3_interrupt_mid_walk() {
 
     let config = HyperbolicWalkConfig {
         step_size: 0.1,
-        max_steps: 1000, // Long walks to ensure interrupt hits mid-walk
-        temperature: 2.0,           // Constitution
+        max_steps: 1000,              // Long walks to ensure interrupt hits mid-walk
+        temperature: 2.0,             // Constitution
         min_blind_spot_distance: 0.7, // Constitution semantic_leap
         direction_samples: 8,
     };
 
-    let mut explorer = HyperbolicExplorer::new(config)
-        .with_seed(789);
+    let mut explorer = HyperbolicExplorer::new(config).with_seed(789);
 
     let interrupt = make_interrupt_flag();
 
@@ -161,8 +182,10 @@ fn edge_case_3_interrupt_mid_walk() {
     // Verify partial results are still valid (whatever was completed before interrupt)
     // The result should be consistent - walks that did complete should have valid trajectories
     for walk in &result.walks {
-        assert!(!walk.trajectory.is_empty() || walk.total_distance == 0.0,
-                "Walk trajectory should be valid even if partial");
+        assert!(
+            !walk.trajectory.is_empty() || walk.total_distance == 0.0,
+            "Walk trajectory should be valid even if partial"
+        );
     }
 
     println!("  ✓ PASSED: Interrupt handled cleanly with partial results");
@@ -175,21 +198,32 @@ fn verify_constitution_compliance() {
 
     let config = HyperbolicWalkConfig::default();
 
-    println!("  - Temperature: {} (Constitution: 2.0)", config.temperature);
-    println!("  - Min blind spot distance: {} (Constitution semantic_leap: 0.7)",
-             config.min_blind_spot_distance);
+    println!(
+        "  - Temperature: {} (Constitution: 2.0)",
+        config.temperature
+    );
+    println!(
+        "  - Min blind spot distance: {} (Constitution semantic_leap: 0.7)",
+        config.min_blind_spot_distance
+    );
 
-    assert_eq!(config.temperature, 2.0,
-               "Temperature must be 2.0 per Constitution");
-    assert_eq!(config.min_blind_spot_distance, 0.7,
-               "Min blind spot distance must be 0.7 per Constitution semantic_leap");
+    assert_eq!(
+        config.temperature, 2.0,
+        "Temperature must be 2.0 per Constitution"
+    );
+    assert_eq!(
+        config.min_blind_spot_distance, 0.7,
+        "Min blind spot distance must be 0.7 per Constitution semantic_leap"
+    );
 
     // Test that explorer respects query limit
     let explorer = HyperbolicExplorer::with_defaults().with_seed(999);
     assert_eq!(explorer.remaining_queries(), 100, "Query limit must be 100");
 
-    println!("  - Query limit (from remaining_queries): {} (Constitution: 100)",
-             explorer.remaining_queries());
+    println!(
+        "  - Query limit (from remaining_queries): {} (Constitution: 100)",
+        explorer.remaining_queries()
+    );
 
     println!("  ✓ PASSED: All Constitution values verified");
 }
@@ -199,8 +233,7 @@ fn verify_constitution_compliance() {
 fn integration_full_exploration_cycle() {
     println!("\n=== INTEGRATION: Full exploration cycle ===");
 
-    let mut explorer = HyperbolicExplorer::with_defaults()
-        .with_seed(999);
+    let mut explorer = HyperbolicExplorer::with_defaults().with_seed(999);
 
     let interrupt = make_interrupt_flag();
 
@@ -217,24 +250,26 @@ fn integration_full_exploration_cycle() {
     // Sample starting positions using the exported helper function
     let start_positions = sample_starting_positions(&node_positions, 10, 2.0);
 
-    println!("  - Sampled {} starting positions from {} nodes",
-             start_positions.len(), node_positions.len());
+    println!(
+        "  - Sampled {} starting positions from {} nodes",
+        start_positions.len(),
+        node_positions.len()
+    );
 
     let result = explorer.explore(&start_positions, &interrupt);
 
     println!("  - Walks completed: {}", result.walks.len());
     println!("  - Total queries: {}", result.queries_generated);
-    println!("  - Blind spots discovered: {}", result.all_blind_spots.len());
+    println!(
+        "  - Blind spots discovered: {}",
+        result.all_blind_spots.len()
+    );
     println!("  - Coverage estimate: {:.4}", result.coverage_estimate);
     println!("  - Unique positions: {}", result.unique_positions);
 
     // Calculate coverage statistics
-    let total_steps: usize = result.walks.iter()
-        .map(|w| w.trajectory.len())
-        .sum();
-    let total_distance: f64 = result.walks.iter()
-        .map(|w| w.total_distance as f64)
-        .sum();
+    let total_steps: usize = result.walks.iter().map(|w| w.trajectory.len()).sum();
+    let total_distance: f64 = result.walks.iter().map(|w| w.total_distance as f64).sum();
 
     println!("  - Total steps taken: {}", total_steps);
     println!("  - Total distance covered: {:.4}", total_distance);
@@ -266,7 +301,10 @@ fn test_position_to_query_helper() {
     pos[1] = 0.3;
     let query_pos = position_to_query(&pos);
     assert_eq!(query_pos.len(), 64, "Query should be 64D");
-    println!("  - Non-origin query: first 5 dims = {:?}", &query_pos[0..5]);
+    println!(
+        "  - Non-origin query: first 5 dims = {:?}",
+        &query_pos[0..5]
+    );
 
     println!("  ✓ PASSED: position_to_query helper works correctly");
 }

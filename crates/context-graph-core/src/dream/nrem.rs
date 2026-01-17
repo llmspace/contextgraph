@@ -36,7 +36,7 @@ use uuid::Uuid;
 
 use super::amortized::AmortizedLearner;
 use super::constants;
-use super::hebbian::{HebbianEngine, select_replay_memories};
+use super::hebbian::{select_replay_memories, HebbianEngine};
 use super::types::NodeActivation;
 use crate::error::CoreResult;
 
@@ -166,7 +166,10 @@ impl std::fmt::Debug for NremPhase {
             .field("recency_bias", &self.recency_bias)
             .field("batch_size", &self.batch_size)
             .field("hebbian_engine", &self.hebbian_engine)
-            .field("memory_provider", &self.memory_provider.as_ref().map(|p| format!("{:?}", p)))
+            .field(
+                "memory_provider",
+                &self.memory_provider.as_ref().map(|p| format!("{:?}", p)),
+            )
             .finish()
     }
 }
@@ -316,7 +319,10 @@ impl NremPhase {
         // Constitution: recency_bias = 0.8, limit = 100
         let memories = match &self.memory_provider {
             Some(provider) => {
-                debug!("Fetching memories from provider with recency_bias={}", self.recency_bias);
+                debug!(
+                    "Fetching memories from provider with recency_bias={}",
+                    self.recency_bias
+                );
                 provider.get_recent_memories(100, self.recency_bias)
             }
             None => {
@@ -346,7 +352,10 @@ impl NremPhase {
         let edges = match &self.memory_provider {
             Some(provider) => {
                 if !selected_memory_ids.is_empty() {
-                    debug!("Fetching edges for {} selected memories", selected_memory_ids.len());
+                    debug!(
+                        "Fetching edges for {} selected memories",
+                        selected_memory_ids.len()
+                    );
                     provider.get_edges_for_memories(&selected_memory_ids)
                 } else {
                     Vec::new()
@@ -714,15 +723,8 @@ mod tests {
         let mem3 = Uuid::new_v4();
 
         let provider = Arc::new(TestMemoryProvider::new(
-            vec![
-                (mem1, 1000, 0.9),
-                (mem2, 2000, 0.8),
-                (mem3, 3000, 0.7),
-            ],
-            vec![
-                (mem1, mem2, 0.5),
-                (mem2, mem3, 0.4),
-            ],
+            vec![(mem1, 1000, 0.9), (mem2, 2000, 0.8), (mem3, 3000, 0.7)],
+            vec![(mem1, mem2, 0.5), (mem2, mem3, 0.4)],
         ));
 
         let mut phase = NremPhase::new();
@@ -735,7 +737,10 @@ mod tests {
 
         // Should have processed real data from provider
         assert!(report.completed);
-        assert_eq!(report.memories_replayed, 3, "Should replay all 3 memories from provider");
+        assert_eq!(
+            report.memories_replayed, 3,
+            "Should replay all 3 memories from provider"
+        );
 
         // HebbianEngine should have processed the edges
         // With 3 memories and 2 edges, we should see edge updates
@@ -772,7 +777,10 @@ mod tests {
         // With high phi values (0.9 * 0.9 = 0.81), the edge should be strengthened
         // Hebbian: dw = eta * phi_i * phi_j = 0.01 * 0.9 * 0.9 = 0.0081
         // Note: edges_strengthened should be 1 since we have one edge with high activations
-        assert_eq!(report.edges_strengthened, 1, "Edge should be strengthened with high phi values");
+        assert_eq!(
+            report.edges_strengthened, 1,
+            "Edge should be strengthened with high phi values"
+        );
     }
 
     #[tokio::test]
@@ -800,13 +808,10 @@ mod tests {
         let mem_external = Uuid::new_v4(); // Not in memories
 
         let provider = Arc::new(TestMemoryProvider::new(
+            vec![(mem1, 1000, 0.9), (mem2, 2000, 0.8)],
             vec![
-                (mem1, 1000, 0.9),
-                (mem2, 2000, 0.8),
-            ],
-            vec![
-                (mem1, mem2, 0.5),           // Both in memories - should process
-                (mem1, mem_external, 0.6),   // mem_external not in memories - should filter out
+                (mem1, mem2, 0.5),         // Both in memories - should process
+                (mem1, mem_external, 0.6), // mem_external not in memories - should filter out
             ],
         ));
 

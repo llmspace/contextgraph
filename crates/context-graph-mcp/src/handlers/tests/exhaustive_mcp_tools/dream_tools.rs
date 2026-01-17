@@ -6,9 +6,9 @@
 
 use serde_json::json;
 
-use crate::handlers::tests::create_test_handlers_with_all_components;
-use super::helpers::{make_tool_call, assert_success, get_tool_data};
+use super::helpers::{assert_success, get_tool_data, make_tool_call};
 use super::synthetic_data;
+use crate::handlers::tests::create_test_handlers_with_all_components;
 
 // -------------------------------------------------------------------------
 // get_dream_status
@@ -24,7 +24,9 @@ async fn test_get_dream_status_basic() {
 
     let data = get_tool_data(&response);
     assert!(
-        data.get("state").is_some() || data.get("dream_state").is_some() || data.get("current_state").is_some(),
+        data.get("state").is_some()
+            || data.get("dream_state").is_some()
+            || data.get("current_state").is_some(),
         "Must have dream state"
     );
 }
@@ -74,7 +76,10 @@ async fn test_trigger_dream_basic_with_rationale() {
 
     let data = get_tool_data(&response);
     assert_eq!(data["triggered"], true, "Manual trigger should be accepted");
-    assert_eq!(data["trigger_reason"], "Manual", "Trigger reason should be Manual");
+    assert_eq!(
+        data["trigger_reason"], "Manual",
+        "Trigger reason should be Manual"
+    );
 }
 
 #[tokio::test]
@@ -84,7 +89,10 @@ async fn test_trigger_dream_missing_rationale_fails_fast() {
     let request = make_tool_call("trigger_dream", json!({}));
 
     let response = handlers.dispatch(request).await;
-    assert!(response.error.is_some(), "Should return error for missing rationale");
+    assert!(
+        response.error.is_some(),
+        "Should return error for missing rationale"
+    );
     let error = response.error.unwrap();
     assert!(
         error.message.contains("rationale"),
@@ -121,7 +129,10 @@ async fn test_trigger_dream_with_force() {
     );
 
     let response = handlers.dispatch(request).await;
-    assert!(response.error.is_none(), "Force should not cause JSON-RPC error");
+    assert!(
+        response.error.is_none(),
+        "Force should not cause JSON-RPC error"
+    );
 
     let data = get_tool_data(&response);
     assert_eq!(data["triggered"], true, "Force should allow trigger");

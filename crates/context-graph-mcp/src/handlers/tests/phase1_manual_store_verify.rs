@@ -79,7 +79,10 @@ async fn phase1_manual_store_verify() {
     assert_eq!(count_before, 0, "Store should be empty initially");
 
     // === STORE ALL 5 SYNTHETIC MEMORIES ===
-    println!("\n[STORING] {} synthetic memories:", SYNTHETIC_MEMORIES.len());
+    println!(
+        "\n[STORING] {} synthetic memories:",
+        SYNTHETIC_MEMORIES.len()
+    );
 
     let mut stored_fingerprint_ids: Vec<String> = Vec::new();
 
@@ -140,8 +143,7 @@ async fn phase1_manual_store_verify() {
 
     let mut all_verified = true;
     for (i, id_str) in stored_fingerprint_ids.iter().enumerate() {
-        let fingerprint_id =
-            uuid::Uuid::parse_str(id_str).expect("Should be valid UUID");
+        let fingerprint_id = uuid::Uuid::parse_str(id_str).expect("Should be valid UUID");
 
         // Check existence via helper
         let exists = exists_in_store(&store, fingerprint_id).await;
@@ -162,7 +164,11 @@ async fn phase1_manual_store_verify() {
                 hex::encode(&fp.content_hash[..8])
             );
         } else {
-            println!("  [{}] {} MISSING - retrieve returned None!", i + 1, fingerprint_id);
+            println!(
+                "  [{}] {} MISSING - retrieve returned None!",
+                i + 1,
+                fingerprint_id
+            );
             all_verified = false;
         }
 
@@ -195,7 +201,10 @@ async fn phase1_manual_store_verify() {
     println!("{}", serde_json::to_string_pretty(&phase1_results).unwrap());
 
     assert!(all_verified, "All fingerprints must be verified in store");
-    println!("\n[PHASE 1 PASSED] All {} memories stored and verified!", SYNTHETIC_MEMORIES.len());
+    println!(
+        "\n[PHASE 1 PASSED] All {} memories stored and verified!",
+        SYNTHETIC_MEMORIES.len()
+    );
     println!("================================================================================\n");
 }
 

@@ -244,9 +244,18 @@ mod tests {
         );
 
         println!("[VERIFIED] default_general() matches legacy constants:");
-        println!("  memory_similarity: {} == 0.50 (MIN_MEMORY_SIMILARITY)", t.memory_similarity);
-        println!("  reflex_hit: {} == 0.85 (MIN_HIT_SIMILARITY)", t.reflex_hit);
-        println!("  consolidation: {} == 0.10 (DEFAULT_CONSOLIDATION_THRESHOLD)", t.consolidation);
+        println!(
+            "  memory_similarity: {} == 0.50 (MIN_MEMORY_SIMILARITY)",
+            t.memory_similarity
+        );
+        println!(
+            "  reflex_hit: {} == 0.85 (MIN_HIT_SIMILARITY)",
+            t.reflex_hit
+        );
+        println!(
+            "  consolidation: {} == 0.10 (DEFAULT_CONSOLIDATION_THRESHOLD)",
+            t.consolidation
+        );
     }
 
     #[test]
@@ -350,7 +359,10 @@ mod tests {
         println!("[VERIFIED] Domain strictness ordering:");
         println!(
             "  memory_sim: Medical({}) >= Code({}) > General({}) > Creative({})",
-            medical.memory_similarity, code.memory_similarity, general.memory_similarity, creative.memory_similarity
+            medical.memory_similarity,
+            code.memory_similarity,
+            general.memory_similarity,
+            creative.memory_similarity
         );
     }
 
@@ -475,7 +487,10 @@ mod tests {
             reflex_hit: 0.85,
             consolidation: 0.10,
         };
-        assert!(!t1.is_valid(), "memory_similarity=0.30 below min 0.35 should fail");
+        assert!(
+            !t1.is_valid(),
+            "memory_similarity=0.30 below min 0.35 should fail"
+        );
 
         // Above maximum (0.75)
         let t2 = LayerThresholds {
@@ -483,7 +498,10 @@ mod tests {
             reflex_hit: 0.85,
             consolidation: 0.10,
         };
-        assert!(!t2.is_valid(), "memory_similarity=0.80 above max 0.75 should fail");
+        assert!(
+            !t2.is_valid(),
+            "memory_similarity=0.80 above max 0.75 should fail"
+        );
     }
 
     #[test]
@@ -513,7 +531,10 @@ mod tests {
             reflex_hit: 0.85,
             consolidation: 0.03,
         };
-        assert!(!t1.is_valid(), "consolidation=0.03 below min 0.05 should fail");
+        assert!(
+            !t1.is_valid(),
+            "consolidation=0.03 below min 0.05 should fail"
+        );
 
         // Above maximum (0.30)
         let t2 = LayerThresholds {
@@ -521,7 +542,10 @@ mod tests {
             reflex_hit: 0.85,
             consolidation: 0.35,
         };
-        assert!(!t2.is_valid(), "consolidation=0.35 above max 0.30 should fail");
+        assert!(
+            !t2.is_valid(),
+            "consolidation=0.35 above max 0.30 should fail"
+        );
     }
 
     #[test]
@@ -549,9 +573,15 @@ mod tests {
         // 1. Verify default_general matches legacy
         let default = LayerThresholds::default_general();
         println!("Default General Thresholds:");
-        println!("  memory_similarity: {} (expected: 0.50)", default.memory_similarity);
+        println!(
+            "  memory_similarity: {} (expected: 0.50)",
+            default.memory_similarity
+        );
         println!("  reflex_hit: {} (expected: 0.85)", default.reflex_hit);
-        println!("  consolidation: {} (expected: 0.10)", default.consolidation);
+        println!(
+            "  consolidation: {} (expected: 0.10)",
+            default.consolidation
+        );
         assert_eq!(default.memory_similarity, 0.50);
         assert_eq!(default.reflex_hit, 0.85);
         assert_eq!(default.consolidation, 0.10);
@@ -581,8 +611,18 @@ mod tests {
 
         let test_cases: [(f32, &str, bool, bool); 6] = [
             (0.09, "should_consolidate", t.should_consolidate(0.09), true),
-            (0.10, "should_consolidate", t.should_consolidate(0.10), false),
-            (0.49, "is_memory_relevant", t.is_memory_relevant(0.49), false),
+            (
+                0.10,
+                "should_consolidate",
+                t.should_consolidate(0.10),
+                false,
+            ),
+            (
+                0.49,
+                "is_memory_relevant",
+                t.is_memory_relevant(0.49),
+                false,
+            ),
             (0.50, "is_memory_relevant", t.is_memory_relevant(0.50), true),
             (0.84, "is_reflex_hit", t.is_reflex_hit(0.84), false),
             (0.85, "is_reflex_hit", t.is_reflex_hit(0.85), true),

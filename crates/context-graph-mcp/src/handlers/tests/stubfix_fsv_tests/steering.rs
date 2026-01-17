@@ -2,8 +2,10 @@
 
 use serde_json::json;
 
+use crate::handlers::tests::{
+    create_test_handlers_with_rocksdb_store_access, extract_mcp_tool_data, make_request,
+};
 use crate::protocol::JsonRpcId;
-use crate::handlers::tests::{create_test_handlers_with_rocksdb_store_access, extract_mcp_tool_data, make_request};
 
 use super::helpers::create_test_fingerprint;
 
@@ -50,9 +52,17 @@ async fn test_steering_feedback_empty_store_returns_zero_metrics() {
     let data = extract_mcp_tool_data(&result);
 
     // Verify gardener details
-    let gardener = data.get("gardener_details").expect("Should have gardener_details");
-    let connectivity = gardener.get("connectivity").and_then(|v| v.as_f64()).unwrap_or(-1.0);
-    let dead_ends_removed = gardener.get("dead_ends_removed").and_then(|v| v.as_u64()).unwrap_or(999);
+    let gardener = data
+        .get("gardener_details")
+        .expect("Should have gardener_details");
+    let connectivity = gardener
+        .get("connectivity")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(-1.0);
+    let dead_ends_removed = gardener
+        .get("dead_ends_removed")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(999);
 
     println!("[RESULT] gardener_details:");
     println!("  - connectivity: {}", connectivity);
@@ -123,13 +133,24 @@ async fn test_steering_feedback_all_orphans_low_connectivity() {
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
 
-    let gardener = data.get("gardener_details").expect("Should have gardener_details");
-    let connectivity = gardener.get("connectivity").and_then(|v| v.as_f64()).unwrap_or(-1.0);
-    let dead_ends_removed = gardener.get("dead_ends_removed").and_then(|v| v.as_u64()).unwrap_or(999);
+    let gardener = data
+        .get("gardener_details")
+        .expect("Should have gardener_details");
+    let connectivity = gardener
+        .get("connectivity")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(-1.0);
+    let dead_ends_removed = gardener
+        .get("dead_ends_removed")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(999);
 
     println!("\n[RESULT] gardener_details:");
     println!("  - connectivity: {}", connectivity);
-    println!("  - dead_ends_removed (orphan_count): {}", dead_ends_removed);
+    println!(
+        "  - dead_ends_removed (orphan_count): {}",
+        dead_ends_removed
+    );
 
     // All orphans with theta < 0.5 means connectivity = 0 (none aligned to North Star)
     assert!(
@@ -183,7 +204,11 @@ async fn test_steering_feedback_mixed_data_accurate_metrics() {
             id,
             theta,
             access_count,
-            if *theta >= 0.5 { "ALIGNED" } else { "NOT ALIGNED" }
+            if *theta >= 0.5 {
+                "ALIGNED"
+            } else {
+                "NOT ALIGNED"
+            }
         );
     }
 
@@ -219,13 +244,24 @@ async fn test_steering_feedback_mixed_data_accurate_metrics() {
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
 
-    let gardener = data.get("gardener_details").expect("Should have gardener_details");
-    let connectivity = gardener.get("connectivity").and_then(|v| v.as_f64()).unwrap_or(-1.0);
-    let dead_ends_removed = gardener.get("dead_ends_removed").and_then(|v| v.as_u64()).unwrap_or(999);
+    let gardener = data
+        .get("gardener_details")
+        .expect("Should have gardener_details");
+    let connectivity = gardener
+        .get("connectivity")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(-1.0);
+    let dead_ends_removed = gardener
+        .get("dead_ends_removed")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(999);
 
     println!("\n[RESULT] gardener_details:");
     println!("  - connectivity: {:.4}", connectivity);
-    println!("  - dead_ends_removed (orphan_count): {}", dead_ends_removed);
+    println!(
+        "  - dead_ends_removed (orphan_count): {}",
+        dead_ends_removed
+    );
 
     // Verify connectivity matches expected (with tolerance for floating point)
     let tolerance = 0.05;
@@ -242,6 +278,8 @@ async fn test_steering_feedback_mixed_data_accurate_metrics() {
         "Orphan count should match"
     );
 
-    println!("\n[FSV-STEERING-003 PASSED] Mixed data produces accurate connectivity and orphan count");
+    println!(
+        "\n[FSV-STEERING-003 PASSED] Mixed data produces accurate connectivity and orphan count"
+    );
     println!("================================================================================\n");
 }

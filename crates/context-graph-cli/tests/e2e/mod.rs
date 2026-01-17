@@ -35,7 +35,7 @@
 //! - AP-26: Exit codes (0-6)
 //! - AP-50: Native hooks only
 
-pub mod helpers;
-pub mod full_session_test;
-pub mod identity_continuity_test;
 pub mod error_recovery_test;
+pub mod full_session_test;
+pub mod helpers;
+pub mod identity_continuity_test;

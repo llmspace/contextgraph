@@ -56,11 +56,10 @@ impl EmbedderEntropyFactory {
 
             // E5: Asymmetric KNN with direction modifiers
             Embedder::Causal => Box::new(
-                AsymmetricKnnEntropy::new(config.k_neighbors)
-                    .with_direction_modifiers(
-                        config.causal_cause_to_effect_mod,
-                        config.causal_effect_to_cause_mod,
-                    ),
+                AsymmetricKnnEntropy::new(config.k_neighbors).with_direction_modifiers(
+                    config.causal_cause_to_effect_mod,
+                    config.causal_effect_to_cause_mod,
+                ),
             ),
 
             // E9: Hamming distance to prototypes
@@ -96,9 +95,7 @@ impl EmbedderEntropyFactory {
             Embedder::TemporalRecent
             | Embedder::TemporalPeriodic
             | Embedder::TemporalPositional
-            | Embedder::Emotional => {
-                Box::new(DefaultKnnEntropy::from_config(embedder, config))
-            }
+            | Embedder::Emotional => Box::new(DefaultKnnEntropy::from_config(embedder, config)),
         }
     }
 
@@ -135,7 +132,10 @@ impl EmbedderEntropyFactory {
     ///
     /// # Returns
     /// Some(calculator) if index is valid, None otherwise
-    pub fn create_by_index(index: usize, config: &SurpriseConfig) -> Option<Box<dyn EmbedderEntropy>> {
+    pub fn create_by_index(
+        index: usize,
+        config: &SurpriseConfig,
+    ) -> Option<Box<dyn EmbedderEntropy>> {
         Embedder::from_index(index).map(|embedder| Self::create(embedder, config))
     }
 }
@@ -175,7 +175,7 @@ mod tests {
             Embedder::TemporalPeriodic,
             Embedder::TemporalPositional,
             Embedder::Sparse,
-            Embedder::Code,       // Uses HybridGmmKnnEntropy
+            Embedder::Code, // Uses HybridGmmKnnEntropy
             Embedder::Emotional,
             Embedder::Multimodal, // Uses CrossModalEntropy
             Embedder::Entity,
@@ -211,7 +211,10 @@ mod tests {
         let history: Vec<Vec<f32>> = vec![vec![0.5f32; 768]; 10];
         let result = calculator.compute_delta_s(&current, &history, 5);
 
-        assert!(result.is_ok(), "CrossModalEntropy should compute successfully");
+        assert!(
+            result.is_ok(),
+            "CrossModalEntropy should compute successfully"
+        );
         let delta_s = result.unwrap();
         assert!(
             (0.0..=1.0).contains(&delta_s),
@@ -360,7 +363,8 @@ mod tests {
             assert!(result.is_ok());
             let delta_s = result.unwrap();
             assert_eq!(
-                delta_s, 1.0,
+                delta_s,
+                1.0,
                 "{:?} should return 1.0 for empty history",
                 calculator.embedder_type()
             );

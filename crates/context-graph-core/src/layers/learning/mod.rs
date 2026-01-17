@@ -36,9 +36,9 @@ mod weight_delta;
 mod tests;
 
 // Re-export all public items for backwards compatibility
-pub use constants::{DEFAULT_LEARNING_RATE, GRADIENT_CLIP, TARGET_FREQUENCY_HZ};
 #[allow(deprecated)]
 pub use constants::DEFAULT_CONSOLIDATION_THRESHOLD;
+pub use constants::{DEFAULT_LEARNING_RATE, GRADIENT_CLIP, TARGET_FREQUENCY_HZ};
 pub use layer::LearningLayer;
 pub use utl_computer::UtlWeightComputer;
 pub use weight_delta::WeightDelta;

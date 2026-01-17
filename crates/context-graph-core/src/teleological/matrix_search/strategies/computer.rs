@@ -60,9 +60,7 @@ impl<'a> SimilarityComputer<'a> {
             ComparisonScope::GroupAlignmentsOnly => {
                 a.group_alignments.similarity(&b.group_alignments)
             }
-            ComparisonScope::SpecificPairs(pairs) => {
-                compute_specific_pairs_similarity(a, b, pairs)
-            }
+            ComparisonScope::SpecificPairs(pairs) => compute_specific_pairs_similarity(a, b, pairs),
             ComparisonScope::SpecificGroups(groups) => {
                 compute_specific_groups_similarity(a, b, groups)
             }

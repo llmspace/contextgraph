@@ -92,8 +92,12 @@ mod tests {
             .collect();
 
         let quantized: Vec<_> = batch_quantize(&embeddings, Precision::Fp16);
-        let reconstructed: Vec<Result<TokenPruningEmbedding, _>> =
-            batch_dequantize(&quantized.iter().map(|r| r.as_ref().unwrap().clone()).collect::<Vec<_>>());
+        let reconstructed: Vec<Result<TokenPruningEmbedding, _>> = batch_dequantize(
+            &quantized
+                .iter()
+                .map(|r| r.as_ref().unwrap().clone())
+                .collect::<Vec<_>>(),
+        );
 
         // Verify order preserved by checking first value of each embedding
         for (i, result) in reconstructed.iter().enumerate() {

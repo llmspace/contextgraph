@@ -2,10 +2,10 @@
 //!
 //! Implements the self-awareness cycle from constitution.yaml lines 365-392.
 
-use crate::error::CoreResult;
 use super::identity_continuity::IdentityContinuity;
 use super::self_ego_node::SelfEgoNode;
 use super::types::{IdentityStatus, SelfReflectionResult};
+use crate::error::CoreResult;
 
 /// Self-Awareness Loop for identity continuity
 #[derive(Debug)]

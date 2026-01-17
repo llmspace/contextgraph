@@ -18,10 +18,10 @@ use crate::traits::TeleologicalMemoryStore;
 use crate::types::fingerprint::{TeleologicalFingerprint, NUM_EMBEDDERS};
 
 use super::super::teleological_query::TeleologicalQuery;
-use super::super::teleological_result::{PipelineBreakdown, ScoredMemory, TeleologicalRetrievalResult};
-use super::super::{
-    MultiEmbeddingQueryExecutor, MultiEmbeddingResult, PipelineStageTiming,
+use super::super::teleological_result::{
+    PipelineBreakdown, ScoredMemory, TeleologicalRetrievalResult,
 };
+use super::super::{MultiEmbeddingQueryExecutor, MultiEmbeddingResult, PipelineStageTiming};
 use super::traits::{PipelineHealth, TeleologicalRetrievalPipeline};
 
 /// Default implementation of the teleological retrieval pipeline.
@@ -197,7 +197,8 @@ where
         })?;
 
         // Pair fingerprints with their aggregated matches
-        let mut candidates: Vec<(&TeleologicalFingerprint, &super::super::AggregatedMatch)> = Vec::new();
+        let mut candidates: Vec<(&TeleologicalFingerprint, &super::super::AggregatedMatch)> =
+            Vec::new();
         for (i, maybe_fp) in fingerprints.iter().enumerate() {
             if let Some(fp) = maybe_fp {
                 candidates.push((fp, &me_result.results[i]));

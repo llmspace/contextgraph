@@ -189,7 +189,9 @@ impl RocksDbAutonomousStore {
     }
 
     /// Serialize a value with version prefix.
-    pub(crate) fn serialize_with_version<T: Serialize>(value: &T) -> AutonomousStoreResult<Vec<u8>> {
+    pub(crate) fn serialize_with_version<T: Serialize>(
+        value: &T,
+    ) -> AutonomousStoreResult<Vec<u8>> {
         let mut result = vec![AUTONOMOUS_STORAGE_VERSION];
         let encoded =
             bincode::serialize(value).map_err(|e| AutonomousStoreError::Serialization {

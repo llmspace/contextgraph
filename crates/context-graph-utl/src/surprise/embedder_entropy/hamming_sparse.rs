@@ -97,12 +97,7 @@ impl EmbedderEntropy for HammingSparseEntropy {
     ///
     /// FAIL FAST: Returns error for empty input.
     /// Returns 1.0 for empty history (maximum surprise).
-    fn compute_delta_s(
-        &self,
-        current: &[f32],
-        history: &[Vec<f32>],
-        k: usize,
-    ) -> UtlResult<f32> {
+    fn compute_delta_s(&self, current: &[f32], history: &[Vec<f32>], k: usize) -> UtlResult<f32> {
         // FAIL FAST: Empty current vector is an error
         if current.is_empty() {
             return Err(UtlError::EmptyInput);
@@ -234,10 +229,7 @@ mod tests {
         let history: Vec<Vec<f32>> = vec![];
 
         let delta_s = calculator.compute_delta_s(&current, &history, 1).unwrap();
-        assert_eq!(
-            delta_s, 1.0,
-            "Empty history should return maximum surprise"
-        );
+        assert_eq!(delta_s, 1.0, "Empty history should return maximum surprise");
 
         println!("[PASS] hamming_sparse_empty_history");
     }
@@ -250,10 +242,7 @@ mod tests {
         let history = vec![vec![0.0, 1.0]];
 
         let result = calculator.compute_delta_s(&current, &history, 1);
-        assert!(
-            result.is_err(),
-            "Empty current vector should FAIL FAST"
-        );
+        assert!(result.is_err(), "Empty current vector should FAIL FAST");
 
         println!("[PASS] hamming_sparse_empty_current_fails");
     }
@@ -312,9 +301,7 @@ mod tests {
         let history = vec![vec![0.01, 0.5, 0.01, 0.5]];
 
         // Default threshold (0.0): all 4 dims active
-        let delta_default = calc_default
-            .compute_delta_s(&current, &history, 1)
-            .unwrap();
+        let delta_default = calc_default.compute_delta_s(&current, &history, 1).unwrap();
         assert_eq!(delta_default, 0.0);
 
         // High threshold (0.05): only dims with 0.5 active (2 dims)

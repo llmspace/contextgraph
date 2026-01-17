@@ -9,8 +9,8 @@
 //! - AP-38: "IC<0.5 MUST auto-trigger dream"
 //! - IDENTITY-007: "IC < 0.5 → auto-trigger dream"
 
-use std::sync::Arc;
 use parking_lot::Mutex;
+use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -258,12 +258,7 @@ impl DreamEventListener {
     ) {
         // Delegate to existing handle_identity_critical
         // This method provides the translation layer from monitor callback
-        self.handle_identity_critical(
-            identity_coherence,
-            previous_status,
-            current_status,
-            reason,
-        );
+        self.handle_identity_critical(identity_coherence, previous_status, current_status, reason);
     }
 }
 
@@ -287,10 +282,7 @@ impl WorkspaceEventListener for DreamEventListener {
                     }
                     Err(e) => {
                         // AP-26: Lock failure is fatal
-                        tracing::error!(
-                            "CRITICAL: Failed to acquire dream_queue lock: {:?}",
-                            e
-                        );
+                        tracing::error!("CRITICAL: Failed to acquire dream_queue lock: {:?}", e);
                         panic!("DreamEventListener: Lock poisoned or deadlocked - cannot queue memory {:?}", id);
                     }
                 }
@@ -382,7 +374,10 @@ mod tests {
         assert_eq!(queued_id, Some(memory_id), "Queued ID must match");
 
         // EVIDENCE
-        println!("EVIDENCE: Memory {:?} correctly queued for dream replay", memory_id);
+        println!(
+            "EVIDENCE: Memory {:?} correctly queued for dream replay",
+            memory_id
+        );
     }
 
     #[tokio::test]
@@ -414,7 +409,10 @@ mod tests {
             queue.len()
         };
 
-        assert_eq!(queue_len, 0, "Queue should remain empty for non-MemoryExits events");
+        assert_eq!(
+            queue_len, 0,
+            "Queue should remain empty for non-MemoryExits events"
+        );
         println!("EVIDENCE: DreamEventListener correctly ignores non-MemoryExits events");
     }
 
@@ -427,8 +425,7 @@ mod tests {
         println!("=== FSV: IC crisis triggers dream consolidation ===");
 
         // SETUP: TriggerManager with IC threshold 0.5 (constitution default)
-        let config = TriggerConfig::default()
-            .with_cooldown(Duration::from_millis(1)); // Short cooldown for test
+        let config = TriggerConfig::default().with_cooldown(Duration::from_millis(1)); // Short cooldown for test
         let manager = Arc::new(Mutex::new(TriggerManager::with_config(config)));
 
         // Track callback invocation
@@ -449,8 +446,14 @@ mod tests {
         let listener = DreamEventListener::new(queue, manager, callback);
 
         // BEFORE
-        println!("BEFORE: callback_called = {}", callback_called.load(Ordering::SeqCst));
-        assert!(!callback_called.load(Ordering::SeqCst), "Callback should not be called yet");
+        println!(
+            "BEFORE: callback_called = {}",
+            callback_called.load(Ordering::SeqCst)
+        );
+        assert!(
+            !callback_called.load(Ordering::SeqCst),
+            "Callback should not be called yet"
+        );
 
         // EXECUTE: Emit IC crisis event (IC=0.3 < threshold 0.5)
         let event = WorkspaceEvent::IdentityCritical {
@@ -463,7 +466,10 @@ mod tests {
         listener.on_event(&event);
 
         // AFTER: VERIFY callback was invoked
-        println!("AFTER: callback_called = {}", callback_called.load(Ordering::SeqCst));
+        println!(
+            "AFTER: callback_called = {}",
+            callback_called.load(Ordering::SeqCst)
+        );
         assert!(
             callback_called.load(Ordering::SeqCst),
             "Consolidation callback MUST be called when IC < threshold"
@@ -483,8 +489,7 @@ mod tests {
     fn test_ic_above_threshold_no_trigger() {
         println!("=== FSV: IC above threshold does NOT trigger ===");
 
-        let config = TriggerConfig::default()
-            .with_cooldown(Duration::from_millis(1));
+        let config = TriggerConfig::default().with_cooldown(Duration::from_millis(1));
         let manager = Arc::new(Mutex::new(TriggerManager::with_config(config)));
 
         let callback_called = Arc::new(AtomicBool::new(false));
@@ -498,7 +503,10 @@ mod tests {
         let listener = DreamEventListener::new(queue, manager, callback);
 
         // BEFORE
-        println!("BEFORE: callback_called = {}", callback_called.load(Ordering::SeqCst));
+        println!(
+            "BEFORE: callback_called = {}",
+            callback_called.load(Ordering::SeqCst)
+        );
 
         // IC=0.7 > threshold 0.5, should NOT trigger
         let event = WorkspaceEvent::IdentityCritical {
@@ -511,7 +519,10 @@ mod tests {
         listener.on_event(&event);
 
         // AFTER
-        println!("AFTER: callback_called = {}", callback_called.load(Ordering::SeqCst));
+        println!(
+            "AFTER: callback_called = {}",
+            callback_called.load(Ordering::SeqCst)
+        );
         assert!(
             !callback_called.load(Ordering::SeqCst),
             "Consolidation callback MUST NOT be called when IC >= threshold"
@@ -524,8 +535,7 @@ mod tests {
     fn test_ic_at_threshold_no_trigger() {
         println!("=== FSV: IC exactly at threshold does NOT trigger ===");
 
-        let config = TriggerConfig::default()
-            .with_cooldown(Duration::from_millis(1));
+        let config = TriggerConfig::default().with_cooldown(Duration::from_millis(1));
         let manager = Arc::new(Mutex::new(TriggerManager::with_config(config)));
 
         let callback_called = Arc::new(AtomicBool::new(false));
@@ -560,8 +570,7 @@ mod tests {
     fn test_ic_just_below_threshold_triggers() {
         println!("=== FSV: IC just below threshold DOES trigger ===");
 
-        let config = TriggerConfig::default()
-            .with_cooldown(Duration::from_millis(1));
+        let config = TriggerConfig::default().with_cooldown(Duration::from_millis(1));
         let manager = Arc::new(Mutex::new(TriggerManager::with_config(config)));
 
         let callback_called = Arc::new(AtomicBool::new(false));
@@ -596,8 +605,7 @@ mod tests {
     fn test_ic_zero_triggers() {
         println!("=== FSV: IC=0.0 (minimum) triggers dream ===");
 
-        let config = TriggerConfig::default()
-            .with_cooldown(Duration::from_millis(1));
+        let config = TriggerConfig::default().with_cooldown(Duration::from_millis(1));
         let manager = Arc::new(Mutex::new(TriggerManager::with_config(config)));
 
         let callback_called = Arc::new(AtomicBool::new(false));
@@ -679,8 +687,7 @@ mod tests {
         println!("=== FSV: Cooldown prevents rapid IC triggers ===");
 
         // TriggerManager with 100ms cooldown
-        let config = TriggerConfig::default()
-            .with_cooldown(Duration::from_millis(100));
+        let config = TriggerConfig::default().with_cooldown(Duration::from_millis(100));
         let manager = Arc::new(Mutex::new(TriggerManager::with_config(config)));
 
         let trigger_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -714,7 +721,10 @@ mod tests {
         listener.on_event(&event);
 
         let count = trigger_count.load(Ordering::SeqCst);
-        println!("EVIDENCE: Trigger count = {} (expected 1 due to cooldown)", count);
+        println!(
+            "EVIDENCE: Trigger count = {} (expected 1 due to cooldown)",
+            count
+        );
 
         assert_eq!(count, 1, "Only first trigger should fire due to cooldown");
     }

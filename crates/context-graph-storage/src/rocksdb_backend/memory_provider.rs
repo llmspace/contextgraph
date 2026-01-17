@@ -108,10 +108,10 @@ impl MemoryProvider for GraphMemoryProvider {
         // Calculate time window based on recency_bias
         // Higher bias = shorter window (more recent)
         let hours_ago = match recency_bias {
-            x if x >= 0.9 => 1,      // Last 1 hour
-            x if x >= 0.7 => 24,     // Last 24 hours
-            x if x >= 0.5 => 168,    // Last 7 days (168 hours)
-            _ => 720,                // Last 30 days (720 hours)
+            x if x >= 0.9 => 1,   // Last 1 hour
+            x if x >= 0.7 => 24,  // Last 24 hours
+            x if x >= 0.5 => 168, // Last 7 days (168 hours)
+            _ => 720,             // Last 30 days (720 hours)
         };
 
         let now = Utc::now();
@@ -125,7 +125,10 @@ impl MemoryProvider for GraphMemoryProvider {
         );
 
         // Query temporal index for recent node IDs
-        let node_ids = match self.storage.get_nodes_in_time_range(start, now, Some(limit), 0) {
+        let node_ids = match self
+            .storage
+            .get_nodes_in_time_range(start, now, Some(limit), 0)
+        {
             Ok(ids) => ids,
             Err(e) => {
                 warn!(
@@ -251,9 +254,38 @@ mod tests {
     #[test]
     fn test_recency_bias_time_window() {
         // Verify time window calculation logic
-        assert_eq!(1, match 1.0_f32 { x if x >= 0.9 => 1, _ => 0 });
-        assert_eq!(24, match 0.8_f32 { x if x >= 0.7 => 24, x if x >= 0.9 => 1, _ => 0 });
-        assert_eq!(168, match 0.5_f32 { x if x >= 0.5 => 168, x if x >= 0.7 => 24, x if x >= 0.9 => 1, _ => 0 });
-        assert_eq!(720, match 0.3_f32 { x if x >= 0.5 => 168, x if x >= 0.7 => 24, x if x >= 0.9 => 1, _ => 720 });
+        assert_eq!(
+            1,
+            match 1.0_f32 {
+                x if x >= 0.9 => 1,
+                _ => 0,
+            }
+        );
+        assert_eq!(
+            24,
+            match 0.8_f32 {
+                x if x >= 0.7 => 24,
+                x if x >= 0.9 => 1,
+                _ => 0,
+            }
+        );
+        assert_eq!(
+            168,
+            match 0.5_f32 {
+                x if x >= 0.5 => 168,
+                x if x >= 0.7 => 24,
+                x if x >= 0.9 => 1,
+                _ => 0,
+            }
+        );
+        assert_eq!(
+            720,
+            match 0.3_f32 {
+                x if x >= 0.5 => 168,
+                x if x >= 0.7 => 24,
+                x if x >= 0.9 => 1,
+                _ => 720,
+            }
+        );
     }
 }

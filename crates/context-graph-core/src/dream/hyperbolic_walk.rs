@@ -17,8 +17,8 @@ use tracing::{debug, info, trace};
 use uuid::Uuid;
 
 use super::poincare_walk::{
-    geodesic_distance, is_far_from_all, mobius_add, norm_64,
-    sample_direction_with_temperature, scale_direction, PoincareBallConfig,
+    geodesic_distance, is_far_from_all, mobius_add, norm_64, sample_direction_with_temperature,
+    scale_direction, PoincareBallConfig,
 };
 use super::types::{HyperbolicWalkConfig, WalkStep};
 
@@ -207,11 +207,7 @@ impl HyperbolicExplorer {
     ///
     /// # Panics
     /// Panics if start position is outside Poincare ball.
-    pub fn walk(
-        &mut self,
-        start: &[f32; 64],
-        interrupt_flag: &Arc<AtomicBool>,
-    ) -> WalkResult {
+    pub fn walk(&mut self, start: &[f32; 64], interrupt_flag: &Arc<AtomicBool>) -> WalkResult {
         // Fail fast: validate start position
         let start_norm = norm_64(start);
         if start_norm >= self.ball_config.max_norm {
@@ -244,7 +240,10 @@ impl HyperbolicExplorer {
 
             // Check query budget (Constitution: 100 max)
             if self.queries_used >= self.query_limit {
-                debug!("Query limit {} reached at step {}", self.query_limit, step_index);
+                debug!(
+                    "Query limit {} reached at step {}",
+                    self.query_limit, step_index
+                );
                 break;
             }
 
@@ -303,7 +302,9 @@ impl HyperbolicExplorer {
 
                 trace!(
                     "Blind spot discovered at step {}, distance={:.4}, confidence={:.4}",
-                    step_index, distance_from_nearest, confidence
+                    step_index,
+                    distance_from_nearest,
+                    confidence
                 );
             }
 
@@ -311,8 +312,8 @@ impl HyperbolicExplorer {
             current_position = new_position;
         }
 
-        let completed = trajectory.len() >= self.config.max_steps
-            || self.queries_used >= self.query_limit;
+        let completed =
+            trajectory.len() >= self.config.max_steps || self.queries_used >= self.query_limit;
 
         debug!(
             "Walk completed: {} steps, {} blind spots, distance={:.4}",
@@ -566,12 +567,18 @@ mod tests {
         let explorer = HyperbolicExplorer::with_defaults();
 
         // Constitution mandated values
-        assert_eq!(explorer.config.temperature, 2.0,
-            "temperature must be 2.0 per Constitution");
-        assert_eq!(explorer.config.min_blind_spot_distance, 0.7,
-            "min_blind_spot_distance must be 0.7 per Constitution semantic_leap");
-        assert_eq!(explorer.query_limit, 100,
-            "query_limit must be 100 per Constitution");
+        assert_eq!(
+            explorer.config.temperature, 2.0,
+            "temperature must be 2.0 per Constitution"
+        );
+        assert_eq!(
+            explorer.config.min_blind_spot_distance, 0.7,
+            "min_blind_spot_distance must be 0.7 per Constitution semantic_leap"
+        );
+        assert_eq!(
+            explorer.query_limit, 100,
+            "query_limit must be 100 per Constitution"
+        );
     }
 
     #[test]
@@ -587,8 +594,11 @@ mod tests {
         let result = explorer.walk(&start, &interrupt);
 
         // Should stop at query limit (100), not max_steps (200)
-        assert!(explorer.queries_used <= 100,
-            "queries_used {} must not exceed Constitution limit 100", explorer.queries_used);
+        assert!(
+            explorer.queries_used <= 100,
+            "queries_used {} must not exceed Constitution limit 100",
+            explorer.queries_used
+        );
         assert!(result.trajectory.len() <= 100);
     }
 
@@ -602,7 +612,10 @@ mod tests {
 
         let result = explorer.walk(&start, &interrupt);
 
-        assert!(!result.trajectory.is_empty(), "walk must produce trajectory");
+        assert!(
+            !result.trajectory.is_empty(),
+            "walk must produce trajectory"
+        );
         assert!(result.total_distance > 0.0, "walk must cover distance");
     }
 
@@ -617,8 +630,12 @@ mod tests {
         // Every position must be strictly inside the ball
         for (i, step) in result.trajectory.iter().enumerate() {
             let norm = norm_64(&step.position);
-            assert!(norm < 1.0,
-                "Step {} position has norm={:.6} >= 1.0 (outside ball)", i, norm);
+            assert!(
+                norm < 1.0,
+                "Step {} position has norm={:.6} >= 1.0 (outside ball)",
+                i,
+                norm
+            );
         }
     }
 
@@ -631,10 +648,14 @@ mod tests {
         let result = explorer.walk(&start, &interrupt);
 
         // Should stop immediately due to interrupt
-        assert!(result.trajectory.is_empty(),
-            "interrupted walk should have empty trajectory");
-        assert!(!result.completed,
-            "interrupted walk should not be marked completed");
+        assert!(
+            result.trajectory.is_empty(),
+            "interrupted walk should have empty trajectory"
+        );
+        assert!(
+            !result.completed,
+            "interrupted walk should not be marked completed"
+        );
     }
 
     // ============ Blind Spot Detection Tests ============
@@ -650,12 +671,18 @@ mod tests {
         let result = explorer.walk(&start, &interrupt);
 
         // All steps should be blind spots when no known positions
-        let blind_spot_count: usize = result.trajectory.iter()
+        let blind_spot_count: usize = result
+            .trajectory
+            .iter()
             .filter(|s| s.blind_spot_detected)
             .count();
 
-        assert_eq!(blind_spot_count, result.trajectory.len(),
-            "All {} steps should be blind spots when no known positions", result.trajectory.len());
+        assert_eq!(
+            blind_spot_count,
+            result.trajectory.len(),
+            "All {} steps should be blind spots when no known positions",
+            result.trajectory.len()
+        );
     }
 
     #[test]
@@ -675,13 +702,13 @@ mod tests {
         // Verify blind spot detection respects min_distance (0.7)
         for step in &result.trajectory {
             if step.blind_spot_detected {
-                let dist = geodesic_distance(
-                    &step.position,
-                    &known,
-                    &PoincareBallConfig::default(),
+                let dist =
+                    geodesic_distance(&step.position, &known, &PoincareBallConfig::default());
+                assert!(
+                    dist >= 0.7,
+                    "Blind spot has distance {:.4} < 0.7 (Constitution semantic_leap)",
+                    dist
                 );
-                assert!(dist >= 0.7,
-                    "Blind spot has distance {:.4} < 0.7 (Constitution semantic_leap)", dist);
             }
         }
     }
@@ -728,7 +755,10 @@ mod tests {
 
         assert!(!result.walks.is_empty(), "should have at least 1 walk");
         assert!(result.queries_generated > 0, "should generate queries");
-        assert!(result.queries_generated <= 100, "should respect query limit");
+        assert!(
+            result.queries_generated <= 100,
+            "should respect query limit"
+        );
     }
 
     #[test]
@@ -738,7 +768,11 @@ mod tests {
 
         let result = explorer.explore(&[], &interrupt);
 
-        assert_eq!(result.walks.len(), 1, "should have exactly 1 walk from origin");
+        assert_eq!(
+            result.walks.len(),
+            1,
+            "should have exactly 1 walk from origin"
+        );
         assert_eq!(result.walks[0].start_position, [0.0f32; 64]);
     }
 
@@ -770,10 +804,7 @@ mod tests {
         let mut low_phi = [0.0f32; 64];
         low_phi[0] = 0.2;
 
-        let node_positions = vec![
-            (0.99, high_phi),
-            (0.01, low_phi),
-        ];
+        let node_positions = vec![(0.99, high_phi), (0.01, low_phi)];
 
         // Low temperature should strongly prefer high phi
         // Run multiple times to verify statistical preference
@@ -781,15 +812,19 @@ mod tests {
         for _seed in 0..100u64 {
             // Use deterministic sampling
             let selected = sample_starting_positions(&node_positions, 1, 0.1);
-            if selected[0][0] == 0.1 { // high_phi position
+            if selected[0][0] == 0.1 {
+                // high_phi position
                 high_phi_count += 1;
             }
         }
 
         // With temp=0.1, should almost always pick high-phi
         // Allow some variance but expect > 90%
-        assert!(high_phi_count > 80,
-            "With low temp, high phi should be selected >80% but was {}/100", high_phi_count);
+        assert!(
+            high_phi_count > 80,
+            "With low temp, high phi should be selected >80% but was {}/100",
+            high_phi_count
+        );
     }
 
     // ============ Position to Query Conversion Test ============

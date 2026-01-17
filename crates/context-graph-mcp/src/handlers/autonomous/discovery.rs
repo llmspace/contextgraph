@@ -136,66 +136,64 @@ impl Handlers {
         };
 
         // Collect memories to analyze
-        let arrays: Vec<context_graph_core::types::SemanticFingerprint> =
-            if let Some(ids) = memory_ids {
-                // FAIL FAST: Load specific memories
-                let mut mems = Vec::with_capacity(ids.len());
-                for mem_id in &ids {
-                    match self.teleological_store.retrieve(*mem_id).await {
-                        Ok(Some(fp)) => mems.push(fp.semantic),
-                        Ok(None) => {
-                            error!(memory_id = %mem_id, "discover_sub_goals: Memory not found");
-                            return JsonRpcResponse::error(
-                                id,
-                                error_codes::FINGERPRINT_NOT_FOUND,
-                                format!("Memory {} not found - FAIL FAST", mem_id),
-                            );
-                        }
-                        Err(e) => {
-                            error!(memory_id = %mem_id, error = %e, "discover_sub_goals: Storage error");
-                            return JsonRpcResponse::error(
-                                id,
-                                error_codes::INTERNAL_ERROR,
-                                format!(
-                                    "Storage error retrieving {}: {} - FAIL FAST",
-                                    mem_id, e
-                                ),
-                            );
-                        }
+        let arrays: Vec<context_graph_core::types::SemanticFingerprint> = if let Some(ids) =
+            memory_ids
+        {
+            // FAIL FAST: Load specific memories
+            let mut mems = Vec::with_capacity(ids.len());
+            for mem_id in &ids {
+                match self.teleological_store.retrieve(*mem_id).await {
+                    Ok(Some(fp)) => mems.push(fp.semantic),
+                    Ok(None) => {
+                        error!(memory_id = %mem_id, "discover_sub_goals: Memory not found");
+                        return JsonRpcResponse::error(
+                            id,
+                            error_codes::FINGERPRINT_NOT_FOUND,
+                            format!("Memory {} not found - FAIL FAST", mem_id),
+                        );
+                    }
+                    Err(e) => {
+                        error!(memory_id = %mem_id, error = %e, "discover_sub_goals: Storage error");
+                        return JsonRpcResponse::error(
+                            id,
+                            error_codes::INTERNAL_ERROR,
+                            format!("Storage error retrieving {}: {} - FAIL FAST", mem_id, e),
+                        );
                     }
                 }
-                mems
-            } else {
-                // No specific memories - legacy behavior returns guidance
-                // Create legacy discovery service for backwards compatibility
-                let legacy_config = ServiceDiscoveryConfig {
-                    min_cluster_size: 3,
-                    min_coherence: params.min_confidence,
-                    emergence_threshold: params.min_confidence,
-                    max_candidates: params.max_goals,
-                    min_confidence: params.min_confidence,
-                };
-                let _discovery_service = SubGoalDiscovery::with_config(legacy_config);
+            }
+            mems
+        } else {
+            // No specific memories - legacy behavior returns guidance
+            // Create legacy discovery service for backwards compatibility
+            let legacy_config = ServiceDiscoveryConfig {
+                min_cluster_size: 3,
+                min_coherence: params.min_confidence,
+                emergence_threshold: params.min_confidence,
+                max_candidates: params.max_goals,
+                min_confidence: params.min_confidence,
+            };
+            let _discovery_service = SubGoalDiscovery::with_config(legacy_config);
 
-                let (parent_id_str, parent_desc) = match &parent_goal {
-                    Some(g) => (g.id.to_string(), g.description.clone()),
-                    None => ("none".to_string(), "autonomous discovery".to_string()),
-                };
+            let (parent_id_str, parent_desc) = match &parent_goal {
+                Some(g) => (g.id.to_string(), g.description.clone()),
+                None => ("none".to_string(), "autonomous discovery".to_string()),
+            };
 
-                let cluster_analysis = json!({
-                    "parent_goal_id": parent_id_str,
-                    "parent_goal_description": parent_desc,
-                    "clusters_analyzed": 0,
-                    "memory_count_analyzed": 0,
-                    "discovery_mode": discovery_mode,
-                    "discovery_parameters": {
-                        "min_confidence": params.min_confidence,
-                        "max_goals": params.max_goals
-                    },
-                    "note": "No memory_ids provided. Pass memory_ids array for GoalDiscoveryPipeline K-means clustering."
-                });
+            let cluster_analysis = json!({
+                "parent_goal_id": parent_id_str,
+                "parent_goal_description": parent_desc,
+                "clusters_analyzed": 0,
+                "memory_count_analyzed": 0,
+                "discovery_mode": discovery_mode,
+                "discovery_parameters": {
+                    "min_confidence": params.min_confidence,
+                    "max_goals": params.max_goals
+                },
+                "note": "No memory_ids provided. Pass memory_ids array for GoalDiscoveryPipeline K-means clustering."
+            });
 
-                return self.tool_result_with_pulse(
+            return self.tool_result_with_pulse(
                     id,
                     json!({
                         "discovered_goals": [],
@@ -207,7 +205,7 @@ impl Handlers {
                         "usage_hint": "Provide 'memory_ids' parameter with fingerprint UUIDs for K-means goal discovery"
                     }),
                 );
-            };
+        };
 
         // FAIL FAST: Must have minimum data for clustering
         let min_cluster_size = 3;

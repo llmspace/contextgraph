@@ -59,8 +59,8 @@ mod tests;
 // TASK-P0-001: Removed AutoBootstrapParams (ARCH-03)
 #[allow(unused_imports)]
 pub use params::{
-    DiscoverSubGoalsParams, ExecutePruneParams, GetAlignmentDriftParams,
-    GetAutonomousStatusParams, GetDriftHistoryParams, GetHealthStatusParams, GetLearnerStateParams,
+    DiscoverSubGoalsParams, ExecutePruneParams, GetAlignmentDriftParams, GetAutonomousStatusParams,
+    GetDriftHistoryParams, GetHealthStatusParams, GetLearnerStateParams,
     GetPruningCandidatesParams, ObserveOutcomeParams, TriggerConsolidationParams,
     TriggerDriftCorrectionParams, TriggerHealingParams,
 };

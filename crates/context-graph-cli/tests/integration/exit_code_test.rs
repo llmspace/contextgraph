@@ -25,8 +25,7 @@ use tempfile::TempDir;
 
 use super::helpers::{
     create_session_end_input, create_session_start_input, generate_test_session_id,
-    invoke_hook_with_stdin, log_test_evidence,
-    EXIT_INVALID_INPUT, EXIT_SUCCESS,
+    invoke_hook_with_stdin, log_test_evidence, EXIT_INVALID_INPUT, EXIT_SUCCESS,
 };
 
 // =============================================================================
@@ -59,13 +58,7 @@ fn test_exit_code_4_empty_session_id() {
     .to_string();
 
     // Invoke with empty session_id
-    let result = invoke_hook_with_stdin(
-        "session-start",
-        "",
-        &[],
-        &input,
-        db_path,
-    );
+    let result = invoke_hook_with_stdin("session-start", "", &[], &input, db_path);
 
     assert_eq!(
         result.exit_code, EXIT_INVALID_INPUT,
@@ -76,9 +69,12 @@ fn test_exit_code_4_empty_session_id() {
     // Verify error message mentions session_id
     let output_lower = result.stdout.to_lowercase() + &result.stderr.to_lowercase();
     assert!(
-        output_lower.contains("session") || output_lower.contains("empty") || output_lower.contains("invalid"),
+        output_lower.contains("session")
+            || output_lower.contains("empty")
+            || output_lower.contains("invalid"),
         "Error should mention session_id issue.\nstdout: {}\nstderr: {}",
-        result.stdout, result.stderr
+        result.stdout,
+        result.stderr
     );
 
     log_test_evidence(
@@ -111,13 +107,7 @@ fn test_exit_code_4_malformed_json() {
     ];
 
     for (i, malformed) in malformed_inputs.iter().enumerate() {
-        let result = invoke_hook_with_stdin(
-            "session-start",
-            &session_id,
-            &[],
-            malformed,
-            db_path,
-        );
+        let result = invoke_hook_with_stdin("session-start", &session_id, &[], malformed, db_path);
 
         // Should return exit code 4 for malformed JSON
         // Note: Empty stdin might be handled differently
@@ -159,13 +149,7 @@ fn test_exit_code_4_missing_required_fields() {
     })
     .to_string();
 
-    let result1 = invoke_hook_with_stdin(
-        "session-start",
-        &session_id,
-        &[],
-        &input1,
-        db_path,
-    );
+    let result1 = invoke_hook_with_stdin("session-start", &session_id, &[], &input1, db_path);
 
     // Missing payload
     let input2 = json!({
@@ -175,13 +159,7 @@ fn test_exit_code_4_missing_required_fields() {
     })
     .to_string();
 
-    let result2 = invoke_hook_with_stdin(
-        "session-start",
-        &session_id,
-        &[],
-        &input2,
-        db_path,
-    );
+    let result2 = invoke_hook_with_stdin("session-start", &session_id, &[], &input2, db_path);
 
     // Missing session_id in JSON (but provided via CLI)
     let input3 = json!({
@@ -191,13 +169,7 @@ fn test_exit_code_4_missing_required_fields() {
     })
     .to_string();
 
-    let result3 = invoke_hook_with_stdin(
-        "session-start",
-        &session_id,
-        &[],
-        &input3,
-        db_path,
-    );
+    let result3 = invoke_hook_with_stdin("session-start", &session_id, &[], &input3, db_path);
 
     // Log all results
     log_test_evidence(
@@ -240,13 +212,8 @@ fn test_exit_code_0_valid_input_all_hooks() {
 
     // SessionStart with valid input
     let start_input = create_session_start_input(&session_id, "/tmp", "cli", None);
-    let start_result = invoke_hook_with_stdin(
-        "session-start",
-        &session_id,
-        &[],
-        &start_input,
-        db_path,
-    );
+    let start_result =
+        invoke_hook_with_stdin("session-start", &session_id, &[], &start_input, db_path);
     assert_eq!(
         start_result.exit_code, EXIT_SUCCESS,
         "SessionStart with valid input should return 0.\nstderr: {}",
@@ -272,12 +239,7 @@ fn test_exit_code_0_valid_input_all_hooks() {
     let pre_result = invoke_hook_with_stdin(
         "pre-tool",
         &session_id,
-        &[
-            "--tool-name",
-            "Read",
-            "--fast-path",
-            "true",
-        ],
+        &["--tool-name", "Read", "--fast-path", "true"],
         &pre_input,
         db_path,
     );
@@ -307,12 +269,7 @@ fn test_exit_code_0_valid_input_all_hooks() {
     let post_result = invoke_hook_with_stdin(
         "post-tool",
         &session_id,
-        &[
-            "--tool-name",
-            "Read",
-            "--success",
-            "true",
-        ],
+        &["--tool-name", "Read", "--success", "true"],
         &post_input,
         db_path,
     );
@@ -337,13 +294,8 @@ fn test_exit_code_0_valid_input_all_hooks() {
     })
     .to_string();
 
-    let prompt_result = invoke_hook_with_stdin(
-        "prompt-submit",
-        &session_id,
-        &[],
-        &prompt_input,
-        db_path,
-    );
+    let prompt_result =
+        invoke_hook_with_stdin("prompt-submit", &session_id, &[], &prompt_input, db_path);
     assert_eq!(
         prompt_result.exit_code, EXIT_SUCCESS,
         "UserPromptSubmit with valid input should return 0.\nstderr: {}",
@@ -355,10 +307,7 @@ fn test_exit_code_0_valid_input_all_hooks() {
     let end_result = invoke_hook_with_stdin(
         "session-end",
         &session_id,
-        &[
-            "--duration-ms",
-            "60000",
-        ],
+        &["--duration-ms", "60000"],
         &end_input,
         db_path,
     );
@@ -411,10 +360,7 @@ fn test_graceful_handling_previous_session_not_found() {
     let result = invoke_hook_with_stdin(
         "session-start",
         &session_id,
-        &[
-            "--previous-session-id",
-            fake_previous,
-        ],
+        &["--previous-session-id", fake_previous],
         &input,
         db_path,
     );
@@ -429,15 +375,19 @@ fn test_graceful_handling_previous_session_not_found() {
     // Verify warning is logged about missing session
     let stderr_lower = result.stderr.to_lowercase();
     assert!(
-        stderr_lower.contains("previous session not found") || stderr_lower.contains("starting fresh"),
+        stderr_lower.contains("previous session not found")
+            || stderr_lower.contains("starting fresh"),
         "Should log warning about missing previous session.\nstderr: {}",
         result.stderr
     );
 
     // Verify output indicates success
     if let Ok(json) = result.parse_stdout() {
-        assert_eq!(json.get("success").and_then(|v| v.as_bool()), Some(true),
-            "Output should show success=true");
+        assert_eq!(
+            json.get("success").and_then(|v| v.as_bool()),
+            Some(true),
+            "Output should show success=true"
+        );
     }
 
     log_test_evidence(
@@ -466,13 +416,7 @@ fn test_error_response_format() {
     let db_path = temp_dir.path();
 
     // Trigger an error by using empty session_id
-    let result = invoke_hook_with_stdin(
-        "session-start",
-        "",
-        &[],
-        "{}",
-        db_path,
-    );
+    let result = invoke_hook_with_stdin("session-start", "", &[], "{}", db_path);
 
     // Should have non-zero exit code
     assert_ne!(
@@ -524,13 +468,7 @@ fn test_stderr_json_for_errors() {
     let db_path = temp_dir.path();
 
     // Trigger an error
-    let result = invoke_hook_with_stdin(
-        "session-start",
-        "",
-        &[],
-        "invalid json {",
-        db_path,
-    );
+    let result = invoke_hook_with_stdin("session-start", "", &[], "invalid json {", db_path);
 
     // stderr should not be empty for errors
     if result.exit_code != EXIT_SUCCESS {

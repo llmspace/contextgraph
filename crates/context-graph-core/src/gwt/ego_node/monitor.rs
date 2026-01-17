@@ -147,7 +147,6 @@ pub struct IdentityContinuityMonitor {
     crisis_threshold: f32,
 
     // === TASK-IDENTITY-P0-004: Crisis Detection Fields ===
-
     /// Previous status for transition detection (default: Healthy)
     #[serde(default = "default_healthy_status")]
     previous_status: IdentityStatus,
@@ -156,14 +155,12 @@ pub struct IdentityContinuityMonitor {
     last_event_time: Option<Instant>,
 
     // === TASK-IDENTITY-P0-007: MCP Tool Exposure Fields ===
-
     /// Cached last crisis detection result for MCP tool exposure.
     /// Not serialized - transient state reconstructed on detect_crisis() calls.
     #[serde(skip)]
     last_detection: Option<CrisisDetectionResult>,
 
     // === TECH-IDENTITY-001: Crisis Callback Field ===
-
     /// Callback invoked when IC drops to CRITICAL (< 0.5).
     ///
     /// Not serialized - must be re-wired on deserialization via `set_crisis_callback()`.
@@ -370,9 +367,7 @@ impl IdentityContinuityMonitor {
     /// );
     /// let monitor = IdentityContinuityMonitor::new(ic_callback);
     /// ```
-    pub fn create_dream_callback(
-        dream_listener: Arc<DreamEventListener>,
-    ) -> IcCrisisCallback {
+    pub fn create_dream_callback(dream_listener: Arc<DreamEventListener>) -> IcCrisisCallback {
         Arc::new(move |result: &CrisisDetectionResult| {
             // Delegate to DreamEventListener for actual trigger
             dream_listener.handle_identity_critical_from_monitor(
@@ -636,8 +631,7 @@ impl IdentityContinuityMonitor {
     pub fn entering_critical(&self) -> bool {
         self.current_status()
             .map(|curr| {
-                curr == IdentityStatus::Critical
-                    && self.previous_status != IdentityStatus::Critical
+                curr == IdentityStatus::Critical && self.previous_status != IdentityStatus::Critical
             })
             .unwrap_or(false)
     }

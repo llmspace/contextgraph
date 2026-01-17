@@ -7,8 +7,8 @@ use crate::types::fingerprint::PurposeVector;
 use crate::types::JohariQuadrant;
 
 use crate::index::purpose::entry::{GoalId, PurposeIndexEntry, PurposeMetadata};
-use crate::index::purpose::query::{PurposeQuery, PurposeQueryTarget};
 use crate::index::purpose::hnsw_purpose::{HnswPurposeIndex, PurposeIndexOps};
+use crate::index::purpose::query::{PurposeQuery, PurposeQueryTarget};
 
 // =========================================================================
 // Helper functions (duplicated for test module isolation)

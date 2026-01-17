@@ -58,6 +58,8 @@ mod types;
 mod tests;
 
 // Re-export all public types for backwards compatibility
-pub use helpers::{compute_cosine_similarity, get_aggregate_dominant_quadrant, query_purpose_alignment};
+pub use helpers::{
+    compute_cosine_similarity, get_aggregate_dominant_quadrant, query_purpose_alignment,
+};
 pub use store::RocksDbTeleologicalStore;
 pub use types::{TeleologicalStoreConfig, TeleologicalStoreError, TeleologicalStoreResult};

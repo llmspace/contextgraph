@@ -37,14 +37,21 @@ async fn test_fsv_delta_c_formula_verification() {
     );
 
     let response = handlers.dispatch(request).await;
-    assert!(response.error.is_none(), "Should succeed: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Should succeed: {:?}",
+        response.error
+    );
 
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
 
     // Verify diagnostics contains delta_c_components
     let diagnostics = &data["diagnostics"];
-    assert!(diagnostics.get("delta_c_components").is_some(), "Should have delta_c_components");
+    assert!(
+        diagnostics.get("delta_c_components").is_some(),
+        "Should have delta_c_components"
+    );
 
     let components = &diagnostics["delta_c_components"];
     let connectivity = components["connectivity"].as_f64().expect("connectivity") as f32;
@@ -118,9 +125,13 @@ async fn test_fsv_utl_learning_potential_formula() {
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
 
-    let delta_s_agg = data["delta_s_aggregate"].as_f64().expect("delta_s_aggregate") as f32;
+    let delta_s_agg = data["delta_s_aggregate"]
+        .as_f64()
+        .expect("delta_s_aggregate") as f32;
     let delta_c = data["delta_c"].as_f64().expect("delta_c") as f32;
-    let learning_potential = data["utl_learning_potential"].as_f64().expect("utl_learning_potential") as f32;
+    let learning_potential = data["utl_learning_potential"]
+        .as_f64()
+        .expect("utl_learning_potential") as f32;
 
     // Verify formula: learning_potential = delta_s_aggregate * delta_c
     let expected = (delta_s_agg * delta_c).clamp(0.0, 1.0);
@@ -228,9 +239,9 @@ async fn test_fsv_johari_classification_rules() {
 
     // Verify classification follows exact rules
     let expected_quadrant = match (delta_s_agg < threshold, delta_c > threshold) {
-        (true, true) => "Open",    // Low surprise, high coherence
-        (false, false) => "Blind", // High surprise, low coherence
-        (true, false) => "Hidden", // Low surprise, low coherence
+        (true, true) => "Open",     // Low surprise, high coherence
+        (false, false) => "Blind",  // High surprise, low coherence
+        (true, false) => "Hidden",  // Low surprise, low coherence
         (false, true) => "Unknown", // High surprise, high coherence
     };
 
@@ -266,12 +277,13 @@ async fn test_fsv_delta_s_aggregate_is_mean() {
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
 
-    let delta_s_per_embedder = data["delta_s_per_embedder"]
-        .as_array()
-        .expect("array");
+    let delta_s_per_embedder = data["delta_s_per_embedder"].as_array().expect("array");
 
     // Calculate expected mean
-    let sum: f64 = delta_s_per_embedder.iter().map(|v| v.as_f64().unwrap()).sum();
+    let sum: f64 = delta_s_per_embedder
+        .iter()
+        .map(|v| v.as_f64().unwrap())
+        .sum();
     let expected_mean = (sum / NUM_EMBEDDERS as f64).clamp(0.0, 1.0);
     let actual_agg = data["delta_s_aggregate"].as_f64().expect("f64");
 

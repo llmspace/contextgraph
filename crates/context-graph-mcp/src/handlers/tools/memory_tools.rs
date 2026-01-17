@@ -49,7 +49,8 @@ impl Handlers {
         let goal_vector = {
             let hierarchy = self.goal_hierarchy.read();
             hierarchy
-                .top_level_goals().first()
+                .top_level_goals()
+                .first()
                 .map(|ns| ns.teleological_array.e1_semantic.clone())
         };
 
@@ -381,8 +382,7 @@ impl Handlers {
                 // TASK-CONTENT-003: Hydrate content if requested
                 // Batch retrieve content for all results to minimize I/O
                 let contents: Vec<Option<String>> = if include_content && !results.is_empty() {
-                    let ids: Vec<uuid::Uuid> =
-                        results.iter().map(|r| r.fingerprint.id).collect();
+                    let ids: Vec<uuid::Uuid> = results.iter().map(|r| r.fingerprint.id).collect();
                     match self.teleological_store.get_content_batch(&ids).await {
                         Ok(c) => c,
                         Err(e) => {

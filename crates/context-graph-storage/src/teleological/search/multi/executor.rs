@@ -153,7 +153,9 @@ impl MultiEmbedderSearch {
                 let embedder_start = Instant::now();
                 let effective_k = self.get_k_for_embedder(embedder, k);
 
-                let result = self.single_search.search(embedder, &query, effective_k, threshold)?;
+                let result = self
+                    .single_search
+                    .search(embedder, &query, effective_k, threshold)?;
 
                 let per_results = PerEmbedderResults {
                     embedder,
@@ -176,8 +178,11 @@ impl MultiEmbedderSearch {
         }
 
         // Aggregate results
-        let aggregated_hits =
-            self.aggregate_results(&per_embedder, &self.config.normalization, &self.config.aggregation);
+        let aggregated_hits = self.aggregate_results(
+            &per_embedder,
+            &self.config.normalization,
+            &self.config.aggregation,
+        );
 
         Ok(MultiEmbedderSearchResults {
             aggregated_hits,
@@ -226,7 +231,9 @@ impl MultiEmbedderSearch {
                 let embedder_start = Instant::now();
                 let effective_k = self.get_k_for_embedder(embedder, k);
 
-                let result = self.single_search.search(embedder, &query, effective_k, threshold)?;
+                let result = self
+                    .single_search
+                    .search(embedder, &query, effective_k, threshold)?;
 
                 let per_results = PerEmbedderResults {
                     embedder,
@@ -260,7 +267,11 @@ impl MultiEmbedderSearch {
     }
 
     /// Validate query vector for an embedder. FAIL FAST on invalid input.
-    pub(crate) fn validate_query(&self, embedder: EmbedderIndex, query: &[f32]) -> SearchResult<()> {
+    pub(crate) fn validate_query(
+        &self,
+        embedder: EmbedderIndex,
+        query: &[f32],
+    ) -> SearchResult<()> {
         // Check embedder supports HNSW
         if !embedder.uses_hnsw() {
             return Err(SearchError::UnsupportedEmbedder { embedder });
@@ -395,8 +406,11 @@ impl MultiEmbedderSearch {
             NormalizationStrategy::ZScore => {
                 let n = hits.len() as f32;
                 let mean: f32 = hits.iter().map(|h| h.similarity).sum::<f32>() / n;
-                let variance: f32 =
-                    hits.iter().map(|h| (h.similarity - mean).powi(2)).sum::<f32>() / n;
+                let variance: f32 = hits
+                    .iter()
+                    .map(|h| (h.similarity - mean).powi(2))
+                    .sum::<f32>()
+                    / n;
                 let stddev = variance.sqrt();
 
                 if stddev < 1e-9 {

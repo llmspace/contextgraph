@@ -209,7 +209,8 @@ pub async fn check_identity_command(args: CheckIdentityArgs) -> i32 {
                 None => {
                     error!("Cannot determine home directory for DB path");
                     let response = CheckIdentityResponse::error(
-                        "Cannot determine DB path. Set --db-path or CONTEXT_GRAPH_DB_PATH".to_string()
+                        "Cannot determine DB path. Set --db-path or CONTEXT_GRAPH_DB_PATH"
+                            .to_string(),
                     );
                     output_response(&response, args.format);
                     return 1;
@@ -226,9 +227,8 @@ pub async fn check_identity_command(args: CheckIdentityArgs) -> i32 {
         Err(e) => {
             let err_str = e.to_string();
             error!("Failed to open RocksDB at {:?}: {}", db_path, err_str);
-            let response = CheckIdentityResponse::error(
-                format!("Failed to open database: {}", err_str)
-            );
+            let response =
+                CheckIdentityResponse::error(format!("Failed to open database: {}", err_str));
             output_response(&response, args.format);
             return if is_corruption_error(&err_str) { 2 } else { 1 };
         }
@@ -248,7 +248,7 @@ pub async fn check_identity_command(args: CheckIdentityArgs) -> i32 {
             // No identity found - this is an error, not cold cache
             error!("check-identity: No identity found in storage - run 'session restore-identity' first");
             let response = CheckIdentityResponse::error(
-                "No identity found in storage - run 'session restore-identity' first".to_string()
+                "No identity found in storage - run 'session restore-identity' first".to_string(),
             );
             output_response(&response, args.format);
             return 1;
@@ -256,19 +256,15 @@ pub async fn check_identity_command(args: CheckIdentityArgs) -> i32 {
         Err(e) => {
             let err_str = e.to_string();
             error!("Failed to load identity from storage: {}", err_str);
-            let response = CheckIdentityResponse::error(
-                format!("Failed to load identity: {}", err_str)
-            );
+            let response =
+                CheckIdentityResponse::error(format!("Failed to load identity: {}", err_str));
             output_response(&response, args.format);
             return if is_corruption_error(&err_str) { 2 } else { 1 };
         }
     };
 
     let session_id = &snapshot.session_id;
-    debug!(
-        "check-identity: IC={:.3}, session={}",
-        ic, session_id
-    );
+    debug!("check-identity: IC={:.3}, session={}", ic, session_id);
 
     // STEP 2: Check for IC crisis
     let crisis = is_ic_crisis(ic);
@@ -277,7 +273,8 @@ pub async fn check_identity_command(args: CheckIdentityArgs) -> i32 {
         // Healthy or warning - no action needed
         info!(
             "check-identity: IC={:.3} status={} - no crisis",
-            ic, classify_ic(ic)
+            ic,
+            classify_ic(ic)
         );
 
         let mut response = CheckIdentityResponse::no_crisis(ic);
@@ -302,12 +299,16 @@ pub async fn check_identity_command(args: CheckIdentityArgs) -> i32 {
     warn!("check-identity: IC CRISIS detected IC={:.3} < 0.5", ic);
     eprintln!(
         "IC crisis detected: {:.2} (status: {})",
-        ic, classify_ic(ic)
+        ic,
+        classify_ic(ic)
     );
 
     if !args.auto_dream {
         // Crisis but --auto-dream not set
-        eprintln!("IC crisis ({:.2}), --auto-dream not set, dream NOT triggered", ic);
+        eprintln!(
+            "IC crisis ({:.2}), --auto-dream not set, dream NOT triggered",
+            ic
+        );
 
         let mut response = CheckIdentityResponse::crisis_no_trigger(ic);
 
@@ -490,7 +491,10 @@ fn trigger_mental_check(entropy: f32) -> bool {
     };
 
     if trigger_set {
-        info!("trigger_mental_check: High entropy trigger fired for entropy={:.3}", entropy);
+        info!(
+            "trigger_mental_check: High entropy trigger fired for entropy={:.3}",
+            entropy
+        );
     } else {
         // Entropy might not fire immediately due to sustained duration requirement
         // Per constitution: entropy > 0.7 for 5 minutes
@@ -530,10 +534,17 @@ fn output_response(response: &CheckIdentityResponse, format: OutputFormat) {
             println!("========================");
             println!("IC Value:        {:.3}", response.ic);
             println!("Status:          {}", response.status);
-            println!("Crisis:          {}", if response.is_crisis { "YES" } else { "No" });
+            println!(
+                "Crisis:          {}",
+                if response.is_crisis { "YES" } else { "No" }
+            );
             println!(
                 "Dream Triggered: {}",
-                if response.dream_triggered { "YES" } else { "No" }
+                if response.dream_triggered {
+                    "YES"
+                } else {
+                    "No"
+                }
             );
             if let Some(ref rationale) = response.trigger_rationale {
                 println!("Rationale:       {}", rationale);
@@ -546,7 +557,11 @@ fn output_response(response: &CheckIdentityResponse, format: OutputFormat) {
                 println!("Threshold:       {:.1}", entropy_check.threshold);
                 println!(
                     "Exceeds:         {}",
-                    if entropy_check.exceeds_threshold { "YES" } else { "No" }
+                    if entropy_check.exceeds_threshold {
+                        "YES"
+                    } else {
+                        "No"
+                    }
                 );
                 println!(
                     "Mental Check:    {}",
@@ -620,7 +635,9 @@ mod tests {
         snapshot.consciousness = 0.85;
         snapshot.last_ic = 0.92; // Healthy IC
 
-        manager.save_snapshot(&snapshot).expect("save_snapshot must succeed");
+        manager
+            .save_snapshot(&snapshot)
+            .expect("save_snapshot must succeed");
 
         println!("BEFORE: Saved snapshot with IC={}", snapshot.last_ic);
 
@@ -657,7 +674,9 @@ mod tests {
         snapshot.consciousness = 0.35;
         snapshot.last_ic = 0.45; // Crisis IC
 
-        manager.save_snapshot(&snapshot).expect("save_snapshot must succeed");
+        manager
+            .save_snapshot(&snapshot)
+            .expect("save_snapshot must succeed");
 
         println!("BEFORE: Saved snapshot with crisis IC={}", snapshot.last_ic);
 
@@ -691,13 +710,18 @@ mod tests {
         let mut snapshot = SessionIdentitySnapshot::new("test-boundary");
         snapshot.last_ic = 0.5; // Boundary
 
-        manager.save_snapshot(&snapshot).expect("save_snapshot must succeed");
+        manager
+            .save_snapshot(&snapshot)
+            .expect("save_snapshot must succeed");
 
         let loaded = manager.load_latest().unwrap().unwrap();
         let ic = loaded.last_ic;
 
         // Per is_ic_crisis: ic < 0.5 is crisis, so 0.5 is NOT crisis
-        assert!(!is_ic_crisis(ic), "IC 0.5 should NOT be crisis (< 0.5 is threshold)");
+        assert!(
+            !is_ic_crisis(ic),
+            "IC 0.5 should NOT be crisis (< 0.5 is threshold)"
+        );
         assert_eq!(classify_ic(ic), "Warning", "IC 0.5 should be Warning");
 
         println!("RESULT: PASS - Boundary IC (0.5) is Warning, not crisis");
@@ -718,7 +742,9 @@ mod tests {
         let mut snapshot = SessionIdentitySnapshot::new("test-below");
         snapshot.last_ic = 0.499;
 
-        manager.save_snapshot(&snapshot).expect("save_snapshot must succeed");
+        manager
+            .save_snapshot(&snapshot)
+            .expect("save_snapshot must succeed");
 
         let loaded = manager.load_latest().unwrap().unwrap();
         let ic = loaded.last_ic;
@@ -758,7 +784,10 @@ mod tests {
         println!("\n=== TC-SESSION-14-06: Entropy Below Threshold ===");
 
         let result = check_entropy(0.5);
-        assert!(!result.exceeds_threshold, "Entropy 0.5 should NOT exceed 0.7");
+        assert!(
+            !result.exceeds_threshold,
+            "Entropy 0.5 should NOT exceed 0.7"
+        );
         assert!(!result.mental_check_triggered);
         assert!(result.rationale.is_none());
 
@@ -791,14 +820,26 @@ mod tests {
         let json = serde_json::to_string(&response).unwrap();
 
         assert!(json.contains("\"ic\":0.95"), "JSON should contain ic=0.95");
-        assert!(json.contains("\"status\":\"Healthy\""), "JSON should contain status=Healthy");
-        assert!(json.contains("\"is_crisis\":false"), "JSON should contain is_crisis=false");
-        assert!(!json.contains("error"), "JSON should not contain error when None");
+        assert!(
+            json.contains("\"status\":\"Healthy\""),
+            "JSON should contain status=Healthy"
+        );
+        assert!(
+            json.contains("\"is_crisis\":false"),
+            "JSON should contain is_crisis=false"
+        );
+        assert!(
+            !json.contains("error"),
+            "JSON should not contain error when None"
+        );
 
         // Also test "Good" status (0.7 <= ic < 0.9)
         let response2 = CheckIdentityResponse::no_crisis(0.85);
         let json2 = serde_json::to_string(&response2).unwrap();
-        assert!(json2.contains("\"status\":\"Good\""), "IC 0.85 should be Good");
+        assert!(
+            json2.contains("\"status\":\"Good\""),
+            "IC 0.85 should be Good"
+        );
 
         println!("RESULT: PASS - Response serializes correctly");
     }
@@ -816,9 +857,18 @@ mod tests {
         );
         let json = serde_json::to_string(&response).unwrap();
 
-        assert!(json.contains("\"is_crisis\":true"), "JSON should contain is_crisis=true");
-        assert!(json.contains("\"dream_triggered\":true"), "JSON should contain dream_triggered");
-        assert!(json.contains("trigger_rationale"), "JSON should contain trigger_rationale");
+        assert!(
+            json.contains("\"is_crisis\":true"),
+            "JSON should contain is_crisis=true"
+        );
+        assert!(
+            json.contains("\"dream_triggered\":true"),
+            "JSON should contain dream_triggered"
+        );
+        assert!(
+            json.contains("trigger_rationale"),
+            "JSON should contain trigger_rationale"
+        );
 
         println!("RESULT: PASS - Crisis response serializes correctly");
     }
@@ -902,7 +952,10 @@ mod tests {
         };
 
         let exit_code = check_identity_command(args).await;
-        println!("AFTER: check_identity_command returned exit_code={}", exit_code);
+        println!(
+            "AFTER: check_identity_command returned exit_code={}",
+            exit_code
+        );
 
         // VERIFY: Success exit code
         assert_eq!(exit_code, 0, "Command should succeed with exit code 0");

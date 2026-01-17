@@ -9,7 +9,9 @@ use context_graph_storage::teleological::{fingerprint_key, CF_FINGERPRINTS};
 use tempfile::TempDir;
 use uuid::Uuid;
 
-use crate::helpers::{create_initialized_store, create_real_fingerprint, create_real_fingerprint_with_id};
+use crate::helpers::{
+    create_initialized_store, create_real_fingerprint, create_real_fingerprint_with_id,
+};
 
 // =============================================================================
 // TEST 7: Update and Delete Operations

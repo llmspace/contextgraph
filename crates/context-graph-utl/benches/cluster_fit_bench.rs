@@ -12,9 +12,7 @@
 use context_graph_utl::coherence::{
     compute_cluster_fit, ClusterContext, ClusterFitConfig, DistanceMetric,
 };
-use criterion::{
-    black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
-};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 // =============================================================================
 // Helper Functions: Deterministic Data Generation
@@ -53,13 +51,7 @@ fn bench_cluster_fit_1000_embeddings(c: &mut Criterion) {
     let config = ClusterFitConfig::default(); // Cosine distance
 
     c.bench_function("cluster_fit_1000_embeddings_1536d", |b| {
-        b.iter(|| {
-            compute_cluster_fit(
-                black_box(&query),
-                black_box(&context),
-                black_box(&config),
-            )
-        })
+        b.iter(|| compute_cluster_fit(black_box(&query), black_box(&context), black_box(&config)))
     });
 }
 
@@ -85,11 +77,7 @@ fn bench_cluster_fit_cluster_scaling(c: &mut Criterion) {
             &context,
             |b, ctx| {
                 b.iter(|| {
-                    compute_cluster_fit(
-                        black_box(&query),
-                        black_box(ctx),
-                        black_box(&config),
-                    )
+                    compute_cluster_fit(black_box(&query), black_box(ctx), black_box(&config))
                 })
             },
         );
@@ -118,9 +106,7 @@ fn bench_cluster_fit_dimension_scaling(c: &mut Criterion) {
             BenchmarkId::from_parameter(dim),
             &(query, context, config),
             |b, (q, ctx, cfg)| {
-                b.iter(|| {
-                    compute_cluster_fit(black_box(q), black_box(ctx), black_box(cfg))
-                })
+                b.iter(|| compute_cluster_fit(black_box(q), black_box(ctx), black_box(cfg)))
             },
         );
     }
@@ -151,13 +137,7 @@ fn bench_cluster_fit_distance_metrics(c: &mut Criterion) {
         config.distance_metric = metric;
 
         group.bench_with_input(BenchmarkId::from_parameter(name), &config, |b, cfg| {
-            b.iter(|| {
-                compute_cluster_fit(
-                    black_box(&query),
-                    black_box(&context),
-                    black_box(cfg),
-                )
-            })
+            b.iter(|| compute_cluster_fit(black_box(&query), black_box(&context), black_box(cfg)))
         });
     }
     group.finish();
@@ -184,11 +164,8 @@ fn bench_cluster_fit_batch(c: &mut Criterion) {
     c.bench_function("cluster_fit_batch_100_queries", |b| {
         b.iter(|| {
             for query in queries.iter() {
-                let _ = compute_cluster_fit(
-                    black_box(query),
-                    black_box(&context),
-                    black_box(&config),
-                );
+                let _ =
+                    compute_cluster_fit(black_box(query), black_box(&context), black_box(&config));
             }
         })
     });
@@ -220,11 +197,7 @@ fn bench_cluster_fit_sampling(c: &mut Criterion) {
             &config,
             |b, cfg| {
                 b.iter(|| {
-                    compute_cluster_fit(
-                        black_box(&query),
-                        black_box(&context),
-                        black_box(cfg),
-                    )
+                    compute_cluster_fit(black_box(&query), black_box(&context), black_box(cfg))
                 })
             },
         );
@@ -264,4 +237,9 @@ criterion_group!(
     targets = bench_cluster_fit_batch
 );
 
-criterion_main!(target_benches, scaling_benches, comparison_benches, batch_benches);
+criterion_main!(
+    target_benches,
+    scaling_benches,
+    comparison_benches,
+    batch_benches
+);

@@ -1,8 +1,6 @@
 //! Analysis function tests for SynergyMatrix.
 
-use crate::teleological::synergy_matrix::{
-    SynergyMatrix, CROSS_CORRELATION_COUNT, SYNERGY_DIM,
-};
+use crate::teleological::synergy_matrix::{SynergyMatrix, CROSS_CORRELATION_COUNT, SYNERGY_DIM};
 
 #[test]
 fn test_synergy_matrix_average_synergy() {

@@ -135,7 +135,8 @@ async fn manual_fsv_purpose_handlers() {
     let (initial_goal_count, has_north_star, north_star_info) = {
         let hierarchy_read = hierarchy.read();
         let ns_info = hierarchy_read
-            .top_level_goals().first()
+            .top_level_goals()
+            .first()
             .map(|ns| (ns.id, ns.description.clone()));
         (
             hierarchy_read.len(),
@@ -341,7 +342,8 @@ async fn manual_fsv_purpose_handlers() {
             .map(|(_, _, uuid)| hierarchy_read.get(uuid).is_some())
             .collect();
         let ns = hierarchy_read
-            .top_level_goals().first()
+            .top_level_goals()
+            .first()
             .map(|ns| (ns.id, ns.description.clone()));
         (count, exists_map, ns)
     }; // guard dropped here
@@ -567,7 +569,10 @@ async fn manual_fsv_purpose_handlers() {
     println!("🎯 GoalHierarchy - Final State:");
     let hierarchy_read = hierarchy.read();
     println!("   ├─ Total goals: {}", hierarchy_read.len());
-    println!("   ├─ Has North Star: {}", hierarchy_read.has_top_level_goals());
+    println!(
+        "   ├─ Has North Star: {}",
+        hierarchy_read.has_top_level_goals()
+    );
     if let Some(ns) = hierarchy_read.top_level_goals().first() {
         println!("   ├─ North Star: {} - {}", ns.id, ns.description);
     }

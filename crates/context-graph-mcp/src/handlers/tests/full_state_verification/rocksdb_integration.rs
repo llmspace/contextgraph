@@ -8,8 +8,8 @@ use sha2::{Digest, Sha256};
 
 use crate::protocol::JsonRpcId;
 
-use super::helpers::{exists_in_store, make_request};
 use super::super::create_test_handlers_with_rocksdb_store_access;
+use super::helpers::{exists_in_store, make_request};
 
 // =============================================================================
 // ROCKSDB FULL STATE VERIFICATION INTEGRATION TESTS
@@ -88,10 +88,7 @@ async fn test_rocksdb_fsv_store_creates_fingerprint() {
 
     println!("\n[EVIDENCE] Stored fingerprint fields from RocksDB:");
     println!("  - ID: {}", stored_fp.id);
-    println!(
-        "  - alignment_score: {:.4}",
-        stored_fp.alignment_score
-    );
+    println!("  - alignment_score: {:.4}", stored_fp.alignment_score);
     println!("  - access_count: {}", stored_fp.access_count);
     println!("  - content_hash: {}", hex::encode(stored_fp.content_hash));
     println!(

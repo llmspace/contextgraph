@@ -58,7 +58,10 @@ fn manual_test_memory_creation_structure() {
 
     // Verify expected outputs
     assert!(!memory.id.is_nil(), "ID should be non-nil UUID v4");
-    assert_eq!(memory.content, content, "Content should match input exactly");
+    assert_eq!(
+        memory.content, content,
+        "Content should match input exactly"
+    );
     assert_eq!(memory.session_id, session_id, "Session ID should match");
     assert_eq!(memory.word_count, 8, "Word count should be 8");
 
@@ -97,7 +100,11 @@ fn manual_test_serialization_size() {
     let bytes = bincode::serialize(&memory).expect("serialization failed");
     let size = bytes.len();
 
-    println!("Serialized size: {} bytes ({:.2} KB)", size, size as f64 / 1024.0);
+    println!(
+        "Serialized size: {} bytes ({:.2} KB)",
+        size,
+        size as f64 / 1024.0
+    );
     println!("Estimated size: {} bytes", memory.estimated_size());
 
     // Verify size is reasonable (< 50KB for zeroed fingerprint)
@@ -162,15 +169,24 @@ fn manual_test_source_type_discrimination() {
     );
 
     println!("\nResponse memory:");
-    println!("  is_hook_description: {}", response_mem.is_hook_description());
-    println!("  is_claude_response: {}", response_mem.is_claude_response());
+    println!(
+        "  is_hook_description: {}",
+        response_mem.is_hook_description()
+    );
+    println!(
+        "  is_claude_response: {}",
+        response_mem.is_claude_response()
+    );
     println!("  is_md_file_chunk: {}", response_mem.is_md_file_chunk());
     println!("  response_type: {:?}", response_mem.response_type());
 
     assert!(!response_mem.is_hook_description());
     assert!(response_mem.is_claude_response());
     assert!(!response_mem.is_md_file_chunk());
-    assert_eq!(response_mem.response_type(), Some(ResponseType::SessionSummary));
+    assert_eq!(
+        response_mem.response_type(),
+        Some(ResponseType::SessionSummary)
+    );
 
     // MDFileChunk memory
     let chunk_mem = Memory::new(
@@ -196,7 +212,10 @@ fn manual_test_source_type_discrimination() {
     println!("  is_hook_description: {}", chunk_mem.is_hook_description());
     println!("  is_claude_response: {}", chunk_mem.is_claude_response());
     println!("  is_md_file_chunk: {}", chunk_mem.is_md_file_chunk());
-    println!("  has_chunk_metadata: {}", chunk_mem.chunk_metadata.is_some());
+    println!(
+        "  has_chunk_metadata: {}",
+        chunk_mem.chunk_metadata.is_some()
+    );
 
     assert!(!chunk_mem.is_hook_description());
     assert!(!chunk_mem.is_claude_response());
@@ -227,12 +246,18 @@ fn manual_test_edge_case_empty_content() {
     );
 
     println!("Input: empty content string");
-    println!("State before validation: content.is_empty() = {}", memory.content.is_empty());
+    println!(
+        "State before validation: content.is_empty() = {}",
+        memory.content.is_empty()
+    );
 
     let result = memory.validate();
 
     println!("Validation result: {:?}", result);
-    println!("State after validation: result.is_err() = {}", result.is_err());
+    println!(
+        "State after validation: result.is_err() = {}",
+        result.is_err()
+    );
 
     assert!(result.is_err(), "Validation should fail for empty content");
     let err = result.unwrap_err();
@@ -268,12 +293,19 @@ fn manual_test_edge_case_max_content_length() {
         None,
     );
 
-    println!("Test 1: Content exactly at limit ({} chars)", MAX_CONTENT_LENGTH);
+    println!(
+        "Test 1: Content exactly at limit ({} chars)",
+        MAX_CONTENT_LENGTH
+    );
     println!("  Content length: {}", memory_at_limit.content.len());
 
     let result = memory_at_limit.validate();
     println!("  Validation result: {:?}", result.is_ok());
-    assert!(result.is_ok(), "Content at exactly {} should pass", MAX_CONTENT_LENGTH);
+    assert!(
+        result.is_ok(),
+        "Content at exactly {} should pass",
+        MAX_CONTENT_LENGTH
+    );
 
     // Over limit should fail
     let over_limit = "x".repeat(MAX_CONTENT_LENGTH + 1);
@@ -288,12 +320,19 @@ fn manual_test_edge_case_max_content_length() {
         None,
     );
 
-    println!("\nTest 2: Content over limit ({} chars)", MAX_CONTENT_LENGTH + 1);
+    println!(
+        "\nTest 2: Content over limit ({} chars)",
+        MAX_CONTENT_LENGTH + 1
+    );
     println!("  Content length: {}", memory_over_limit.content.len());
 
     let result = memory_over_limit.validate();
     println!("  Validation result: {:?}", result);
-    assert!(result.is_err(), "Content over {} should fail", MAX_CONTENT_LENGTH);
+    assert!(
+        result.is_err(),
+        "Content over {} should fail",
+        MAX_CONTENT_LENGTH
+    );
     let err = result.unwrap_err();
     assert!(
         err.contains("exceeds"),
@@ -328,14 +367,23 @@ fn manual_test_edge_case_mdfilechunk_missing_metadata() {
     println!("Input: MDFileChunk source with chunk_metadata = None");
     println!("State before validation:");
     println!("  source: {:?}", memory.source);
-    println!("  chunk_metadata.is_none(): {}", memory.chunk_metadata.is_none());
+    println!(
+        "  chunk_metadata.is_none(): {}",
+        memory.chunk_metadata.is_none()
+    );
 
     let result = memory.validate();
 
     println!("Validation result: {:?}", result);
-    println!("State after validation: result.is_err() = {}", result.is_err());
+    println!(
+        "State after validation: result.is_err() = {}",
+        result.is_err()
+    );
 
-    assert!(result.is_err(), "Validation should fail for MDFileChunk without metadata");
+    assert!(
+        result.is_err(),
+        "Validation should fail for MDFileChunk without metadata"
+    );
     let err = result.unwrap_err();
     assert!(
         err.contains("chunk_metadata"),

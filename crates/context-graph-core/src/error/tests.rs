@@ -97,8 +97,14 @@ fn test_is_critical() {
 
 #[test]
 fn test_mcp_error_codes() {
-    assert_eq!(McpError::InvalidRequest("".to_string()).error_code(), -32600);
-    assert_eq!(McpError::MethodNotFound("".to_string()).error_code(), -32601);
+    assert_eq!(
+        McpError::InvalidRequest("".to_string()).error_code(),
+        -32600
+    );
+    assert_eq!(
+        McpError::MethodNotFound("".to_string()).error_code(),
+        -32601
+    );
     assert_eq!(McpError::InvalidParams("".to_string()).error_code(), -32602);
     assert_eq!(McpError::RateLimited("".to_string()).error_code(), -32005);
     assert_eq!(McpError::Unauthorized("".to_string()).error_code(), -32006);

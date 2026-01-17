@@ -366,12 +366,7 @@ impl HybridGmmKnnEntropy {
 }
 
 impl EmbedderEntropy for HybridGmmKnnEntropy {
-    fn compute_delta_s(
-        &self,
-        current: &[f32],
-        history: &[Vec<f32>],
-        k: usize,
-    ) -> UtlResult<f32> {
+    fn compute_delta_s(&self, current: &[f32], history: &[Vec<f32>], k: usize) -> UtlResult<f32> {
         // Validate input
         if current.is_empty() {
             return Err(UtlError::EmptyInput);
@@ -487,9 +482,7 @@ mod tests {
         assert!(result.is_ok());
         let delta_s = result.unwrap();
 
-        println!(
-            "BEFORE: history contains 20 identical embeddings to current"
-        );
+        println!("BEFORE: history contains 20 identical embeddings to current");
         println!("AFTER: delta_s = {}", delta_s);
         assert!(
             delta_s < 0.5,
@@ -497,7 +490,10 @@ mod tests {
             delta_s
         );
 
-        println!("[PASS] test_hybrid_identical_returns_low - delta_s = {}", delta_s);
+        println!(
+            "[PASS] test_hybrid_identical_returns_low - delta_s = {}",
+            delta_s
+        );
     }
 
     #[test]
@@ -524,7 +520,10 @@ mod tests {
             delta_s
         );
 
-        println!("[PASS] test_hybrid_distant_returns_high - delta_s = {}", delta_s);
+        println!(
+            "[PASS] test_hybrid_distant_returns_high - delta_s = {}",
+            delta_s
+        );
     }
 
     #[test]
@@ -650,7 +649,10 @@ mod tests {
         assert!(result.is_ok());
         let delta_s = result.unwrap();
         assert!(!delta_s.is_nan(), "delta_s should not be NaN (AP-10)");
-        assert!(!delta_s.is_infinite(), "delta_s should not be Infinite (AP-10)");
+        assert!(
+            !delta_s.is_infinite(),
+            "delta_s should not be Infinite (AP-10)"
+        );
 
         // Edge case: values near 1
         let near_one: Vec<f32> = vec![0.9999; E7_DIM];
@@ -685,7 +687,10 @@ mod tests {
 
         println!(
             "[PASS] test_hybrid_from_config - gmm_weight={}, knn_weight={}, n_components={}, k={}",
-            calculator.gmm_weight, calculator.knn_weight, calculator.n_components, calculator.k_neighbors
+            calculator.gmm_weight,
+            calculator.knn_weight,
+            calculator.n_components,
+            calculator.k_neighbors
         );
     }
 
@@ -700,16 +705,31 @@ mod tests {
         let _ = calculator.fit_gmm(&history);
 
         assert!(calculator.fitted, "Should be fitted after fit_gmm");
-        assert!(!calculator.means.is_empty(), "Should have means after fitting");
+        assert!(
+            !calculator.means.is_empty(),
+            "Should have means after fitting"
+        );
 
         calculator.reset();
 
         assert!(!calculator.fitted, "fitted should be false after reset");
-        assert!(calculator.means.is_empty(), "means should be cleared after reset");
-        assert!(calculator.variances.is_empty(), "variances should be cleared after reset");
-        assert!(calculator.weights.is_empty(), "weights should be cleared after reset");
+        assert!(
+            calculator.means.is_empty(),
+            "means should be cleared after reset"
+        );
+        assert!(
+            calculator.variances.is_empty(),
+            "variances should be cleared after reset"
+        );
+        assert!(
+            calculator.weights.is_empty(),
+            "weights should be cleared after reset"
+        );
         assert_eq!(calculator.knn_mean, 0.5, "knn_mean should reset to 0.5");
-        assert_eq!(calculator.knn_variance, 0.1, "knn_variance should reset to 0.1");
+        assert_eq!(
+            calculator.knn_variance, 0.1,
+            "knn_variance should reset to 0.1"
+        );
 
         println!("[PASS] test_hybrid_reset");
     }
@@ -775,7 +795,10 @@ mod tests {
         );
 
         // Should be high surprise (current very different from history)
-        assert!(delta_s > 0.3, "Distant values should have meaningful surprise");
+        assert!(
+            delta_s > 0.3,
+            "Distant values should have meaningful surprise"
+        );
     }
 
     #[test]
@@ -836,7 +859,10 @@ mod tests {
         // Test with non-normalized weights
         let calc2 = HybridGmmKnnEntropy::with_weights(0.6, 0.6);
         let sum = calc2.gmm_weight + calc2.knn_weight;
-        assert!((sum - 1.0).abs() < 1e-6, "Weights should be normalized to 1.0");
+        assert!(
+            (sum - 1.0).abs() < 1e-6,
+            "Weights should be normalized to 1.0"
+        );
 
         println!("[PASS] test_with_weights_normalization");
     }
@@ -844,10 +870,16 @@ mod tests {
     #[test]
     fn test_with_n_components_clamping() {
         let calc = HybridGmmKnnEntropy::new().with_n_components(1);
-        assert_eq!(calc.n_components, 2, "Should clamp n_components minimum to 2");
+        assert_eq!(
+            calc.n_components, 2,
+            "Should clamp n_components minimum to 2"
+        );
 
         let calc2 = HybridGmmKnnEntropy::new().with_n_components(100);
-        assert_eq!(calc2.n_components, 10, "Should clamp n_components maximum to 10");
+        assert_eq!(
+            calc2.n_components, 10,
+            "Should clamp n_components maximum to 10"
+        );
 
         println!("[PASS] test_with_n_components_clamping");
     }
@@ -858,7 +890,10 @@ mod tests {
         assert_eq!(calc.k_neighbors, 1, "Should clamp k_neighbors minimum to 1");
 
         let calc2 = HybridGmmKnnEntropy::new().with_k_neighbors(100);
-        assert_eq!(calc2.k_neighbors, 20, "Should clamp k_neighbors maximum to 20");
+        assert_eq!(
+            calc2.k_neighbors, 20,
+            "Should clamp k_neighbors maximum to 20"
+        );
 
         println!("[PASS] test_with_k_neighbors_clamping");
     }

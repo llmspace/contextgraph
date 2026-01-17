@@ -19,7 +19,10 @@ fn test_mcp_config_default_values() {
         config.max_payload_size, 10_485_760,
         "Default max_payload_size must be 10MB"
     );
-    assert_eq!(config.request_timeout, 30, "Default request_timeout must be 30s");
+    assert_eq!(
+        config.request_timeout, 30,
+        "Default request_timeout must be 30s"
+    );
     assert_eq!(
         config.bind_address, "127.0.0.1",
         "Default bind_address must be 127.0.0.1"
@@ -214,10 +217,7 @@ fn test_mcp_config_accepts_minimum_request_timeout() {
         request_timeout: 1,
         ..Default::default()
     };
-    assert!(
-        config.validate().is_ok(),
-        "request_timeout=1 must validate"
-    );
+    assert!(config.validate().is_ok(), "request_timeout=1 must validate");
 }
 
 #[test]
@@ -498,7 +498,10 @@ fn test_mcp_config_serde_default_transport() {
     let json = r#"{}"#;
     let config: McpConfig = serde_json::from_str(json).expect("Failed to deserialize");
 
-    assert_eq!(config.transport, "stdio", "Missing transport should default to stdio");
+    assert_eq!(
+        config.transport, "stdio",
+        "Missing transport should default to stdio"
+    );
     assert_eq!(
         config.max_payload_size, 10_485_760,
         "Missing max_payload_size should default to 10MB"

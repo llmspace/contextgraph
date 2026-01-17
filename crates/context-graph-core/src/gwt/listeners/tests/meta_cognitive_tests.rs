@@ -41,7 +41,10 @@ async fn test_fsv_meta_listener_workspace_empty() {
     println!("AFTER: epistemic_action_triggered = {}", after_flag);
 
     // VERIFY
-    assert!(after_flag, "Flag must be set to true when duration >= 5000ms");
+    assert!(
+        after_flag,
+        "Flag must be set to true when duration >= 5000ms"
+    );
 
     // EVIDENCE
     println!("EVIDENCE: Epistemic action flag correctly set on WorkspaceEmpty at threshold");
@@ -135,7 +138,10 @@ async fn test_workspace_empty_below_threshold_no_trigger() {
     let listener = MetaCognitiveEventListener::new(meta_cognitive.clone(), epistemic_flag.clone());
 
     // BEFORE
-    assert!(!listener.is_epistemic_action_triggered(), "Flag must start false");
+    assert!(
+        !listener.is_epistemic_action_triggered(),
+        "Flag must start false"
+    );
 
     // EXECUTE with 4999ms (below threshold)
     let event = WorkspaceEvent::WorkspaceEmpty {
@@ -163,7 +169,10 @@ async fn test_workspace_empty_at_threshold_triggers() {
     let listener = MetaCognitiveEventListener::new(meta_cognitive.clone(), epistemic_flag.clone());
 
     // BEFORE
-    assert!(!listener.is_epistemic_action_triggered(), "Flag must start false");
+    assert!(
+        !listener.is_epistemic_action_triggered(),
+        "Flag must start false"
+    );
 
     // EXECUTE with exactly 5000ms (at threshold)
     let event = WorkspaceEvent::WorkspaceEmpty {
@@ -191,7 +200,10 @@ async fn test_workspace_empty_above_threshold_triggers() {
     let listener = MetaCognitiveEventListener::new(meta_cognitive.clone(), epistemic_flag.clone());
 
     // BEFORE
-    assert!(!listener.is_epistemic_action_triggered(), "Flag must start false");
+    assert!(
+        !listener.is_epistemic_action_triggered(),
+        "Flag must start false"
+    );
 
     // EXECUTE with 10000ms (above threshold)
     let event = WorkspaceEvent::WorkspaceEmpty {

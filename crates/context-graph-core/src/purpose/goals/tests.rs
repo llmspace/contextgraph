@@ -232,7 +232,10 @@ mod tests {
         // TASK-P0-001/ARCH-03: Multiple Strategic goals are now allowed
         assert!(hierarchy.add_goal(ns1).is_ok());
         let result = hierarchy.add_goal(ns2);
-        assert!(result.is_ok(), "Multiple Strategic goals should be allowed per ARCH-03");
+        assert!(
+            result.is_ok(),
+            "Multiple Strategic goals should be allowed per ARCH-03"
+        );
         assert_eq!(hierarchy.top_level_goals().len(), 2);
         println!("[VERIFIED] GoalHierarchy allows multiple Strategic goals (ARCH-03)");
     }
@@ -325,7 +328,10 @@ mod tests {
 
         // ARCH-03: Empty hierarchies are valid - goals emerge autonomously
         let result = hierarchy.validate();
-        assert!(result.is_ok(), "Empty hierarchy should be valid per ARCH-03");
+        assert!(
+            result.is_ok(),
+            "Empty hierarchy should be valid per ARCH-03"
+        );
         assert!(!hierarchy.has_top_level_goals());
         println!("[VERIFIED] Empty hierarchy is valid (ARCH-03)");
     }
@@ -348,7 +354,10 @@ mod tests {
         hierarchy.nodes.insert(goal.id, goal);
 
         let result = hierarchy.validate();
-        assert!(result.is_ok(), "Hierarchy with Strategic goal should be valid");
+        assert!(
+            result.is_ok(),
+            "Hierarchy with Strategic goal should be valid"
+        );
         assert!(hierarchy.has_top_level_goals());
         println!("[VERIFIED] Hierarchy with Strategic goal is valid");
     }
@@ -482,7 +491,10 @@ mod tests {
         let result = hierarchy.add_goal(s2);
 
         // ARCH-03: Multiple Strategic goals are now allowed
-        assert!(result.is_ok(), "Multiple Strategic goals should be allowed per ARCH-03");
+        assert!(
+            result.is_ok(),
+            "Multiple Strategic goals should be allowed per ARCH-03"
+        );
         assert_eq!(hierarchy.top_level_goals().len(), 2);
         println!("[EDGE CASE 3 PASSED] Multiple Strategic goals allowed (ARCH-03)");
     }

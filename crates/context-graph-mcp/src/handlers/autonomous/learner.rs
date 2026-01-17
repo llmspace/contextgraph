@@ -161,7 +161,10 @@ impl Handlers {
                 return JsonRpcResponse::error(
                     id,
                     error_codes::INVALID_PARAMS,
-                    format!("Invalid prediction_id UUID format: {}", params.prediction_id),
+                    format!(
+                        "Invalid prediction_id UUID format: {}",
+                        params.prediction_id
+                    ),
                 );
             }
         };

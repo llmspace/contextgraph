@@ -9,18 +9,9 @@
 #![allow(clippy::needless_range_loop)] // Intentional index-based iteration for clarity in tests
 
 use context_graph_core::dream::{
+    direction_toward, geodesic_distance, inner_product_64, is_far_from_all, mobius_add, norm_64,
+    norm_squared_64, project_to_ball, random_direction, scale_direction, softmax_temperature,
     PoincareBallConfig,
-    direction_toward,
-    geodesic_distance,
-    inner_product_64,
-    is_far_from_all,
-    mobius_add,
-    norm_64,
-    norm_squared_64,
-    project_to_ball,
-    random_direction,
-    scale_direction,
-    softmax_temperature,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -48,9 +39,13 @@ fn manual_test_norm_squared_64_synthetic() {
     assert!(
         (result - expected).abs() < 1e-6,
         "FAIL: norm_squared_64([0.125; 64]) = {}, expected {}",
+        result,
+        expected
+    );
+    println!(
+        "PASS: norm_squared_64([0.125; 64]) = {} (expected: {})",
         result, expected
     );
-    println!("PASS: norm_squared_64([0.125; 64]) = {} (expected: {})", result, expected);
 
     // Test Case 2: All zeros
     let zeros = [0.0f32; 64];
@@ -60,7 +55,10 @@ fn manual_test_norm_squared_64_synthetic() {
         "FAIL: norm_squared_64([0; 64]) = {}, expected 0.0",
         result
     );
-    println!("PASS: norm_squared_64([0; 64]) = {} (expected: 0.0)", result);
+    println!(
+        "PASS: norm_squared_64([0; 64]) = {} (expected: 0.0)",
+        result
+    );
 
     // Test Case 3: First element = 0.5, rest = 0
     let single = point_at_norm(0.5);
@@ -69,9 +67,13 @@ fn manual_test_norm_squared_64_synthetic() {
     assert!(
         (result - expected).abs() < 1e-6,
         "FAIL: norm_squared_64([0.5, 0..]) = {}, expected {}",
+        result,
+        expected
+    );
+    println!(
+        "PASS: norm_squared_64([0.5, 0..]) = {} (expected: {})",
         result, expected
     );
-    println!("PASS: norm_squared_64([0.5, 0..]) = {} (expected: {})", result, expected);
 }
 
 // ============================================================================
@@ -86,9 +88,13 @@ fn manual_test_norm_64_synthetic() {
     assert!(
         (result - expected).abs() < 1e-6,
         "FAIL: norm_64([0.125; 64]) = {}, expected {}",
+        result,
+        expected
+    );
+    println!(
+        "PASS: norm_64([0.125; 64]) = {} (expected: {})",
         result, expected
     );
-    println!("PASS: norm_64([0.125; 64]) = {} (expected: {})", result, expected);
 }
 
 // ============================================================================
@@ -107,7 +113,10 @@ fn manual_test_inner_product_64_synthetic() {
         "FAIL: orthogonal inner_product = {}, expected 0.0",
         result
     );
-    println!("PASS: orthogonal inner_product = {} (expected: 0.0)", result);
+    println!(
+        "PASS: orthogonal inner_product = {} (expected: 0.0)",
+        result
+    );
 
     // Test Case 2: Self-inner product = norm squared
     let v = [0.125f32; 64];
@@ -116,9 +125,13 @@ fn manual_test_inner_product_64_synthetic() {
     assert!(
         (result - expected).abs() < 1e-6,
         "FAIL: self inner_product = {}, expected {}",
+        result,
+        expected
+    );
+    println!(
+        "PASS: self inner_product = {} (expected: {})",
         result, expected
     );
-    println!("PASS: self inner_product = {} (expected: {})", result, expected);
 }
 
 // ============================================================================
@@ -138,14 +151,18 @@ fn manual_test_mobius_add_origin_identity() {
         "FAIL: mobius_add(origin, [0.5, 0..]) first element = {}, expected 0.5",
         result[0]
     );
-    println!("PASS: mobius_add(origin, [0.5, 0..]) first element = {} (expected: ~0.5)", result[0]);
+    println!(
+        "PASS: mobius_add(origin, [0.5, 0..]) first element = {} (expected: ~0.5)",
+        result[0]
+    );
 
     // All other elements should be 0
     for i in 1..64 {
         assert!(
             result[i].abs() < 1e-6,
             "FAIL: mobius_add(origin, [0.5, 0..]) element {} = {}, expected 0.0",
-            i, result[i]
+            i,
+            result[i]
         );
     }
     println!("PASS: All other 63 elements are ~0.0");
@@ -176,9 +193,13 @@ fn manual_test_geodesic_distance_properties() {
     assert!(
         (d1 - d2).abs() < 1e-5,
         "FAIL: geodesic_distance asymmetric: d(p,q)={}, d(q,p)={}",
+        d1,
+        d2
+    );
+    println!(
+        "PASS: geodesic_distance symmetry: d(p,q)={}, d(q,p)={}",
         d1, d2
     );
-    println!("PASS: geodesic_distance symmetry: d(p,q)={}, d(q,p)={}", d1, d2);
 
     // Test Case 3: Known distance from origin
     let origin = [0.0f32; 64];
@@ -189,9 +210,13 @@ fn manual_test_geodesic_distance_properties() {
     assert!(
         (dist - expected).abs() < 0.01,
         "FAIL: geodesic from origin = {}, expected ~{}",
+        dist,
+        expected
+    );
+    println!(
+        "PASS: geodesic_distance(origin, [0.5, 0..]) = {} (expected: ~{})",
         dist, expected
     );
-    println!("PASS: geodesic_distance(origin, [0.5, 0..]) = {} (expected: ~{})", dist, expected);
 }
 
 // ============================================================================
@@ -215,7 +240,8 @@ fn manual_test_softmax_temperature_synthetic() {
         assert!(
             (p - 0.25).abs() < 0.01,
             "FAIL: uniform softmax prob[{}] = {}, expected ~0.25",
-            i, p
+            i,
+            p
         );
     }
     println!("PASS: uniform scores -> uniform probs: {:?}", probs);
@@ -231,9 +257,13 @@ fn manual_test_softmax_temperature_synthetic() {
     assert!(
         range_high < range_low,
         "FAIL: high temp should be more uniform. high_range={}, low_range={}",
+        range_high,
+        range_low
+    );
+    println!(
+        "PASS: high temp more uniform. T=10.0 range={}, T=0.1 range={}",
         range_high, range_low
     );
-    println!("PASS: high temp more uniform. T=10.0 range={}, T=0.1 range={}", range_high, range_low);
 }
 
 // ============================================================================
@@ -249,7 +279,8 @@ fn manual_test_random_direction_unit_length() {
         assert!(
             (norm - 1.0).abs() < 1e-5,
             "FAIL: random_direction {} norm = {}, expected 1.0",
-            i, norm
+            i,
+            norm
         );
     }
     println!("PASS: 10 random_direction calls all produced unit vectors");
@@ -280,9 +311,13 @@ fn manual_test_project_to_ball_behavior() {
     assert!(
         new_norm < config.max_norm,
         "FAIL: projected norm {} >= max_norm {}",
-        new_norm, config.max_norm
+        new_norm,
+        config.max_norm
     );
-    println!("PASS: outside point (norm=1.5) projected to norm={}", new_norm);
+    println!(
+        "PASS: outside point (norm=1.5) projected to norm={}",
+        new_norm
+    );
 }
 
 // ============================================================================
@@ -316,11 +351,16 @@ fn manual_test_is_far_from_all_semantic_leap() {
     println!("Distance to far_point: {}", dist);
     // Only assert "is far" if distance actually >= 0.7
     assert_eq!(
-        result, dist >= 0.7,
+        result,
+        dist >= 0.7,
         "FAIL: is_far_from_all result {} inconsistent with distance {} vs threshold 0.7",
-        result, dist
+        result,
+        dist
     );
-    println!("PASS: is_far_from_all correctly evaluates distance {} vs threshold 0.7", dist);
+    println!(
+        "PASS: is_far_from_all correctly evaluates distance {} vs threshold 0.7",
+        dist
+    );
 }
 
 // ============================================================================
@@ -348,11 +388,14 @@ fn manual_test_direction_toward_convergence() {
     assert!(
         dist_after < dist_before,
         "FAIL: direction_toward should reduce distance: {} -> {}",
-        dist_before, dist_after
+        dist_before,
+        dist_after
     );
     println!(
         "PASS: direction_toward reduced distance from {} to {} (Δ={})",
-        dist_before, dist_after, dist_before - dist_after
+        dist_before,
+        dist_after,
+        dist_before - dist_after
     );
 }
 
@@ -375,7 +418,8 @@ fn manual_test_scale_direction_boundary() {
     assert!(
         norm_origin > norm_boundary,
         "FAIL: step at origin ({}) should be > step at boundary ({})",
-        norm_origin, norm_boundary
+        norm_origin,
+        norm_boundary
     );
     println!(
         "PASS: scale_direction at origin (norm={}) > at boundary (norm={})",
@@ -407,7 +451,8 @@ fn manual_test_geodesic_triangle_inequality() {
     assert!(
         d_pr <= d_pq + d_qr + 1e-5,
         "FAIL: triangle inequality: d(p,r)={} > d(p,q)+d(q,r)={}",
-        d_pr, d_pq + d_qr
+        d_pr,
+        d_pq + d_qr
     );
     println!("PASS: Triangle inequality holds:");
     println!("  d(p,q) = {}", d_pq);
@@ -426,10 +471,14 @@ fn manual_test_mobius_stays_in_ball() {
     // Generate random points and velocities, verify result stays in ball
     for i in 0..20 {
         let mut p = random_direction(&mut rng);
-        for x in p.iter_mut() { *x *= 0.5; } // Scale to be inside ball
+        for x in p.iter_mut() {
+            *x *= 0.5;
+        } // Scale to be inside ball
 
         let mut v = random_direction(&mut rng);
-        for x in v.iter_mut() { *x *= 0.3; }
+        for x in v.iter_mut() {
+            *x *= 0.3;
+        }
 
         let result = mobius_add(&p, &v, &config);
         let result_norm = norm_64(&result);
@@ -437,7 +486,9 @@ fn manual_test_mobius_stays_in_ball() {
         assert!(
             result_norm < config.max_norm,
             "FAIL: mobius_add iteration {} produced norm={} >= max_norm={}",
-            i, result_norm, config.max_norm
+            i,
+            result_norm,
+            config.max_norm
         );
     }
     println!("PASS: 20 random mobius_add operations all stayed in ball");
@@ -456,7 +507,10 @@ fn manual_test_reproducibility() {
 
     assert_eq!(dir1, dir2, "FAIL: same seed should produce same direction");
     println!("PASS: Deterministic RNG produces reproducible results");
-    println!("  First 3 elements: [{:.6}, {:.6}, {:.6}]", dir1[0], dir1[1], dir1[2]);
+    println!(
+        "  First 3 elements: [{:.6}, {:.6}, {:.6}]",
+        dir1[0], dir1[1], dir1[2]
+    );
 }
 
 // ============================================================================

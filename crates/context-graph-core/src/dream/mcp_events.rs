@@ -15,9 +15,9 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::types::ExtendedTriggerReason;
 #[cfg(test)]
 use super::types::DreamPhase;
+use super::types::ExtendedTriggerReason;
 use super::WakeReason;
 
 /// Base trait for dream events.
@@ -43,9 +43,15 @@ pub struct DreamCycleStarted {
 }
 
 impl DreamEvent for DreamCycleStarted {
-    fn event_type(&self) -> &'static str { "dream_cycle_started" }
-    fn session_id(&self) -> Uuid { self.session_id }
-    fn timestamp_ms(&self) -> u64 { self.timestamp_ms }
+    fn event_type(&self) -> &'static str {
+        "dream_cycle_started"
+    }
+    fn session_id(&self) -> Uuid {
+        self.session_id
+    }
+    fn timestamp_ms(&self) -> u64 {
+        self.timestamp_ms
+    }
 }
 
 impl DreamCycleStarted {
@@ -83,9 +89,15 @@ pub struct NremPhaseCompleted {
 }
 
 impl DreamEvent for NremPhaseCompleted {
-    fn event_type(&self) -> &'static str { "nrem_phase_completed" }
-    fn session_id(&self) -> Uuid { self.session_id }
-    fn timestamp_ms(&self) -> u64 { self.timestamp_ms }
+    fn event_type(&self) -> &'static str {
+        "nrem_phase_completed"
+    }
+    fn session_id(&self) -> Uuid {
+        self.session_id
+    }
+    fn timestamp_ms(&self) -> u64 {
+        self.timestamp_ms
+    }
 }
 
 impl NremPhaseCompleted {
@@ -125,9 +137,15 @@ pub struct RemPhaseCompleted {
 }
 
 impl DreamEvent for RemPhaseCompleted {
-    fn event_type(&self) -> &'static str { "rem_phase_completed" }
-    fn session_id(&self) -> Uuid { self.session_id }
-    fn timestamp_ms(&self) -> u64 { self.timestamp_ms }
+    fn event_type(&self) -> &'static str {
+        "rem_phase_completed"
+    }
+    fn session_id(&self) -> Uuid {
+        self.session_id
+    }
+    fn timestamp_ms(&self) -> u64 {
+        self.timestamp_ms
+    }
 }
 
 impl RemPhaseCompleted {
@@ -164,9 +182,15 @@ pub struct DreamCycleCompleted {
 }
 
 impl DreamEvent for DreamCycleCompleted {
-    fn event_type(&self) -> &'static str { "dream_cycle_completed" }
-    fn session_id(&self) -> Uuid { self.session_id }
-    fn timestamp_ms(&self) -> u64 { self.timestamp_ms }
+    fn event_type(&self) -> &'static str {
+        "dream_cycle_completed"
+    }
+    fn session_id(&self) -> Uuid {
+        self.session_id
+    }
+    fn timestamp_ms(&self) -> u64 {
+        self.timestamp_ms
+    }
 }
 
 impl DreamCycleCompleted {
@@ -203,9 +227,15 @@ pub struct BlindSpotDiscovered {
 }
 
 impl DreamEvent for BlindSpotDiscovered {
-    fn event_type(&self) -> &'static str { "blind_spot_discovered" }
-    fn session_id(&self) -> Uuid { self.session_id }
-    fn timestamp_ms(&self) -> u64 { self.timestamp_ms }
+    fn event_type(&self) -> &'static str {
+        "blind_spot_discovered"
+    }
+    fn session_id(&self) -> Uuid {
+        self.session_id
+    }
+    fn timestamp_ms(&self) -> u64 {
+        self.timestamp_ms
+    }
 }
 
 impl BlindSpotDiscovered {
@@ -241,9 +271,15 @@ pub struct ShortcutCreated {
 }
 
 impl DreamEvent for ShortcutCreated {
-    fn event_type(&self) -> &'static str { "shortcut_created" }
-    fn session_id(&self) -> Uuid { self.session_id }
-    fn timestamp_ms(&self) -> u64 { self.timestamp_ms }
+    fn event_type(&self) -> &'static str {
+        "shortcut_created"
+    }
+    fn session_id(&self) -> Uuid {
+        self.session_id
+    }
+    fn timestamp_ms(&self) -> u64 {
+        self.timestamp_ms
+    }
 }
 
 impl ShortcutCreated {
@@ -278,18 +314,19 @@ pub struct GpuBudgetWarning {
 }
 
 impl DreamEvent for GpuBudgetWarning {
-    fn event_type(&self) -> &'static str { "gpu_budget_warning" }
-    fn session_id(&self) -> Uuid { self.session_id }
-    fn timestamp_ms(&self) -> u64 { self.timestamp_ms }
+    fn event_type(&self) -> &'static str {
+        "gpu_budget_warning"
+    }
+    fn session_id(&self) -> Uuid {
+        self.session_id
+    }
+    fn timestamp_ms(&self) -> u64 {
+        self.timestamp_ms
+    }
 }
 
 impl GpuBudgetWarning {
-    pub fn new(
-        session_id: Uuid,
-        current_usage: f32,
-        budget: f32,
-        action_taken: &str,
-    ) -> Self {
+    pub fn new(session_id: Uuid, current_usage: f32, budget: f32, action_taken: &str) -> Self {
         Self {
             session_id,
             timestamp_ms: current_timestamp_ms(),
@@ -311,18 +348,19 @@ pub struct WakeTriggered {
 }
 
 impl DreamEvent for WakeTriggered {
-    fn event_type(&self) -> &'static str { "wake_triggered" }
-    fn session_id(&self) -> Uuid { self.session_id }
-    fn timestamp_ms(&self) -> u64 { self.timestamp_ms }
+    fn event_type(&self) -> &'static str {
+        "wake_triggered"
+    }
+    fn session_id(&self) -> Uuid {
+        self.session_id
+    }
+    fn timestamp_ms(&self) -> u64 {
+        self.timestamp_ms
+    }
 }
 
 impl WakeTriggered {
-    pub fn new(
-        session_id: Uuid,
-        reason: WakeReason,
-        phase: &str,
-        latency: Duration,
-    ) -> Self {
+    pub fn new(session_id: Uuid, reason: WakeReason, phase: &str, latency: Duration) -> Self {
         Self {
             session_id,
             timestamp_ms: current_timestamp_ms(),
@@ -451,9 +489,9 @@ mod tests {
         let session_id = Uuid::new_v4();
         let event = NremPhaseCompleted::new(
             session_id,
-            100,  // memories replayed
-            75,   // edges strengthened
-            10,   // edges pruned
+            100, // memories replayed
+            75,  // edges strengthened
+            10,  // edges pruned
             Duration::from_secs(180),
         );
 
@@ -470,13 +508,16 @@ mod tests {
         let session_id = Uuid::new_v4();
         let event = NremPhaseCompleted::new(
             session_id,
-            0,  // zero memories
+            0, // zero memories
             0,
             0,
             Duration::from_secs(180),
         );
 
-        assert_eq!(event.compression_ratio, 0.0, "Division by zero should return 0.0");
+        assert_eq!(
+            event.compression_ratio, 0.0,
+            "Division by zero should return 0.0"
+        );
     }
 
     #[test]
@@ -484,9 +525,9 @@ mod tests {
         let session_id = Uuid::new_v4();
         let event = RemPhaseCompleted::new(
             session_id,
-            50,   // queries generated
-            3,    // blind spots found
-            0.8,  // walk distance
+            50,  // queries generated
+            3,   // blind spots found
+            0.8, // walk distance
             Duration::from_secs(120),
             0.75, // average semantic leap
         );
@@ -502,13 +543,7 @@ mod tests {
     fn test_blind_spot_discovered() {
         let session_id = Uuid::new_v4();
         let position = vec![0.1, 0.2, 0.3];
-        let event = BlindSpotDiscovered::new(
-            session_id,
-            position.clone(),
-            0.85,
-            0.9,
-            42,
-        );
+        let event = BlindSpotDiscovered::new(session_id, position.clone(), 0.85, 0.9, 42);
 
         assert_eq!(event.event_type(), "blind_spot_discovered");
         assert_eq!(event.session_id, session_id);
@@ -525,10 +560,7 @@ mod tests {
         let source_id = Uuid::new_v4();
         let target_id = Uuid::new_v4();
         let event = ShortcutCreated::new(
-            session_id,
-            source_id,
-            target_id,
-            4,    // hop count
+            session_id, source_id, target_id, 4,    // hop count
             0.85, // combined weight
             7,    // traversal count
         );
@@ -544,12 +576,7 @@ mod tests {
     #[test]
     fn test_gpu_budget_warning() {
         let session_id = Uuid::new_v4();
-        let event = GpuBudgetWarning::new(
-            session_id,
-            0.35,
-            0.30,
-            "Initiating wake sequence",
-        );
+        let event = GpuBudgetWarning::new(session_id, 0.35, 0.30, "Initiating wake sequence");
 
         assert_eq!(event.event_type(), "gpu_budget_warning");
         assert_eq!(event.current_usage, 0.35);
@@ -602,44 +629,86 @@ mod tests {
             phase: DreamPhase::FullCycle,
         });
         let json1 = serde_json::to_string(&event1);
-        assert!(json1.is_ok(), "DreamCycleStarted serialization failed: {:?}", json1.err());
+        assert!(
+            json1.is_ok(),
+            "DreamCycleStarted serialization failed: {:?}",
+            json1.err()
+        );
 
         // Test DreamCycleCompleted
         let event2 = DreamCycleCompleted::new(
-            session_id, true, WakeReason::CycleComplete, 0, Duration::ZERO, Duration::ZERO
+            session_id,
+            true,
+            WakeReason::CycleComplete,
+            0,
+            Duration::ZERO,
+            Duration::ZERO,
         );
         let json2 = serde_json::to_string(&event2);
-        assert!(json2.is_ok(), "DreamCycleCompleted serialization failed: {:?}", json2.err());
+        assert!(
+            json2.is_ok(),
+            "DreamCycleCompleted serialization failed: {:?}",
+            json2.err()
+        );
 
         // Test NremPhaseCompleted
         let event3 = NremPhaseCompleted::new(session_id, 0, 0, 0, Duration::ZERO);
         let json3 = serde_json::to_string(&event3);
-        assert!(json3.is_ok(), "NremPhaseCompleted serialization failed: {:?}", json3.err());
+        assert!(
+            json3.is_ok(),
+            "NremPhaseCompleted serialization failed: {:?}",
+            json3.err()
+        );
 
         // Test RemPhaseCompleted
         let event4 = RemPhaseCompleted::new(session_id, 0, 0, 0.0, Duration::ZERO, 0.0);
         let json4 = serde_json::to_string(&event4);
-        assert!(json4.is_ok(), "RemPhaseCompleted serialization failed: {:?}", json4.err());
+        assert!(
+            json4.is_ok(),
+            "RemPhaseCompleted serialization failed: {:?}",
+            json4.err()
+        );
 
         // Test WakeTriggered
-        let event5 = WakeTriggered::new(session_id, WakeReason::ExternalQuery, "test", Duration::from_millis(50));
+        let event5 = WakeTriggered::new(
+            session_id,
+            WakeReason::ExternalQuery,
+            "test",
+            Duration::from_millis(50),
+        );
         let json5 = serde_json::to_string(&event5);
-        assert!(json5.is_ok(), "WakeTriggered serialization failed: {:?}", json5.err());
+        assert!(
+            json5.is_ok(),
+            "WakeTriggered serialization failed: {:?}",
+            json5.err()
+        );
 
         // Test BlindSpotDiscovered
         let event6 = BlindSpotDiscovered::new(session_id, vec![0.1, 0.2], 0.8, 0.9, 1);
         let json6 = serde_json::to_string(&event6);
-        assert!(json6.is_ok(), "BlindSpotDiscovered serialization failed: {:?}", json6.err());
+        assert!(
+            json6.is_ok(),
+            "BlindSpotDiscovered serialization failed: {:?}",
+            json6.err()
+        );
 
         // Test ShortcutCreated
         let event7 = ShortcutCreated::new(session_id, Uuid::new_v4(), Uuid::new_v4(), 3, 0.8, 5);
         let json7 = serde_json::to_string(&event7);
-        assert!(json7.is_ok(), "ShortcutCreated serialization failed: {:?}", json7.err());
+        assert!(
+            json7.is_ok(),
+            "ShortcutCreated serialization failed: {:?}",
+            json7.err()
+        );
 
         // Test GpuBudgetWarning
         let event8 = GpuBudgetWarning::new(session_id, 0.35, 0.30, "test");
         let json8 = serde_json::to_string(&event8);
-        assert!(json8.is_ok(), "GpuBudgetWarning serialization failed: {:?}", json8.err());
+        assert!(
+            json8.is_ok(),
+            "GpuBudgetWarning serialization failed: {:?}",
+            json8.err()
+        );
     }
 
     #[test]
@@ -654,7 +723,12 @@ mod tests {
         assert_eq!(deserialized1.trigger_reason, "high_entropy");
 
         // Serialize and deserialize WakeTriggered
-        let event2 = WakeTriggered::new(session_id, WakeReason::ManualAbort, "rem", Duration::from_millis(75));
+        let event2 = WakeTriggered::new(
+            session_id,
+            WakeReason::ManualAbort,
+            "rem",
+            Duration::from_millis(75),
+        );
         let json2 = serde_json::to_string(&event2).unwrap();
         let deserialized2: WakeTriggered = serde_json::from_str(&json2).unwrap();
         assert_eq!(deserialized2.reason, "manual_abort");
@@ -668,6 +742,10 @@ mod tests {
         // Timestamp should be after 2020-01-01 (1577836800000 ms)
         assert!(ts > 1577836800000, "Timestamp seems too old: {}", ts);
         // Timestamp should be before 2100-01-01 (4102444800000 ms)
-        assert!(ts < 4102444800000, "Timestamp seems too far in future: {}", ts);
+        assert!(
+            ts < 4102444800000,
+            "Timestamp seems too far in future: {}",
+            ts
+        );
     }
 }

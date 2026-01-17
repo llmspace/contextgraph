@@ -10,8 +10,8 @@ mod tests {
     use uuid::Uuid;
 
     use crate::teleological::indexes::{EmbedderIndex, EmbedderIndexRegistry};
-    use crate::teleological::search::matrix::{MatrixStrategySearch, SearchMatrix};
     use crate::teleological::search::matrix::strategy_search::pearson_correlation_matched;
+    use crate::teleological::search::matrix::{MatrixStrategySearch, SearchMatrix};
 
     // ========== SEARCH MATRIX TESTS ==========
 
@@ -111,8 +111,16 @@ mod tests {
         let m = SearchMatrix::temporal_aware();
         assert_eq!(m.get(0, 0), 0.5, "E1Semantic should have weight 0.5");
         assert_eq!(m.get(1, 1), 0.8, "E2TemporalRecent should have weight 0.8");
-        assert_eq!(m.get(2, 2), 0.8, "E3TemporalPeriodic should have weight 0.8");
-        assert_eq!(m.get(3, 3), 0.8, "E4TemporalPositional should have weight 0.8");
+        assert_eq!(
+            m.get(2, 2),
+            0.8,
+            "E3TemporalPeriodic should have weight 0.8"
+        );
+        assert_eq!(
+            m.get(3, 3),
+            0.8,
+            "E4TemporalPositional should have weight 0.8"
+        );
         assert_eq!(m.get(1, 2), 0.1, "E2-E3 cross should be 0.1");
         assert_eq!(m.get(2, 1), 0.1, "E3-E2 cross should be 0.1");
         assert!(m.has_cross_correlations());
@@ -129,7 +137,11 @@ mod tests {
         assert_eq!(m.get(1, 1), 0.1); // E2
         assert_eq!(m.get(6, 6), 0.1); // E7
         assert_eq!(m.get(5, 5), 0.0, "E6Sparse should have weight 0.0");
-        assert_eq!(m.get(11, 11), 0.0, "E12LateInteraction should have weight 0.0");
+        assert_eq!(
+            m.get(11, 11),
+            0.0,
+            "E12LateInteraction should have weight 0.0"
+        );
         assert_eq!(m.get(12, 12), 0.0, "E13Splade should have weight 0.0");
         assert!(m.is_diagonal(), "Balanced should be diagonal-only");
 

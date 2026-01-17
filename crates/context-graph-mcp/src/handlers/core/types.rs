@@ -446,8 +446,7 @@ impl LambdaAdjustmentResult {
 
     /// Check if any adjustment was made.
     pub fn was_adjusted(&self) -> bool {
-        (self.lambda_s_delta().abs() > f32::EPSILON)
-            || (self.lambda_c_delta().abs() > f32::EPSILON)
+        (self.lambda_s_delta().abs() > f32::EPSILON) || (self.lambda_c_delta().abs() > f32::EPSILON)
     }
 }
 
@@ -504,10 +503,7 @@ mod task_f02_tests {
             format!("{}", AdjustmentReason::DreamConsolidation),
             "dream_consolidation"
         );
-        assert_eq!(
-            format!("{}", AdjustmentReason::ManualReset),
-            "manual_reset"
-        );
+        assert_eq!(format!("{}", AdjustmentReason::ManualReset), "manual_reset");
         assert_eq!(
             format!("{}", AdjustmentReason::BayesianOptimization),
             "bayesian_optimization"
@@ -529,8 +525,10 @@ mod task_f02_tests {
     #[test]
     fn test_lambda_adjustment_result_new() {
         let adj = LambdaAdjustmentResult::new(
-            0.5, 0.55, // lambda_s before/after
-            0.6, 0.55, // lambda_c before/after
+            0.5,
+            0.55, // lambda_s before/after
+            0.6,
+            0.55, // lambda_c before/after
             false,
             AdjustmentReason::DreamConsolidation,
         );
@@ -545,7 +543,11 @@ mod task_f02_tests {
     #[test]
     fn test_lambda_adjustment_result_no_change() {
         let adj = LambdaAdjustmentResult::new(
-            0.5, 0.5, 0.6, 0.6, false,
+            0.5,
+            0.5,
+            0.6,
+            0.6,
+            false,
             AdjustmentReason::DreamConsolidation,
         );
 
@@ -556,7 +558,11 @@ mod task_f02_tests {
     #[test]
     fn test_lambda_adjustment_result_serde() {
         let adj = LambdaAdjustmentResult::new(
-            0.5, 0.55, 0.6, 0.55, true,
+            0.5,
+            0.55,
+            0.6,
+            0.55,
+            true,
             AdjustmentReason::DreamConsolidation,
         );
 
@@ -572,9 +578,7 @@ mod task_f02_tests {
 
     #[test]
     fn test_lambda_error_codes() {
-        let err = LambdaError::InvalidMetrics(InvalidMetricsError::NaN {
-            field: "quality",
-        });
+        let err = LambdaError::InvalidMetrics(InvalidMetricsError::NaN { field: "quality" });
         assert_eq!(err.code(), "E_DREAM_LAMBDA_001");
 
         let err = LambdaError::MutexPoisoned;

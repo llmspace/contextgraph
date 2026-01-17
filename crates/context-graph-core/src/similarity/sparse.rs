@@ -289,11 +289,7 @@ mod tests {
         let v = SparseVector::new(vec![0, 5, 10], vec![1.0, 2.0, 3.0]).unwrap();
         let dot = sparse_dot_product(&v, &v);
         // 1*1 + 2*2 + 3*3 = 1 + 4 + 9 = 14
-        assert!(
-            (dot - 14.0).abs() < 1e-6,
-            "Expected 14.0, got {}",
-            dot
-        );
+        assert!((dot - 14.0).abs() < 1e-6, "Expected 14.0, got {}", dot);
         println!("[PASS] Dot product of identical sparse vectors = {}", dot);
     }
 
@@ -302,7 +298,10 @@ mod tests {
         let a = SparseVector::new(vec![0, 1], vec![1.0, 2.0]).unwrap();
         let b = SparseVector::new(vec![2, 3], vec![3.0, 4.0]).unwrap();
         let dot = sparse_dot_product(&a, &b);
-        assert_eq!(dot, 0.0, "Non-overlapping vectors should have 0 dot product");
+        assert_eq!(
+            dot, 0.0,
+            "Non-overlapping vectors should have 0 dot product"
+        );
         println!("[PASS] Dot product of non-overlapping vectors = {}", dot);
     }
 
@@ -312,11 +311,7 @@ mod tests {
         let b = SparseVector::new(vec![2, 3, 5], vec![4.0, 5.0, 6.0]).unwrap();
         let dot = sparse_dot_product(&a, &b);
         // Overlap at 3 and 5: 2*5 + 3*6 = 10 + 18 = 28
-        assert!(
-            (dot - 28.0).abs() < 1e-6,
-            "Expected 28.0, got {}",
-            dot
-        );
+        assert!((dot - 28.0).abs() < 1e-6, "Expected 28.0, got {}", dot);
         println!("[PASS] Dot product with partial overlap = {}", dot);
     }
 
@@ -340,11 +335,7 @@ mod tests {
         let v = SparseVector::new(vec![0, 1], vec![3.0, 4.0]).unwrap();
         let norm = sparse_l2_norm(&v);
         // sqrt(9 + 16) = sqrt(25) = 5
-        assert!(
-            (norm - 5.0).abs() < 1e-6,
-            "Expected 5.0, got {}",
-            norm
-        );
+        assert!((norm - 5.0).abs() < 1e-6, "Expected 5.0, got {}", norm);
         println!("[PASS] L2 norm of [3, 4] = {}", norm);
     }
 
@@ -426,11 +417,7 @@ mod tests {
         let b = SparseVector::new(vec![2, 3, 4], vec![0.5, 0.5, 0.5]).unwrap();
         let sim = jaccard_similarity(&a, &b);
         // Intersection: {2, 3} = 2, Union: {1, 2, 3, 4} = 4
-        assert!(
-            (sim - 0.5).abs() < 1e-6,
-            "Expected 0.5, got {}",
-            sim
-        );
+        assert!((sim - 0.5).abs() < 1e-6, "Expected 0.5, got {}", sim);
         println!("[PASS] Jaccard with 50% overlap = {}", sim);
     }
 
@@ -440,11 +427,7 @@ mod tests {
         let b = SparseVector::new(vec![1, 2, 3, 4], vec![0.5, 0.5, 0.5, 0.5]).unwrap();
         let sim = jaccard_similarity(&a, &b);
         // Intersection: {1, 2} = 2, Union: {1, 2, 3, 4} = 4
-        assert!(
-            (sim - 0.5).abs() < 1e-6,
-            "Expected 0.5, got {}",
-            sim
-        );
+        assert!((sim - 0.5).abs() < 1e-6, "Expected 0.5, got {}", sim);
         println!("[PASS] Jaccard with subset = {}", sim);
     }
 
@@ -487,7 +470,14 @@ mod tests {
         let mut term_df = HashMap::new();
         term_df.insert(100, 5);
 
-        let score = bm25_score(&query, &document, 3.0, 100, &term_df, &Bm25Config::default());
+        let score = bm25_score(
+            &query,
+            &document,
+            3.0,
+            100,
+            &term_df,
+            &Bm25Config::default(),
+        );
 
         assert!(score > 0.0, "BM25 score should be positive");
         println!("[PASS] BM25 basic score = {}", score);
@@ -499,7 +489,14 @@ mod tests {
         let document = SparseVector::new(vec![200], vec![1.0]).unwrap();
 
         let term_df = HashMap::new();
-        let score = bm25_score(&query, &document, 3.0, 100, &term_df, &Bm25Config::default());
+        let score = bm25_score(
+            &query,
+            &document,
+            3.0,
+            100,
+            &term_df,
+            &Bm25Config::default(),
+        );
 
         assert_eq!(score, 0.0, "No term overlap should give 0 score");
         println!("[PASS] BM25 no overlap = {}", score);
@@ -512,8 +509,8 @@ mod tests {
         let doc_rare = SparseVector::new(vec![200], vec![1.0]).unwrap();
 
         let mut term_df = HashMap::new();
-        term_df.insert(100, 50);  // Common term in 50 docs
-        term_df.insert(200, 2);   // Rare term in 2 docs
+        term_df.insert(100, 50); // Common term in 50 docs
+        term_df.insert(200, 2); // Rare term in 2 docs
 
         let config = Bm25Config::default();
         let score_common = bm25_score(&query, &doc_common, 1.0, 100, &term_df, &config);
@@ -525,7 +522,10 @@ mod tests {
             score_rare,
             score_common
         );
-        println!("[PASS] BM25 rare term scores higher: rare={}, common={}", score_rare, score_common);
+        println!(
+            "[PASS] BM25 rare term scores higher: rare={}, common={}",
+            score_rare, score_common
+        );
     }
 
     #[test]
@@ -535,8 +535,14 @@ mod tests {
         let term_df = HashMap::new();
         let config = Bm25Config::default();
 
-        assert_eq!(bm25_score(&empty, &non_empty, 1.0, 100, &term_df, &config), 0.0);
-        assert_eq!(bm25_score(&non_empty, &empty, 1.0, 100, &term_df, &config), 0.0);
+        assert_eq!(
+            bm25_score(&empty, &non_empty, 1.0, 100, &term_df, &config),
+            0.0
+        );
+        assert_eq!(
+            bm25_score(&non_empty, &empty, 1.0, 100, &term_df, &config),
+            0.0
+        );
         println!("[PASS] BM25 handles empty vectors");
     }
 
@@ -545,7 +551,10 @@ mod tests {
         let config = Bm25Config::default();
         assert!((config.k1 - 1.2).abs() < 1e-6);
         assert!((config.b - 0.75).abs() < 1e-6);
-        println!("[PASS] BM25 default config: k1={}, b={}", config.k1, config.b);
+        println!(
+            "[PASS] BM25 default config: k1={}, b={}",
+            config.k1, config.b
+        );
     }
 
     #[test]
@@ -568,7 +577,10 @@ mod tests {
             score_short,
             score_long
         );
-        println!("[PASS] BM25 length normalization: short={}, long={}", score_short, score_long);
+        println!(
+            "[PASS] BM25 length normalization: short={}, long={}",
+            score_short, score_long
+        );
     }
 
     // ========================================================================
@@ -631,15 +643,17 @@ mod tests {
         let b = SparseVector::new(vec![3, 5], vec![4.0, 5.0]).unwrap();
         let dot = sparse_dot_product(&a, &b);
 
-        println!("STATE BEFORE: a.indices={:?}, a.values={:?}", a.indices, a.values);
-        println!("STATE BEFORE: b.indices={:?}, b.values={:?}", b.indices, b.values);
+        println!(
+            "STATE BEFORE: a.indices={:?}, a.values={:?}",
+            a.indices, a.values
+        );
+        println!(
+            "STATE BEFORE: b.indices={:?}, b.values={:?}",
+            b.indices, b.values
+        );
         println!("STATE AFTER: dot={} (expected 12.0)", dot);
 
-        assert!(
-            (dot - 12.0).abs() < 1e-6,
-            "Expected 12.0, got {}",
-            dot
-        );
+        assert!((dot - 12.0).abs() < 1e-6, "Expected 12.0, got {}", dot);
         println!("[PASS] Synthetic dot product verified: 12.0");
     }
 
@@ -677,8 +691,8 @@ mod tests {
         let doc_rare = SparseVector::new(vec![200], vec![1.0]).unwrap();
 
         let mut term_df = HashMap::new();
-        term_df.insert(100, 90);  // Common term in 90 docs
-        term_df.insert(200, 5);   // Rare term in 5 docs
+        term_df.insert(100, 90); // Common term in 90 docs
+        term_df.insert(200, 5); // Rare term in 5 docs
 
         let config = Bm25Config::default();
         let score_common = bm25_score(&query, &doc_common, 1.0, 100, &term_df, &config);

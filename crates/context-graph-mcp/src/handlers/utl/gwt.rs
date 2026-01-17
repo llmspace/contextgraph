@@ -13,10 +13,10 @@ use context_graph_core::types::JohariQuadrant;
 
 use crate::protocol::{error_codes, JsonRpcId, JsonRpcResponse};
 
+use super::super::Handlers;
 use super::constants::{ALPHA, BETA, GAMMA};
 use super::gwt_compute::{compute_delta_c, compute_delta_s};
 use super::helpers::classify_johari;
-use super::super::Handlers;
 
 impl Handlers {
     /// Handle gwt/compute_delta_sc request.
@@ -157,11 +157,18 @@ impl Handlers {
 
         // Classify Johari quadrants
         let johari_quadrants: [JohariQuadrant; NUM_EMBEDDERS] = std::array::from_fn(|i| {
-            classify_johari(delta_s_result.per_embedder[i], delta_c_result.delta_c, johari_threshold)
+            classify_johari(
+                delta_s_result.per_embedder[i],
+                delta_c_result.delta_c,
+                johari_threshold,
+            )
         });
 
-        let johari_aggregate =
-            classify_johari(delta_s_result.aggregate, delta_c_result.delta_c, johari_threshold);
+        let johari_aggregate = classify_johari(
+            delta_s_result.aggregate,
+            delta_c_result.delta_c,
+            johari_threshold,
+        );
 
         // Build response
         let utl_learning_potential =

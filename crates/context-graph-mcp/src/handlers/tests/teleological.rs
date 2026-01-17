@@ -171,15 +171,15 @@ async fn test_search_teleological_fail_fast_no_query() {
     let response = handlers.dispatch(request).await;
 
     let result = response.result.expect("Must have result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(is_error, "Should fail when no query provided");
 
     let content = result["content"].as_array().expect("content is array");
     let text = content[0]["text"].as_str().expect("Must have text");
-    assert!(
-        text.contains("FAIL FAST"),
-        "Error should mention FAIL FAST"
-    );
+    assert!(text.contains("FAIL FAST"), "Error should mention FAIL FAST");
     assert!(
         text.contains("query_content") || text.contains("query_vector_id"),
         "Error should mention the missing parameters"
@@ -206,7 +206,10 @@ async fn test_search_teleological_fail_fast_empty_content() {
     let response = handlers.dispatch(request).await;
 
     let result = response.result.expect("Must have result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(is_error, "Should fail with empty query_content");
 
     let content = result["content"].as_array().expect("content is array");
@@ -237,15 +240,15 @@ async fn test_search_teleological_fail_fast_invalid_vector_id() {
     let response = handlers.dispatch(request).await;
 
     let result = response.result.expect("Must have result");
-    let is_error = result.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = result
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     assert!(is_error, "Should fail with invalid UUID");
 
     let content = result["content"].as_array().expect("content is array");
     let text = content[0]["text"].as_str().expect("Must have text");
-    assert!(
-        text.contains("FAIL FAST"),
-        "Error should mention FAIL FAST"
-    );
+    assert!(text.contains("FAIL FAST"), "Error should mention FAIL FAST");
 }
 
 // =============================================================================

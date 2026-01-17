@@ -148,7 +148,9 @@ async fn test_gwt_kuramoto_integration_full_verification() {
     println!("=== FULL STATE VERIFICATION ===");
 
     // === SETUP ===
-    let gwt = GwtSystem::new().await.expect("GwtSystem creation must succeed");
+    let gwt = GwtSystem::new()
+        .await
+        .expect("GwtSystem creation must succeed");
 
     // === SOURCE OF TRUTH CHECK ===
     let network = gwt.kuramoto.read().await;

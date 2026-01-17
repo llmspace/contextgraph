@@ -106,7 +106,10 @@ mod tests {
 
         for (state, expected_code, full_name) in test_cases {
             let actual = state.short_name();
-            println!("  {:?} -> '{}' (expected '{}')", state, actual, expected_code);
+            println!(
+                "  {:?} -> '{}' (expected '{}')",
+                state, actual, expected_code
+            );
             assert_eq!(
                 actual, expected_code,
                 "{} must return '{}', got '{}'",
@@ -137,7 +140,12 @@ mod tests {
 
         for state in all_states {
             let code = state.short_name();
-            println!("  {:?}.short_name() = '{}' (len={})", state, code, code.len());
+            println!(
+                "  {:?}.short_name() = '{}' (len={})",
+                state,
+                code,
+                code.len()
+            );
             assert_eq!(
                 code.len(),
                 3,
@@ -209,8 +217,15 @@ mod tests {
 
         for (level, expected) in test_cases {
             let actual = ConsciousnessState::from_level(level);
-            println!("  from_level({:.2}) = {:?} (expected {:?})", level, actual, expected);
-            assert_eq!(actual, expected, "from_level({}) must return {:?}", level, expected);
+            println!(
+                "  from_level({:.2}) = {:?} (expected {:?})",
+                level, actual, expected
+            );
+            assert_eq!(
+                actual, expected,
+                "from_level({}) must return {:?}",
+                level, expected
+            );
         }
 
         println!("RESULT: PASS - from_level() unchanged");

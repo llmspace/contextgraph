@@ -63,7 +63,11 @@ impl<'a> StageExecutor<'a> {
             .collect();
 
         // Sort by score descending
-        candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let latency_us = stage_start.elapsed().as_micros() as u64;
         let latency_ms = latency_us / 1000;
@@ -107,7 +111,8 @@ impl<'a> StageExecutor<'a> {
         let target_count = if candidates.is_empty() {
             (self.config.k as f32 * config.candidate_multiplier * 5.0) as usize
         } else {
-            (candidates.len() as f32 * 0.1).max(self.config.k as f32 * config.candidate_multiplier) as usize
+            (candidates.len() as f32 * 0.1).max(self.config.k as f32 * config.candidate_multiplier)
+                as usize
         };
 
         // Search using Matryoshka 128D HNSW
@@ -156,7 +161,11 @@ impl<'a> StageExecutor<'a> {
         };
 
         // Sort by score descending
-        new_candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        new_candidates.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let latency_us = stage_start.elapsed().as_micros() as u64;
         let latency_ms = latency_us / 1000;
@@ -209,7 +218,8 @@ impl<'a> StageExecutor<'a> {
         // Create candidate ID set for filtering
         let candidate_ids: HashSet<_> = candidates.iter().map(|c| c.id).collect();
         let target_count = (candidates.len() as f32 * 0.1)
-            .max(self.config.k as f32 * config.candidate_multiplier) as usize;
+            .max(self.config.k as f32 * config.candidate_multiplier)
+            as usize;
 
         // Compute RRF scores
         // RRF(d) = Σ 1/(k + rank_i(d)) for each ranking i
@@ -251,7 +261,11 @@ impl<'a> StageExecutor<'a> {
             .collect();
 
         // Sort by RRF score descending
-        new_candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        new_candidates.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         new_candidates.truncate(target_count);
 
         let latency_us = stage_start.elapsed().as_micros() as u64;
@@ -291,7 +305,10 @@ impl<'a> StageExecutor<'a> {
         let stage_start = Instant::now();
         let candidates_in = candidates.len();
 
-        let purpose_vector = self.config.purpose_vector.ok_or(PipelineError::MissingPurposeVector)?;
+        let purpose_vector = self
+            .config
+            .purpose_vector
+            .ok_or(PipelineError::MissingPurposeVector)?;
 
         if candidates.is_empty() {
             return Ok(StageResult {
@@ -336,7 +353,11 @@ impl<'a> StageExecutor<'a> {
             .collect();
 
         // Sort by alignment score descending
-        new_candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        new_candidates.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let latency_us = stage_start.elapsed().as_micros() as u64;
         let latency_ms = latency_us / 1000;
@@ -408,7 +429,11 @@ impl<'a> StageExecutor<'a> {
             .map(|(c, _)| c)
             .collect();
 
-        new_candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        new_candidates.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         new_candidates.truncate(self.config.k);
 
         let latency_us = stage_start.elapsed().as_micros() as u64;

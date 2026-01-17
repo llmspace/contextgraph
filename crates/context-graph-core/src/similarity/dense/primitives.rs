@@ -162,10 +162,6 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, DenseSimilarityEr
             actual: b.len(),
         });
     }
-    let sum: f32 = a
-        .iter()
-        .zip(b.iter())
-        .map(|(x, y)| (x - y).powi(2))
-        .sum();
+    let sum: f32 = a.iter().zip(b.iter()).map(|(x, y)| (x - y).powi(2)).sum();
     Ok(sum.sqrt())
 }

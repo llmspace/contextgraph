@@ -226,7 +226,10 @@ mod tests {
         current.kuramoto_phases = [0.0; KURAMOTO_N]; // Aligned phases -> r = 1.0
 
         println!("BEFORE:");
-        println!("  current.purpose_vector: {:?}", &current.purpose_vector[..3]);
+        println!(
+            "  current.purpose_vector: {:?}",
+            &current.purpose_vector[..3]
+        );
         println!(
             "  previous.purpose_vector: {:?}",
             &previous.purpose_vector[..3]
@@ -263,9 +266,12 @@ mod tests {
         let mut previous = SessionIdentitySnapshot::new("previous-session");
 
         // Create orthogonal vectors
-        current.purpose_vector = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        previous.purpose_vector =
-            [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        current.purpose_vector = [
+            1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        ];
+        previous.purpose_vector = [
+            0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        ];
         current.kuramoto_phases = [0.0; KURAMOTO_N]; // r = 1.0 (doesn't matter since cos=0)
 
         println!("BEFORE:");
@@ -389,10 +395,7 @@ mod tests {
         current.kuramoto_phases = low_sync_phases;
         let r_low = compute_kuramoto_r(&current.kuramoto_phases);
         let ic_low_sync = compute_ic(&current, &previous);
-        println!(
-            "IC with lower sync (r={:.3}): {}",
-            r_low, ic_low_sync
-        );
+        println!("IC with lower sync (r={:.3}): {}", r_low, ic_low_sync);
 
         // VERIFY: IC decreases with lower synchronization
         assert!(
@@ -439,7 +442,10 @@ mod tests {
 
         for (ic, expected) in test_cases {
             let actual = classify_ic(ic);
-            println!("classify_ic({:.3}) = '{}' (expected: '{}')", ic, actual, expected);
+            println!(
+                "classify_ic({:.3}) = '{}' (expected: '{}')",
+                ic, actual, expected
+            );
             assert_eq!(
                 actual, expected,
                 "classify_ic({}) should return '{}', got '{}'",
@@ -479,7 +485,10 @@ mod tests {
         // SOURCE OF TRUTH: IDENTITY-002 - warning is 0.5 <= IC < 0.7
 
         // Below warning (crisis range)
-        assert!(!is_ic_warning(0.49), "0.49 should NOT be warning (is crisis)");
+        assert!(
+            !is_ic_warning(0.49),
+            "0.49 should NOT be warning (is crisis)"
+        );
         assert!(!is_ic_warning(0.0), "0.0 should NOT be warning (is crisis)");
 
         // Warning range
@@ -490,7 +499,10 @@ mod tests {
         // Above warning (good or healthy range)
         assert!(!is_ic_warning(0.7), "0.7 should NOT be warning (is good)");
         assert!(!is_ic_warning(0.71), "0.71 should NOT be warning");
-        assert!(!is_ic_warning(0.9), "0.9 should NOT be warning (is healthy)");
+        assert!(
+            !is_ic_warning(0.9),
+            "0.9 should NOT be warning (is healthy)"
+        );
         assert!(!is_ic_warning(1.0), "1.0 should NOT be warning");
 
         println!("RESULT: PASS - is_ic_warning() boundaries correct at 0.5 and 0.7");

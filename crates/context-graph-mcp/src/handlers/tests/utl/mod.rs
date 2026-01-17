@@ -8,10 +8,10 @@
 //! - AP-10 compliance (all values in [0,1], no NaN/Inf)
 //! - FAIL FAST error handling
 
-mod helpers;
-mod delta_sc_valid;
-mod delta_sc_errors;
 mod basic_utl;
-mod fsv;
+mod delta_sc_errors;
+mod delta_sc_valid;
 mod edge_cases;
+mod fsv;
+mod helpers;
 mod property_based;

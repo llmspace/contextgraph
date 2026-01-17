@@ -39,9 +39,16 @@ pub enum PQ8QuantizationError {
     /// Insufficient training samples for codebook training.
     InsufficientSamples { required: usize, provided: usize },
     /// Sample dimension mismatch during training.
-    SampleDimensionMismatch { sample_idx: usize, expected: usize, got: usize },
+    SampleDimensionMismatch {
+        sample_idx: usize,
+        expected: usize,
+        got: usize,
+    },
     /// K-means clustering did not converge.
-    KMeansDidNotConverge { iterations: usize, max_iterations: usize },
+    KMeansDidNotConverge {
+        iterations: usize,
+        max_iterations: usize,
+    },
     /// IO error during codebook persistence.
     IoError { message: String },
     /// Deserialization error during codebook loading.
@@ -175,7 +182,10 @@ impl SimpleRng {
 
     pub fn next_u64(&mut self) -> u64 {
         // LCG parameters from Numerical Recipes
-        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.state = self
+            .state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         self.state
     }
 

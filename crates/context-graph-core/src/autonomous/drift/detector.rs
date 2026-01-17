@@ -4,9 +4,7 @@
 
 use chrono::Utc;
 
-use crate::teleological::{
-    Embedder, MatrixSearchConfig, SearchStrategy, TeleologicalComparator,
-};
+use crate::teleological::{Embedder, MatrixSearchConfig, SearchStrategy, TeleologicalComparator};
 use crate::types::SemanticFingerprint;
 
 use super::error::DriftError;
@@ -149,18 +147,12 @@ impl TeleologicalDriftDetector {
                         for (i, &v) in values.iter().enumerate() {
                             if v.is_nan() {
                                 return Err(DriftError::InvalidGoal {
-                                    reason: format!(
-                                        "NaN at index {} in {:?}",
-                                        i, embedder
-                                    ),
+                                    reason: format!("NaN at index {} in {:?}", i, embedder),
                                 });
                             }
                             if v.is_infinite() {
                                 return Err(DriftError::InvalidGoal {
-                                    reason: format!(
-                                        "Infinity at index {} in {:?}",
-                                        i, embedder
-                                    ),
+                                    reason: format!("Infinity at index {} in {:?}", i, embedder),
                                 });
                             }
                         }

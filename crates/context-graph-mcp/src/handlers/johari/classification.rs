@@ -241,7 +241,7 @@ impl Handlers {
 #[inline]
 fn classify_johari(delta_s: f32, delta_c: f32, threshold: f32) -> JohariQuadrant {
     match (delta_s < threshold, delta_c > threshold) {
-        (true, true) => JohariQuadrant::Open,    // Low surprise, high coherence
+        (true, true) => JohariQuadrant::Open, // Low surprise, high coherence
         (false, false) => JohariQuadrant::Blind, // High surprise, low coherence
         (true, false) => JohariQuadrant::Hidden, // Low surprise, low coherence
         (false, true) => JohariQuadrant::Unknown, // High surprise, high coherence
@@ -469,9 +469,21 @@ mod tests {
         let delta_c = json.get("delta_c").unwrap().as_f64().unwrap();
         let threshold = json.get("threshold").unwrap().as_f64().unwrap();
 
-        assert!((delta_s - 0.75).abs() < 1e-6, "delta_s mismatch: {}", delta_s);
-        assert!((delta_c - 0.85).abs() < 1e-6, "delta_c mismatch: {}", delta_c);
-        assert!((threshold - 0.5).abs() < 1e-6, "threshold mismatch: {}", threshold);
+        assert!(
+            (delta_s - 0.75).abs() < 1e-6,
+            "delta_s mismatch: {}",
+            delta_s
+        );
+        assert!(
+            (delta_c - 0.85).abs() < 1e-6,
+            "delta_c mismatch: {}",
+            delta_c
+        );
+        assert!(
+            (threshold - 0.5).abs() < 1e-6,
+            "threshold mismatch: {}",
+            threshold
+        );
     }
 
     // ========== CONSTITUTION COMPLIANCE TESTS ==========
@@ -493,7 +505,10 @@ mod tests {
         // Hidden: ΔS<0.5, ΔC<0.5 → GetNeighborhood
         let hidden = classify_johari(0.3, 0.3, 0.5);
         assert_eq!(hidden, JohariQuadrant::Hidden);
-        assert_eq!(get_suggested_action(hidden), SuggestedAction::GetNeighborhood);
+        assert_eq!(
+            get_suggested_action(hidden),
+            SuggestedAction::GetNeighborhood
+        );
 
         // Unknown: ΔS>0.5, ΔC>0.5 → EpistemicAction
         let unknown = classify_johari(0.7, 0.7, 0.5);
@@ -536,7 +551,10 @@ mod tests {
         // Result: (false, false) -> Blind quadrant
         let quadrant = classify_johari(0.5, 0.5, 0.5);
         assert_eq!(quadrant, JohariQuadrant::Blind);
-        assert_eq!(get_suggested_action(quadrant), SuggestedAction::TriggerDream);
+        assert_eq!(
+            get_suggested_action(quadrant),
+            SuggestedAction::TriggerDream
+        );
     }
 
     #[test]
@@ -571,7 +589,10 @@ mod tests {
         // With (0.6, 0.8): delta_s < 0.7 TRUE, delta_c > 0.7 TRUE -> Open
         let quadrant = classify_johari(0.6, 0.8, 0.7);
         assert_eq!(quadrant, JohariQuadrant::Open);
-        assert_eq!(get_suggested_action(quadrant), SuggestedAction::DirectRecall);
+        assert_eq!(
+            get_suggested_action(quadrant),
+            SuggestedAction::DirectRecall
+        );
 
         // Same values with default threshold would give Unknown
         let quadrant_default = classify_johari(0.6, 0.8, 0.5);
@@ -586,7 +607,10 @@ mod tests {
         // Result: Open quadrant
         let quadrant = classify_johari(0.499, 0.501, 0.5);
         assert_eq!(quadrant, JohariQuadrant::Open);
-        assert_eq!(get_suggested_action(quadrant), SuggestedAction::DirectRecall);
+        assert_eq!(
+            get_suggested_action(quadrant),
+            SuggestedAction::DirectRecall
+        );
     }
 
     #[test]
@@ -597,7 +621,10 @@ mod tests {
         // Result: Blind quadrant
         let quadrant = classify_johari(0.501, 0.499, 0.5);
         assert_eq!(quadrant, JohariQuadrant::Blind);
-        assert_eq!(get_suggested_action(quadrant), SuggestedAction::TriggerDream);
+        assert_eq!(
+            get_suggested_action(quadrant),
+            SuggestedAction::TriggerDream
+        );
     }
 
     #[test]

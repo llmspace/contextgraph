@@ -20,7 +20,9 @@ async fn test_07_purpose_query() {
         "content": "Purpose-aligned memory for testing goal alignment",
         "importance": 0.9
     });
-    handlers.dispatch(make_request("memory/store", 1, Some(store_params))).await;
+    handlers
+        .dispatch(make_request("memory/store", 1, Some(store_params)))
+        .await;
 
     // purpose/query requires a 13-element purpose_vector array
     // Each element is a float in [0.0, 1.0] representing alignment per embedder
@@ -32,9 +34,16 @@ async fn test_07_purpose_query() {
     let request = make_request("purpose/query", 2, Some(query_params));
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Should not have error: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Should not have error: {:?}",
+        response.error
+    );
     let result = response.result.expect("Should have result");
 
     println!("\n[VERIFICATION]");
@@ -43,7 +52,8 @@ async fn test_07_purpose_query() {
         if let Some(arr) = results.as_array() {
             println!("  Found {} results matching purpose vector", arr.len());
             for (i, r) in arr.iter().take(3).enumerate() {
-                println!("  [{}] id={}, alignment={}",
+                println!(
+                    "  [{}] id={}, alignment={}",
                     i,
                     r.get("id").unwrap_or(&json!("?")),
                     r.get("purpose_alignment").unwrap_or(&json!("?"))
@@ -53,7 +63,10 @@ async fn test_07_purpose_query() {
     }
 
     if let Some(meta) = result.get("query_metadata") {
-        println!("  search_time_ms: {}", meta.get("search_time_ms").unwrap_or(&json!("?")));
+        println!(
+            "  search_time_ms: {}",
+            meta.get("search_time_ms").unwrap_or(&json!("?"))
+        );
     }
 
     println!("\n[PASSED] purpose/query works correctly");
@@ -75,17 +88,30 @@ async fn test_08_utl_compute() {
     let request = make_request("utl/compute", 2, Some(compute_params));
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Should not have error: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Should not have error: {:?}",
+        response.error
+    );
     let result = response.result.expect("Should have result");
 
     println!("\n[VERIFICATION]");
-    println!("  learningScore: {}", result.get("learningScore").unwrap_or(&json!("?")));
+    println!(
+        "  learningScore: {}",
+        result.get("learningScore").unwrap_or(&json!("?"))
+    );
 
     // Verify learning score is in valid range [0.0, 1.0]
     if let Some(score) = result.get("learningScore").and_then(|v| v.as_f64()) {
-        assert!((0.0..=1.0).contains(&score), "Learning score should be in [0.0, 1.0]");
+        assert!(
+            (0.0..=1.0).contains(&score),
+            "Learning score should be in [0.0, 1.0]"
+        );
     }
 
     println!("\n[PASSED] utl/compute works correctly");
@@ -107,16 +133,35 @@ async fn test_09_utl_metrics() {
     let request = make_request("utl/metrics", 10, Some(metrics_params));
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Should not have error: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Should not have error: {:?}",
+        response.error
+    );
     let result = response.result.expect("Should have result");
 
     println!("\n[VERIFICATION]");
-    println!("  entropy: {}", result.get("entropy").unwrap_or(&json!("?")));
-    println!("  coherence: {}", result.get("coherence").unwrap_or(&json!("?")));
-    println!("  learningScore: {}", result.get("learningScore").unwrap_or(&json!("?")));
-    println!("  surprise: {}", result.get("surprise").unwrap_or(&json!("?")));
+    println!(
+        "  entropy: {}",
+        result.get("entropy").unwrap_or(&json!("?"))
+    );
+    println!(
+        "  coherence: {}",
+        result.get("coherence").unwrap_or(&json!("?"))
+    );
+    println!(
+        "  learningScore: {}",
+        result.get("learningScore").unwrap_or(&json!("?"))
+    );
+    println!(
+        "  surprise: {}",
+        result.get("surprise").unwrap_or(&json!("?"))
+    );
 
     println!("\n[PASSED] utl/metrics works correctly");
 }

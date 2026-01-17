@@ -287,8 +287,7 @@ fn test_load_wrong_shape() {
     .expect("Failed to create tensor view");
     tensors.insert(PROJECTION_TENSOR_NAME.to_string(), tensor_view);
 
-    let safetensors_bytes =
-        safetensors::serialize(&tensors, &None).expect("Failed to serialize");
+    let safetensors_bytes = safetensors::serialize(&tensors, &None).expect("Failed to serialize");
 
     // Write to file
     let weight_file = temp_dir.join(PROJECTION_WEIGHT_FILE);
@@ -549,14 +548,14 @@ fn test_project_method_signatures() {
 
     #[allow(clippy::type_complexity)]
     fn _assert_project_batch() {
-        let _: fn(
-            &ProjectionMatrix,
-            &[SparseVector],
-        ) -> Result<Vec<Vec<f32>>, ProjectionError> = ProjectionMatrix::project_batch;
+        let _: fn(&ProjectionMatrix, &[SparseVector]) -> Result<Vec<Vec<f32>>, ProjectionError> =
+            ProjectionMatrix::project_batch;
     }
 
     println!("VERIFIED: project(&self, &SparseVector) -> Result<Vec<f32>, ProjectionError>");
-    println!("VERIFIED: project_batch(&self, &[SparseVector]) -> Result<Vec<Vec<f32>>, ProjectionError>");
+    println!(
+        "VERIFIED: project_batch(&self, &[SparseVector]) -> Result<Vec<Vec<f32>>, ProjectionError>"
+    );
 }
 
 /// Verify no forbidden hash patterns in implementation
@@ -576,9 +575,7 @@ fn test_project_no_forbidden_patterns() {
         .lines()
         .filter(|line| {
             let trimmed = line.trim();
-            !trimmed.starts_with("//")
-                && !trimmed.starts_with("///")
-                && !trimmed.starts_with("*")
+            !trimmed.starts_with("//") && !trimmed.starts_with("///") && !trimmed.starts_with("*")
         })
         .collect();
     let code_only = code_lines.join("\n");
@@ -600,10 +597,7 @@ fn test_project_no_forbidden_patterns() {
     );
 
     println!("CHECKING: L2 normalization exists (sqrt)");
-    assert!(
-        source.contains("sqrt"),
-        "Missing sqrt for L2 normalization"
-    );
+    assert!(source.contains("sqrt"), "Missing sqrt for L2 normalization");
 
     println!("CHECKING: matmul operation exists");
     assert!(source.contains("matmul"), "Missing matmul operation");

@@ -200,8 +200,8 @@ impl Default for HyperbolicWalkConfig {
         Self {
             step_size: 0.1,
             max_steps: 100,
-            temperature: 2.0,              // Constitution mandated
-            min_blind_spot_distance: 0.7,  // Constitution: semantic_leap >= 0.7
+            temperature: 2.0,             // Constitution mandated
+            min_blind_spot_distance: 0.7, // Constitution: semantic_leap >= 0.7
             direction_samples: 8,
         }
     }
@@ -271,12 +271,7 @@ impl WalkStep {
     ///
     /// Panics if position is outside Poincare ball (norm >= 1.0).
     #[track_caller]
-    pub fn new(
-        position: [f32; 64],
-        direction: [f32; 64],
-        distance: f32,
-        index: usize,
-    ) -> Self {
+    pub fn new(position: [f32; 64], direction: [f32; 64], distance: f32, index: usize) -> Self {
         let norm_sq: f32 = position.iter().map(|x| x * x).sum();
         assert!(
             norm_sq < 1.0,
@@ -348,7 +343,10 @@ impl EntropyWindow {
     ///
     /// Tests MUST use real durations, not mocked time.
     pub fn with_params(window_duration: Duration, threshold: f32) -> Self {
-        assert!((0.0..=1.0).contains(&threshold), "threshold must be in [0.0, 1.0]");
+        assert!(
+            (0.0..=1.0).contains(&threshold),
+            "threshold must be in [0.0, 1.0]"
+        );
         let capacity = (window_duration.as_secs() + 1) as usize;
         Self {
             samples: VecDeque::with_capacity(capacity),
@@ -451,7 +449,9 @@ impl Default for EntropyWindow {
 /// Per constitution DREAM-001, DREAM-002, DREAM-003.
 ///
 /// # TECH-DREAM-PHASE-001
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum DreamPhase {
     /// NREM phase only: memory consolidation, pruning weak edges
@@ -524,7 +524,7 @@ impl GpuTriggerState {
     pub fn new() -> Self {
         Self {
             current_usage: 0.0,
-            threshold: 0.30,  // CORRECTED: Constitution says <30%, not 80%
+            threshold: 0.30, // CORRECTED: Constitution says <30%, not 80%
             samples: VecDeque::with_capacity(10),
             max_samples: 10,
             triggered: false,
@@ -820,14 +820,25 @@ mod tests {
         let config = HebbianConfig::default();
 
         // Constitution mandated values
-        assert_eq!(config.learning_rate, 0.01, "learning_rate must match constitution");
-        assert_eq!(config.weight_decay, 0.001, "weight_decay must match constitution");
-        assert_eq!(config.weight_floor, 0.05, "weight_floor must match constitution");
+        assert_eq!(
+            config.learning_rate, 0.01,
+            "learning_rate must match constitution"
+        );
+        assert_eq!(
+            config.weight_decay, 0.001,
+            "weight_decay must match constitution"
+        );
+        assert_eq!(
+            config.weight_floor, 0.05,
+            "weight_floor must match constitution"
+        );
         assert_eq!(config.weight_cap, 1.0, "weight_cap must match constitution");
 
         // CRITICAL: coupling_strength is 0.9, NOT 10.0
-        assert_eq!(config.coupling_strength, 0.9,
-            "coupling_strength must be 0.9 per constitution line 393, NOT 10.0");
+        assert_eq!(
+            config.coupling_strength, 0.9,
+            "coupling_strength must be 0.9 per constitution line 393, NOT 10.0"
+        );
     }
 
     #[test]
@@ -885,8 +896,14 @@ mod tests {
     fn test_hyperbolic_walk_config_constitution_compliance() {
         let config = HyperbolicWalkConfig::default();
 
-        assert_eq!(config.temperature, 2.0, "temperature must be 2.0 per constitution");
-        assert_eq!(config.min_blind_spot_distance, 0.7, "semantic_leap must be 0.7 per constitution");
+        assert_eq!(
+            config.temperature, 2.0,
+            "temperature must be 2.0 per constitution"
+        );
+        assert_eq!(
+            config.min_blind_spot_distance, 0.7,
+            "semantic_leap must be 0.7 per constitution"
+        );
     }
 
     #[test]
@@ -918,15 +935,20 @@ mod tests {
         // Wait for half the window duration
         thread::sleep(Duration::from_millis(25));
         window.push(0.85); // Still above threshold
-        assert!(!window.should_trigger(), "should not trigger at half window");
+        assert!(
+            !window.should_trigger(),
+            "should not trigger at half window"
+        );
 
         // Wait for remaining time plus margin
         thread::sleep(Duration::from_millis(30));
         window.push(0.9); // Still above threshold
 
         // Now we've had high entropy for ~55ms >= 50ms window
-        assert!(window.should_trigger(),
-            "should trigger after sustained high entropy for window duration");
+        assert!(
+            window.should_trigger(),
+            "should trigger after sustained high entropy for window duration"
+        );
     }
 
     #[test]
@@ -939,23 +961,33 @@ mod tests {
 
         // t=30: Drop below threshold - resets tracking
         window.push(0.5);
-        assert!(!window.should_trigger(), "should not trigger after dropping below threshold");
+        assert!(
+            !window.should_trigger(),
+            "should not trigger after dropping below threshold"
+        );
 
         // t=30: Resume high entropy - tracking restarts from here
         window.push(0.9);
-        assert!(!window.should_trigger(), "should not trigger immediately after resuming");
+        assert!(
+            !window.should_trigger(),
+            "should not trigger immediately after resuming"
+        );
 
         // t=60: Still not enough time since tracking restarted at t=30
         thread::sleep(Duration::from_millis(30));
         window.push(0.92);
-        assert!(!window.should_trigger(),
-            "should NOT trigger - only 30ms since tracking restarted");
+        assert!(
+            !window.should_trigger(),
+            "should NOT trigger - only 30ms since tracking restarted"
+        );
 
         // t=90: Now 60ms since tracking restarted at t=30 (60ms > 50ms window)
         thread::sleep(Duration::from_millis(30));
         window.push(0.95);
-        assert!(window.should_trigger(),
-            "should trigger after sustained high entropy following reset (60ms > 50ms window)");
+        assert!(
+            window.should_trigger(),
+            "should trigger after sustained high entropy following reset (60ms > 50ms window)"
+        );
     }
 
     #[test]
@@ -963,8 +995,10 @@ mod tests {
         let state = GpuTriggerState::new();
 
         // CRITICAL: threshold is 0.30, NOT 0.80
-        assert_eq!(state.threshold, 0.30,
-            "GPU threshold must be 0.30 per constitution line 398: 'gpu_usage: <30%'");
+        assert_eq!(
+            state.threshold, 0.30,
+            "GPU threshold must be 0.30 per constitution line 398: 'gpu_usage: <30%'"
+        );
     }
 
     #[test]
@@ -992,7 +1026,10 @@ mod tests {
         assert!(state.should_trigger());
 
         state.mark_triggered();
-        assert!(!state.should_trigger(), "should not trigger again until reset");
+        assert!(
+            !state.should_trigger(),
+            "should not trigger again until reset"
+        );
     }
 
     #[test]
@@ -1010,25 +1047,46 @@ mod tests {
     #[test]
     fn test_extended_trigger_reason_display() {
         assert_eq!(
-            ExtendedTriggerReason::Manual { phase: DreamPhase::FullCycle }.to_string(),
+            ExtendedTriggerReason::Manual {
+                phase: DreamPhase::FullCycle
+            }
+            .to_string(),
             "manual"
         );
         assert_eq!(
-            ExtendedTriggerReason::Manual { phase: DreamPhase::Nrem }.to_string(),
+            ExtendedTriggerReason::Manual {
+                phase: DreamPhase::Nrem
+            }
+            .to_string(),
             "manual(nrem)"
         );
         assert_eq!(
-            ExtendedTriggerReason::Manual { phase: DreamPhase::Rem }.to_string(),
+            ExtendedTriggerReason::Manual {
+                phase: DreamPhase::Rem
+            }
+            .to_string(),
             "manual(rem)"
         );
         assert_eq!(
             ExtendedTriggerReason::IdentityCritical { ic_value: 0.423 }.to_string(),
             "identity_critical(IC=0.423)"
         );
-        assert_eq!(ExtendedTriggerReason::IdleTimeout.to_string(), "idle_timeout");
-        assert_eq!(ExtendedTriggerReason::HighEntropy.to_string(), "high_entropy");
-        assert_eq!(ExtendedTriggerReason::GpuOverload.to_string(), "gpu_overload");
-        assert_eq!(ExtendedTriggerReason::MemoryPressure.to_string(), "memory_pressure");
+        assert_eq!(
+            ExtendedTriggerReason::IdleTimeout.to_string(),
+            "idle_timeout"
+        );
+        assert_eq!(
+            ExtendedTriggerReason::HighEntropy.to_string(),
+            "high_entropy"
+        );
+        assert_eq!(
+            ExtendedTriggerReason::GpuOverload.to_string(),
+            "gpu_overload"
+        );
+        assert_eq!(
+            ExtendedTriggerReason::MemoryPressure.to_string(),
+            "memory_pressure"
+        );
         assert_eq!(ExtendedTriggerReason::Scheduled.to_string(), "scheduled");
     }
 
@@ -1051,8 +1109,11 @@ mod tests {
         // Verify round-trip
         match deserialized {
             ExtendedTriggerReason::IdentityCritical { ic_value } => {
-                assert!((ic_value - 0.35).abs() < 0.001,
-                    "IC value should survive round-trip: got {}", ic_value);
+                assert!(
+                    (ic_value - 0.35).abs() < 0.001,
+                    "IC value should survive round-trip: got {}",
+                    ic_value
+                );
             }
             _ => panic!("Expected IdentityCritical variant"),
         }
@@ -1070,8 +1131,13 @@ mod tests {
 
         for (ic_value, expected) in test_cases {
             let reason = ExtendedTriggerReason::IdentityCritical { ic_value };
-            assert_eq!(reason.to_string(), expected,
-                "IC={} should display as {}", ic_value, expected);
+            assert_eq!(
+                reason.to_string(),
+                expected,
+                "IC={} should display as {}",
+                ic_value,
+                expected
+            );
         }
     }
 
@@ -1083,7 +1149,13 @@ mod tests {
 
         assert_eq!(a, b, "Same IC values should be equal");
         assert_ne!(a, c, "Different IC values should not be equal");
-        assert_ne!(a, ExtendedTriggerReason::Manual { phase: DreamPhase::FullCycle }, "Different variants should not be equal");
+        assert_ne!(
+            a,
+            ExtendedTriggerReason::Manual {
+                phase: DreamPhase::FullCycle
+            },
+            "Different variants should not be equal"
+        );
     }
 
     // ============================================================================
@@ -1106,19 +1178,28 @@ mod tests {
     fn test_dream_phase_from_str() {
         assert_eq!("nrem".parse::<DreamPhase>().unwrap(), DreamPhase::Nrem);
         assert_eq!("rem".parse::<DreamPhase>().unwrap(), DreamPhase::Rem);
-        assert_eq!("full_cycle".parse::<DreamPhase>().unwrap(), DreamPhase::FullCycle);
+        assert_eq!(
+            "full_cycle".parse::<DreamPhase>().unwrap(),
+            DreamPhase::FullCycle
+        );
     }
 
     #[test]
     fn test_dream_phase_from_str_case_insensitive() {
         assert_eq!("NREM".parse::<DreamPhase>().unwrap(), DreamPhase::Nrem);
         assert_eq!("REM".parse::<DreamPhase>().unwrap(), DreamPhase::Rem);
-        assert_eq!("Full_Cycle".parse::<DreamPhase>().unwrap(), DreamPhase::FullCycle);
+        assert_eq!(
+            "Full_Cycle".parse::<DreamPhase>().unwrap(),
+            DreamPhase::FullCycle
+        );
     }
 
     #[test]
     fn test_dream_phase_from_str_aliases() {
-        assert_eq!("fullcycle".parse::<DreamPhase>().unwrap(), DreamPhase::FullCycle);
+        assert_eq!(
+            "fullcycle".parse::<DreamPhase>().unwrap(),
+            DreamPhase::FullCycle
+        );
         assert_eq!("full".parse::<DreamPhase>().unwrap(), DreamPhase::FullCycle);
     }
 
@@ -1147,13 +1228,16 @@ mod tests {
 
     #[test]
     fn test_dream_phase_deserialization() {
-        let nrem: DreamPhase = serde_json::from_str("\"nrem\"").expect("deserialization should succeed");
+        let nrem: DreamPhase =
+            serde_json::from_str("\"nrem\"").expect("deserialization should succeed");
         assert_eq!(nrem, DreamPhase::Nrem);
 
-        let rem: DreamPhase = serde_json::from_str("\"rem\"").expect("deserialization should succeed");
+        let rem: DreamPhase =
+            serde_json::from_str("\"rem\"").expect("deserialization should succeed");
         assert_eq!(rem, DreamPhase::Rem);
 
-        let full: DreamPhase = serde_json::from_str("\"full_cycle\"").expect("deserialization should succeed");
+        let full: DreamPhase =
+            serde_json::from_str("\"full_cycle\"").expect("deserialization should succeed");
         assert_eq!(full, DreamPhase::FullCycle);
     }
 
@@ -1178,9 +1262,15 @@ mod tests {
 
     #[test]
     fn test_manual_trigger_with_phase() {
-        let manual_full = ExtendedTriggerReason::Manual { phase: DreamPhase::FullCycle };
-        let manual_nrem = ExtendedTriggerReason::Manual { phase: DreamPhase::Nrem };
-        let manual_rem = ExtendedTriggerReason::Manual { phase: DreamPhase::Rem };
+        let manual_full = ExtendedTriggerReason::Manual {
+            phase: DreamPhase::FullCycle,
+        };
+        let manual_nrem = ExtendedTriggerReason::Manual {
+            phase: DreamPhase::Nrem,
+        };
+        let manual_rem = ExtendedTriggerReason::Manual {
+            phase: DreamPhase::Rem,
+        };
 
         // Different phases should not be equal
         assert_ne!(manual_full, manual_nrem);
@@ -1188,13 +1278,17 @@ mod tests {
         assert_ne!(manual_nrem, manual_rem);
 
         // Same phases should be equal
-        let manual_full_2 = ExtendedTriggerReason::Manual { phase: DreamPhase::FullCycle };
+        let manual_full_2 = ExtendedTriggerReason::Manual {
+            phase: DreamPhase::FullCycle,
+        };
         assert_eq!(manual_full, manual_full_2);
     }
 
     #[test]
     fn test_manual_trigger_serialization_with_phase() {
-        let manual = ExtendedTriggerReason::Manual { phase: DreamPhase::Nrem };
+        let manual = ExtendedTriggerReason::Manual {
+            phase: DreamPhase::Nrem,
+        };
         let json = serde_json::to_string(&manual).expect("serialization should succeed");
 
         // Should contain Manual and nrem
@@ -1234,7 +1328,10 @@ mod tests {
         let mut metrics = valid_metrics();
         metrics.quality = f32::NAN;
         let result = metrics.validate();
-        assert!(matches!(result, Err(InvalidMetricsError::NaN { field: "quality" })));
+        assert!(matches!(
+            result,
+            Err(InvalidMetricsError::NaN { field: "quality" })
+        ));
     }
 
     #[test]
@@ -1242,7 +1339,10 @@ mod tests {
         let mut metrics = valid_metrics();
         metrics.coherence = f32::NAN;
         let result = metrics.validate();
-        assert!(matches!(result, Err(InvalidMetricsError::NaN { field: "coherence" })));
+        assert!(matches!(
+            result,
+            Err(InvalidMetricsError::NaN { field: "coherence" })
+        ));
     }
 
     #[test]
@@ -1250,7 +1350,10 @@ mod tests {
         let mut metrics = valid_metrics();
         metrics.quality = f32::INFINITY;
         let result = metrics.validate();
-        assert!(matches!(result, Err(InvalidMetricsError::Infinite { field: "quality" })));
+        assert!(matches!(
+            result,
+            Err(InvalidMetricsError::Infinite { field: "quality" })
+        ));
     }
 
     #[test]
@@ -1258,7 +1361,10 @@ mod tests {
         let mut metrics = valid_metrics();
         metrics.coherence = f32::NEG_INFINITY;
         let result = metrics.validate();
-        assert!(matches!(result, Err(InvalidMetricsError::Infinite { field: "coherence" })));
+        assert!(matches!(
+            result,
+            Err(InvalidMetricsError::Infinite { field: "coherence" })
+        ));
     }
 
     #[test]
@@ -1268,7 +1374,10 @@ mod tests {
         let result = metrics.validate();
         assert!(matches!(
             result,
-            Err(InvalidMetricsError::OutOfRange { field: "quality", .. })
+            Err(InvalidMetricsError::OutOfRange {
+                field: "quality",
+                ..
+            })
         ));
     }
 
@@ -1279,7 +1388,10 @@ mod tests {
         let result = metrics.validate();
         assert!(matches!(
             result,
-            Err(InvalidMetricsError::OutOfRange { field: "quality", .. })
+            Err(InvalidMetricsError::OutOfRange {
+                field: "quality",
+                ..
+            })
         ));
     }
 
@@ -1290,7 +1402,10 @@ mod tests {
         let result = metrics.validate();
         assert!(matches!(
             result,
-            Err(InvalidMetricsError::OutOfRange { field: "coherence", .. })
+            Err(InvalidMetricsError::OutOfRange {
+                field: "coherence",
+                ..
+            })
         ));
     }
 
@@ -1313,7 +1428,8 @@ mod tests {
     fn test_consolidation_metrics_serde_roundtrip() {
         let metrics = valid_metrics();
         let json = serde_json::to_string(&metrics).expect("serialization should succeed");
-        let deserialized: ConsolidationMetrics = serde_json::from_str(&json).expect("deserialization should succeed");
+        let deserialized: ConsolidationMetrics =
+            serde_json::from_str(&json).expect("deserialization should succeed");
         assert_eq!(metrics, deserialized);
     }
 

@@ -5,8 +5,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::error::CoreResult;
 use super::types::IdentityStatus;
+use crate::error::CoreResult;
 
 /// Tracks identity continuity over time
 ///

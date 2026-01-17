@@ -40,7 +40,11 @@ mod tests;
 pub use encoder::PQ8Encoder;
 pub use training::generate_realistic_embeddings;
 pub use types::{
-    KMeansConfig, NUM_CENTROIDS, NUM_SUBVECTORS, PQ8QuantizationError,
+    KMeansConfig,
+    PQ8QuantizationError,
     // Internal constants also re-exported for completeness
-    CODEBOOK_MAGIC, CODEBOOK_VERSION,
+    CODEBOOK_MAGIC,
+    CODEBOOK_VERSION,
+    NUM_CENTROIDS,
+    NUM_SUBVECTORS,
 };

@@ -114,8 +114,7 @@ async fn test_e2e_identity_continuity_across_sessions() {
     println!("Restoring from: {}", session1_id);
 
     // Start session 2 with previous_session_id
-    let start2_input =
-        create_claude_code_session_start_with_previous(&session2_id, &session1_id);
+    let start2_input = create_claude_code_session_start_with_previous(&session2_id, &session1_id);
     let start2_result = execute_hook_script(
         "session_start.sh",
         &start2_input,
@@ -165,9 +164,7 @@ async fn test_e2e_identity_continuity_across_sessions() {
                 "WARNING: IC drift exceeds expected threshold (0.3): {}",
                 ic_delta
             );
-            println!(
-                "This may indicate session identity restoration is not fully implemented"
-            );
+            println!("This may indicate session identity restoration is not fully implemented");
 
             // Check if drift metrics were returned (indicates restoration was attempted)
             if start2_result.drift_metrics().is_some() {
@@ -212,7 +209,10 @@ async fn test_e2e_identity_continuity_across_sessions() {
         let snapshot2 =
             load_snapshot_for_verification(db_path, &session2_id).expect("Snapshot 2 should exist");
 
-        println!("Session 2 previous_session_id: {:?}", snapshot2.previous_session_id);
+        println!(
+            "Session 2 previous_session_id: {:?}",
+            snapshot2.previous_session_id
+        );
 
         if snapshot2.previous_session_id.is_some() {
             assert_eq!(
@@ -405,12 +405,7 @@ async fn test_e2e_identity_chain_three_sessions() {
     if ic_values.len() >= 2 {
         for i in 1..ic_values.len() {
             let delta = (ic_values[i] - ic_values[i - 1]).abs();
-            println!(
-                "IC delta (session {} -> {}): {}",
-                i,
-                i + 1,
-                delta
-            );
+            println!("IC delta (session {} -> {}): {}", i, i + 1, delta);
             // Each transition should not cause too much drift
         }
     }

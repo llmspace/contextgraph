@@ -14,9 +14,9 @@
 //! - VERIFY: Assert expected outcomes
 //! - EVIDENCE: Print physical proof
 
+mod embedder_scores_fix;
+mod fail_fast_edge_cases;
 mod issue1_query_content;
 mod issue3_arch03_autonomous;
-mod fail_fast_edge_cases;
 mod positive_north_star;
-mod embedder_scores_fix;
 mod summary;

@@ -11,9 +11,9 @@ use context_graph_core::types::fingerprint::TeleologicalFingerprint;
 use context_graph_storage::teleological::{
     deserialize_e1_matryoshka_128, deserialize_purpose_vector,
     deserialize_teleological_fingerprint, e1_matryoshka_128_key, fingerprint_key,
-    purpose_vector_key, RocksDbTeleologicalStore, TeleologicalStoreConfig,
-    CF_E13_SPLADE_INVERTED, CF_E1_MATRYOSHKA_128, CF_FINGERPRINTS, CF_PURPOSE_VECTORS,
-    QUANTIZED_EMBEDDER_CFS, TELEOLOGICAL_CFS,
+    purpose_vector_key, RocksDbTeleologicalStore, TeleologicalStoreConfig, CF_E13_SPLADE_INVERTED,
+    CF_E1_MATRYOSHKA_128, CF_FINGERPRINTS, CF_PURPOSE_VECTORS, QUANTIZED_EMBEDDER_CFS,
+    TELEOLOGICAL_CFS,
 };
 use tempfile::TempDir;
 use uuid::Uuid;
@@ -64,7 +64,7 @@ async fn test_full_storage_pipeline_real_data() {
         include_deleted: false,
         johari_quadrant_filter: None,
         embedder_indices: vec![],
-        semantic_query: None, // No semantic query for this test
+        semantic_query: None,   // No semantic query for this test
         include_content: false, // TASK-CONTENT-005
     };
 

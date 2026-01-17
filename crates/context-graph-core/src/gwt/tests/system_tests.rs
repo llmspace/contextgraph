@@ -24,6 +24,10 @@ async fn test_gwt_system_has_trigger_manager_wired() {
     let system = GwtSystem::new().await.expect("GwtSystem creation failed");
     let tm = system.trigger_manager();
     let manager = tm.lock();
-    assert_eq!(manager.ic_threshold(), 0.5, "IC threshold must be 0.5 per Constitution");
+    assert_eq!(
+        manager.ic_threshold(),
+        0.5,
+        "IC threshold must be 0.5 per Constitution"
+    );
     assert!(manager.is_enabled(), "Triggers must be enabled by default");
 }

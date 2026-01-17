@@ -21,8 +21,8 @@ fn test_full_consolidation_workflow() {
         create_test_memory(embedding.clone(), "The fast brown fox", 0.83).with_access_count(3);
 
     // Create dissimilar memory
-    let mem3 = create_test_memory(vec![0.0, 0.0, 1.0], "Something unrelated", 0.90)
-        .with_access_count(10);
+    let mem3 =
+        create_test_memory(vec![0.0, 0.0, 1.0], "Something unrelated", 0.90).with_access_count(10);
 
     // Build pairs
     let pairs = vec![
@@ -91,8 +91,8 @@ fn test_edge_case_all_same_alignment() {
         .map(|i| create_test_memory(embedding.clone(), &format!("mem{}", i), 0.75))
         .collect();
 
-    let result = service
-        .compute_combined_alignment(&mems.iter().map(|m| m.alignment).collect::<Vec<_>>());
+    let result =
+        service.compute_combined_alignment(&mems.iter().map(|m| m.alignment).collect::<Vec<_>>());
     assert!((result - 0.75).abs() < f32::EPSILON);
 
     println!("[PASS] test_edge_case_all_same_alignment");

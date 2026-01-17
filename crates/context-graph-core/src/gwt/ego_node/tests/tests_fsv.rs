@@ -78,7 +78,9 @@ fn fsv_identity_continuity_monitor_complete_lifecycle() {
     assert_eq!(monitor.history_len(), 0);
     assert!(monitor.last_result().is_none());
 
-    let pv1 = [0.85, 0.78, 0.92, 0.67, 0.73, 0.61, 0.88, 0.75, 0.81, 0.69, 0.84, 0.72, 0.79];
+    let pv1 = [
+        0.85, 0.78, 0.92, 0.67, 0.73, 0.61, 0.88, 0.75, 0.81, 0.69, 0.84, 0.72, 0.79,
+    ];
     let result1 = monitor.compute_continuity(&pv1, 0.95, "Initial purpose alignment");
 
     assert!(monitor.is_first_vector());
@@ -86,14 +88,18 @@ fn fsv_identity_continuity_monitor_complete_lifecycle() {
     assert_eq!(result1.status, IdentityStatus::Healthy);
     assert!(!monitor.is_in_crisis());
 
-    let pv2 = [0.84, 0.77, 0.91, 0.68, 0.74, 0.62, 0.87, 0.74, 0.80, 0.70, 0.83, 0.71, 0.78];
+    let pv2 = [
+        0.84, 0.77, 0.91, 0.68, 0.74, 0.62, 0.87, 0.74, 0.80, 0.70, 0.83, 0.71, 0.78,
+    ];
     let result2 = monitor.compute_continuity(&pv2, 0.93, "Minor adjustment");
 
     assert!(!monitor.is_first_vector());
     assert!(result2.recent_continuity > 0.99);
     assert!(result2.identity_coherence > 0.9);
 
-    let pv4 = [0.2, 0.95, 0.3, 0.85, 0.25, 0.9, 0.35, 0.88, 0.28, 0.92, 0.32, 0.87, 0.29];
+    let pv4 = [
+        0.2, 0.95, 0.3, 0.85, 0.25, 0.9, 0.35, 0.88, 0.28, 0.92, 0.32, 0.87, 0.29,
+    ];
     monitor.compute_continuity(&pv4, 0.9, "Shifted");
     let result4 = monitor.compute_continuity(&pv4, 0.2, "Low consciousness");
 
@@ -103,7 +109,8 @@ fn fsv_identity_continuity_monitor_complete_lifecycle() {
     assert!(monitor.is_in_crisis());
 
     let serialized = bincode::serialize(&monitor).expect("serialize");
-    let restored: IdentityContinuityMonitor = bincode::deserialize(&serialized).expect("deserialize");
+    let restored: IdentityContinuityMonitor =
+        bincode::deserialize(&serialized).expect("deserialize");
 
     assert_eq!(restored.history_len(), monitor.history_len());
     assert_eq!(restored.identity_coherence(), monitor.identity_coherence());
@@ -149,8 +156,12 @@ fn fsv_identity_continuity_monitor_edge_cases() {
 
 #[test]
 fn fsv_cosine_similarity_13d_mathematical_properties() {
-    let a = [0.8, 0.7, 0.9, 0.6, 0.75, 0.65, 0.85, 0.72, 0.78, 0.68, 0.82, 0.71, 0.76];
-    let b = [0.5, 0.9, 0.3, 0.85, 0.4, 0.88, 0.35, 0.82, 0.45, 0.87, 0.38, 0.84, 0.42];
+    let a = [
+        0.8, 0.7, 0.9, 0.6, 0.75, 0.65, 0.85, 0.72, 0.78, 0.68, 0.82, 0.71, 0.76,
+    ];
+    let b = [
+        0.5, 0.9, 0.3, 0.85, 0.4, 0.88, 0.35, 0.82, 0.45, 0.87, 0.38, 0.84, 0.42,
+    ];
 
     let cos_ab = cosine_similarity_13d(&a, &b);
     let cos_ba = cosine_similarity_13d(&b, &a);

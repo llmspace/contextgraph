@@ -413,7 +413,9 @@ pub fn serialize_ego_node(ego: &SelfEgoNode) -> Vec<u8> {
              Error: {}. EgoNode ID: {:?}. Trajectory length: {}. \
              This indicates struct incompatibility with bincode 1.3. \
              Check that all fields implement Serialize correctly.",
-            e, ego.id, ego.identity_trajectory.len()
+            e,
+            ego.id,
+            ego.identity_trajectory.len()
         );
     });
 

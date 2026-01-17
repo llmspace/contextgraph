@@ -78,7 +78,10 @@ impl StandaloneSessionIdentityManager {
     /// * `Ok(Some(snapshot))` - Found and loaded
     /// * `Ok(None)` - Session not found
     /// * `Err` - Storage error
-    pub fn load_snapshot(&self, session_id: &str) -> StorageResult<Option<SessionIdentitySnapshot>> {
+    pub fn load_snapshot(
+        &self,
+        session_id: &str,
+    ) -> StorageResult<Option<SessionIdentitySnapshot>> {
         self.storage.load_snapshot(session_id)
     }
 
@@ -308,8 +311,9 @@ mod tests {
         snapshot.integration = 0.80;
         snapshot.differentiation = 0.70;
         snapshot.reflection = 0.65;
-        snapshot.purpose_vector =
-            [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.9, 0.8, 0.7];
+        snapshot.purpose_vector = [
+            0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.9, 0.8, 0.7,
+        ];
         snapshot.kuramoto_phases = [0.0; KURAMOTO_N];
         snapshot.last_ic = 0.85;
 
@@ -321,7 +325,10 @@ mod tests {
             "  kuramoto_phases[0..3]: {:?}",
             &snapshot.kuramoto_phases[..3]
         );
-        println!("  purpose_vector[0..3]: {:?}", &snapshot.purpose_vector[..3]);
+        println!(
+            "  purpose_vector[0..3]: {:?}",
+            &snapshot.purpose_vector[..3]
+        );
 
         // Save the snapshot
         manager
@@ -383,10 +390,7 @@ mod tests {
             .expect("restore_identity must succeed");
 
         // VERIFY: Cache is now warm (was updated by restore_identity)
-        assert!(
-            IdentityCache::is_warm(),
-            "Cache must be warm after restore"
-        );
+        assert!(IdentityCache::is_warm(), "Cache must be warm after restore");
 
         let (cached_ic, _cached_r, _cached_state, cached_session) =
             IdentityCache::get().expect("Cache must return values after restore");

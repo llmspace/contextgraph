@@ -13,8 +13,8 @@
 //! 3. Call handler via MCP dispatch
 //! 4. Verify output matches expected computation from stored data
 
-mod helpers;
-mod steering;
-mod pruning;
 mod consolidation;
+mod helpers;
+mod pruning;
 mod rocksdb_verification;
+mod steering;

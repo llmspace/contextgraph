@@ -134,11 +134,15 @@ fn test_identity_continuity_monitor_real_drift() {
     let mut monitor = IdentityContinuityMonitor::new_for_testing();
 
     // First vector - realistic purpose vector
-    let pv1 = [0.9, 0.85, 0.92, 0.8, 0.88, 0.75, 0.95, 0.82, 0.87, 0.78, 0.91, 0.83, 0.86];
+    let pv1 = [
+        0.9, 0.85, 0.92, 0.8, 0.88, 0.75, 0.95, 0.82, 0.87, 0.78, 0.91, 0.83, 0.86,
+    ];
     monitor.compute_continuity(&pv1, 0.95, "Aligned");
 
     // Second vector - shifted purpose (some dimensions change)
-    let pv2 = [0.3, 0.25, 0.32, 0.9, 0.88, 0.95, 0.25, 0.92, 0.17, 0.98, 0.21, 0.93, 0.16];
+    let pv2 = [
+        0.3, 0.25, 0.32, 0.9, 0.88, 0.95, 0.25, 0.92, 0.17, 0.98, 0.21, 0.93, 0.16,
+    ];
     let result = monitor.compute_continuity(&pv2, 0.9, "Shifted");
 
     // These vectors have different patterns, so cos < 1.0

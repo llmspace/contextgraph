@@ -64,9 +64,9 @@ pub use column_families::{
     autonomous_config_cf_options,
     autonomous_lineage_cf_options,
     consolidation_history_cf_options,
-    memory_curation_cf_options,
     // Descriptor getter
     get_autonomous_cf_descriptors,
+    memory_curation_cf_options,
     // CF arrays and counts
     AUTONOMOUS_CFS,
     AUTONOMOUS_CF_COUNT,
@@ -85,13 +85,13 @@ pub use schema::{
     // Autonomous lineage keys
     autonomous_lineage_key,
     autonomous_lineage_timestamp_prefix,
-    parse_autonomous_lineage_key,
     // Consolidation history keys
     consolidation_history_key,
     consolidation_history_timestamp_prefix,
-    parse_consolidation_history_key,
     // Memory curation keys
     memory_curation_key,
+    parse_autonomous_lineage_key,
+    parse_consolidation_history_key,
     parse_memory_curation_key,
     // Singleton key constants
     ADAPTIVE_THRESHOLD_STATE_KEY,

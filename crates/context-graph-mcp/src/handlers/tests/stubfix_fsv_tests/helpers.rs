@@ -30,7 +30,11 @@ pub(crate) const NUM_EMBEDDERS: usize = 13;
 /// - content: Used to generate content hash and embeddings deterministically
 /// - theta: The alignment_score alignment value [0.0, 1.0]
 /// - access_count: Number of times this fingerprint has been accessed
-pub(crate) fn create_test_fingerprint(content: &str, theta: f32, access_count: u64) -> TeleologicalFingerprint {
+pub(crate) fn create_test_fingerprint(
+    content: &str,
+    theta: f32,
+    access_count: u64,
+) -> TeleologicalFingerprint {
     let content_hash = {
         let mut hasher = Sha256::new();
         hasher.update(content.as_bytes());
@@ -84,7 +88,11 @@ pub(crate) fn create_test_semantic(hash: &[u8; 32]) -> SemanticFingerprint {
 
     // E12: Late interaction - 10 tokens
     let e12_late_interaction: Vec<Vec<f32>> = (0..10)
-        .map(|t| (0..E12_TOKEN_DIM).map(|i| seed(i + t * 128 + 11000)).collect())
+        .map(|t| {
+            (0..E12_TOKEN_DIM)
+                .map(|i| seed(i + t * 128 + 11000))
+                .collect()
+        })
         .collect();
 
     // Sparse vectors

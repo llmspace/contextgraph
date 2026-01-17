@@ -48,12 +48,12 @@ pub mod ego_node;
 pub mod listeners;
 pub mod meta_cognitive;
 pub mod meta_learning_trait;
+pub mod session_identity;
 pub mod state_machine;
 mod system;
 mod system_awareness;
 mod system_kuramoto;
 pub mod workspace;
-pub mod session_identity;
 
 #[cfg(test)]
 mod tests;
@@ -84,12 +84,14 @@ pub use meta_cognitive::{MetaCognitiveLoop, MetaCognitiveState};
 
 // Re-export from meta_learning_trait - TASK-METAUTL-P0-006
 pub use meta_learning_trait::{
-    EnhancedMetaCognitiveState, LambdaValues, MetaCallbackStatus, MetaDomain,
-    MetaLambdaAdjustment, MetaLearningCallback, NoOpMetaLearningCallback,
+    EnhancedMetaCognitiveState, LambdaValues, MetaCallbackStatus, MetaDomain, MetaLambdaAdjustment,
+    MetaLearningCallback, NoOpMetaLearningCallback,
 };
 
 // Re-export from state_machine
-pub use state_machine::{ConsciousnessState, StateMachineManager, StateTransition, TransitionAnalysis};
+pub use state_machine::{
+    ConsciousnessState, StateMachineManager, StateTransition, TransitionAnalysis,
+};
 
 // Re-export from workspace
 pub use workspace::{
@@ -99,9 +101,9 @@ pub use workspace::{
 
 // Re-export from session_identity
 pub use session_identity::{
-    classify_ic, classify_sync, clear_cache, compute_ic, compute_kuramoto_r,
-    is_ic_crisis, is_ic_warning, update_cache, IdentityCache,
-    SessionIdentityManager, SessionIdentitySnapshot, MAX_TRAJECTORY_LEN,
+    classify_ic, classify_sync, clear_cache, compute_ic, compute_kuramoto_r, is_ic_crisis,
+    is_ic_warning, update_cache, IdentityCache, SessionIdentityManager, SessionIdentitySnapshot,
+    MAX_TRAJECTORY_LEN,
 };
 // Note: KURAMOTO_N is already exported from layers module
 

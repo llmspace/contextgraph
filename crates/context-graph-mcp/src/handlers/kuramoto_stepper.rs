@@ -74,7 +74,9 @@ pub struct KuramotoStepperConfig {
 
 impl Default for KuramotoStepperConfig {
     fn default() -> Self {
-        Self { step_interval_ms: 10 }
+        Self {
+            step_interval_ms: 10,
+        }
     }
 }
 
@@ -155,10 +157,7 @@ impl KuramotoStepper {
     ///
     /// * `network` - Arc-wrapped Kuramoto provider with parking_lot RwLock
     /// * `config` - Stepper configuration (step interval, etc.)
-    pub fn new(
-        network: Arc<RwLock<dyn KuramotoProvider>>,
-        config: KuramotoStepperConfig,
-    ) -> Self {
+    pub fn new(network: Arc<RwLock<dyn KuramotoProvider>>, config: KuramotoStepperConfig) -> Self {
         Self {
             network,
             config,
@@ -206,10 +205,7 @@ impl KuramotoStepper {
 
         self.task_handle = Some(handle);
 
-        tracing::info!(
-            interval_ms = interval_ms,
-            "Kuramoto stepper started"
-        );
+        tracing::info!(interval_ms = interval_ms, "Kuramoto stepper started");
 
         Ok(())
     }
@@ -382,7 +378,11 @@ mod tests {
 
         println!("STATE: is_running = {}", stepper.is_running());
         assert!(!stepper.is_running(), "New stepper should not be running");
-        assert_eq!(stepper.step_interval_ms(), 10, "Default interval should be 10ms");
+        assert_eq!(
+            stepper.step_interval_ms(),
+            10,
+            "Default interval should be 10ms"
+        );
 
         println!("EVIDENCE: new() creates stepper in stopped state");
     }
@@ -401,7 +401,10 @@ mod tests {
         // START
         stepper.start().expect("start must succeed");
         println!("AFTER START: is_running = {}", stepper.is_running());
-        assert!(stepper.is_running(), "Stepper should be running after start");
+        assert!(
+            stepper.is_running(),
+            "Stepper should be running after start"
+        );
 
         // Let it run briefly
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -409,7 +412,10 @@ mod tests {
         // STOP
         stepper.stop().await.expect("stop must succeed");
         println!("AFTER STOP: is_running = {}", stepper.is_running());
-        assert!(!stepper.is_running(), "Stepper should not be running after stop");
+        assert!(
+            !stepper.is_running(),
+            "Stepper should not be running after stop"
+        );
 
         println!("EVIDENCE: start/stop lifecycle works correctly");
     }
@@ -433,7 +439,11 @@ mod tests {
             let net = network.read();
             net.order_parameter().0
         };
-        println!("STATE BEFORE: r = {:.4}, is_running = {}", initial_r, stepper.is_running());
+        println!(
+            "STATE BEFORE: r = {:.4}, is_running = {}",
+            initial_r,
+            stepper.is_running()
+        );
         assert!(!stepper.is_running());
 
         // === EXECUTE ===
@@ -452,7 +462,11 @@ mod tests {
         println!("STATE AFTER 500ms: r = {:.4}", after_r);
 
         // r should be valid (within bounds)
-        assert!((0.0..=1.0).contains(&after_r), "r must be valid: {}", after_r);
+        assert!(
+            (0.0..=1.0).contains(&after_r),
+            "r must be valid: {}",
+            after_r
+        );
 
         // === STOP ===
         stepper.stop().await.expect("stop must succeed");
@@ -522,7 +536,9 @@ mod tests {
         println!("\n=== EDGE CASE 3: Zero Interval ===");
 
         let network = create_test_network();
-        let config = KuramotoStepperConfig { step_interval_ms: 0 };
+        let config = KuramotoStepperConfig {
+            step_interval_ms: 0,
+        };
         let mut stepper = KuramotoStepper::new(network, config);
 
         println!("BEFORE: step_interval_ms = {}", stepper.step_interval_ms());
@@ -577,7 +593,9 @@ mod tests {
         let network: Arc<RwLock<dyn KuramotoProvider>> =
             Arc::new(RwLock::new(KuramotoProviderImpl::synchronized()));
 
-        let config = KuramotoStepperConfig { step_interval_ms: 5 }; // Fast stepping
+        let config = KuramotoStepperConfig {
+            step_interval_ms: 5,
+        }; // Fast stepping
         let mut stepper = KuramotoStepper::new(Arc::clone(&network), config);
 
         // Get initial r
@@ -629,7 +647,10 @@ mod tests {
                     let net = network_clone.read();
                     net.order_parameter().0
                 };
-                assert!((0.0..=1.0).contains(&r), "r must be valid during concurrent read");
+                assert!(
+                    (0.0..=1.0).contains(&r),
+                    "r must be valid during concurrent read"
+                );
                 if i % 5 == 0 {
                     println!("  Concurrent read {}: r = {:.4}", i, r);
                 }
@@ -654,7 +675,9 @@ mod tests {
 
         let mut stepper = KuramotoStepper::new(
             Arc::clone(&network),
-            KuramotoStepperConfig { step_interval_ms: 10 },
+            KuramotoStepperConfig {
+                step_interval_ms: 10,
+            },
         );
 
         let initial_elapsed = {
@@ -707,6 +730,7 @@ mod tests {
         // SETUP: Create real Handlers with all GWT providers
         // Uses the standard stub implementations that implement full trait contracts
         // ====================================================================
+        use crate::handlers::core::MetaUtlTracker;
         use crate::handlers::Handlers;
         use context_graph_core::alignment::DefaultAlignmentCalculator;
         use context_graph_core::johari::DynDefaultJohariManager;
@@ -718,7 +742,6 @@ mod tests {
         use context_graph_core::traits::{
             MultiArrayEmbeddingProvider, TeleologicalMemoryStore, UtlProcessor,
         };
-        use crate::handlers::core::MetaUtlTracker;
 
         // Use proper stubs from context_graph_core::stubs
         let teleological_store: Arc<dyn TeleologicalMemoryStore> =
@@ -728,8 +751,9 @@ mod tests {
             Arc::new(StubMultiArrayProvider::new());
         let alignment_calculator = Arc::new(DefaultAlignmentCalculator::new());
         let goal_hierarchy = Arc::new(parking_lot::RwLock::new(GoalHierarchy::new()));
-        let johari_manager: Arc<dyn context_graph_core::johari::JohariTransitionManager> =
-            Arc::new(DynDefaultJohariManager::new(Arc::clone(&teleological_store)));
+        let johari_manager: Arc<dyn context_graph_core::johari::JohariTransitionManager> = Arc::new(
+            DynDefaultJohariManager::new(Arc::clone(&teleological_store)),
+        );
         let meta_utl_tracker = Arc::new(parking_lot::RwLock::new(MetaUtlTracker::new()));
         let system_monitor: Arc<dyn context_graph_core::SystemMonitor> =
             Arc::new(StubSystemMonitor);
@@ -801,7 +825,10 @@ mod tests {
         let double_start_result = handlers.start_kuramoto_stepper();
         println!("DOUBLE START RESULT: {:?}", double_start_result);
         assert!(
-            matches!(double_start_result, Err(KuramotoStepperError::AlreadyRunning)),
+            matches!(
+                double_start_result,
+                Err(KuramotoStepperError::AlreadyRunning)
+            ),
             "Double start should return AlreadyRunning error"
         );
 

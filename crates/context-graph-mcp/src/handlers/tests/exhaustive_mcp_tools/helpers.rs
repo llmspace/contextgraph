@@ -6,7 +6,10 @@ use crate::handlers::tests::{extract_mcp_tool_data, make_request};
 use crate::protocol::JsonRpcId;
 
 /// Make a tools/call request with given tool name and arguments.
-pub fn make_tool_call(tool_name: &str, arguments: serde_json::Value) -> crate::protocol::JsonRpcRequest {
+pub fn make_tool_call(
+    tool_name: &str,
+    arguments: serde_json::Value,
+) -> crate::protocol::JsonRpcRequest {
     make_request(
         "tools/call",
         Some(JsonRpcId::Number(1)),
@@ -50,7 +53,11 @@ pub fn assert_tool_error(response: &crate::protocol::JsonRpcResponse, tool_name:
         .get("isError")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
-    assert!(is_error, "{} should have isError=true for errors", tool_name);
+    assert!(
+        is_error,
+        "{} should have isError=true for errors",
+        tool_name
+    );
 }
 
 /// Extract the data from a successful MCP tool response.

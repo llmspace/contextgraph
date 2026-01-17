@@ -318,7 +318,10 @@ mod tests {
 
     #[test]
     fn test_quantization_error_codes() {
-        assert_eq!(QuantizationError::NaN { index: 0 }.code(), "E_E12_QUANT_001");
+        assert_eq!(
+            QuantizationError::NaN { index: 0 }.code(),
+            "E_E12_QUANT_001"
+        );
         assert_eq!(
             QuantizationError::Infinity {
                 index: 0,

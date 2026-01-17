@@ -83,12 +83,7 @@ pub trait EmbedderEntropy: Send + Sync {
     /// # Errors
     /// - `UtlError::EmptyInput` if current embedding is empty
     /// - `UtlError::EntropyError` for computation failures
-    fn compute_delta_s(
-        &self,
-        current: &[f32],
-        history: &[Vec<f32>],
-        k: usize,
-    ) -> UtlResult<f32>;
+    fn compute_delta_s(&self, current: &[f32], history: &[Vec<f32>], k: usize) -> UtlResult<f32>;
 
     /// Get the embedder type this calculator handles.
     fn embedder_type(&self) -> Embedder;
@@ -157,7 +152,7 @@ mod tests {
                 Embedder::Code => vec![0.5f32; 1536],
                 Embedder::Emotional | Embedder::Entity => vec![0.5f32; 384],
                 Embedder::Sparse | Embedder::KeywordSplade => vec![0.5f32; 100], // Sparse test
-                Embedder::LateInteraction => vec![0.5f32; 128], // Token-level
+                Embedder::LateInteraction => vec![0.5f32; 128],                  // Token-level
             };
 
             let history: Vec<Vec<f32>> = vec![];

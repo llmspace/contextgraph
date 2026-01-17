@@ -5,9 +5,7 @@
 //! - K-means++ initialization for better convergence
 //! - Synthetic embedding generation for testing
 
-use super::types::{
-    KMeansConfig, SimpleRng, NUM_CENTROIDS, NUM_SUBVECTORS, PQ8QuantizationError,
-};
+use super::types::{KMeansConfig, PQ8QuantizationError, SimpleRng, NUM_CENTROIDS, NUM_SUBVECTORS};
 use crate::quantization::types::PQ8Codebook;
 use tracing::{debug, info, warn};
 
@@ -57,9 +55,7 @@ impl PQ8Codebook {
 
         let embedding_dim = samples[0].len();
         if !embedding_dim.is_multiple_of(NUM_SUBVECTORS) {
-            return Err(PQ8QuantizationError::DimensionNotDivisible {
-                dim: embedding_dim,
-            });
+            return Err(PQ8QuantizationError::DimensionNotDivisible { dim: embedding_dim });
         }
 
         // Validate all samples have same dimension

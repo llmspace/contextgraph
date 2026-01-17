@@ -1,6 +1,8 @@
 //! Validation methods for SynergyMatrix.
 
-use crate::teleological::comparison_error::{ComparisonValidationError, ComparisonValidationResult};
+use crate::teleological::comparison_error::{
+    ComparisonValidationError, ComparisonValidationResult,
+};
 
 use super::constants::SYNERGY_DIM;
 use super::types::SynergyMatrix;

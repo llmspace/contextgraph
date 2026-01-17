@@ -33,11 +33,11 @@
 //! }
 //! ```
 
-mod types;
-mod error;
 mod detector;
+mod error;
 mod history;
 mod recommendations;
+mod types;
 
 #[cfg(test)]
 mod tests;
@@ -46,23 +46,23 @@ mod tests;
 pub use types::{
     // Legacy types (NORTH-010/011)
     DriftConfig,
-    DriftMonitoring,
-    DriftSeverity,
     DriftDataPoint,
-    DriftState,
     // Core types (TASK-LOGIC-010)
     DriftLevel,
-    DriftTrend,
-    DriftThresholds,
+    DriftMonitoring,
     // Result types
     DriftResult,
+    DriftSeverity,
+    DriftState,
+    DriftThresholds,
+    DriftTrend,
+    EmbedderDriftInfo,
     OverallDrift,
     PerEmbedderDrift,
-    EmbedderDriftInfo,
+    MAX_MOST_DRIFTED,
+    MIN_TREND_SAMPLES,
     // Constants
     NUM_EMBEDDERS,
-    MIN_TREND_SAMPLES,
-    MAX_MOST_DRIFTED,
 };
 
 pub use error::DriftError;

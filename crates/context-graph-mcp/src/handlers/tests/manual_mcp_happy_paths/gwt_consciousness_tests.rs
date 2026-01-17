@@ -18,7 +18,10 @@ async fn test_16_gwt_consciousness_level() {
     let request = make_request("gwt/consciousness_level", 1, None);
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
     // This may return an error if GWT is not initialized - that's OK
     if response.error.is_some() {
@@ -44,7 +47,10 @@ async fn test_17_consciousness_get_state() {
     let request = make_request("consciousness/get_state", 1, None);
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
     // This may return an error if consciousness subsystem is not initialized
     if response.error.is_some() {

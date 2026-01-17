@@ -25,16 +25,16 @@ const PRODUCTION_DB_PATH: &str = "/home/cabdru/contextgraph/contextgraph_data";
 const NUM_EMBEDDERS: usize = 13;
 
 /// Embedding dimensions from semantic/constants.rs
-const E1_DIM: usize = 1024;  // Semantic
-const E2_DIM: usize = 512;   // Temporal Recent
-const E3_DIM: usize = 512;   // Temporal Periodic
-const E4_DIM: usize = 512;   // Temporal Positional
-const E5_DIM: usize = 768;   // Causal
-const E7_DIM: usize = 1536;  // Code
-const E8_DIM: usize = 384;   // Graph
-const E9_DIM: usize = 1024;  // HDC
-const E10_DIM: usize = 768;  // Multimodal
-const E11_DIM: usize = 384;  // Entity
+const E1_DIM: usize = 1024; // Semantic
+const E2_DIM: usize = 512; // Temporal Recent
+const E3_DIM: usize = 512; // Temporal Periodic
+const E4_DIM: usize = 512; // Temporal Positional
+const E5_DIM: usize = 768; // Causal
+const E7_DIM: usize = 1536; // Code
+const E8_DIM: usize = 384; // Graph
+const E9_DIM: usize = 1024; // HDC
+const E10_DIM: usize = 768; // Multimodal
+const E11_DIM: usize = 384; // Entity
 const E12_TOKEN_DIM: usize = 128; // Per-token dimension
 
 /// Synthetic test data - 10 memories covering diverse AI/ML topics
@@ -165,7 +165,11 @@ fn create_synthetic_semantic(content: &str, hash: &[u8; 32]) -> SemanticFingerpr
     // E12: Late interaction (ColBERT-style) - multiple token vectors 128D each
     let num_tokens = content.split_whitespace().count().min(64);
     let e12_late_interaction: Vec<Vec<f32>> = (0..num_tokens)
-        .map(|t| (0..E12_TOKEN_DIM).map(|i| seed(i + t * 128 + 11000)).collect())
+        .map(|t| {
+            (0..E12_TOKEN_DIM)
+                .map(|i| seed(i + t * 128 + 11000))
+                .collect()
+        })
         .collect();
 
     // E13: SPLADE sparse (u16 indices)
@@ -230,19 +234,19 @@ fn create_synthetic_purpose_vector(topic: &str) -> PurposeVector {
 
     // Create varied alignments per embedder (13 embedders)
     let alignments: [f32; NUM_EMBEDDERS] = [
-        alignment_seed * 0.9,         // E1 semantic
-        alignment_seed * 0.7,         // E2 temporal recent
-        alignment_seed * 0.65,        // E3 temporal periodic
-        alignment_seed * 0.6,         // E4 temporal positional
-        alignment_seed * 0.75,        // E5 causal
-        alignment_seed * 0.5,         // E6 sparse
-        alignment_seed * 0.8,         // E7 code
-        alignment_seed * 0.7,         // E8 graph
-        alignment_seed * 0.4,         // E9 hdc
-        alignment_seed * 0.55,        // E10 multimodal
-        alignment_seed * 0.6,         // E11 entity
-        alignment_seed * 0.85,        // E12 late interaction
-        alignment_seed * 0.5,         // E13 splade
+        alignment_seed * 0.9,  // E1 semantic
+        alignment_seed * 0.7,  // E2 temporal recent
+        alignment_seed * 0.65, // E3 temporal periodic
+        alignment_seed * 0.6,  // E4 temporal positional
+        alignment_seed * 0.75, // E5 causal
+        alignment_seed * 0.5,  // E6 sparse
+        alignment_seed * 0.8,  // E7 code
+        alignment_seed * 0.7,  // E8 graph
+        alignment_seed * 0.4,  // E9 hdc
+        alignment_seed * 0.55, // E10 multimodal
+        alignment_seed * 0.6,  // E11 entity
+        alignment_seed * 0.85, // E12 late interaction
+        alignment_seed * 0.5,  // E13 splade
     ];
 
     // Use the constructor which computes dominant_embedder and coherence
@@ -274,11 +278,17 @@ async fn inject_synthetic_production() {
     let store: Arc<dyn TeleologicalMemoryStore> = Arc::new(store);
 
     // Get count BEFORE injection
-    let count_before = store.count().await.expect("Failed to count before injection");
+    let count_before = store
+        .count()
+        .await
+        .expect("Failed to count before injection");
     println!("[BEFORE] Fingerprint count: {}", count_before);
 
     // Inject all synthetic memories
-    println!("\n[INJECTING] {} synthetic memories:", SYNTHETIC_MEMORIES.len());
+    println!(
+        "\n[INJECTING] {} synthetic memories:",
+        SYNTHETIC_MEMORIES.len()
+    );
     let mut stored_ids: Vec<uuid::Uuid> = Vec::new();
 
     for (i, (topic, content)) in SYNTHETIC_MEMORIES.iter().enumerate() {
@@ -303,7 +313,10 @@ async fn inject_synthetic_production() {
     }
 
     // Get count AFTER injection
-    let count_after = store.count().await.expect("Failed to count after injection");
+    let count_after = store
+        .count()
+        .await
+        .expect("Failed to count after injection");
     println!("\n[AFTER] Fingerprint count: {}", count_after);
     println!("  Added: {} fingerprints", count_after - count_before);
 

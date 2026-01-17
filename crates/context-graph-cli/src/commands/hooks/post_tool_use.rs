@@ -173,7 +173,10 @@ fn parse_stdin() -> HookResult<HookInput> {
         return Err(HookError::invalid_input("stdin is empty - expected JSON"));
     }
 
-    debug!(input_bytes = input_str.len(), "POST_TOOL: parsing stdin JSON");
+    debug!(
+        input_bytes = input_str.len(),
+        "POST_TOOL: parsing stdin JSON"
+    );
 
     serde_json::from_str(&input_str).map_err(|e| {
         error!(error = %e, "POST_TOOL: JSON parse failed");
@@ -251,7 +254,10 @@ fn open_storage(db_path: &Path) -> HookResult<Arc<RocksDbMemex>> {
 }
 
 /// Load snapshot for session. FAIL FAST if not found.
-fn load_snapshot(memex: &Arc<RocksDbMemex>, session_id: &str) -> HookResult<SessionIdentitySnapshot> {
+fn load_snapshot(
+    memex: &Arc<RocksDbMemex>,
+    session_id: &str,
+) -> HookResult<SessionIdentitySnapshot> {
     match memex.load_snapshot(session_id) {
         Ok(Some(snapshot)) => {
             info!(session_id = %session_id, ic = snapshot.last_ic, "POST_TOOL: loaded snapshot");
@@ -484,7 +490,10 @@ mod tests {
         println!("AFTER state: IC={}", after_snapshot.last_ic);
 
         // Read tool should have minimal positive impact
-        println!("RESULT: PASS - Tool processed, IC changed from 0.85 to {}", after_snapshot.last_ic);
+        println!(
+            "RESULT: PASS - Tool processed, IC changed from 0.85 to {}",
+            after_snapshot.last_ic
+        );
     }
 
     // =========================================================================
@@ -508,7 +517,7 @@ mod tests {
             db_path: Some(db_path.clone()),
             session_id: session_id.to_string(),
             tool_name: Some("Bash".to_string()),
-            success: Some(false),  // Tool failed
+            success: Some(false), // Tool failed
             stdin: false,
             format: OutputFormat::Json,
         };
@@ -518,13 +527,20 @@ mod tests {
         // AFTER: Verify crisis triggered
         assert!(result.is_err(), "Should return error for crisis");
         let err = result.unwrap_err();
-        assert!(matches!(err, HookError::CrisisTriggered(_)), "Must be CrisisTriggered, got: {:?}", err);
+        assert!(
+            matches!(err, HookError::CrisisTriggered(_)),
+            "Must be CrisisTriggered, got: {:?}",
+            err
+        );
         assert_eq!(err.exit_code(), 6, "Crisis must be exit code 6");
 
         // Verify database still has the snapshot (for auditing)
         let memex = RocksDbMemex::open(&db_path).expect("DB must open");
         let snapshot = memex.load_snapshot(session_id).unwrap();
-        assert!(snapshot.is_some(), "Snapshot must be preserved even in crisis");
+        assert!(
+            snapshot.is_some(),
+            "Snapshot must be preserved even in crisis"
+        );
 
         println!("RESULT: PASS - Crisis detected, exit code 6 returned");
     }
@@ -554,7 +570,11 @@ mod tests {
         // Verify error
         assert!(result.is_err(), "Should return error for missing session");
         let err = result.unwrap_err();
-        assert!(matches!(err, HookError::SessionNotFound(_)), "Must be SessionNotFound, got: {:?}", err);
+        assert!(
+            matches!(err, HookError::SessionNotFound(_)),
+            "Must be SessionNotFound, got: {:?}",
+            err
+        );
         assert_eq!(err.exit_code(), 5, "SessionNotFound must be exit code 5");
 
         println!("RESULT: PASS - SessionNotFound error with exit code 5");
@@ -658,7 +678,7 @@ mod tests {
         let args = PostToolArgs {
             db_path: Some(db_path.clone()),
             session_id: session_id.to_string(),
-            tool_name: Some("WebFetch".to_string()),  // Opens awareness
+            tool_name: Some("WebFetch".to_string()), // Opens awareness
             success: Some(true),
             stdin: false,
             format: OutputFormat::Json,
@@ -672,7 +692,10 @@ mod tests {
 
         // Open expansion should increase IC
         println!("Open expansion: IC 0.80 -> {}", snapshot.last_ic);
-        assert!(snapshot.last_ic >= 0.80, "Open expansion should increase or maintain IC");
+        assert!(
+            snapshot.last_ic >= 0.80,
+            "Open expansion should increase or maintain IC"
+        );
 
         println!("RESULT: PASS - Johari updates affect IC correctly");
     }
@@ -701,14 +724,21 @@ mod tests {
         let result = execute(args).await.unwrap();
         let actual_elapsed = start.elapsed().as_millis() as u64;
 
-        assert!(result.execution_time_ms > 0, "Must have positive execution time");
+        assert!(
+            result.execution_time_ms > 0,
+            "Must have positive execution time"
+        );
         assert!(
             result.execution_time_ms < POST_TOOL_USE_TIMEOUT_MS,
             "Execution time {} must be under timeout {}ms",
-            result.execution_time_ms, POST_TOOL_USE_TIMEOUT_MS
+            result.execution_time_ms,
+            POST_TOOL_USE_TIMEOUT_MS
         );
 
-        println!("Execution time: {}ms (timeout: {}ms)", result.execution_time_ms, POST_TOOL_USE_TIMEOUT_MS);
+        println!(
+            "Execution time: {}ms (timeout: {}ms)",
+            result.execution_time_ms, POST_TOOL_USE_TIMEOUT_MS
+        );
         println!("Actual elapsed: {}ms", actual_elapsed);
         println!("RESULT: PASS - Execution time within timeout budget");
     }
@@ -728,9 +758,9 @@ mod tests {
         let args = PostToolArgs {
             db_path: Some(db_path),
             session_id: session_id.to_string(),
-            tool_name: None,  // Missing!
+            tool_name: None, // Missing!
             success: Some(true),
-            stdin: false,  // Not reading from stdin
+            stdin: false, // Not reading from stdin
             format: OutputFormat::Json,
         };
 
@@ -738,7 +768,11 @@ mod tests {
 
         assert!(result.is_err(), "Should fail with missing tool_name");
         let err = result.unwrap_err();
-        assert!(matches!(err, HookError::InvalidInput(_)), "Must be InvalidInput, got: {:?}", err);
+        assert!(
+            matches!(err, HookError::InvalidInput(_)),
+            "Must be InvalidInput, got: {:?}",
+            err
+        );
         assert_eq!(err.exit_code(), 4, "InvalidInput must be exit code 4");
 
         println!("RESULT: PASS - Missing tool_name returns InvalidInput error");
@@ -771,9 +805,16 @@ mod tests {
         let result = execute(args).await;
 
         // IC=0.5 is NOT < 0.5, so should NOT trigger crisis
-        assert!(result.is_ok(), "IC=0.5 should NOT trigger crisis: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "IC=0.5 should NOT trigger crisis: {:?}",
+            result.err()
+        );
         let output = result.unwrap();
-        assert!(output.success, "Should succeed when IC is exactly at threshold");
+        assert!(
+            output.success,
+            "Should succeed when IC is exactly at threshold"
+        );
 
         println!("RESULT: PASS - IC=0.5 does not trigger crisis (< 0.5 required)");
     }
@@ -806,7 +847,10 @@ mod tests {
         // IC=0.49 IS < 0.5, so should trigger crisis
         assert!(result.is_err(), "IC=0.49 should trigger crisis");
         let err = result.unwrap_err();
-        assert!(matches!(err, HookError::CrisisTriggered(_)), "Must be CrisisTriggered");
+        assert!(
+            matches!(err, HookError::CrisisTriggered(_)),
+            "Must be CrisisTriggered"
+        );
         assert_eq!(err.exit_code(), 6, "Crisis must be exit code 6");
 
         println!("RESULT: PASS - IC=0.49 triggers crisis (exit code 6)");

@@ -9,8 +9,8 @@
 //! Run with: cargo test -p context-graph-core --test triggers_fsv_manual_test -- --nocapture
 
 use context_graph_core::dream::{
-    DreamPhase, EntropyCalculator, EntropyWindow, ExtendedTriggerReason, GpuMonitor, GpuMonitorError,
-    GpuTriggerState, StubGpuMonitor, TriggerManager, gpu_thresholds,
+    gpu_thresholds, DreamPhase, EntropyCalculator, EntropyWindow, ExtendedTriggerReason,
+    GpuMonitor, GpuMonitorError, GpuTriggerState, StubGpuMonitor, TriggerManager,
 };
 use std::thread;
 use std::time::Duration;
@@ -278,7 +278,10 @@ fn fsv_test_case_2_entropy_tracking_reset() {
 
     // Push entropy 0.8 (starts tracking)
     manager.update_entropy(0.8);
-    println!("t0: pushed entropy 0.8, should_trigger={}", manager.should_trigger());
+    println!(
+        "t0: pushed entropy 0.8, should_trigger={}",
+        manager.should_trigger()
+    );
     assert!(!manager.should_trigger(), "Should not trigger immediately");
 
     // Wait 30ms
@@ -287,24 +290,42 @@ fn fsv_test_case_2_entropy_tracking_reset() {
 
     // Push entropy 0.5 (below threshold - resets)
     manager.update_entropy(0.5);
-    println!("t=30ms: pushed entropy 0.5 (resets tracking), should_trigger={}", manager.should_trigger());
+    println!(
+        "t=30ms: pushed entropy 0.5 (resets tracking), should_trigger={}",
+        manager.should_trigger()
+    );
     assert!(!manager.should_trigger());
 
     // Push entropy 0.9 (restarts tracking)
     manager.update_entropy(0.9);
-    println!("t=30ms: pushed entropy 0.9 (restarts tracking), should_trigger={}", manager.should_trigger());
+    println!(
+        "t=30ms: pushed entropy 0.9 (restarts tracking), should_trigger={}",
+        manager.should_trigger()
+    );
 
     // Wait 30ms
     thread::sleep(Duration::from_millis(30));
     manager.update_entropy(0.92);
-    println!("t=60ms: should_trigger={} (only 30ms since restart, not 50ms)", manager.should_trigger());
-    assert!(!manager.should_trigger(), "Should NOT trigger - only 30ms since tracking restarted");
+    println!(
+        "t=60ms: should_trigger={} (only 30ms since restart, not 50ms)",
+        manager.should_trigger()
+    );
+    assert!(
+        !manager.should_trigger(),
+        "Should NOT trigger - only 30ms since tracking restarted"
+    );
 
     // Wait another 30ms (total 60ms since restart > 50ms window)
     thread::sleep(Duration::from_millis(30));
     manager.update_entropy(0.95);
-    println!("t=90ms: should_trigger={} (60ms since restart > 50ms window)", manager.should_trigger());
-    assert!(manager.should_trigger(), "Should trigger now - sustained for >50ms");
+    println!(
+        "t=90ms: should_trigger={} (60ms since restart > 50ms window)",
+        manager.should_trigger()
+    );
+    assert!(
+        manager.should_trigger(),
+        "Should trigger now - sustained for >50ms"
+    );
 
     println!("\n=== Test Case 2 PASSED ===\n");
 }
@@ -374,12 +395,20 @@ fn fsv_gpu_monitor_verification() {
     let mut monitor = StubGpuMonitor::unavailable();
     println!("Test 1: StubGpuMonitor::unavailable()");
     println!("  is_available={}", monitor.is_available());
-    assert!(!monitor.is_available(), "Unavailable monitor should return false");
+    assert!(
+        !monitor.is_available(),
+        "Unavailable monitor should return false"
+    );
     let result = monitor.get_utilization();
     println!("  get_utilization={:?}", result);
-    assert!(result.is_err(), "Unavailable GPU should return error, not 0.0 (AP-26)");
+    assert!(
+        result.is_err(),
+        "Unavailable GPU should return error, not 0.0 (AP-26)"
+    );
     match result {
-        Err(GpuMonitorError::NvmlNotAvailable) => println!("  PASS: Got expected NvmlNotAvailable error"),
+        Err(GpuMonitorError::NvmlNotAvailable) => {
+            println!("  PASS: Got expected NvmlNotAvailable error")
+        }
         other => panic!("Expected NvmlNotAvailable, got {:?}", other),
     }
 
@@ -565,11 +594,15 @@ fn fsv_constitution_compliance_verification() {
     assert_eq!(manager.gpu_state().threshold, 0.30);
 
     // Verify GpuTriggerState::with_threshold panics at >0.30
-    let result = std::panic::catch_unwind(|| {
-        GpuTriggerState::with_threshold(0.80)
-    });
-    println!("GpuTriggerState::with_threshold(0.80) panics: {}", result.is_err());
-    assert!(result.is_err(), "Creating GpuTriggerState with threshold >0.30 should panic");
+    let result = std::panic::catch_unwind(|| GpuTriggerState::with_threshold(0.80));
+    println!(
+        "GpuTriggerState::with_threshold(0.80) panics: {}",
+        result.is_err()
+    );
+    assert!(
+        result.is_err(),
+        "Creating GpuTriggerState with threshold >0.30 should panic"
+    );
 
     println!("\n=== Constitution Compliance PASSED ===\n");
 }

@@ -221,10 +221,7 @@ mod tests {
             ConsciousnessState::from_order_parameter_with_thresholds(r, &creative_t);
 
         println!("r=0.80:");
-        println!(
-            "  Code domain (gate={:.3}): {:?}",
-            code_t.gate, code_state
-        );
+        println!("  Code domain (gate={:.3}): {:?}", code_t.gate, code_state);
         println!(
             "  Creative domain (gate={:.3}): {:?}",
             creative_t.gate, creative_state
@@ -292,8 +289,10 @@ mod tests {
         println!("\n=== FSV: ConsciousnessState Classification ===\n");
 
         let t = GwtThresholds::default_general();
-        println!("Using default thresholds: gate={}, hypersync={}, frag={}",
-                 t.gate, t.hypersync, t.fragmentation);
+        println!(
+            "Using default thresholds: gate={}, hypersync={}, frag={}",
+            t.gate, t.hypersync, t.fragmentation
+        );
         println!();
 
         let test_cases: [(f32, ConsciousnessState); 10] = [

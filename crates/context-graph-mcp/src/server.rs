@@ -664,10 +664,7 @@ impl McpServer {
                     writer.write_all(b"\n").await?;
                     writer.flush().await?;
                     // FAIL FAST: Disconnect client
-                    return Err(anyhow::anyhow!(
-                        "Client sent invalid JSON-RPC: {}",
-                        e
-                    ));
+                    return Err(anyhow::anyhow!("Client sent invalid JSON-RPC: {}", e));
                 }
             };
 
@@ -764,15 +761,17 @@ impl McpServer {
         let router = create_sse_router(sse_state);
 
         // Bind TCP listener
-        let listener = tokio::net::TcpListener::bind(bind_addr).await.map_err(|e| {
-            error!("FATAL: Failed to bind SSE listener to {}: {}", bind_addr, e);
-            anyhow::anyhow!(
-                "Failed to bind SSE listener to {}: {}. \
+        let listener = tokio::net::TcpListener::bind(bind_addr)
+            .await
+            .map_err(|e| {
+                error!("FATAL: Failed to bind SSE listener to {}: {}", bind_addr, e);
+                anyhow::anyhow!(
+                    "Failed to bind SSE listener to {}: {}. \
                  Address may be in use or require elevated permissions.",
-                bind_addr,
-                e
-            )
-        })?;
+                    bind_addr,
+                    e
+                )
+            })?;
 
         info!(
             "MCP Server listening on SSE http://{}/events (max_connections={})",
@@ -875,7 +874,11 @@ mod tests {
         let mut unique_codes = tcp_codes.clone();
         unique_codes.sort();
         unique_codes.dedup();
-        assert_eq!(tcp_codes.len(), unique_codes.len(), "TCP error codes must be unique");
+        assert_eq!(
+            tcp_codes.len(),
+            unique_codes.len(),
+            "TCP error codes must be unique"
+        );
 
         // All codes should be in reserved range (-32110 to -32119)
         for code in &tcp_codes {

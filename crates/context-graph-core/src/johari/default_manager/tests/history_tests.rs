@@ -107,7 +107,9 @@ async fn test_transition_stats_computed() {
         "Expected 1 transition on E1"
     );
 
-    println!("[VERIFIED] test_transition_stats_computed: Stats correctly computed from real transitions");
+    println!(
+        "[VERIFIED] test_transition_stats_computed: Stats correctly computed from real transitions"
+    );
 }
 
 #[tokio::test]

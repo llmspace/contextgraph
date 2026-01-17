@@ -239,9 +239,7 @@ pub fn handle_get_meta_learning_status(
         lambda_c: current_lambdas.lambda_c - base_lambdas.lambda_c,
     };
 
-    let last_adjustment_at = service
-        .last_adjustment()
-        .map(|a| a.timestamp.to_rfc3339());
+    let last_adjustment_at = service.last_adjustment().map(|a| a.timestamp.to_rfc3339());
 
     let accuracy_history = if input.include_accuracy_history {
         let history = service.accuracy_history();
@@ -403,8 +401,7 @@ pub fn parse_timestamp(s: &str) -> McpResult<DateTime<Utc>> {
         .map(|dt| dt.with_timezone(&Utc))
         .or_else(|_| {
             // Try parsing without timezone (assume UTC)
-            chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
-                .map(|ndt| ndt.and_utc())
+            chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").map(|ndt| ndt.and_utc())
         })
         .map_err(|_| MetaLearningMcpError::InvalidTimestamp {
             value: s.to_string(),
@@ -658,7 +655,10 @@ mod tests {
             "FSV AFTER: weights={:?}, adjustment_count={}",
             after_weights, after_adjustment_count
         );
-        println!("FSV OUTPUT: dry_run={}, success={}", output.dry_run, output.success);
+        println!(
+            "FSV OUTPUT: dry_run={}, success={}",
+            output.dry_run, output.success
+        );
 
         // VERIFY: State unchanged
         assert!(output.dry_run, "FSV: Output should indicate dry_run=true");
@@ -691,7 +691,10 @@ mod tests {
         println!("FSV AFTER: result.is_err()={}", result.is_err());
 
         // VERIFY: Should fail fast with clear error
-        assert!(result.is_err(), "FSV: Invalid event_type should return error");
+        assert!(
+            result.is_err(),
+            "FSV: Invalid event_type should return error"
+        );
         let err = result.unwrap_err();
         let err_msg = format!("{:?}", err);
         assert!(

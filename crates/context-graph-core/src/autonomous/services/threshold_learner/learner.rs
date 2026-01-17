@@ -13,8 +13,8 @@ use crate::autonomous::{
 };
 
 use super::types::{
-    BayesianObservation, EmbedderLearningState, DEFAULT_ALPHA,
-    MIN_OBSERVATIONS_FOR_RECALIBRATION, NUM_EMBEDDERS, RECALIBRATION_CHECK_INTERVAL_SECS,
+    BayesianObservation, EmbedderLearningState, DEFAULT_ALPHA, MIN_OBSERVATIONS_FOR_RECALIBRATION,
+    NUM_EMBEDDERS, RECALIBRATION_CHECK_INTERVAL_SECS,
 };
 
 /// NORTH-009 ThresholdLearner Service

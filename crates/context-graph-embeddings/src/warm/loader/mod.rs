@@ -36,8 +36,7 @@ pub use summary::LoadingSummary;
 
 // Re-export warm loading types (TASK-EMB-006, TASK-EMB-016)
 pub use types::{
-    InferenceValidation, LoadedModelWeights, TensorMetadata, VramAllocationTracking,
-    WarmLoadResult,
+    InferenceValidation, LoadedModelWeights, TensorMetadata, VramAllocationTracking, WarmLoadResult,
 };
 
 // Re-export weight loading operations (TASK-EMB-013)

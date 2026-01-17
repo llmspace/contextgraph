@@ -20,10 +20,16 @@ async fn test_12_johari_get_distribution() {
         "content": "Johari test memory for distribution analysis",
         "importance": 0.8
     });
-    let store_response = handlers.dispatch(make_request("memory/store", 1, Some(store_params))).await;
-    let fingerprint_id = store_response.result.unwrap()
-        .get("fingerprintId").unwrap()
-        .as_str().unwrap()
+    let store_response = handlers
+        .dispatch(make_request("memory/store", 1, Some(store_params)))
+        .await;
+    let fingerprint_id = store_response
+        .result
+        .unwrap()
+        .get("fingerprintId")
+        .unwrap()
+        .as_str()
+        .unwrap()
         .to_string();
 
     // johari/get_distribution requires memory_id
@@ -33,9 +39,16 @@ async fn test_12_johari_get_distribution() {
     let request = make_request("johari/get_distribution", 10, Some(distribution_params));
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Should not have error: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Should not have error: {:?}",
+        response.error
+    );
     let result = response.result.expect("Should have result");
 
     println!("\n[VERIFICATION]");
@@ -44,7 +57,8 @@ async fn test_12_johari_get_distribution() {
         if let Some(arr) = embedders.as_array() {
             println!("  Found {} embedder distributions", arr.len());
             for (i, e) in arr.iter().take(3).enumerate() {
-                println!("  [{}] {}: quadrant={}",
+                println!(
+                    "  [{}] {}: quadrant={}",
                     i,
                     e.get("embedder_name").unwrap_or(&json!("?")),
                     e.get("quadrant").unwrap_or(&json!("?"))
@@ -54,8 +68,14 @@ async fn test_12_johari_get_distribution() {
     }
 
     if let Some(summary) = result.get("summary") {
-        println!("  summary.open_count: {}", summary.get("open_count").unwrap_or(&json!("?")));
-        println!("  summary.unknown_count: {}", summary.get("unknown_count").unwrap_or(&json!("?")));
+        println!(
+            "  summary.open_count: {}",
+            summary.get("open_count").unwrap_or(&json!("?"))
+        );
+        println!(
+            "  summary.unknown_count: {}",
+            summary.get("unknown_count").unwrap_or(&json!("?"))
+        );
     }
 
     println!("\n[PASSED] johari/get_distribution works correctly");
@@ -73,7 +93,9 @@ async fn test_13_johari_find_by_quadrant() {
     // Store some memories (they start in Unknown quadrant)
     for content in ["Quadrant search test 1", "Quadrant search test 2"] {
         let params = json!({ "content": content, "importance": 0.8 });
-        handlers.dispatch(make_request("memory/store", 1, Some(params))).await;
+        handlers
+            .dispatch(make_request("memory/store", 1, Some(params)))
+            .await;
     }
 
     // johari/find_by_quadrant requires embedder_index and quadrant
@@ -85,15 +107,25 @@ async fn test_13_johari_find_by_quadrant() {
     let request = make_request("johari/find_by_quadrant", 10, Some(search_params));
     let response = handlers.dispatch(request).await;
 
-    println!("Response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "Response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
-    assert!(response.error.is_none(), "Should not have error: {:?}", response.error);
+    assert!(
+        response.error.is_none(),
+        "Should not have error: {:?}",
+        response.error
+    );
     let result = response.result.expect("Should have result");
 
     println!("\n[VERIFICATION]");
     if let Some(fingerprints) = result.get("fingerprints") {
         if let Some(arr) = fingerprints.as_array() {
-            println!("  Found {} fingerprints in Unknown quadrant (E1_semantic)", arr.len());
+            println!(
+                "  Found {} fingerprints in Unknown quadrant (E1_semantic)",
+                arr.len()
+            );
             for (i, fp) in arr.iter().take(3).enumerate() {
                 println!("  [{}] id={}", i, fp.get("id").unwrap_or(&json!("?")));
             }

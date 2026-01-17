@@ -10,8 +10,7 @@ async fn test_utl_consolidation_threshold() {
     let embedding = vec![0.5; 1536];
 
     // Node below threshold
-    let mut low_importance =
-        crate::types::MemoryNode::new("low".to_string(), embedding.clone());
+    let mut low_importance = crate::types::MemoryNode::new("low".to_string(), embedding.clone());
     low_importance.importance = 0.5;
 
     // Node at threshold

@@ -25,17 +25,17 @@
 //! 13. Merge (1): merge_concepts
 //! 14. Johari (1): get_johari_classification
 
-mod synthetic_data;
-mod helpers;
-mod core_tools;
-mod gwt_consciousness_tools;
 mod atc_tools;
-mod dream_tools;
-mod neuromod_tools;
-mod steering_causal_tools;
-mod teleological_tools;
 mod autonomous_tools;
-mod gwt_verification;
+mod core_tools;
+mod dream_tools;
 mod edge_cases;
 mod gpu_status;
+mod gwt_consciousness_tools;
+mod gwt_verification;
+mod helpers;
 mod identity_continuity;
+mod neuromod_tools;
+mod steering_causal_tools;
+mod synthetic_data;
+mod teleological_tools;

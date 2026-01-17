@@ -23,15 +23,15 @@
 //!
 //! TOTAL_DIMENSION = 9856
 
-mod constants;
-mod native_dimensions;
-mod projected_dimensions;
-mod quantization_methods;
 mod aggregate_dimensions;
-mod offsets;
+mod comprehensive;
+mod constants;
 mod edge_cases;
 mod model_metadata;
-mod comprehensive;
+mod native_dimensions;
+mod offsets;
+mod projected_dimensions;
+mod quantization_methods;
 
 // Re-export constants for use in submodules
 pub use constants::*;

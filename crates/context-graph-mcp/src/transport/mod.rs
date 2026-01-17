@@ -8,8 +8,14 @@
 pub mod sse;
 
 pub use sse::{
+    create_sse_router,
+    next_event_id,
+    sse_handler,
     // TASK-32: Types
-    McpSseEvent, SseConfig, SseConfigError,
+    McpSseEvent,
     // TASK-33: Handler
-    SseAppState, SseHandlerError, create_sse_router, sse_handler, next_event_id,
+    SseAppState,
+    SseConfig,
+    SseConfigError,
+    SseHandlerError,
 };

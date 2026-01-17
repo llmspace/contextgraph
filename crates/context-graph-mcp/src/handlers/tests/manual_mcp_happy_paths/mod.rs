@@ -7,12 +7,12 @@
 
 mod common;
 
-mod memory_tests;
-mod search_tests;
-mod purpose_utl_tests;
-mod system_tests;
-mod johari_tests;
-mod tools_init_tests;
-mod gwt_consciousness_tests;
 mod comprehensive_summary;
+mod gwt_consciousness_tests;
+mod johari_tests;
+mod memory_tests;
+mod purpose_utl_tests;
+mod search_tests;
 mod stubfix_tests;
+mod system_tests;
+mod tools_init_tests;
