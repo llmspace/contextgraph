@@ -1,186 +1,13 @@
-# Task: TASK-P5-001 - InjectionCandidate and InjectionCategory Types
-
-## Task Overview
-**Status**: COMPLETE
-**Phase**: 5 (Injection Pipeline)
-**Sequence**: 36
-**Layer**: foundation
-**Estimated LOC**: 200 (Actual: ~550 including tests)
-**Last Audit Date**: 2026-01-17
-**Completion Date**: 2026-01-17
-
-## Evidence of Completion
-
-```
-================================================================================
-TASK-P5-001 VERIFICATION LOG - 2026-01-17
-================================================================================
-BUILD STATUS: PASS
-  - cargo build: 0 errors, 0 warnings (from injection module)
-  - Note: 3 warnings exist in unrelated modules (coherence/constants.rs)
-
-TEST STATUS: PASS
-  - Unit Tests: 24 passed, 0 failed (candidate.rs)
-  - Manual Edge Case Tests: 9 passed, 0 failed (injection_manual_test.rs)
-  - Total: 33 tests passed
-
-FILES CREATED:
-  - crates/context-graph-core/src/injection/mod.rs (623 bytes)
-  - crates/context-graph-core/src/injection/candidate.rs (28,103 bytes)
-  - crates/context-graph-core/tests/injection_manual_test.rs (9,847 bytes)
-
-EXPORTS VERIFIED:
-  - InjectionCandidate exported from lib.rs (line 106)
-  - InjectionCategory exported from lib.rs (line 106)
-  - pub mod injection added to lib.rs (line 41)
-  - Constants exported: TOKEN_MULTIPLIER, MIN/MAX_RECENCY_FACTOR,
-    MIN/MAX_DIVERSITY_BONUS, MAX_WEIGHTED_AGREEMENT
-
-EDGE CASES VERIFIED (FSV Protocol):
-  1. Empty content: token_count = 0
-  2. Max weighted_agreement (8.5): accepted
-  3. Category sorting: deterministic, priority descending
-  4. Boundary recency/diversity: 0.8..1.3, 0.8..1.5
-  5. Temporal exclusion: semantic_space_count excludes E2-E4 (AP-60)
-  6. Token estimation: ceil(words x 1.3)
-  7. Category thresholds: >= 2.5 High, >= 1.0 Single, < 1.0 None
-  8. fits_budget: exact boundary testing
-
-CONSTITUTION COMPLIANCE:
-  - ARCH-09 (topic threshold 2.5): VERIFIED
-  - AP-60 (temporal exclusion): VERIFIED
-  - AP-10 (no NaN/Infinity): VERIFIED (validation + total_cmp)
-  - AP-14 (no unwrap in lib): VERIFIED (uses assert! for programmer errors)
-
-CODE SIMPLIFIER REVIEW:
-  - Reviewed and approved by code-simplifier agent
-  - One simplification applied: use is_temporal() convenience function
-  - All 24 tests pass after refinement
-================================================================================
-```
-
-## Critical Context
-
-This is the FIRST task in Phase 5. The injection module does NOT exist yet. You must create:
-- `crates/context-graph-core/src/injection/` directory
-- `crates/context-graph-core/src/injection/mod.rs`
-- `crates/context-graph-core/src/injection/candidate.rs`
-- Add `pub mod injection;` to `crates/context-graph-core/src/lib.rs`
-
-## Dependencies (VERIFIED AS COMPLETE)
-
-| Task | Artifact | Location | Status |
-|------|----------|----------|--------|
-| TASK-P1-001 | `Memory` struct with `id: Uuid` | `crates/context-graph-core/src/memory/mod.rs:98-124` | COMPLETE |
-| TASK-P2-001 | `Embedder` enum (13 variants) | `crates/context-graph-core/src/teleological/embedder.rs:77-111` | COMPLETE |
-| TASK-P2-003b | `EmbedderCategory` enum | `crates/context-graph-core/src/embeddings/category.rs:38-74` | COMPLETE |
-
-## Existing Types to Use (DO NOT RECREATE)
-
-### From `crate::teleological`
-```rust
-// Location: crates/context-graph-core/src/teleological/embedder.rs:77-111
-pub enum Embedder {
-    Semantic = 0,           // E1
-    TemporalRecent = 1,     // E2
-    TemporalPeriodic = 2,   // E3
-    TemporalPositional = 3, // E4
-    Causal = 4,             // E5
-    Sparse = 5,             // E6
-    Code = 6,               // E7
-    Emotional = 7,          // E8
-    Hdc = 8,                // E9
-    Multimodal = 9,         // E10
-    Entity = 10,            // E11
-    LateInteraction = 11,   // E12
-    KeywordSplade = 12,     // E13
-}
-```
-
-### From `crate::embeddings::category`
-```rust
-// Location: crates/context-graph-core/src/embeddings/category.rs
-pub fn category_for(embedder: Embedder) -> EmbedderCategory;
-pub const fn max_weighted_agreement() -> f32;  // Returns 8.5
-pub const fn topic_threshold() -> f32;         // Returns 2.5
-```
-
-### From `crate::clustering`
-```rust
-// Location: crates/context-graph-core/src/clustering/topic.rs:173-187
-// TopicProfile::weighted_agreement() method already exists and handles:
-// - SEMANTIC weight 1.0
-// - TEMPORAL weight 0.0 (excluded per AP-60)
-// - RELATIONAL weight 0.5
-// - STRUCTURAL weight 0.5
-```
-
-## Constitution Rules (MUST FOLLOW)
-
-| Rule | Requirement |
-|------|-------------|
-| ARCH-09 | Topic threshold = `weighted_agreement >= 2.5` |
-| AP-60 | Temporal embedders (E2-E4) NEVER count toward topics (weight 0.0) |
-| AP-10 | No NaN/Infinity in similarity/relevance scores |
-| AP-14 | No `.unwrap()` in library code |
-
-## Injection Category Budget (From Constitution)
-
-| Category | Priority | Budget | Condition |
-|----------|----------|--------|-----------|
-| DivergenceAlert | 1 (highest) | 200 tokens | Low SEMANTIC space similarity |
-| HighRelevanceCluster | 2 | 400 tokens | `weighted_agreement >= 2.5` |
-| SingleSpaceMatch | 3 | 300 tokens | `weighted_agreement in [1.0, 2.5)` |
-| RecentSession | 4 (lowest) | 200 tokens | Last session summary |
-
-## Diversity Bonus (From Constitution)
-
-| Condition | Bonus |
-|-----------|-------|
-| `weighted_agreement >= 5.0` | 1.5 |
-| `weighted_agreement in [2.5, 5.0)` | 1.2 |
-| `weighted_agreement in [1.0, 2.5)` | 1.0 |
-| `weighted_agreement < 1.0` | 0.8 |
-
-## Recency Factors (From Constitution)
-
-| Age | Factor |
-|-----|--------|
-| `< 1 hour` | 1.3 |
-| `< 1 day` | 1.2 |
-| `< 7 days` | 1.1 |
-| `< 30 days` | 1.0 |
-| `> 90 days` | 0.8 |
-
----
-
-## Implementation Specification
-
-### File: `crates/context-graph-core/src/injection/mod.rs`
-
-```rust
-//! Injection pipeline types for context injection.
-//!
-//! This module provides types for the injection pipeline:
-//! - [`InjectionCandidate`] - Memory candidate for injection with scores
-//! - [`InjectionCategory`] - Priority category determining budget
-//!
-//! # Constitution Compliance
-//! - ARCH-09: Topic threshold = weighted_agreement >= 2.5
-//! - AP-60: Temporal embedders NEVER count toward topics
-
-pub mod candidate;
-
-pub use candidate::{InjectionCandidate, InjectionCategory};
-```
-
-### File: `crates/context-graph-core/src/injection/candidate.rs`
-
-```rust
 //! InjectionCandidate and InjectionCategory types.
 //!
 //! These types form the foundation of the injection pipeline,
 //! tracking candidate memories with their computed scores.
+//!
+//! # Constitution Compliance
+//! - ARCH-09: Topic threshold = weighted_agreement >= 2.5
+//! - AP-60: Temporal embedders NEVER count toward topics
+//! - AP-10: No NaN/Infinity in similarity/relevance scores
+//! - AP-14: No .unwrap() in library code
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -310,6 +137,25 @@ impl std::fmt::Display for InjectionCategory {
 // InjectionCandidate
 // =============================================================================
 
+/// Token estimation multiplier (words to tokens).
+/// Empirically determined: tokens ≈ words × 1.3
+pub const TOKEN_MULTIPLIER: f32 = 1.3;
+
+/// Minimum recency factor (for old memories > 90 days).
+pub const MIN_RECENCY_FACTOR: f32 = 0.8;
+
+/// Maximum recency factor (for recent memories < 1 hour).
+pub const MAX_RECENCY_FACTOR: f32 = 1.3;
+
+/// Minimum diversity bonus (weak agreement < 1.0).
+pub const MIN_DIVERSITY_BONUS: f32 = 0.8;
+
+/// Maximum diversity bonus (strong agreement >= 5.0).
+pub const MAX_DIVERSITY_BONUS: f32 = 1.5;
+
+/// Maximum weighted agreement per constitution (8.5).
+pub const MAX_WEIGHTED_AGREEMENT: f32 = 8.5;
+
 /// A candidate memory for context injection with computed scores.
 ///
 /// This is the primary data structure flowing through the injection pipeline.
@@ -380,25 +226,6 @@ pub struct InjectionCandidate {
     pub created_at: DateTime<Utc>,
 }
 
-/// Token estimation multiplier (words to tokens).
-/// Empirically determined: tokens ≈ words × 1.3
-pub const TOKEN_MULTIPLIER: f32 = 1.3;
-
-/// Minimum recency factor (for old memories > 90 days).
-pub const MIN_RECENCY_FACTOR: f32 = 0.8;
-
-/// Maximum recency factor (for recent memories < 1 hour).
-pub const MAX_RECENCY_FACTOR: f32 = 1.3;
-
-/// Minimum diversity bonus (weak agreement < 1.0).
-pub const MIN_DIVERSITY_BONUS: f32 = 0.8;
-
-/// Maximum diversity bonus (strong agreement >= 5.0).
-pub const MAX_DIVERSITY_BONUS: f32 = 1.5;
-
-/// Maximum weighted agreement per constitution (8.5).
-pub const MAX_WEIGHTED_AGREEMENT: f32 = 8.5;
-
 impl InjectionCandidate {
     /// Create a new injection candidate with initial scores.
     ///
@@ -463,11 +290,11 @@ impl InjectionCandidate {
             memory_id,
             content,
             relevance_score,
-            recency_factor: 1.0,      // Default, computed later
-            diversity_bonus: 1.0,     // Default, computed later
+            recency_factor: 1.0,  // Default, computed later
+            diversity_bonus: 1.0, // Default, computed later
             weighted_agreement,
             matching_spaces,
-            priority: 0.0,            // Computed later
+            priority: 0.0, // Computed later
             token_count,
             category,
             created_at,
@@ -531,11 +358,11 @@ impl InjectionCandidate {
     ///
     /// Excludes temporal embedders (E2-E4) per AP-60.
     pub fn semantic_space_count(&self) -> usize {
-        use crate::embeddings::category::category_for;
+        use crate::embeddings::is_temporal;
 
         self.matching_spaces
             .iter()
-            .filter(|&&e| !category_for(e).is_temporal())
+            .filter(|&&e| !is_temporal(e))
             .count()
     }
 }
@@ -598,12 +425,18 @@ mod tests {
 
     #[test]
     fn test_category_priority_order() {
-        assert!(InjectionCategory::DivergenceAlert.priority() <
-                InjectionCategory::HighRelevanceCluster.priority());
-        assert!(InjectionCategory::HighRelevanceCluster.priority() <
-                InjectionCategory::SingleSpaceMatch.priority());
-        assert!(InjectionCategory::SingleSpaceMatch.priority() <
-                InjectionCategory::RecentSession.priority());
+        assert!(
+            InjectionCategory::DivergenceAlert.priority()
+                < InjectionCategory::HighRelevanceCluster.priority()
+        );
+        assert!(
+            InjectionCategory::HighRelevanceCluster.priority()
+                < InjectionCategory::SingleSpaceMatch.priority()
+        );
+        assert!(
+            InjectionCategory::SingleSpaceMatch.priority()
+                < InjectionCategory::RecentSession.priority()
+        );
         println!("[PASS] Category priority ordering correct");
     }
 
@@ -870,186 +703,97 @@ mod tests {
         assert_eq!(c.category, restored.category);
         println!("[PASS] InjectionCandidate serialization roundtrip");
     }
+
+    // =========================================================================
+    // semantic_space_count Tests
+    // =========================================================================
+
+    #[test]
+    fn test_semantic_space_count_excludes_temporal() {
+        let c = InjectionCandidate::new(
+            Uuid::new_v4(),
+            "test".to_string(),
+            0.5,
+            3.0,
+            vec![
+                Embedder::Semantic,       // Semantic - counts
+                Embedder::Code,           // Semantic - counts
+                Embedder::TemporalRecent, // Temporal - excluded
+                Embedder::TemporalPeriodic, // Temporal - excluded
+                Embedder::Emotional,      // Relational - counts
+            ],
+            InjectionCategory::HighRelevanceCluster,
+            Utc::now(),
+        );
+
+        // Only Semantic, Code, Emotional should count (3)
+        assert_eq!(c.semantic_space_count(), 3);
+        println!("[PASS] semantic_space_count excludes temporal embedders");
+    }
+
+    #[test]
+    fn test_semantic_space_count_all_temporal() {
+        let c = InjectionCandidate::new(
+            Uuid::new_v4(),
+            "test".to_string(),
+            0.5,
+            0.0,
+            vec![
+                Embedder::TemporalRecent,
+                Embedder::TemporalPeriodic,
+                Embedder::TemporalPositional,
+            ],
+            InjectionCategory::SingleSpaceMatch,
+            Utc::now(),
+        );
+
+        // All temporal - none count
+        assert_eq!(c.semantic_space_count(), 0);
+        println!("[PASS] All temporal embedders result in count 0");
+    }
+
+    // =========================================================================
+    // Empty content test
+    // =========================================================================
+
+    #[test]
+    fn test_empty_content() {
+        let c = InjectionCandidate::new(
+            Uuid::new_v4(),
+            "".to_string(), // Empty
+            0.5,
+            2.0,
+            vec![],
+            InjectionCategory::SingleSpaceMatch,
+            Utc::now(),
+        );
+        // Expected: token_count = 0 (0 words × 1.3 = 0)
+        assert_eq!(c.token_count, 0);
+        println!("[PASS] Empty content results in token_count = 0");
+    }
+
+    // =========================================================================
+    // Display tests
+    // =========================================================================
+
+    #[test]
+    fn test_category_display() {
+        assert_eq!(
+            format!("{}", InjectionCategory::DivergenceAlert),
+            "DivergenceAlert"
+        );
+        assert_eq!(
+            format!("{}", InjectionCategory::HighRelevanceCluster),
+            "HighRelevanceCluster"
+        );
+        assert_eq!(
+            format!("{}", InjectionCategory::SingleSpaceMatch),
+            "SingleSpaceMatch"
+        );
+        assert_eq!(
+            format!("{}", InjectionCategory::RecentSession),
+            "RecentSession"
+        );
+        println!("[PASS] Display trait works for InjectionCategory");
+    }
 }
-```
-
-### Update: `crates/context-graph-core/src/lib.rs`
-
-Add after line 56 (after `pub mod types;`):
-```rust
-pub mod injection;
-```
-
-Add to re-exports section (around line 100):
-```rust
-// Injection pipeline types (Phase 5) - TASK-P5-001
-pub use injection::{InjectionCandidate, InjectionCategory};
-```
-
----
-
-## Verification Requirements
-
-### Source of Truth
-- **Location**: `crates/context-graph-core/src/injection/candidate.rs`
-- **Exported via**: `crates/context-graph-core/src/lib.rs`
-- **Type signatures**: InjectionCandidate struct, InjectionCategory enum
-
-### Build Verification
-```bash
-# Must pass without errors or warnings
-cargo build --package context-graph-core 2>&1 | tee /tmp/build.log
-grep -E "(error|warning)" /tmp/build.log && echo "FAIL: Build has errors/warnings" || echo "PASS: Clean build"
-```
-
-### Test Verification
-```bash
-# All 16 tests must pass
-cargo test injection::candidate::tests --package context-graph-core -- --nocapture 2>&1 | tee /tmp/test.log
-grep "test result: ok" /tmp/test.log && echo "PASS: All tests passed" || echo "FAIL: Some tests failed"
-```
-
-### Full State Verification Protocol
-
-After implementation, you MUST perform these verification steps:
-
-#### Step 1: Verify Module Exists
-```bash
-# Verify files exist
-ls -la crates/context-graph-core/src/injection/mod.rs
-ls -la crates/context-graph-core/src/injection/candidate.rs
-
-# Verify exports in lib.rs
-grep "pub mod injection" crates/context-graph-core/src/lib.rs
-grep "InjectionCandidate" crates/context-graph-core/src/lib.rs
-```
-
-#### Step 2: Verify Type Signatures
-```rust
-// In a test file or REPL, verify:
-use context_graph_core::{InjectionCandidate, InjectionCategory};
-use context_graph_core::teleological::Embedder;
-
-// Verify InjectionCategory methods exist
-let _ = InjectionCategory::DivergenceAlert.priority();
-let _ = InjectionCategory::DivergenceAlert.token_budget();
-let _ = InjectionCategory::from_weighted_agreement(3.0);
-let _ = InjectionCategory::all();
-
-// Verify InjectionCandidate construction
-let candidate = InjectionCandidate::new(
-    uuid::Uuid::new_v4(),
-    "test".to_string(),
-    0.5,
-    3.0,
-    vec![Embedder::Semantic],
-    InjectionCategory::HighRelevanceCluster,
-    chrono::Utc::now(),
-);
-```
-
-#### Step 3: Manual Edge Case Testing
-
-**Test Case 1: Empty Content**
-```rust
-let c = InjectionCandidate::new(
-    Uuid::new_v4(),
-    "".to_string(),  // Empty
-    0.5, 2.0, vec![],
-    InjectionCategory::SingleSpaceMatch,
-    Utc::now(),
-);
-// Expected: token_count = 0 (0 words × 1.3 = 0)
-assert_eq!(c.token_count, 0);
-```
-
-**Test Case 2: Maximum Weighted Agreement**
-```rust
-let c = InjectionCandidate::new(
-    Uuid::new_v4(),
-    "test".to_string(),
-    1.0, 8.5,  // Max values
-    Embedder::all().collect(),
-    InjectionCategory::HighRelevanceCluster,
-    Utc::now(),
-);
-// Expected: accepts max values without panic
-```
-
-**Test Case 3: Category Sorting Stability**
-```rust
-let mut candidates = vec![
-    /* 10 candidates with same category but different priorities */
-];
-candidates.sort();
-// Verify: order is deterministic and priority descending
-```
-
-#### Step 4: Evidence of Success Log
-
-After all tests pass, produce this log:
-```
-================================================================================
-TASK-P5-001 VERIFICATION LOG - [timestamp]
-================================================================================
-BUILD STATUS: PASS
-  - cargo build: 0 errors, 0 warnings
-
-TEST STATUS: PASS
-  - Tests run: 16
-  - Tests passed: 16
-  - Tests failed: 0
-
-FILES CREATED:
-  - crates/context-graph-core/src/injection/mod.rs (✓ exists)
-  - crates/context-graph-core/src/injection/candidate.rs (✓ exists)
-
-EXPORTS VERIFIED:
-  - InjectionCandidate exported from lib.rs (✓)
-  - InjectionCategory exported from lib.rs (✓)
-
-EDGE CASES VERIFIED:
-  - Empty content: token_count = 0 (✓)
-  - Max weighted_agreement (8.5): accepted (✓)
-  - NaN relevance: panics with correct message (✓)
-  - Category sorting: deterministic (✓)
-
-CONSTITUTION COMPLIANCE:
-  - ARCH-09 (topic threshold 2.5): ✓
-  - AP-60 (temporal exclusion): ✓
-  - AP-10 (no NaN/Infinity): ✓
-  - AP-14 (no unwrap): ✓
-================================================================================
-```
-
----
-
-## Anti-Patterns to Avoid
-
-| Code | Anti-Pattern | Correct Approach |
-|------|--------------|------------------|
-| AP-10 | Using `partial_cmp` on f32 without NaN check | Use `total_cmp` for sorting |
-| AP-14 | Using `.unwrap()` in library code | Use `.expect()` with context message |
-| AP-60 | Including temporal embedders in weighted_agreement | Use `category_for(e).topic_weight()` |
-
----
-
-## NO Backwards Compatibility
-
-- This is a NEW module - no backwards compatibility needed
-- If any test fails, the implementation is WRONG - fix it, don't work around it
-- If build has warnings, fix them before proceeding
-- NO mock data in tests - use real type construction
-
----
-
-## Acceptance Criteria
-
-- [x] `crates/context-graph-core/src/injection/mod.rs` exists
-- [x] `crates/context-graph-core/src/injection/candidate.rs` exists
-- [x] `pub mod injection;` added to `lib.rs`
-- [x] Re-exports added to `lib.rs`
-- [x] `cargo build --package context-graph-core` succeeds with 0 warnings (from injection module)
-- [x] All 24 unit tests pass (exceeds original 16 estimate)
-- [x] Manual edge case verification completed (9 additional tests)
-- [x] Evidence log produced

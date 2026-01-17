@@ -38,6 +38,7 @@ pub mod config;
 pub mod dream;
 pub mod embeddings;
 pub mod error;
+pub mod injection;
 pub mod gwt;
 pub mod index;
 pub mod johari;
@@ -100,3 +101,6 @@ pub use clustering::{
     ClusterSelectionMethod, HDBSCANClusterer, HDBSCANParams, Topic, TopicPhase, TopicProfile,
     TopicStability, hdbscan_defaults,
 };
+
+// Injection pipeline types (Phase 5) - TASK-P5-001
+pub use injection::{InjectionCandidate, InjectionCategory};

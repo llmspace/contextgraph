@@ -30,6 +30,8 @@
 //! - [`InsertResult`]: Result of inserting a memory into the manager
 //! - [`ReclusterResult`]: Result of HDBSCAN batch reclustering
 //! - [`TopicSynthesizer`]: Standalone synthesizer using weighted agreement formula
+//! - [`TopicSnapshot`]: Snapshot of topic portfolio at a point in time
+//! - [`TopicStabilityTracker`]: Portfolio-level stability tracking for dream triggers
 
 pub mod birch;
 pub mod cluster;
@@ -37,6 +39,7 @@ pub mod error;
 pub mod hdbscan;
 pub mod manager;
 pub mod membership;
+pub mod stability;
 pub mod synthesizer;
 pub mod topic;
 
@@ -49,5 +52,9 @@ pub use manager::{
     UpdateStatus, DEFAULT_RECLUSTER_THRESHOLD, MAX_WEIGHTED_AGREEMENT, TOPIC_THRESHOLD,
 };
 pub use membership::ClusterMembership;
+pub use stability::{
+    TopicSnapshot, TopicStabilityTracker, DEFAULT_CHURN_THRESHOLD, DEFAULT_ENTROPY_DURATION_SECS,
+    DEFAULT_ENTROPY_THRESHOLD, SNAPSHOT_RETENTION_HOURS,
+};
 pub use synthesizer::{TopicSynthesizer, DEFAULT_MERGE_THRESHOLD, DEFAULT_MIN_SILHOUETTE};
 pub use topic::{Topic, TopicPhase, TopicProfile, TopicStability};

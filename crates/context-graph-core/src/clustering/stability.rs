@@ -1,206 +1,3 @@
-# TASK-P4-009: TopicStabilityTracker
-
-```xml
-<task_spec id="TASK-P4-009" version="2.0">
-<metadata>
-  <title>TopicStabilityTracker Implementation</title>
-  <status>complete</status>
-  <layer>logic</layer>
-  <sequence>35</sequence>
-  <phase>4</phase>
-  <implements>
-    <requirement_ref>REQ-P4-05</requirement_ref>
-  </implements>
-  <depends_on>
-    <task_ref>TASK-P4-002</task_ref><!-- Topic, TopicProfile, TopicPhase, TopicStability types - COMPLETED -->
-    <task_ref>TASK-P4-008</task_ref><!-- TopicSynthesizer with update_topic_stability - COMPLETED -->
-  </depends_on>
-  <estimated_complexity>medium</estimated_complexity>
-</metadata>
-
-<context>
-Implements TopicStabilityTracker which monitors topic portfolio churn over time and
-triggers dream consolidation when high entropy is detected. Maintains snapshots
-of the entire topic portfolio and computes churn rates between snapshots.
-
-CRITICAL DISTINCTION:
-- TopicStability (in topic.rs) = per-topic stability metrics (age, churn, phase)
-- TopicStabilityTracker (NEW in stability.rs) = portfolio-level tracker that:
-  - Takes periodic snapshots of the ENTIRE topic portfolio
-  - Computes churn rate across snapshots (topics added/removed)
-  - Tracks high entropy duration for dream triggers
-  - Per AP-70: Dream triggers MUST use entropy > 0.7 AND churn > 0.5
-
-DREAM TRIGGER CONDITIONS (from constitution.yaml):
-1. entropy > 0.7 AND churn > 0.5 (both must be true simultaneously)
-2. entropy > 0.7 for 5+ continuous minutes
-
-The TopicSynthesizer.update_topic_stability() already handles per-topic stability.
-This tracker operates at the portfolio level - tracking when topics appear/disappear.
-</context>
-
-<codebase_state>
-COMPLETED DEPENDENCIES:
-- topic.rs (985 lines): Topic, TopicProfile, TopicPhase, TopicStability - COMPLETE
-- synthesizer.rs (1014 lines): TopicSynthesizer with update_topic_stability - COMPLETE
-- manager.rs (1428 lines): MultiSpaceClusterManager - COMPLETE
-- All other Phase 4 components COMPLETE
-
-EXISTING TYPES TO USE:
-- Topic (topic.rs:329-348): Has id:Uuid, profile:TopicProfile, member_memories:Vec<Uuid>
-- TopicProfile (topic.rs:78-238): Has weighted_agreement() -> f32, is_topic() -> bool
-- TopicPhase (topic.rs:37-58): Emerging, Stable, Declining, Merging
-- TopicStability (topic.rs:248-312): Per-topic stability with phase, age_hours, membership_churn
-
-VERIFIED TYPE SIGNATURES (from actual codebase):
-```rust
-// topic.rs line 329-348
-pub struct Topic {
-    pub id: Uuid,
-    pub name: Option<String>,
-    pub profile: TopicProfile,
-    pub contributing_spaces: Vec<Embedder>,
-    pub cluster_ids: HashMap<Embedder, i32>,
-    pub member_memories: Vec<Uuid>,
-    pub confidence: f32,
-    pub stability: TopicStability,
-    pub created_at: DateTime<Utc>,
-}
-
-impl Topic {
-    // topic.rs line 372-392
-    pub fn new(
-        profile: TopicProfile,
-        cluster_ids: HashMap<Embedder, i32>,
-        members: Vec<Uuid>,
-    ) -> Self
-
-    pub fn member_count(&self) -> usize  // line 421-423
-}
-
-// topic.rs line 78-238
-pub struct TopicProfile {
-    pub strengths: [f32; 13],
-}
-```
-
-MODULE EXPORTS (mod.rs line 43-53):
-- pub use topic::{Topic, TopicPhase, TopicProfile, TopicStability};
-- NO stability module exported yet - this task creates it
-</codebase_state>
-
-<input_context_files>
-  <file purpose="component_spec">docs2/impplan/technical/TECH-PHASE4-CLUSTERING.md#component_contracts (lines 341-368)</file>
-  <file purpose="topic_types">crates/context-graph-core/src/clustering/topic.rs</file>
-  <file purpose="constitution">docs2/constitution.yaml (dream.trigger section)</file>
-  <file purpose="synthesizer">crates/context-graph-core/src/clustering/synthesizer.rs (reference for update_topic_stability)</file>
-</input_context_files>
-
-<prerequisites>
-  <check>TASK-P4-002 complete (Topic types exist) - VERIFIED: topic.rs exists with 985 lines</check>
-  <check>TASK-P4-008 complete (TopicSynthesizer exists) - VERIFIED: synthesizer.rs exists with 1014 lines</check>
-</prerequisites>
-
-<scope>
-  <in_scope>
-    - Create new file: crates/context-graph-core/src/clustering/stability.rs
-    - Implement TopicSnapshot struct (portfolio snapshot at point in time)
-    - Implement TopicStabilityTracker struct (portfolio-level churn tracking)
-    - Implement track_churn method (compare snapshots, compute rate)
-    - Implement check_dream_trigger method (per AP-70 and constitution)
-    - Implement take_snapshot method (capture current topic portfolio)
-    - Maintain 24-hour snapshot history
-    - Compute topics added/removed between snapshots
-    - Track continuous high-entropy duration
-    - Update mod.rs to export stability module and types
-  </in_scope>
-  <out_of_scope>
-    - Dream execution (Phase 6)
-    - Topic persistence (handled elsewhere)
-    - Long-term trend analysis beyond 24 hours
-    - Per-topic stability updates (handled by TopicSynthesizer.update_topic_stability)
-    - Entropy calculation (passed in as parameter)
-  </out_of_scope>
-</scope>
-
-<definition_of_done>
-  <signatures file="crates/context-graph-core/src/clustering/stability.rs">
-    /// Snapshot of topic portfolio at a point in time.
-    /// Used for churn calculation between snapshots.
-    #[derive(Debug, Clone)]
-    pub struct TopicSnapshot {
-        /// When this snapshot was taken
-        pub timestamp: DateTime&lt;Utc&gt;,
-        /// Topic IDs present at snapshot time
-        pub topic_ids: Vec&lt;Uuid&gt;,
-        /// Total members across all topics
-        pub total_members: usize,
-    }
-
-    /// Configuration constants
-    pub const DEFAULT_CHURN_THRESHOLD: f32 = 0.5;
-    pub const DEFAULT_ENTROPY_THRESHOLD: f32 = 0.7;
-    pub const DEFAULT_ENTROPY_DURATION_SECS: u64 = 300; // 5 minutes
-    pub const SNAPSHOT_RETENTION_HOURS: i64 = 24;
-
-    /// Tracks portfolio-level topic stability and dream triggers.
-    ///
-    /// DISTINCT FROM TopicStability which tracks per-topic metrics.
-    /// This tracks the entire topic portfolio over time.
-    pub struct TopicStabilityTracker {
-        snapshots: VecDeque&lt;TopicSnapshot&gt;,
-        current_churn: f32,
-        high_entropy_start: Option&lt;DateTime&lt;Utc&gt;&gt;,
-        churn_threshold: f32,
-        entropy_threshold: f32,
-        entropy_duration_secs: u64,
-        churn_history: VecDeque&lt;(DateTime&lt;Utc&gt;, f32)&gt;,
-    }
-
-    impl TopicStabilityTracker {
-        pub fn new() -> Self;
-        pub fn with_thresholds(churn: f32, entropy: f32, duration_secs: u64) -> Self;
-        pub fn take_snapshot(&amp;mut self, topics: &amp;[Topic]);
-        pub fn track_churn(&amp;mut self) -> f32;
-        pub fn check_dream_trigger(&amp;mut self, entropy: f32) -> bool;
-        pub fn current_churn(&amp;self) -> f32;
-        pub fn get_churn_history(&amp;self) -> Vec&lt;(DateTime&lt;Utc&gt;, f32)&gt;;
-        pub fn snapshot_count(&amp;self) -> usize;
-        pub fn latest_snapshot(&amp;self) -> Option&lt;&amp;TopicSnapshot&gt;;
-        pub fn average_churn(&amp;self, hours: i64) -> f32;
-        pub fn is_stable(&amp;self) -> bool;
-        pub fn topic_count_change(&amp;self) -> (i32, i32);
-        pub fn reset_entropy_tracking(&amp;mut self);
-        fn cleanup_old_snapshots(&amp;mut self);
-        fn compute_churn(&amp;self, old: &amp;TopicSnapshot, current: &amp;TopicSnapshot) -> f32;
-    }
-  </signatures>
-
-  <constraints>
-    - Keep last 24 hours of snapshots
-    - churn = (topics_added + topics_removed) / total_unique_topics
-    - Dream trigger per AP-70: (entropy > 0.7 AND churn > 0.5) OR (entropy > 0.7 for 5+ min)
-    - Do NOT use TopicProfile in TopicSnapshot (only need topic_ids for churn)
-    - Handle edge cases: empty topics, single snapshot, zero topics
-    - No NaN/Infinity in churn calculations (AP-10)
-  </constraints>
-
-  <verification>
-    - take_snapshot correctly captures topic IDs and member counts
-    - track_churn computes correct rate using Jaccard-like formula
-    - check_dream_trigger fires on (entropy > 0.7 AND churn > 0.5)
-    - check_dream_trigger fires on sustained high entropy (5+ minutes)
-    - Old snapshots cleaned up after 24 hours
-    - Churn history accessible and correctly maintained
-    - reset_entropy_tracking clears high_entropy_start
-    - is_stable returns true when average churn < 0.2 over 6 hours
-  </verification>
-</definition_of_done>
-
-<implementation>
-File: crates/context-graph-core/src/clustering/stability.rs
-
-```rust
 //! Portfolio-level topic stability tracking for dream triggers.
 //!
 //! DISTINCT FROM TopicStability (per-topic metrics in topic.rs).
@@ -253,26 +50,21 @@ pub struct TopicSnapshot {
 impl TopicSnapshot {
     /// Create snapshot from current topic portfolio.
     pub fn from_topics(topics: &[Topic]) -> Self {
-        let topic_ids: Vec<Uuid> = topics.iter().map(|t| t.id).collect();
-        let total_members: usize = topics.iter().map(|t| t.member_count()).sum();
-
-        Self {
-            timestamp: Utc::now(),
-            topic_ids,
-            total_members,
-        }
+        Self::at_time(topics, Utc::now())
     }
 
     /// Create snapshot with specific timestamp (for testing).
     #[cfg(test)]
     pub fn with_timestamp(topics: &[Topic], timestamp: DateTime<Utc>) -> Self {
-        let topic_ids: Vec<Uuid> = topics.iter().map(|t| t.id).collect();
-        let total_members: usize = topics.iter().map(|t| t.member_count()).sum();
+        Self::at_time(topics, timestamp)
+    }
 
+    /// Internal helper to create a snapshot at a given time.
+    fn at_time(topics: &[Topic], timestamp: DateTime<Utc>) -> Self {
         Self {
             timestamp,
-            topic_ids,
-            total_members,
+            topic_ids: topics.iter().map(|t| t.id).collect(),
+            total_members: topics.iter().map(|t| t.member_count()).sum(),
         }
     }
 }
@@ -372,53 +164,42 @@ impl TopicStabilityTracker {
         let now = Utc::now();
         let one_hour_ago = now - Duration::hours(1);
 
-        // Find closest snapshot to 1 hour ago
+        // Find closest snapshot to 1 hour ago (iterate from back for efficiency)
         let old_snapshot = self
             .snapshots
             .iter()
-            .filter(|s| s.timestamp <= one_hour_ago)
-            .last()
-            .cloned();
+            .rev()
+            .find(|s| s.timestamp <= one_hour_ago);
 
-        let current_snapshot = self.snapshots.back().cloned();
-
-        let churn = match (old_snapshot, current_snapshot) {
-            (Some(old), Some(current)) => self.compute_churn(&old, &current),
-            _ => 0.0, // Not enough data
+        // Compute churn if we have both old and current snapshots
+        let churn = match (old_snapshot, self.snapshots.back()) {
+            (Some(old), Some(current)) => self.compute_churn(old, current),
+            _ => 0.0,
         };
 
         self.current_churn = churn;
         self.churn_history.push_back((now, churn));
-
-        // Maintain 24-hour churn history
-        let cutoff = now - Duration::hours(24);
-        while let Some((timestamp, _)) = self.churn_history.front() {
-            if *timestamp < cutoff {
-                self.churn_history.pop_front();
-            } else {
-                break;
-            }
-        }
+        self.cleanup_old_churn_history(now);
 
         churn
     }
 
-    /// Compute churn between two snapshots using Jaccard-like formula.
+    /// Compute churn between two snapshots using Jaccard distance formula.
     ///
     /// churn = |symmetric_difference| / |union|
+    ///
+    /// This is equivalent to 1 - Jaccard similarity.
     fn compute_churn(&self, old: &TopicSnapshot, current: &TopicSnapshot) -> f32 {
         let old_ids: HashSet<_> = old.topic_ids.iter().collect();
         let current_ids: HashSet<_> = current.topic_ids.iter().collect();
 
-        let added = current_ids.difference(&old_ids).count();
-        let removed = old_ids.difference(&current_ids).count();
         let union_count = old_ids.union(&current_ids).count();
-
         if union_count == 0 {
             return 0.0;
         }
 
-        let churn = (added + removed) as f32 / union_count as f32;
+        let symmetric_diff = old_ids.symmetric_difference(&current_ids).count();
+        let churn = symmetric_diff as f32 / union_count as f32;
 
         // Guard against NaN/Infinity per AP-10
         if churn.is_nan() || churn.is_infinite() {
@@ -441,26 +222,24 @@ impl TopicStabilityTracker {
     /// true if dream should be triggered
     pub fn check_dream_trigger(&mut self, entropy: f32) -> bool {
         let now = Utc::now();
+        let is_high_entropy = entropy > self.entropy_threshold;
 
-        // Track high-entropy duration
-        if entropy > self.entropy_threshold {
-            if self.high_entropy_start.is_none() {
-                self.high_entropy_start = Some(now);
-            }
-        } else {
-            // Reset when entropy drops below threshold
-            self.high_entropy_start = None;
-        }
+        // Track high-entropy duration: start timer or reset based on current entropy
+        self.high_entropy_start = match (is_high_entropy, self.high_entropy_start) {
+            (true, None) => Some(now),
+            (true, Some(start)) => Some(start),
+            (false, _) => None,
+        };
 
         // Condition 1: High entropy AND high churn (per AP-70)
-        if entropy > self.entropy_threshold && self.current_churn > self.churn_threshold {
+        if is_high_entropy && self.current_churn > self.churn_threshold {
             return true;
         }
 
-        // Condition 2: Sustained high entropy
+        // Condition 2: Sustained high entropy for required duration
         if let Some(start) = self.high_entropy_start {
-            let duration = now.signed_duration_since(start);
-            if duration.num_seconds() as u64 >= self.entropy_duration_secs {
+            let duration_secs = now.signed_duration_since(start).num_seconds();
+            if duration_secs >= 0 && duration_secs as u64 >= self.entropy_duration_secs {
                 return true;
             }
         }
@@ -472,6 +251,15 @@ impl TopicStabilityTracker {
     #[inline]
     pub fn current_churn(&self) -> f32 {
         self.current_churn
+    }
+
+    /// Set current churn rate (for testing/simulation).
+    ///
+    /// # Arguments
+    /// * `churn` - Churn value (clamped to 0.0..=1.0)
+    #[inline]
+    pub fn set_current_churn(&mut self, churn: f32) {
+        self.current_churn = churn.clamp(0.0, 1.0);
     }
 
     /// Get churn history with timestamps.
@@ -500,26 +288,22 @@ impl TopicStabilityTracker {
     pub fn average_churn(&self, hours: i64) -> f32 {
         let cutoff = Utc::now() - Duration::hours(hours);
 
-        let relevant: Vec<f32> = self
+        let (sum, count) = self
             .churn_history
             .iter()
             .filter(|(t, _)| *t >= cutoff)
-            .map(|(_, c)| *c)
-            .collect();
+            .fold((0.0f32, 0usize), |(sum, count), (_, churn)| {
+                (sum + churn, count + 1)
+            });
 
-        if relevant.is_empty() {
+        if count == 0 {
             return 0.0;
         }
 
-        let sum: f32 = relevant.iter().sum();
-        let avg = sum / relevant.len() as f32;
+        let avg = sum / count as f32;
 
         // Guard against NaN per AP-10
-        if avg.is_nan() {
-            0.0
-        } else {
-            avg
-        }
+        if avg.is_nan() { 0.0 } else { avg }
     }
 
     /// Check if system is stable (low churn over time).
@@ -536,25 +320,21 @@ impl TopicStabilityTracker {
     /// # Returns
     /// (topics_added, topics_removed) since oldest snapshot
     pub fn topic_count_change(&self) -> (i32, i32) {
-        if self.snapshots.len() < 2 {
+        let (Some(oldest), Some(current)) = (self.snapshots.front(), self.snapshots.back()) else {
+            return (0, 0);
+        };
+
+        if oldest.timestamp == current.timestamp {
             return (0, 0);
         }
 
-        let oldest = self.snapshots.front().map(|s| &s.topic_ids);
-        let current = self.snapshots.back().map(|s| &s.topic_ids);
+        let old_set: HashSet<_> = oldest.topic_ids.iter().collect();
+        let cur_set: HashSet<_> = current.topic_ids.iter().collect();
 
-        match (oldest, current) {
-            (Some(old_ids), Some(cur_ids)) => {
-                let old_set: HashSet<_> = old_ids.iter().collect();
-                let cur_set: HashSet<_> = cur_ids.iter().collect();
+        let added = cur_set.difference(&old_set).count() as i32;
+        let removed = old_set.difference(&cur_set).count() as i32;
 
-                let added = cur_set.difference(&old_set).count() as i32;
-                let removed = old_set.difference(&cur_set).count() as i32;
-
-                (added, removed)
-            }
-            _ => (0, 0),
-        }
+        (added, removed)
     }
 
     /// Reset high-entropy tracking (call after dream completes).
@@ -565,10 +345,23 @@ impl TopicStabilityTracker {
     /// Remove snapshots older than 24 hours.
     fn cleanup_old_snapshots(&mut self) {
         let cutoff = Utc::now() - Duration::hours(SNAPSHOT_RETENTION_HOURS);
+        Self::cleanup_before(&mut self.snapshots, |s| s.timestamp, cutoff);
+    }
 
-        while let Some(snapshot) = self.snapshots.front() {
-            if snapshot.timestamp < cutoff {
-                self.snapshots.pop_front();
+    /// Remove churn history entries older than 24 hours.
+    fn cleanup_old_churn_history(&mut self, now: DateTime<Utc>) {
+        let cutoff = now - Duration::hours(SNAPSHOT_RETENTION_HOURS);
+        Self::cleanup_before(&mut self.churn_history, |(ts, _)| *ts, cutoff);
+    }
+
+    /// Generic helper to remove entries with timestamp before cutoff.
+    fn cleanup_before<T, F>(deque: &mut VecDeque<T>, get_time: F, cutoff: DateTime<Utc>)
+    where
+        F: Fn(&T) -> DateTime<Utc>,
+    {
+        while let Some(entry) = deque.front() {
+            if get_time(entry) < cutoff {
+                deque.pop_front();
             } else {
                 break;
             }
@@ -941,7 +734,7 @@ mod tests {
 
         // Need at least 2 snapshots with time gap for churn calc
         let id1 = Uuid::new_v4();
-        let topics1 = create_test_topics(&[id1]);
+        let _topics1 = create_test_topics(&[id1]);
 
         // Manually add old snapshot
         tracker.snapshots.push_back(TopicSnapshot {
@@ -1107,160 +900,160 @@ mod tests {
 
         println!("[PASS] Custom thresholds clamped correctly\n");
     }
+
+    // ===== Boundary Condition Tests =====
+
+    #[test]
+    fn test_dream_trigger_boundary_exactly_at_threshold() {
+        println!("=== TEST: test_dream_trigger_boundary_exactly_at_threshold ===");
+        let mut tracker = TopicStabilityTracker::new();
+        tracker.current_churn = 0.5; // Exactly at threshold
+
+        println!("STATE: entropy=0.7, churn=0.5 (exactly at thresholds)");
+
+        let should_trigger = tracker.check_dream_trigger(0.7);
+
+        println!("RESULT: should_trigger = {}", should_trigger);
+
+        // Per AP-70: need entropy > 0.7, not >=
+        assert!(!should_trigger, "At threshold (not above) should NOT trigger");
+
+        println!("[PASS] Boundary condition: exactly at threshold does not trigger\n");
+    }
+
+    #[test]
+    fn test_dream_trigger_just_above_threshold() {
+        println!("=== TEST: test_dream_trigger_just_above_threshold ===");
+        let mut tracker = TopicStabilityTracker::new();
+        tracker.current_churn = 0.51; // Just above threshold
+
+        println!("STATE: entropy=0.71, churn=0.51 (just above thresholds)");
+
+        let should_trigger = tracker.check_dream_trigger(0.71);
+
+        println!("RESULT: should_trigger = {}", should_trigger);
+
+        assert!(should_trigger, "Just above thresholds should trigger");
+
+        println!("[PASS] Just above threshold triggers dream\n");
+    }
+
+    #[test]
+    fn test_churn_from_empty_to_populated() {
+        println!("=== TEST: test_churn_from_empty_to_populated ===");
+        let tracker = TopicStabilityTracker::new();
+
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+
+        let old = TopicSnapshot {
+            timestamp: Utc::now() - Duration::hours(1),
+            topic_ids: vec![],
+            total_members: 0,
+        };
+        let current = TopicSnapshot {
+            timestamp: Utc::now(),
+            topic_ids: vec![id1, id2],
+            total_members: 10,
+        };
+
+        println!("STATE: empty -> 2 topics");
+
+        let churn = tracker.compute_churn(&old, &current);
+
+        println!("RESULT: churn = {}", churn);
+
+        // 2 added, 0 removed, union = 2, churn = 2/2 = 1.0
+        assert!((churn - 1.0).abs() < 0.001, "Empty to populated = 1.0 churn");
+
+        println!("[PASS] Empty to populated handled correctly\n");
+    }
+
+    #[test]
+    fn test_churn_from_populated_to_empty() {
+        println!("=== TEST: test_churn_from_populated_to_empty ===");
+        let tracker = TopicStabilityTracker::new();
+
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+
+        let old = TopicSnapshot {
+            timestamp: Utc::now() - Duration::hours(1),
+            topic_ids: vec![id1, id2],
+            total_members: 10,
+        };
+        let current = TopicSnapshot {
+            timestamp: Utc::now(),
+            topic_ids: vec![],
+            total_members: 0,
+        };
+
+        println!("STATE: 2 topics -> empty");
+
+        let churn = tracker.compute_churn(&old, &current);
+
+        println!("RESULT: churn = {}", churn);
+
+        // 0 added, 2 removed, union = 2, churn = 2/2 = 1.0
+        assert!((churn - 1.0).abs() < 0.001, "Populated to empty = 1.0 churn");
+
+        println!("[PASS] Populated to empty handled correctly\n");
+    }
+
+    #[test]
+    fn test_nan_prevention_in_average_churn() {
+        println!("=== TEST: test_nan_prevention_in_average_churn ===");
+        let tracker = TopicStabilityTracker::new();
+
+        // Empty history
+        let avg = tracker.average_churn(6);
+
+        println!("Empty history average = {}", avg);
+
+        assert!(!avg.is_nan(), "Average should not be NaN for empty history");
+        assert_eq!(avg, 0.0, "Empty history should return 0.0");
+
+        println!("[PASS] NaN prevention in average_churn\n");
+    }
+
+    #[test]
+    fn test_latest_snapshot_returns_most_recent() {
+        println!("=== TEST: test_latest_snapshot_returns_most_recent ===");
+        let mut tracker = TopicStabilityTracker::new();
+
+        let topics1 = create_random_topics(2);
+        let topics2 = create_random_topics(5);
+
+        tracker.take_snapshot(&topics1);
+        tracker.take_snapshot(&topics2);
+
+        println!("STATE: 2 snapshots taken, latest has 5 topics");
+
+        let latest = tracker.latest_snapshot();
+
+        assert!(latest.is_some());
+        assert_eq!(latest.unwrap().topic_ids.len(), 5, "Latest should have 5 topics");
+
+        println!("[PASS] latest_snapshot returns most recent\n");
+    }
+
+    #[test]
+    fn test_snapshot_count_change_single_snapshot() {
+        println!("=== TEST: test_snapshot_count_change_single_snapshot ===");
+        let mut tracker = TopicStabilityTracker::new();
+
+        let topics = create_random_topics(3);
+        tracker.take_snapshot(&topics);
+
+        println!("STATE: only 1 snapshot");
+
+        let (added, removed) = tracker.topic_count_change();
+
+        println!("RESULT: added={}, removed={}", added, removed);
+
+        assert_eq!(added, 0, "Single snapshot should show 0 added");
+        assert_eq!(removed, 0, "Single snapshot should show 0 removed");
+
+        println!("[PASS] Single snapshot returns (0, 0)\n");
+    }
 }
-```
-</implementation>
-
-<files_to_create>
-  <file path="crates/context-graph-core/src/clustering/stability.rs">TopicStabilityTracker implementation with tests</file>
-</files_to_create>
-
-<files_to_modify>
-  <file path="crates/context-graph-core/src/clustering/mod.rs">
-    Add: pub mod stability;
-    Add exports: pub use stability::{TopicSnapshot, TopicStabilityTracker, DEFAULT_CHURN_THRESHOLD, DEFAULT_ENTROPY_THRESHOLD, DEFAULT_ENTROPY_DURATION_SECS, SNAPSHOT_RETENTION_HOURS};
-  </file>
-</files_to_modify>
-
-<full_state_verification>
-## Source of Truth
-- The TopicStabilityTracker state is stored in-memory in the tracker struct
-- Verification requires inspecting: snapshots VecDeque, current_churn, high_entropy_start, churn_history
-
-## Post-Implementation Verification Steps
-
-1. COMPILE CHECK:
-   ```bash
-   cargo check --package context-graph-core
-   # Expected: No errors
-   ```
-
-2. RUN UNIT TESTS:
-   ```bash
-   cargo test --package context-graph-core stability -- --nocapture
-   # Expected: All tests pass with STATE BEFORE/AFTER logging
-   ```
-
-3. VERIFY MODULE EXPORT:
-   ```bash
-   cargo doc --package context-graph-core --no-deps 2>&1 | grep -i stability
-   # Expected: stability module appears in docs
-   ```
-
-4. VERIFY INTEGRATION WITH EXISTING TYPES:
-   ```bash
-   cargo test --package context-graph-core topic -- --nocapture
-   # Expected: Existing topic tests still pass
-   ```
-
-## Manual Edge Case Verification
-
-### Edge Case 1: Empty Topic Portfolio
-INPUT: tracker.take_snapshot(&[])
-EXPECTED: snapshot.topic_ids = [], snapshot.total_members = 0
-VERIFY: Assert snapshot_count increments, no panic
-
-### Edge Case 2: Dream Trigger Boundary Conditions
-INPUT: entropy = 0.7 (exactly threshold), churn = 0.5 (exactly threshold)
-EXPECTED: Should NOT trigger (needs > not >=)
-VERIFY: check_dream_trigger(0.7) with current_churn = 0.5 returns false
-
-### Edge Case 3: NaN Prevention
-INPUT: compute_churn with empty snapshots (potential 0/0)
-EXPECTED: Returns 0.0, not NaN
-VERIFY: churn.is_nan() == false, churn == 0.0
-
-## Evidence of Success
-After implementation, running tests should show:
-```
-running X tests
-=== TEST: test_snapshot_creation ===
-STATE BEFORE: 5 topics created
-STATE AFTER: snapshot.topic_ids.len() = 5
-[PASS] Snapshot correctly captures topic portfolio
-...
-test result: ok. X passed; 0 failed
-```
-</full_state_verification>
-
-<validation_criteria>
-  <criterion>take_snapshot correctly captures topic IDs (not full profiles)</criterion>
-  <criterion>track_churn computes Jaccard-like formula correctly</criterion>
-  <criterion>check_dream_trigger fires ONLY when entropy > 0.7 AND churn > 0.5</criterion>
-  <criterion>check_dream_trigger fires ONLY on sustained high entropy (5+ min)</criterion>
-  <criterion>Old snapshots cleaned up after 24 hours</criterion>
-  <criterion>Churn history maintained and accessible</criterion>
-  <criterion>reset_entropy_tracking clears high_entropy_start</criterion>
-  <criterion>is_stable returns correct value based on 6-hour average</criterion>
-  <criterion>No NaN/Infinity in any calculations (AP-10)</criterion>
-  <criterion>All existing clustering tests still pass</criterion>
-</validation_criteria>
-
-<test_commands>
-  <command description="Run stability module tests with output">cargo test --package context-graph-core stability -- --nocapture</command>
-  <command description="Run all clustering tests">cargo test --package context-graph-core clustering</command>
-  <command description="Check compilation">cargo check --package context-graph-core</command>
-  <command description="Run clippy">cargo clippy --package context-graph-core -- -D warnings</command>
-  <command description="Verify module exports">cargo doc --package context-graph-core --no-deps</command>
-</test_commands>
-</task_spec>
-```
-
-## Execution Checklist
-
-- [x] Read TECH-PHASE4-CLUSTERING.md component contract for TopicStabilityTracker (lines 341-368)
-- [x] Read topic.rs to verify Topic::new signature matches implementation
-- [x] Create stability.rs with TopicSnapshot struct
-- [x] Create stability.rs with TopicStabilityTracker struct
-- [x] Implement take_snapshot method
-- [x] Implement track_churn method
-- [x] Implement compute_churn helper
-- [x] Implement check_dream_trigger (per AP-70)
-- [x] Implement cleanup_old_snapshots
-- [x] Implement churn history tracking
-- [x] Implement average_churn and is_stable
-- [x] Implement topic_count_change
-- [x] Implement reset_entropy_tracking
-- [x] Write comprehensive unit tests with STATE BEFORE/AFTER logging
-- [x] Update mod.rs with stability module exports
-- [x] Run `cargo check --package context-graph-core`
-- [x] Run `cargo test --package context-graph-core stability -- --nocapture`
-- [x] Run `cargo clippy --package context-graph-core -- -D warnings`
-- [x] Run full clustering test suite to verify no regressions
-- [x] Verify module appears in cargo doc output
-- [x] Phase 4 COMPLETE!
-
-## Implementation Summary
-
-**Completed**: 2026-01-17
-
-### Files Created
-- `crates/context-graph-core/src/clustering/stability.rs` - TopicSnapshot and TopicStabilityTracker implementation with 27 unit tests
-
-### Files Modified
-- `crates/context-graph-core/src/clustering/mod.rs` - Added stability module exports
-
-### Test Results
-- 27 internal unit tests: **PASS**
-- 14 FSV (Full State Verification) tests: **PASS**
-- 280 clustering regression tests: **PASS**
-- Cargo check: **PASS**
-- Clippy: **PASS**
-
-### Key Implementation Details
-1. TopicSnapshot captures topic IDs and member counts at a point in time
-2. TopicStabilityTracker maintains 24-hour snapshot and churn history
-3. Dream trigger conditions per AP-70: (entropy > 0.7 AND churn > 0.5) OR (entropy > 0.7 for 5+ minutes)
-4. Churn calculation uses Jaccard-like formula: |symmetric_difference| / |union|
-5. NaN/Infinity prevention per AP-10 in all calculations
-6. Public setter `set_current_churn()` added for FSV testing
-
-## Key Differences from Original Task
-
-1. **TopicSnapshot simplified**: Only stores topic_ids (not TopicProfile) since churn = topics added/removed
-2. **Topic::new signature corrected**: Uses actual signature from codebase (line 372-392)
-3. **Dream trigger clarified**: Per AP-70, BOTH conditions must use > not >=
-4. **Distinction from TopicStability**: Added clear documentation that this is portfolio-level, not per-topic
-5. **Full state verification section added**: With specific verification steps and expected outputs
-6. **Edge case tests added**: Empty portfolios, boundary conditions, NaN prevention
-7. **Tests include STATE BEFORE/AFTER logging**: For manual verification
