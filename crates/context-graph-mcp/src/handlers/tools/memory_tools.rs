@@ -11,6 +11,7 @@ use context_graph_core::traits::TeleologicalSearchOptions;
 use context_graph_core::types::fingerprint::{
     PurposeVector, TeleologicalFingerprint, NUM_EMBEDDERS,
 };
+use context_graph_core::teleological::matrix_search::embedder_names;
 use context_graph_core::types::UtlContext;
 
 use crate::protocol::JsonRpcId;
@@ -396,11 +397,15 @@ impl Handlers {
                     .iter()
                     .enumerate()
                     .map(|(i, r)| {
+                        // Convert embedder index to human-readable name (E1_Semantic, etc.)
+                        let dominant_idx = r.dominant_embedder();
+                        let dominant_name = embedder_names::name(dominant_idx);
+
                         let mut entry = json!({
                             "fingerprintId": r.fingerprint.id.to_string(),
                             "similarity": r.similarity,
                             "purposeAlignment": r.purpose_alignment,
-                            "dominantEmbedder": r.dominant_embedder(),
+                            "dominantEmbedder": dominant_name,
                             "alignmentScore": r.fingerprint.alignment_score
                         });
                         // Only include content field when includeContent=true

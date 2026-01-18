@@ -120,6 +120,11 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "type": "string",
                         "enum": ["text", "code", "image", "audio", "structured", "mixed"],
                         "description": "Filter results by modality"
+                    },
+                    "includeContent": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include content text in results"
                     }
                 },
                 "required": ["query"]
