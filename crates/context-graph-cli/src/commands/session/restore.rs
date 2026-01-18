@@ -113,7 +113,7 @@ pub async fn restore_identity_command(args: RestoreIdentityArgs) -> i32 {
     match input.source.as_str() {
         "clear" => handle_clear_source(&args),
         "resume" => handle_resume_source(&args, input.session_id),
-        "startup" | _ => handle_startup_source(&args),
+        _ => handle_startup_source(&args),
     }
 }
 

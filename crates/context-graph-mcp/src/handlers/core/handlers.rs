@@ -8,13 +8,12 @@ use parking_lot::RwLock;
 use serde_json::json;
 use tracing::info;
 
-use context_graph_core::monitoring::{LayerStatusProvider, StubLayerStatusProvider};
+use context_graph_core::monitoring::LayerStatusProvider;
 use context_graph_core::purpose::GoalHierarchy;
 use context_graph_core::traits::{
     MultiArrayEmbeddingProvider, TeleologicalMemoryStore, UtlProcessor,
 };
 
-use crate::adapters::UtlProcessorAdapter;
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
 
 /// Request handlers for MCP protocol.
@@ -41,27 +40,14 @@ pub struct Handlers {
 }
 
 impl Handlers {
-    /// Create new handlers with required dependencies.
+    /// Create handlers with all dependencies explicitly provided.
     ///
     /// # Arguments
     /// * `teleological_store` - Store for TeleologicalFingerprint
+    /// * `utl_processor` - UTL processor for learning metrics
     /// * `multi_array_provider` - 13-embedding generator
     /// * `goal_hierarchy` - Goal hierarchy (can be empty initially)
-    pub fn new(
-        teleological_store: Arc<dyn TeleologicalMemoryStore>,
-        multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
-        goal_hierarchy: GoalHierarchy,
-    ) -> Self {
-        Self {
-            teleological_store,
-            utl_processor: Arc::new(UtlProcessorAdapter::with_defaults()),
-            multi_array_provider,
-            goal_hierarchy: Arc::new(RwLock::new(goal_hierarchy)),
-            layer_status_provider: Arc::new(StubLayerStatusProvider::new()),
-        }
-    }
-
-    /// Create handlers with all dependencies explicitly provided.
+    /// * `layer_status_provider` - Provider for layer status information
     pub fn with_all(
         teleological_store: Arc<dyn TeleologicalMemoryStore>,
         utl_processor: Arc<dyn UtlProcessor>,

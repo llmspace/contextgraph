@@ -123,6 +123,7 @@ pub fn exit_code_for_error(e: &(dyn std::error::Error + 'static)) -> CliExitCode
 
 /// Helper to convert CliExitCode to i32 (for command handlers).
 #[inline]
+#[allow(dead_code)]
 pub fn to_exit_code_i32(code: CliExitCode) -> i32 {
     code as i32
 }

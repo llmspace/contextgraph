@@ -87,8 +87,8 @@ impl MemoryProvider for GraphMemoryProvider {
     /// # Arguments
     ///
     /// * `limit` - Maximum number of memories to retrieve
-    /// * `recency_bias` - How much to favor recent memories [0.0, 1.0]
-    ///                    Higher values = more recent memories preferred
+    /// * `recency_bias` - How much to favor recent memories [0.0, 1.0].
+    ///   Higher values = more recent memories preferred.
     ///
     /// # Returns
     ///

@@ -14,12 +14,18 @@
 //! # NO BACKWARDS COMPATIBILITY
 //! This module FAILS FAST on any error. Do not add fallback logic.
 
+// Allow dead code in submodules - these types are scaffolded for future hook implementations
+#[allow(dead_code)]
 mod args;
+#[allow(dead_code)]
 mod error;
+#[allow(dead_code)]
 pub mod post_tool_use;
+#[allow(dead_code)]
 pub mod pre_tool_use;
 pub mod session_end;
 pub mod session_start;
+#[allow(dead_code)]
 mod types;
 pub mod user_prompt_submit;
 

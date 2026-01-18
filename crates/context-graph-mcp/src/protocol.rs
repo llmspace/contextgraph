@@ -72,12 +72,6 @@ impl JsonRpcResponse {
             cognitive_pulse: None,
         }
     }
-
-    /// Add cognitive pulse header.
-    pub fn with_pulse(mut self, pulse: CognitivePulse) -> Self {
-        self.cognitive_pulse = Some(pulse);
-        self
-    }
 }
 
 /// Standard JSON-RPC error codes.

@@ -339,7 +339,7 @@ impl Handlers {
         // Serialize original fingerprints for reversal (FAIL FAST on serialization error)
         let original_fingerprints_json: Vec<String> = source_fingerprints
             .iter()
-            .map(|f| serde_json::to_string(f))
+            .map(serde_json::to_string)
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| {
                 error!(
@@ -830,7 +830,7 @@ impl Handlers {
         let n = vectors.len() as f32;
         let mut result = vec![0.0f32; dim];
 
-        for i in 0..dim {
+        for (i, result_val) in result.iter_mut().enumerate().take(dim) {
             let all_significant = vectors.iter().all(|v| {
                 v.get(i)
                     .map(|&x| x.abs() >= INTERSECTION_THRESHOLD)
@@ -839,7 +839,7 @@ impl Handlers {
 
             if all_significant {
                 let sum: f32 = vectors.iter().filter_map(|v| v.get(i)).sum();
-                result[i] = sum / n;
+                *result_val = sum / n;
             }
         }
 
@@ -869,7 +869,7 @@ impl Handlers {
     }
 
     /// Normalize a vector to unit length.
-    fn normalize_vector(vec: &mut Vec<f32>) {
+    fn normalize_vector(vec: &mut [f32]) {
         let magnitude: f32 = vec.iter().map(|x| x * x).sum::<f32>().sqrt();
         if magnitude > 0.0 {
             for val in vec.iter_mut() {

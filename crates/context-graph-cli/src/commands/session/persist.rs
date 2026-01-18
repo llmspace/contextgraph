@@ -35,7 +35,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 use serde::Deserialize;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use context_graph_core::gwt::session_snapshot::{store_in_cache, SessionCache, SessionSnapshot};
 

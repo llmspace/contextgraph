@@ -29,6 +29,7 @@ use super::types::{
 // ============================================================================
 
 /// UserPromptSubmit timeout in milliseconds
+#[allow(dead_code)]
 pub const USER_PROMPT_SUBMIT_TIMEOUT_MS: u64 = 2000;
 
 // ============================================================================

@@ -12,6 +12,9 @@
 //! Reference: NVIDIA Pro Tip - cuDeviceGetAttribute is orders of
 //! magnitude faster than cudaGetDeviceProperties.
 
+// FFI types match official CUDA API naming conventions
+#![allow(non_camel_case_types)]
+
 use std::ffi::c_void;
 use std::os::raw::{c_char, c_int, c_uint};
 

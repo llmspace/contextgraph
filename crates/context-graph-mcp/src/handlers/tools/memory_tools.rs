@@ -98,7 +98,7 @@ impl Handlers {
 
             // If no top-level goal is defined, use default purpose vector
             // This enables AUTONOMOUS operation - no manual configuration required
-            if hierarchy.top_level_goals().first().is_none() {
+            if hierarchy.top_level_goals().is_empty() {
                 debug!(
                     "inject_context: No top-level goal configured. Using default purpose vector. \
                      Memory will be stored with neutral alignment (can be recomputed later)."
@@ -243,7 +243,7 @@ impl Handlers {
 
             // If no strategic goal is defined, use default purpose vector
             // This enables AUTONOMOUS operation per ARCH-03 - no manual configuration required
-            if hierarchy.top_level_goals().first().is_none() {
+            if hierarchy.top_level_goals().is_empty() {
                 debug!(
                     "store_memory: No strategic goal configured. Using default purpose vector. \
                      Memory will be stored with neutral alignment (can be recomputed later \
