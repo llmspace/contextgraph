@@ -8,7 +8,7 @@
 //! 1. CRUD Operations (store, retrieve, update, delete)
 //! 2. Search Operations (semantic, purpose, sparse)
 //! 3. Batch Operations (store_batch, retrieve_batch)
-//! 4. Statistics (count, count_by_quadrant, storage_size)
+//! 4. Statistics (count, storage_size)
 //! 5. Persistence (flush, checkpoint, restore, compact)
 //! 6. Edge Cases (empty store, nonexistent IDs, filters)
 
@@ -20,8 +20,7 @@ use crate::traits::{
     TeleologicalStorageBackend,
 };
 use crate::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
-    NUM_EMBEDDERS,
+    PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint, NUM_EMBEDDERS,
 };
 
 /// Create a real test fingerprint with meaningful data.
@@ -29,7 +28,6 @@ fn create_real_fingerprint() -> TeleologicalFingerprint {
     TeleologicalFingerprint::new(
         SemanticFingerprint::zeroed(),
         PurposeVector::new([0.75; NUM_EMBEDDERS]),
-        JohariFingerprint::zeroed(),
         [0u8; 32],
     )
 }
@@ -39,7 +37,6 @@ fn create_fingerprint_with_alignment(alignment: f32) -> TeleologicalFingerprint 
     TeleologicalFingerprint::new(
         SemanticFingerprint::zeroed(),
         PurposeVector::new([alignment; NUM_EMBEDDERS]),
-        JohariFingerprint::zeroed(),
         [0u8; 32],
     )
 }
@@ -317,9 +314,6 @@ async fn test_empty_store_count() {
     let count = store.count().await.unwrap();
     assert_eq!(count, 0);
 
-    let quadrant_counts = store.count_by_quadrant().await.unwrap();
-    assert_eq!(quadrant_counts, [0, 0, 0, 0]);
-
     println!("[VERIFIED] test_empty_store_count: Empty store has zero counts");
 }
 
@@ -426,25 +420,6 @@ async fn test_sparse_search() {
         "[VERIFIED] test_sparse_search: Sparse search finds correct matches (top score={})",
         top_score
     );
-}
-
-#[tokio::test]
-async fn test_count_by_quadrant() {
-    let store = InMemoryTeleologicalStore::new();
-
-    // Store 4 fingerprints (all will have Unknown dominant due to zeroed Johari)
-    for _ in 0..4 {
-        store.store(create_real_fingerprint()).await.unwrap();
-    }
-
-    let counts = store.count_by_quadrant().await.unwrap();
-    let total: usize = counts.iter().sum();
-    assert_eq!(total, 4, "quadrant counts should sum to total");
-
-    // With zeroed Johari, all should be in quadrant 3 (Unknown)
-    assert_eq!(counts[3], 4, "all zeroed Johari should be Unknown quadrant");
-
-    println!("[VERIFIED] test_count_by_quadrant: Quadrant classification works correctly");
 }
 
 #[tokio::test]

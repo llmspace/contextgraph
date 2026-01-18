@@ -6,7 +6,7 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use context_graph_core::johari::NUM_EMBEDDERS;
+use context_graph_core::teleological::NUM_EMBEDDERS;
 use context_graph_core::traits::TeleologicalMemoryStore;
 
 use super::helpers::{

@@ -320,7 +320,6 @@ fn test_fingerprint_estimated_size() {
         Uuid::new_v4(),
         embeddings,
         [0.5f32; 13],
-        [0.25f32; 4],
         [0x42u8; 32],
     );
 
@@ -411,7 +410,6 @@ fn test_fingerprint_creation_timing() {
             Uuid::new_v4(),
             embeddings,
             [0.5f32; 13],
-            [0.25f32; 4],
             [0x42u8; 32],
         );
     }
@@ -525,7 +523,6 @@ fn test_edge_case_maximum_size_fingerprint() {
         Uuid::new_v4(),
         embeddings,
         [0.5f32; 13],
-        [0.25f32; 4],
         [0x42u8; 32],
     );
 
@@ -568,7 +565,6 @@ fn test_edge_case_minimum_size_fingerprint() {
         Uuid::new_v4(),
         embeddings,
         [0.5f32; 13],
-        [0.25f32; 4],
         [0x42u8; 32],
     );
 
@@ -602,7 +598,6 @@ fn test_edge_case_concurrent_creation() {
                         Uuid::new_v4(),
                         embeddings,
                         [0.5f32; 13],
-                        [0.25f32; 4],
                         [0x42u8; 32],
                     );
                     count.fetch_add(1, Ordering::Relaxed);

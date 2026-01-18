@@ -72,9 +72,9 @@ async fn test_fsv_purpose_alignment_with_hierarchy() {
     // =========================================================================
     // STEP 3: VERIFY DEPRECATED METHOD RETURNS METHOD_NOT_FOUND (TASK-CORE-001)
     // =========================================================================
-    println!("STEP 3: purpose/north_star_alignment (deprecated per ARCH-03)");
+    println!("STEP 3: purpose/alignment (deprecated per ARCH-03)");
     let align_request = make_request(
-        "purpose/north_star_alignment",
+        "purpose/alignment",
         2,
         json!({
             "fingerprint_id": fingerprint_id,
@@ -158,7 +158,7 @@ async fn test_fsv_purpose_alignment_with_hierarchy() {
     let all_goals_arr = all_result["goals"].as_array().unwrap();
     println!("   - get_all: {} goals", all_goals_arr.len());
 
-    // TASK-P0-001: Extract Strategic goal ID (not NorthStar which no longer exists)
+    // TASK-P0-001: Extract Strategic goal ID
     let strategic_id = all_goals_arr
         .iter()
         .find(|g| g["level"].as_str() == Some("Strategic"))
@@ -222,7 +222,7 @@ async fn test_fsv_purpose_alignment_with_hierarchy() {
     println!("Operations Verified:");
     // TASK-P0-001: Updated counts for 3-level hierarchy
     println!("  1. Goal hierarchy: 4 goals (2 Strategic + 1 Tactical + 1 Immediate)");
-    println!("  2. North Star alignment: Returns METHOD_NOT_FOUND (deprecated per TASK-CORE-001)");
+    println!("  2. Purpose alignment: Returns METHOD_NOT_FOUND (deprecated per TASK-CORE-001)");
     println!("  3. Fingerprint stored and verified in Source of Truth");
     println!(
         "  4. Drift check: {} fingerprints analyzed",

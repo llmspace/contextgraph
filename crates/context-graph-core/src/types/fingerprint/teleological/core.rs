@@ -6,7 +6,6 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::types::fingerprint::evolution::{EvolutionTrigger, PurposeSnapshot};
-use crate::types::fingerprint::johari::JohariFingerprint;
 use crate::types::fingerprint::purpose::PurposeVector;
 use crate::types::fingerprint::SemanticFingerprint;
 
@@ -36,29 +35,23 @@ impl TeleologicalFingerprint {
     /// # Arguments
     /// * `semantic` - The semantic fingerprint (13 embeddings)
     /// * `purpose_vector` - The purpose alignment vector
-    /// * `johari` - The Johari awareness classification
     /// * `content_hash` - SHA-256 hash of source content
     pub fn new(
         semantic: SemanticFingerprint,
         purpose_vector: PurposeVector,
-        johari: JohariFingerprint,
         content_hash: [u8; 32],
     ) -> Self {
         let now = Utc::now();
         let alignment_score = purpose_vector.aggregate_alignment();
 
         // Create initial snapshot
-        let initial_snapshot = PurposeSnapshot::new(
-            purpose_vector.clone(),
-            johari.clone(),
-            EvolutionTrigger::Created,
-        );
+        let initial_snapshot =
+            PurposeSnapshot::new(purpose_vector.clone(), EvolutionTrigger::Created);
 
         Self {
             id: Uuid::new_v4(),
             semantic,
             purpose_vector,
-            johari,
             purpose_evolution: vec![initial_snapshot],
             alignment_score,
             content_hash,
@@ -73,10 +66,9 @@ impl TeleologicalFingerprint {
         id: Uuid,
         semantic: SemanticFingerprint,
         purpose_vector: PurposeVector,
-        johari: JohariFingerprint,
         content_hash: [u8; 32],
     ) -> Self {
-        let mut fp = Self::new(semantic, purpose_vector, johari, content_hash);
+        let mut fp = Self::new(semantic, purpose_vector, content_hash);
         fp.id = id;
         fp
     }
@@ -92,8 +84,7 @@ impl TeleologicalFingerprint {
     /// # Arguments
     /// * `trigger` - What caused this evolution event
     pub fn record_snapshot(&mut self, trigger: EvolutionTrigger) {
-        let snapshot =
-            PurposeSnapshot::new(self.purpose_vector.clone(), self.johari.clone(), trigger);
+        let snapshot = PurposeSnapshot::new(self.purpose_vector.clone(), trigger);
 
         self.purpose_evolution.push(snapshot);
 

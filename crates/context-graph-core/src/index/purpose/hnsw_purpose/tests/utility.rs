@@ -4,7 +4,6 @@ use uuid::Uuid;
 
 use crate::index::config::{DistanceMetric, HnswConfig, PURPOSE_VECTOR_DIM};
 use crate::types::fingerprint::PurposeVector;
-use crate::types::JohariQuadrant;
 
 use crate::index::purpose::entry::{GoalId, PurposeIndexEntry, PurposeMetadata};
 use crate::index::purpose::hnsw_purpose::{HnswPurposeIndex, PurposeIndexOps};
@@ -22,13 +21,13 @@ fn create_purpose_vector(base: f32, variation: f32) -> PurposeVector {
     PurposeVector::new(alignments)
 }
 
-fn create_metadata(goal: &str, quadrant: JohariQuadrant) -> PurposeMetadata {
-    PurposeMetadata::new(GoalId::new(goal), 0.85, quadrant).unwrap()
+fn create_metadata(goal: &str) -> PurposeMetadata {
+    PurposeMetadata::new(GoalId::new(goal), 0.85).unwrap()
 }
 
-fn create_entry(base: f32, goal: &str, quadrant: JohariQuadrant) -> PurposeIndexEntry {
+fn create_entry(base: f32, goal: &str) -> PurposeIndexEntry {
     let pv = create_purpose_vector(base, 0.02);
-    let metadata = create_metadata(goal, quadrant);
+    let metadata = create_metadata(goal);
     PurposeIndexEntry::new(Uuid::new_v4(), pv, metadata)
 }
 
@@ -43,7 +42,7 @@ fn purpose_config() -> HnswConfig {
 #[test]
 fn test_contains() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
-    let entry = create_entry(0.5, "goal", JohariQuadrant::Open);
+    let entry = create_entry(0.5, "goal");
     let id = entry.memory_id;
     let other_id = Uuid::new_v4();
 
@@ -65,9 +64,7 @@ fn test_len_and_is_empty() {
     assert!(index.is_empty());
     assert_eq!(index.len(), 0);
 
-    index
-        .insert(create_entry(0.5, "goal", JohariQuadrant::Open))
-        .unwrap();
+    index.insert(create_entry(0.5, "goal")).unwrap();
 
     assert!(!index.is_empty());
     assert_eq!(index.len(), 1);
@@ -81,11 +78,7 @@ fn test_clear() {
 
     for i in 0..10 {
         index
-            .insert(create_entry(
-                0.3 + i as f32 * 0.05,
-                &format!("goal_{}", i % 3),
-                JohariQuadrant::Open,
-            ))
+            .insert(create_entry(0.3 + i as f32 * 0.05, &format!("goal_{}", i % 3)))
             .unwrap();
     }
 
@@ -105,15 +98,9 @@ fn test_clear() {
 fn test_goals_returns_all_goals() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
 
-    index
-        .insert(create_entry(0.5, "alpha", JohariQuadrant::Open))
-        .unwrap();
-    index
-        .insert(create_entry(0.6, "beta", JohariQuadrant::Hidden))
-        .unwrap();
-    index
-        .insert(create_entry(0.7, "gamma", JohariQuadrant::Blind))
-        .unwrap();
+    index.insert(create_entry(0.5, "alpha")).unwrap();
+    index.insert(create_entry(0.6, "beta")).unwrap();
+    index.insert(create_entry(0.7, "gamma")).unwrap();
 
     let goals = index.goals();
 
@@ -135,9 +122,7 @@ fn test_goals_returns_all_goals() {
 fn test_filter_returns_empty_when_no_matches() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
 
-    index
-        .insert(create_entry(0.5, "goal_a", JohariQuadrant::Open))
-        .unwrap();
+    index.insert(create_entry(0.5, "goal_a")).unwrap();
 
     // Search with non-existent goal filter
     let query = PurposeQuery::new(
@@ -161,7 +146,7 @@ fn test_search_results_sorted_by_similarity() {
 
     for i in 0..10 {
         index
-            .insert(create_entry(0.1 * i as f32, "goal", JohariQuadrant::Open))
+            .insert(create_entry(0.1 * i as f32, "goal"))
             .unwrap();
     }
 
@@ -191,7 +176,7 @@ fn test_search_results_sorted_by_similarity() {
 fn test_search_result_contains_complete_data() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
 
-    let entry = create_entry(0.75, "complete_goal", JohariQuadrant::Blind);
+    let entry = create_entry(0.75, "complete_goal");
     index.insert(entry.clone()).unwrap();
 
     let query = PurposeQuery::new(
@@ -214,10 +199,6 @@ fn test_search_result_contains_complete_data() {
     assert_eq!(
         result.metadata.primary_goal.as_str(),
         entry.metadata.primary_goal.as_str()
-    );
-    assert_eq!(
-        result.metadata.dominant_quadrant,
-        entry.metadata.dominant_quadrant
     );
 
     println!("[VERIFIED] Search result contains complete entry data");

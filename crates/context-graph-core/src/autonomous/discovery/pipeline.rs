@@ -208,7 +208,7 @@ impl GoalDiscoveryPipeline {
     /// Assign goal level based on size and coherence thresholds.
     ///
     /// Thresholds:
-    /// - NorthStar: size >= 50 AND coherence >= 0.85
+    /// - Strategic (top): size >= 50 AND coherence >= 0.85
     /// - Strategic: size >= 20 AND coherence >= 0.80
     /// - Tactical: size >= 10 AND coherence >= 0.75
     /// - Operational: everything else
@@ -289,7 +289,7 @@ impl GoalDiscoveryPipeline {
     }
 
     /// Convert level to ordering number.
-    /// TASK-P0-001: Removed NorthStar, Strategic is now 0.
+    /// TASK-P0-001: Uses 3-level hierarchy, Strategic is now 0.
     fn level_order(level: &GoalLevel) -> u8 {
         match level {
             GoalLevel::Strategic => 0,

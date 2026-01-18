@@ -183,20 +183,19 @@ impl QuantizedFingerprintStorage for RocksDbMemex {
             }
         };
 
-        // Note: johari_quadrants and content_hash are stored in CF_FINGERPRINTS
+        // Note: content_hash is stored in CF_FINGERPRINTS
         // as part of the full TeleologicalFingerprint. For quantized-only storage,
         // we use defaults. Callers needing full metadata should use the
         // TeleologicalMemoryStore::get() method instead.
         //
         // FAIL FAST is maintained: embeddings are required (panic if missing),
         // purpose_vector is loaded from storage (warn if missing),
-        // johari/hash use documented defaults (caller's responsibility).
+        // content_hash uses documented default (caller's responsibility).
         Ok(StoredQuantizedFingerprint::new(
             id,
             embeddings,
             purpose_vector,
-            [0.25f32; 4], // Johari quadrants default - load from CF_FINGERPRINTS if needed
-            [0u8; 32],    // Content hash default - load from CF_FINGERPRINTS if needed
+            [0u8; 32], // Content hash default - load from CF_FINGERPRINTS if needed
         ))
     }
 

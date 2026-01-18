@@ -164,9 +164,9 @@ mod tests {
 
         let base_centroid = create_test_fingerprint(0, 0.0);
 
-        // Test NorthStar: size=50, coherence=0.85
+        // Test Strategic: size=50, coherence=0.85
         let candidate_ns = GoalCandidate {
-            goal_id: "ns".to_string(),
+            goal_id: "strategic".to_string(),
             description: "Test".to_string(),
             level: GoalLevel::Operational,
             confidence: 0.9,
@@ -237,7 +237,7 @@ mod tests {
         let base_centroid = create_test_fingerprint(0, 0.0);
         let similar_centroid = create_test_fingerprint(0, 0.05); // Very similar
 
-        // Parent cluster: Large (50 members), high coherence (NorthStar)
+        // Parent cluster: Large (50 members), high coherence (Strategic)
         let parent = GoalCandidate {
             goal_id: "parent".to_string(),
             description: "Parent goal".to_string(),

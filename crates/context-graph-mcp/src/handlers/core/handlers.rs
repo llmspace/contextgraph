@@ -2,9 +2,10 @@
 //!
 //! TASK-S001: Updated to use TeleologicalMemoryStore and MultiArrayEmbeddingProvider.
 //! TASK-S003: Added GoalAlignmentCalculator for purpose/goal operations.
-//! TASK-S004: Added JohariTransitionManager for johari/* handlers.
 //! TASK-S005: Added MetaUtlTracker for meta_utl/* handlers.
-//! TASK-GWT-001: Added GWT/Kuramoto provider traits for consciousness operations.
+//! TASK-GWT-001: Added GWT provider traits for workspace/ego operations.
+//!
+//! Note: Uses embedder category weights per CLAUDE.md.
 
 use std::sync::Arc;
 
@@ -17,11 +18,6 @@ use context_graph_core::dream::{
 };
 // TASK-004: Import PredictionHistory for autonomous learner predictions
 use super::super::autonomous::PredictionHistory;
-// TASK-IDENTITY-P0-001: Import GWT identity components for shared monitor wiring
-use context_graph_core::gwt::ego_node::SelfEgoNode;
-use context_graph_core::gwt::listeners::IdentityContinuityListener;
-use context_graph_core::gwt::workspace::WorkspaceEventBroadcaster;
-use context_graph_core::johari::{DynDefaultJohariManager, JohariTransitionManager};
 use context_graph_core::monitoring::{
     LayerStatusProvider, StubLayerStatusProvider, StubSystemMonitor, SystemMonitor,
 };
@@ -31,9 +27,7 @@ use context_graph_core::traits::{
     MultiArrayEmbeddingProvider, TeleologicalMemoryStore, UtlProcessor,
 };
 
-use super::super::gwt_traits::{
-    GwtSystemProvider, KuramotoProvider, MetaCognitiveProvider, SelfEgoProvider, WorkspaceProvider,
-};
+use super::super::gwt_traits::{GwtSystemProvider, MetaCognitiveProvider, WorkspaceProvider};
 use super::meta_utl_tracker::MetaUtlTracker;
 
 /// Request handlers for MCP protocol.
@@ -41,7 +35,6 @@ use super::meta_utl_tracker::MetaUtlTracker;
 /// Uses TeleologicalMemoryStore for 13-embedding fingerprint storage
 /// and MultiArrayEmbeddingProvider for generating all 13 embeddings.
 /// TASK-S003: Added GoalAlignmentCalculator and GoalHierarchy for purpose operations.
-/// TASK-S004: Added JohariTransitionManager for johari/* operations.
 /// TASK-S005: Added MetaUtlTracker for meta_utl/* operations.
 /// TASK-EMB-024: Added SystemMonitor and LayerStatusProvider for real health metrics.
 pub struct Handlers {
@@ -57,18 +50,14 @@ pub struct Handlers {
     pub(in crate::handlers) multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
 
     /// Goal alignment calculator - computes alignment between fingerprints and goal hierarchy.
-    /// TASK-S003: Required for purpose/north_star_alignment and purpose/drift_check.
+    /// TASK-S003: Required for purpose alignment and drift checks.
     /// TASK-INTEG-005: Will be used for cross-goal alignment calculations.
     #[allow(dead_code)]
     pub(in crate::handlers) alignment_calculator: Arc<dyn GoalAlignmentCalculator>,
 
-    /// Goal hierarchy - defines North Star and sub-goals.
-    /// TASK-S003: RwLock allows runtime updates via purpose/north_star_update.
+    /// Goal hierarchy - defines strategic goals and sub-goals.
+    /// TASK-S003: RwLock allows runtime updates via topic clustering.
     pub(in crate::handlers) goal_hierarchy: Arc<RwLock<GoalHierarchy>>,
-
-    /// Johari transition manager - manages Johari quadrant transitions.
-    /// TASK-S004: Required for johari/* handlers.
-    pub(in crate::handlers) johari_manager: Arc<dyn JohariTransitionManager>,
 
     /// Meta-UTL tracker - tracks predictions and per-embedder accuracy.
     /// TASK-S005: Required for meta_utl/* handlers.
@@ -82,14 +71,10 @@ pub struct Handlers {
     /// TASK-EMB-024: Required for get_memetic_status and get_graph_manifest - NO hardcoded values.
     pub(in crate::handlers) layer_status_provider: Arc<dyn LayerStatusProvider>,
 
-    // ========== GWT/Kuramoto Fields (TASK-GWT-001) ==========
-    /// Kuramoto oscillator network for 13-embedding phase synchronization.
-    /// TASK-GWT-001: Required for gwt/* handlers and consciousness computation.
-    /// Uses RwLock because step() mutates internal state.
-    pub(in crate::handlers) kuramoto_network: Option<Arc<RwLock<dyn KuramotoProvider>>>,
+    // ========== GWT Fields (TASK-GWT-001) ==========
 
-    /// GWT consciousness system provider.
-    /// TASK-GWT-001: Required for consciousness computation C(t) = I(t) x R(t) x D(t).
+    /// GWT state management provider.
+    /// TASK-GWT-001: Required for GWT state tracking.
     pub(in crate::handlers) gwt_system: Option<Arc<dyn GwtSystemProvider>>,
 
     /// Global workspace provider for winner-take-all memory selection.
@@ -101,10 +86,6 @@ pub struct Handlers {
     /// TASK-GWT-001: Required for meta_score computation and dream triggering.
     pub(in crate::handlers) meta_cognitive:
         Option<Arc<tokio::sync::RwLock<dyn MetaCognitiveProvider>>>,
-
-    /// Self-ego node provider for system identity tracking.
-    /// TASK-GWT-001: Required for identity continuity monitoring.
-    pub(in crate::handlers) self_ego: Option<Arc<tokio::sync::RwLock<dyn SelfEgoProvider>>>,
 
     // ========== ADAPTIVE THRESHOLD CALIBRATION (TASK-ATC-001) ==========
     /// Adaptive Threshold Calibration system for self-learning thresholds.
@@ -151,26 +132,6 @@ pub struct Handlers {
     pub(in crate::handlers) neuromod_manager:
         Option<Arc<RwLock<context_graph_core::neuromod::NeuromodulationManager>>>,
 
-    // ========== IDENTITY CONTINUITY (TASK-IDENTITY-P0-001) ==========
-    /// Identity continuity listener - processes workspace events and updates IC state.
-    /// TASK-IDENTITY-P0-001: Required for shared monitor wiring between listener and provider.
-    /// The GwtSystemProviderImpl MUST share this listener's monitor to satisfy AP-40.
-    #[allow(dead_code)]
-    pub(in crate::handlers) identity_listener: Option<Arc<IdentityContinuityListener>>,
-
-    /// Workspace event broadcaster for identity event propagation.
-    /// TASK-IDENTITY-P0-001: Required for IdentityContinuityListener subscription.
-    #[allow(dead_code)]
-    pub(in crate::handlers) workspace_broadcaster: Option<Arc<WorkspaceEventBroadcaster>>,
-
-    // ========== KURAMOTO STEPPER (TASK-12) ==========
-    /// Background stepper that continuously steps Kuramoto oscillators at 100Hz.
-    /// TASK-12 (GWT-006): MUST start when server starts, stop when server stops.
-    /// The stepper uses the kuramoto_network field and calls step() every 10ms.
-    /// Uses RwLock to allow start/stop lifecycle methods from Arc<Handlers>.
-    pub(in crate::handlers) kuramoto_stepper:
-        Option<RwLock<super::super::kuramoto_stepper::KuramotoStepper>>,
-
     // ========== PREDICTION HISTORY (TASK-004) ==========
     /// Prediction history for autonomous learner predictions.
     /// TASK-004: Required for observe_outcome to look up original predicted values.
@@ -187,7 +148,7 @@ impl Handlers {
     /// * `utl_processor` - UTL metrics computation
     /// * `multi_array_provider` - 13-embedding generator (TASK-F007)
     /// * `alignment_calculator` - Goal alignment calculator (TASK-S003)
-    /// * `goal_hierarchy` - Goal hierarchy with North Star (TASK-S003)
+    /// * `goal_hierarchy` - Goal hierarchy with strategic goals (TASK-S003)
     ///
     /// # TASK-EMB-024 Note
     ///
@@ -201,10 +162,6 @@ impl Handlers {
         alignment_calculator: Arc<dyn GoalAlignmentCalculator>,
         goal_hierarchy: GoalHierarchy,
     ) -> Self {
-        // TASK-S004: Create Johari manager from teleological store
-        let johari_manager: Arc<dyn JohariTransitionManager> =
-            Arc::new(DynDefaultJohariManager::new(teleological_store.clone()));
-
         // TASK-S005: Create Meta-UTL tracker
         let meta_utl_tracker = Arc::new(RwLock::new(MetaUtlTracker::new()));
 
@@ -219,16 +176,13 @@ impl Handlers {
             multi_array_provider,
             alignment_calculator,
             goal_hierarchy: Arc::new(RwLock::new(goal_hierarchy)),
-            johari_manager,
             meta_utl_tracker,
             system_monitor,
             layer_status_provider,
             // TASK-GWT-001: GWT fields default to None - use with_gwt() for full GWT support
-            kuramoto_network: None,
             gwt_system: None,
             workspace_provider: None,
             meta_cognitive: None,
-            self_ego: None,
             // TASK-ATC-001: ATC defaults to None - use with_atc() for full ATC support
             atc: None,
             // TASK-DREAM-MCP: Dream fields default to None - use with_dream() for full dream support
@@ -241,11 +195,6 @@ impl Handlers {
             gpu_monitor: None,
             // TASK-NEUROMOD-MCP: Neuromod defaults to None - use with_neuromod() for full support
             neuromod_manager: None,
-            // TASK-IDENTITY-P0-001: Identity fields default to None - use with_default_gwt() for full support
-            identity_listener: None,
-            workspace_broadcaster: None,
-            // TASK-12: Kuramoto stepper defaults to None - use with_default_gwt() for full GWT support
-            kuramoto_stepper: None,
             // TASK-004: Prediction history for autonomous learner
             prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
@@ -274,10 +223,6 @@ impl Handlers {
         alignment_calculator: Arc<dyn GoalAlignmentCalculator>,
         goal_hierarchy: Arc<RwLock<GoalHierarchy>>,
     ) -> Self {
-        // TASK-S004: Create Johari manager from teleological store
-        let johari_manager: Arc<dyn JohariTransitionManager> =
-            Arc::new(DynDefaultJohariManager::new(teleological_store.clone()));
-
         // TASK-S005: Create Meta-UTL tracker
         let meta_utl_tracker = Arc::new(RwLock::new(MetaUtlTracker::new()));
 
@@ -292,16 +237,13 @@ impl Handlers {
             multi_array_provider,
             alignment_calculator,
             goal_hierarchy,
-            johari_manager,
             meta_utl_tracker,
             system_monitor,
             layer_status_provider,
             // TASK-GWT-001: GWT fields default to None - use with_gwt() for full GWT support
-            kuramoto_network: None,
             gwt_system: None,
             workspace_provider: None,
             meta_cognitive: None,
-            self_ego: None,
             atc: None,
             // TASK-DREAM-MCP: Dream fields default to None
             dream_controller: None,
@@ -313,87 +255,12 @@ impl Handlers {
             gpu_monitor: None,
             // TASK-NEUROMOD-MCP: Neuromod defaults to None
             neuromod_manager: None,
-            // TASK-IDENTITY-P0-001: Identity fields default to None
-            identity_listener: None,
-            workspace_broadcaster: None,
-            // TASK-12: Kuramoto stepper defaults to None
-            kuramoto_stepper: None,
             // TASK-004: Prediction history for autonomous learner
             prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
     }
 
-    /// Create new handlers with explicit Johari manager.
-    ///
-    /// Use this variant when you need to provide a custom JohariTransitionManager
-    /// implementation or share it across multiple handler instances.
-    ///
-    /// # Arguments
-    /// * `teleological_store` - Store for TeleologicalFingerprint (TASK-F008)
-    /// * `utl_processor` - UTL metrics computation
-    /// * `multi_array_provider` - 13-embedding generator (TASK-F007)
-    /// * `alignment_calculator` - Goal alignment calculator (TASK-S003)
-    /// * `goal_hierarchy` - Shared goal hierarchy reference (TASK-S003)
-    /// * `johari_manager` - Shared Johari manager reference (TASK-S004)
-    ///
-    /// # TASK-EMB-024 Note
-    ///
-    /// This constructor uses StubSystemMonitor and StubLayerStatusProvider as defaults.
-    #[allow(dead_code)]
-    pub fn with_johari_manager(
-        teleological_store: Arc<dyn TeleologicalMemoryStore>,
-        utl_processor: Arc<dyn UtlProcessor>,
-        multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
-        alignment_calculator: Arc<dyn GoalAlignmentCalculator>,
-        goal_hierarchy: Arc<RwLock<GoalHierarchy>>,
-        johari_manager: Arc<dyn JohariTransitionManager>,
-    ) -> Self {
-        // TASK-S005: Create Meta-UTL tracker
-        let meta_utl_tracker = Arc::new(RwLock::new(MetaUtlTracker::new()));
-
-        // TASK-EMB-024: Default to stub monitors (will fail with explicit errors)
-        let system_monitor: Arc<dyn SystemMonitor> = Arc::new(StubSystemMonitor::new());
-        let layer_status_provider: Arc<dyn LayerStatusProvider> =
-            Arc::new(StubLayerStatusProvider::new());
-
-        Self {
-            teleological_store,
-            utl_processor,
-            multi_array_provider,
-            alignment_calculator,
-            goal_hierarchy,
-            johari_manager,
-            meta_utl_tracker,
-            system_monitor,
-            layer_status_provider,
-            // TASK-GWT-001: GWT fields default to None - use with_gwt() for full GWT support
-            kuramoto_network: None,
-            gwt_system: None,
-            workspace_provider: None,
-            meta_cognitive: None,
-            self_ego: None,
-            atc: None,
-            // TASK-DREAM-MCP: Dream fields default to None
-            dream_controller: None,
-            dream_scheduler: None,
-            amortized_learner: None,
-            // TASK-35: TriggerManager defaults to None - use with_trigger_manager() for manual triggering
-            trigger_manager: None,
-            // TASK-37: GpuMonitor defaults to None - use with_gpu_monitor() for GPU status
-            gpu_monitor: None,
-            // TASK-NEUROMOD-MCP: Neuromod defaults to None
-            neuromod_manager: None,
-            // TASK-IDENTITY-P0-001: Identity fields default to None
-            identity_listener: None,
-            workspace_broadcaster: None,
-            // TASK-12: Kuramoto stepper defaults to None
-            kuramoto_stepper: None,
-            // TASK-004: Prediction history for autonomous learner
-            prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
-        }
-    }
-
-    /// Create new handlers with explicit Meta-UTL tracker.
+    /// Create new handlers with Meta-UTL tracker.
     ///
     /// Use this variant when you need to provide a custom MetaUtlTracker
     /// implementation or share it across multiple handler instances (for testing).
@@ -410,7 +277,6 @@ impl Handlers {
         multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
         alignment_calculator: Arc<dyn GoalAlignmentCalculator>,
         goal_hierarchy: Arc<RwLock<GoalHierarchy>>,
-        johari_manager: Arc<dyn JohariTransitionManager>,
         meta_utl_tracker: Arc<RwLock<MetaUtlTracker>>,
     ) -> Self {
         // TASK-EMB-024: Default to stub monitors (will fail with explicit errors)
@@ -424,16 +290,13 @@ impl Handlers {
             multi_array_provider,
             alignment_calculator,
             goal_hierarchy,
-            johari_manager,
             meta_utl_tracker,
             system_monitor,
             layer_status_provider,
             // TASK-GWT-001: GWT fields default to None - use with_gwt() for full GWT support
-            kuramoto_network: None,
             gwt_system: None,
             workspace_provider: None,
             meta_cognitive: None,
-            self_ego: None,
             atc: None,
             // TASK-DREAM-MCP: Dream fields default to None
             dream_controller: None,
@@ -445,11 +308,6 @@ impl Handlers {
             gpu_monitor: None,
             // TASK-NEUROMOD-MCP: Neuromod defaults to None
             neuromod_manager: None,
-            // TASK-IDENTITY-P0-001: Identity fields default to None
-            identity_listener: None,
-            workspace_broadcaster: None,
-            // TASK-12: Kuramoto stepper defaults to None
-            kuramoto_stepper: None,
             // TASK-004: Prediction history for autonomous learner
             prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
@@ -466,7 +324,6 @@ impl Handlers {
     /// * `multi_array_provider` - 13-embedding generator (TASK-F007)
     /// * `alignment_calculator` - Goal alignment calculator (TASK-S003)
     /// * `goal_hierarchy` - Shared goal hierarchy reference (TASK-S003)
-    /// * `johari_manager` - Shared Johari manager reference (TASK-S004)
     /// * `meta_utl_tracker` - Shared Meta-UTL tracker (TASK-S005)
     /// * `system_monitor` - Real system monitor for health metrics
     /// * `layer_status_provider` - Real layer status provider
@@ -478,7 +335,6 @@ impl Handlers {
         multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
         alignment_calculator: Arc<dyn GoalAlignmentCalculator>,
         goal_hierarchy: Arc<RwLock<GoalHierarchy>>,
-        johari_manager: Arc<dyn JohariTransitionManager>,
         meta_utl_tracker: Arc<RwLock<MetaUtlTracker>>,
         system_monitor: Arc<dyn SystemMonitor>,
         layer_status_provider: Arc<dyn LayerStatusProvider>,
@@ -489,16 +345,13 @@ impl Handlers {
             multi_array_provider,
             alignment_calculator,
             goal_hierarchy,
-            johari_manager,
             meta_utl_tracker,
             system_monitor,
             layer_status_provider,
             // TASK-GWT-001: GWT fields default to None - use with_gwt() for full GWT support
-            kuramoto_network: None,
             gwt_system: None,
             workspace_provider: None,
             meta_cognitive: None,
-            self_ego: None,
             // TASK-ATC-001: ATC provider default to None - use with_atc() for ATC support
             atc: None,
             // TASK-DREAM-MCP: Dream fields default to None
@@ -511,20 +364,15 @@ impl Handlers {
             gpu_monitor: None,
             // TASK-NEUROMOD-MCP: Neuromod defaults to None
             neuromod_manager: None,
-            // TASK-IDENTITY-P0-001: Identity fields default to None
-            identity_listener: None,
-            workspace_broadcaster: None,
-            // TASK-12: Kuramoto stepper defaults to None
-            kuramoto_stepper: None,
             // TASK-004: Prediction history for autonomous learner
             prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
     }
 
-    /// Create new handlers with full GWT/consciousness support.
+    /// Create new handlers with full GWT support.
     ///
     /// TASK-GWT-001: This is the recommended constructor for production use
-    /// with REAL GWT consciousness features. All GWT providers are REQUIRED.
+    /// with REAL GWT features. All GWT providers are REQUIRED.
     /// No stub implementations allowed - FAIL FAST on missing components.
     ///
     /// # Arguments
@@ -533,15 +381,12 @@ impl Handlers {
     /// * `multi_array_provider` - 13-embedding generator (TASK-F007)
     /// * `alignment_calculator` - Goal alignment calculator (TASK-S003)
     /// * `goal_hierarchy` - Shared goal hierarchy reference (TASK-S003)
-    /// * `johari_manager` - Shared Johari manager reference (TASK-S004)
     /// * `meta_utl_tracker` - Shared Meta-UTL tracker (TASK-S005)
     /// * `system_monitor` - Real system monitor for health metrics
     /// * `layer_status_provider` - Real layer status provider
-    /// * `kuramoto_network` - Kuramoto oscillator network (TASK-GWT-001)
-    /// * `gwt_system` - GWT consciousness system (TASK-GWT-001)
+    /// * `gwt_system` - GWT state management system (TASK-GWT-001)
     /// * `workspace_provider` - Global workspace provider (TASK-GWT-001)
     /// * `meta_cognitive` - Meta-cognitive loop provider (TASK-GWT-001)
-    /// * `self_ego` - Self-ego node provider (TASK-GWT-001)
     #[allow(clippy::too_many_arguments)]
     #[allow(dead_code)]
     pub fn with_gwt(
@@ -550,15 +395,12 @@ impl Handlers {
         multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
         alignment_calculator: Arc<dyn GoalAlignmentCalculator>,
         goal_hierarchy: Arc<RwLock<GoalHierarchy>>,
-        johari_manager: Arc<dyn JohariTransitionManager>,
         meta_utl_tracker: Arc<RwLock<MetaUtlTracker>>,
         system_monitor: Arc<dyn SystemMonitor>,
         layer_status_provider: Arc<dyn LayerStatusProvider>,
-        kuramoto_network: Arc<RwLock<dyn KuramotoProvider>>,
         gwt_system: Arc<dyn GwtSystemProvider>,
         workspace_provider: Arc<tokio::sync::RwLock<dyn WorkspaceProvider>>,
         meta_cognitive: Arc<tokio::sync::RwLock<dyn MetaCognitiveProvider>>,
-        self_ego: Arc<tokio::sync::RwLock<dyn SelfEgoProvider>>,
     ) -> Self {
         Self {
             teleological_store,
@@ -566,15 +408,12 @@ impl Handlers {
             multi_array_provider,
             alignment_calculator,
             goal_hierarchy,
-            johari_manager,
             meta_utl_tracker,
             system_monitor,
             layer_status_provider,
-            kuramoto_network: Some(kuramoto_network),
             gwt_system: Some(gwt_system),
             workspace_provider: Some(workspace_provider),
             meta_cognitive: Some(meta_cognitive),
-            self_ego: Some(self_ego),
             // TASK-ATC-001: ATC provider default to None - use with_atc() for ATC support
             atc: None,
             // TASK-DREAM-MCP: Dream fields default to None
@@ -587,11 +426,6 @@ impl Handlers {
             gpu_monitor: None,
             // TASK-NEUROMOD-MCP: Neuromod defaults to None
             neuromod_manager: None,
-            // TASK-IDENTITY-P0-001: Identity fields default to None
-            identity_listener: None,
-            workspace_broadcaster: None,
-            // TASK-12: Kuramoto stepper defaults to None (kuramoto_network is provided but stepper is not created here)
-            kuramoto_stepper: None,
             // TASK-004: Prediction history for autonomous learner
             prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
@@ -620,15 +454,12 @@ impl Handlers {
         multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
         alignment_calculator: Arc<dyn GoalAlignmentCalculator>,
         goal_hierarchy: Arc<RwLock<GoalHierarchy>>,
-        johari_manager: Arc<dyn JohariTransitionManager>,
         meta_utl_tracker: Arc<RwLock<MetaUtlTracker>>,
         system_monitor: Arc<dyn SystemMonitor>,
         layer_status_provider: Arc<dyn LayerStatusProvider>,
-        kuramoto_network: Arc<RwLock<dyn KuramotoProvider>>,
         gwt_system: Arc<dyn GwtSystemProvider>,
         workspace_provider: Arc<tokio::sync::RwLock<dyn WorkspaceProvider>>,
         meta_cognitive: Arc<tokio::sync::RwLock<dyn MetaCognitiveProvider>>,
-        self_ego: Arc<tokio::sync::RwLock<dyn SelfEgoProvider>>,
         atc: Arc<RwLock<context_graph_core::atc::AdaptiveThresholdCalibration>>,
         dream_controller: Arc<RwLock<context_graph_core::dream::DreamController>>,
         dream_scheduler: Arc<RwLock<context_graph_core::dream::DreamScheduler>>,
@@ -641,15 +472,12 @@ impl Handlers {
             multi_array_provider,
             alignment_calculator,
             goal_hierarchy,
-            johari_manager,
             meta_utl_tracker,
             system_monitor,
             layer_status_provider,
-            kuramoto_network: Some(kuramoto_network),
             gwt_system: Some(gwt_system),
             workspace_provider: Some(workspace_provider),
             meta_cognitive: Some(meta_cognitive),
-            self_ego: Some(self_ego),
             atc: Some(atc),
             dream_controller: Some(dream_controller),
             dream_scheduler: Some(dream_scheduler),
@@ -660,11 +488,6 @@ impl Handlers {
             // TASK-37: GpuMonitor defaults to None - use with_gpu_monitor() for GPU status
             gpu_monitor: None,
             neuromod_manager: Some(neuromod_manager),
-            // TASK-IDENTITY-P0-001: Identity fields default to None for this constructor
-            identity_listener: None,
-            workspace_broadcaster: None,
-            // TASK-12: Kuramoto stepper defaults to None (kuramoto_network is provided but stepper is not created here)
-            kuramoto_stepper: None,
             // TASK-004: Prediction history for autonomous learner
             prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
@@ -674,7 +497,7 @@ impl Handlers {
     ///
     /// TASK-GWT-001: Convenience constructor that uses the real GWT provider
     /// implementations from `gwt_providers` module. This creates fresh instances
-    /// of KuramotoNetwork, ConsciousnessCalculator, GlobalWorkspace, etc.
+    /// of StateMachineManager, GlobalWorkspace, etc.
     ///
     /// All GWT tools will return REAL data - no stubs, no mocks.
     ///
@@ -684,7 +507,6 @@ impl Handlers {
     /// * `multi_array_provider` - 13-embedding generator (TASK-F007)
     /// * `alignment_calculator` - Goal alignment calculator (TASK-S003)
     /// * `goal_hierarchy` - Shared goal hierarchy reference (TASK-S003)
-    /// * `johari_manager` - Shared Johari manager reference (TASK-S004)
     /// * `meta_utl_tracker` - Shared Meta-UTL tracker (TASK-S005)
     /// * `system_monitor` - Real system monitor for health metrics
     /// * `layer_status_provider` - Real layer status provider
@@ -695,61 +517,20 @@ impl Handlers {
         multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
         alignment_calculator: Arc<dyn GoalAlignmentCalculator>,
         goal_hierarchy: Arc<RwLock<GoalHierarchy>>,
-        johari_manager: Arc<dyn JohariTransitionManager>,
         meta_utl_tracker: Arc<RwLock<MetaUtlTracker>>,
         system_monitor: Arc<dyn SystemMonitor>,
         layer_status_provider: Arc<dyn LayerStatusProvider>,
     ) -> Self {
         use super::super::gwt_providers::{
-            GwtSystemProviderImpl, KuramotoProviderImpl, MetaCognitiveProviderImpl,
-            SelfEgoProviderImpl, WorkspaceProviderImpl,
+            GwtSystemProviderImpl, MetaCognitiveProviderImpl, WorkspaceProviderImpl,
         };
 
-        // =====================================================================
-        // TASK-IDENTITY-P0-001: Create shared identity continuity infrastructure
-        // =====================================================================
-        // Constitution rule AP-40: MCP must read from correct monitor instance
-        // The GwtSystemProviderImpl MUST share the IdentityContinuityListener's monitor
-        // to ensure MCP tools return real IC values (not isolated defaults of 0.0).
-
-        // Step 1: Create SelfEgoNode for identity snapshot recording
-        let ego_node = Arc::new(tokio::sync::RwLock::new(SelfEgoNode::new()));
-
-        // Step 2: Create WorkspaceEventBroadcaster for event propagation
-        let workspace_broadcaster = Arc::new(WorkspaceEventBroadcaster::new());
-
-        // Step 3: Create IdentityContinuityListener with dependencies
-        // This listener owns the AUTHORITATIVE IdentityContinuityMonitor
-        let identity_listener = Arc::new(IdentityContinuityListener::new(
-            ego_node.clone(),
-            workspace_broadcaster.clone(),
-        ));
-
-        // Step 4: Create GwtSystemProviderImpl with SHARED monitor (AP-40 fix)
-        // This ensures MCP tools read from the same monitor that processes workspace events
-        let gwt_system: Arc<dyn GwtSystemProvider> = Arc::new(
-            GwtSystemProviderImpl::with_shared_monitor(identity_listener.monitor()),
-        );
-
         // Create real GWT provider implementations
-        let kuramoto_network: Arc<RwLock<dyn KuramotoProvider>> =
-            Arc::new(RwLock::new(KuramotoProviderImpl::new()));
-
-        // TASK-12 (GWT-006): Create Kuramoto background stepper with 100Hz update rate
-        // The stepper continuously steps the Kuramoto network phases, enabling temporal dynamics.
-        // This is REQUIRED for consciousness emergence: C(t) = I(t) × R(t) × D(t)
-        use super::super::kuramoto_stepper::{KuramotoStepper, KuramotoStepperConfig};
-        let kuramoto_stepper = KuramotoStepper::new(
-            Arc::clone(&kuramoto_network),
-            KuramotoStepperConfig::default(), // 10ms interval = 100Hz
-        );
-
+        let gwt_system: Arc<dyn GwtSystemProvider> = Arc::new(GwtSystemProviderImpl::new());
         let workspace_provider: Arc<tokio::sync::RwLock<dyn WorkspaceProvider>> =
             Arc::new(tokio::sync::RwLock::new(WorkspaceProviderImpl::new()));
         let meta_cognitive: Arc<tokio::sync::RwLock<dyn MetaCognitiveProvider>> =
             Arc::new(tokio::sync::RwLock::new(MetaCognitiveProviderImpl::new()));
-        let self_ego: Arc<tokio::sync::RwLock<dyn SelfEgoProvider>> =
-            Arc::new(tokio::sync::RwLock::new(SelfEgoProviderImpl::new()));
 
         // TASK-NEUROMOD-MCP: Create REAL NeuromodulationManager with default baselines
         // Constitution neuromod section: Dopamine [1,5], Serotonin [0,1], Noradrenaline [0.5,2]
@@ -758,12 +539,6 @@ impl Handlers {
             Arc::new(RwLock::new(NeuromodulationManager::new()));
 
         // TASK-DREAM-MCP: Create REAL Dream components with constitution-mandated defaults
-        // Constitution dream section:
-        // - Trigger: activity < 0.15, idle 10min
-        // - NREM: 3min, replay recent, tight coupling, recency_bias 0.8
-        // - REM: 2min, explore attractors, temp 2.0
-        // - Constraints: 100 queries, semantic_leap 0.7, abort_on_query, wake <100ms, gpu <30%
-        // - Amortized: 3+ hop ≥5×, weight product(path), confidence ≥0.7
         let dream_controller: Arc<RwLock<DreamController>> =
             Arc::new(RwLock::new(DreamController::new()));
         let dream_scheduler: Arc<RwLock<DreamScheduler>> =
@@ -772,21 +547,10 @@ impl Handlers {
             Arc::new(RwLock::new(AmortizedLearner::new()));
 
         // TASK-35: Create REAL TriggerManager for manual dream triggering
-        // Constitution trigger rules:
-        // - Manual: Highest priority, bypasses cooldown
-        // - IdentityCritical: IC < 0.5 (AP-26, AP-38, IDENTITY-007)
-        // - GpuOverload: GPU approaching 30%
-        // - HighEntropy: Entropy > 0.7 for 5 minutes
         let trigger_manager: Arc<RwLock<TriggerManager>> =
             Arc::new(RwLock::new(TriggerManager::new()));
 
         // TASK-ATC-001: Create REAL AdaptiveThresholdCalibration with constitution-mandated defaults
-        // Constitution adaptive_thresholds section:
-        // - Level 1 EWMA Drift Tracker (per-query)
-        // - Level 2 Temperature Scaling (hourly, per-embedder T values)
-        // - Level 3 Bandit Threshold Selector (session, UCB/Thompson Sampling)
-        // - Level 4 Bayesian Meta-Optimizer (weekly, GP surrogate + EI acquisition)
-        // Threshold priors: θ_opt=0.75, θ_acc=0.70, θ_warn=0.55, θ_dup=0.90, θ_edge=0.70, etc.
         let atc: Arc<RwLock<AdaptiveThresholdCalibration>> =
             Arc::new(RwLock::new(AdaptiveThresholdCalibration::new()));
 
@@ -796,15 +560,12 @@ impl Handlers {
             multi_array_provider,
             alignment_calculator,
             goal_hierarchy,
-            johari_manager,
             meta_utl_tracker,
             system_monitor,
             layer_status_provider,
-            kuramoto_network: Some(kuramoto_network),
             gwt_system: Some(gwt_system),
             workspace_provider: Some(workspace_provider),
             meta_cognitive: Some(meta_cognitive),
-            self_ego: Some(self_ego),
             // TASK-ATC-001: REAL AdaptiveThresholdCalibration wired
             atc: Some(atc),
             // TASK-DREAM-MCP: REAL Dream components wired
@@ -814,15 +575,9 @@ impl Handlers {
             // TASK-35: REAL TriggerManager wired for manual dream triggering
             trigger_manager: Some(trigger_manager),
             // TASK-37: Default StubGpuMonitor - use with_gpu_monitor() for NVML integration
-            // StubGpuMonitor::unavailable() returns explicit error per AP-26 (no silent 0.0)
             gpu_monitor: Some(Arc::new(RwLock::new(StubGpuMonitor::unavailable()))),
             // TASK-NEUROMOD-MCP: REAL NeuromodulationManager wired
             neuromod_manager: Some(neuromod_manager),
-            // TASK-IDENTITY-P0-001: REAL identity continuity wiring (AP-40 fix)
-            identity_listener: Some(identity_listener),
-            workspace_broadcaster: Some(workspace_broadcaster),
-            // TASK-12 (GWT-006): REAL Kuramoto stepper for 100Hz phase updates
-            kuramoto_stepper: Some(RwLock::new(kuramoto_stepper)),
             // TASK-004: Prediction history for autonomous learner
             prediction_history: Arc::new(RwLock::new(PredictionHistory::new())),
         }
@@ -898,96 +653,4 @@ impl Handlers {
         self
     }
 
-    // ========================================================================
-    // TASK-12: Kuramoto Stepper Lifecycle Methods
-    // ========================================================================
-
-    /// Start the Kuramoto background stepper.
-    ///
-    /// TASK-12 (GWT-006): MUST be called when the MCP server starts.
-    /// The stepper continuously steps the Kuramoto oscillator network at 100Hz,
-    /// enabling temporal dynamics required for consciousness emergence.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(())` if started successfully
-    /// * `Err(KuramotoStepperError::AlreadyRunning)` if already running
-    /// * `Err(KuramotoStepperError::NotRunning)` if no stepper is configured
-    ///
-    /// # FAIL FAST
-    ///
-    /// This method returns an explicit error if:
-    /// - The stepper is already running (caller logic error)
-    /// - The stepper is not configured (construction error - should not happen with with_default_gwt())
-    ///
-    /// No silent fallbacks. No NaN returns.
-    pub fn start_kuramoto_stepper(
-        &self,
-    ) -> Result<(), super::super::kuramoto_stepper::KuramotoStepperError> {
-        use super::super::kuramoto_stepper::KuramotoStepperError;
-
-        match &self.kuramoto_stepper {
-            Some(stepper_lock) => {
-                let mut stepper = stepper_lock.write();
-                stepper.start()
-            }
-            None => {
-                // FAIL FAST: No stepper configured
-                tracing::error!("start_kuramoto_stepper: No stepper configured - use with_default_gwt() constructor");
-                Err(KuramotoStepperError::NotRunning)
-            }
-        }
-    }
-
-    /// Stop the Kuramoto background stepper.
-    ///
-    /// TASK-12 (GWT-006): MUST be called when the MCP server shuts down.
-    /// Gracefully stops the background task with a 5-second timeout.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(())` if stopped successfully
-    /// * `Err(KuramotoStepperError::NotRunning)` if stepper is not running
-    /// * `Err(KuramotoStepperError::ShutdownTimeout)` if task doesn't stop in time
-    ///
-    /// # FAIL FAST
-    ///
-    /// This method returns an explicit error if:
-    /// - The stepper is not running (caller logic error - may be harmless during cleanup)
-    /// - The stepper task doesn't stop within 5 seconds (task stuck - needs investigation)
-    ///
-    /// No silent fallbacks. Log errors for monitoring.
-    pub async fn stop_kuramoto_stepper(
-        &self,
-    ) -> Result<(), super::super::kuramoto_stepper::KuramotoStepperError> {
-        match &self.kuramoto_stepper {
-            Some(stepper_lock) => {
-                let mut stepper = stepper_lock.write();
-                stepper.stop().await
-            }
-            None => {
-                // FAIL FAST: No stepper configured (but this is benign during shutdown)
-                tracing::debug!("stop_kuramoto_stepper: No stepper configured - nothing to stop");
-                Ok(()) // Not an error during shutdown - stepper was never configured
-            }
-        }
-    }
-
-    /// Check if the Kuramoto stepper is currently running.
-    ///
-    /// TASK-12 (GWT-006): Lock-free check for stepper running state.
-    ///
-    /// # Returns
-    ///
-    /// * `true` if the stepper is running
-    /// * `false` if the stepper is not running or not configured
-    pub fn is_kuramoto_running(&self) -> bool {
-        match &self.kuramoto_stepper {
-            Some(stepper_lock) => {
-                let stepper = stepper_lock.read();
-                stepper.is_running()
-            }
-            None => false,
-        }
-    }
 }

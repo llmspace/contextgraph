@@ -5,12 +5,10 @@
 use serde_json::json;
 use tracing::{debug, warn};
 
-use context_graph_core::johari::NUM_EMBEDDERS;
-
 use crate::protocol::{error_codes, JsonRpcId, JsonRpcResponse};
 
 use super::super::Handlers;
-use super::constants::{EMBEDDER_NAMES, LEARNING_SCORE_TARGET};
+use super::constants::{EMBEDDER_NAMES, LEARNING_SCORE_TARGET, NUM_EMBEDDERS};
 
 impl Handlers {
     /// Handle meta_utl/learning_trajectory request.

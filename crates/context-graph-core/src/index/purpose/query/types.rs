@@ -3,8 +3,6 @@
 //! This module provides [`PurposeQuery`] which represents a complete query
 //! with filters and constraints for purpose-based search operations.
 
-use crate::types::JohariQuadrant;
-
 use super::super::entry::GoalId;
 use super::super::error::{PurposeIndexError, PurposeIndexResult};
 use super::builder::PurposeQueryBuilder;
@@ -19,7 +17,6 @@ use super::target::PurposeQueryTarget;
 /// - `limit`: Maximum number of results to return
 /// - `min_similarity`: Minimum similarity threshold [0.0, 1.0]
 /// - `goal_filter`: Optional filter by goal ID
-/// - `quadrant_filter`: Optional filter by Johari quadrant
 ///
 /// # Construction
 ///
@@ -68,11 +65,6 @@ pub struct PurposeQuery {
     ///
     /// When set, only memories aligned with this goal are returned.
     pub goal_filter: Option<GoalId>,
-
-    /// Optional filter by Johari quadrant.
-    ///
-    /// When set, only memories in this quadrant are returned.
-    pub quadrant_filter: Option<JohariQuadrant>,
 }
 
 impl PurposeQuery {
@@ -112,7 +104,6 @@ impl PurposeQuery {
             limit,
             min_similarity,
             goal_filter: None,
-            quadrant_filter: None,
         })
     }
 
@@ -144,21 +135,6 @@ impl PurposeQuery {
     #[must_use]
     pub fn with_goal_filter(mut self, goal: GoalId) -> Self {
         self.goal_filter = Some(goal);
-        self
-    }
-
-    /// Add a quadrant filter to the query.
-    ///
-    /// Returns a new query with the filter applied.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// let filtered = query.with_quadrant_filter(JohariQuadrant::Open);
-    /// ```
-    #[must_use]
-    pub fn with_quadrant_filter(mut self, quadrant: JohariQuadrant) -> Self {
-        self.quadrant_filter = Some(quadrant);
         self
     }
 
@@ -213,19 +189,12 @@ impl PurposeQuery {
     /// Check if this query has any filters applied.
     #[inline]
     pub fn has_filters(&self) -> bool {
-        self.goal_filter.is_some() || self.quadrant_filter.is_some()
+        self.goal_filter.is_some()
     }
 
     /// Get the number of filters applied.
     #[inline]
     pub fn filter_count(&self) -> usize {
-        let mut count = 0;
-        if self.goal_filter.is_some() {
-            count += 1;
-        }
-        if self.quadrant_filter.is_some() {
-            count += 1;
-        }
-        count
+        if self.goal_filter.is_some() { 1 } else { 0 }
     }
 }

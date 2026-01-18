@@ -1,9 +1,7 @@
-//! RocksDB-backed storage for autonomous North Star system.
+//! RocksDB-backed storage for autonomous topic-based system.
 //!
 //! This module provides persistent storage for the autonomous system including:
 //! - Singleton AutonomousConfig and AdaptiveThresholdState
-//! - Time-series DriftDataPoint history
-//! - Per-goal GoalActivityMetrics
 //! - Lineage events for traceability
 //! - Consolidation history records
 //! - Memory curation state
@@ -53,9 +51,9 @@ pub use types::{ConsolidationRecord, LineageEvent};
 // Main Store Implementation
 // ============================================================================
 
-/// RocksDB-backed storage for autonomous North Star system.
+/// RocksDB-backed storage for autonomous topic-based system.
 ///
-/// Provides persistent storage for all autonomous system state across 7 column families.
+/// Provides persistent storage for all autonomous system state across 5 column families.
 ///
 /// # Thread Safety
 ///

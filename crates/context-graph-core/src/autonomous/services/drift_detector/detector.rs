@@ -1,12 +1,12 @@
-//! NORTH-010: DriftDetector Implementation
+//! DriftDetector Implementation
 //!
-//! Core drift detection service for monitoring alignment from North Star goal.
+//! Core drift detection service for monitoring alignment.
 
 use crate::autonomous::drift::{DriftConfig, DriftMonitoring, DriftSeverity, DriftTrend};
 
 use super::types::{DetectorDataPoint, DetectorState, DriftRecommendation, MIN_SAMPLES_DEFAULT};
 
-/// Service for detecting alignment drift from North Star goal
+/// Service for detecting alignment drift
 #[derive(Clone, Debug)]
 pub struct DriftDetector {
     config: DriftConfig,

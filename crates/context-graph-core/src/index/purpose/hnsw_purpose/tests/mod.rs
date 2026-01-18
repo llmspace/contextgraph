@@ -7,7 +7,6 @@ use uuid::Uuid;
 
 use crate::index::config::{DistanceMetric, HnswConfig, PURPOSE_VECTOR_DIM};
 use crate::types::fingerprint::PurposeVector;
-use crate::types::JohariQuadrant;
 
 use crate::index::purpose::entry::{GoalId, PurposeIndexEntry, PurposeMetadata};
 use crate::index::purpose::hnsw_purpose::{HnswPurposeIndex, PurposeIndexOps};
@@ -25,15 +24,15 @@ fn create_purpose_vector(base: f32, variation: f32) -> PurposeVector {
     PurposeVector::new(alignments)
 }
 
-/// Create metadata with given goal and quadrant.
-fn create_metadata(goal: &str, quadrant: JohariQuadrant) -> PurposeMetadata {
-    PurposeMetadata::new(GoalId::new(goal), 0.85, quadrant).unwrap()
+/// Create metadata with given goal.
+fn create_metadata(goal: &str) -> PurposeMetadata {
+    PurposeMetadata::new(GoalId::new(goal), 0.85).unwrap()
 }
 
 /// Create a complete purpose index entry.
-fn create_entry(base: f32, goal: &str, quadrant: JohariQuadrant) -> PurposeIndexEntry {
+fn create_entry(base: f32, goal: &str) -> PurposeIndexEntry {
     let pv = create_purpose_vector(base, 0.02);
-    let metadata = create_metadata(goal, quadrant);
+    let metadata = create_metadata(goal);
     PurposeIndexEntry::new(Uuid::new_v4(), pv, metadata)
 }
 
@@ -92,7 +91,7 @@ fn test_hnsw_purpose_index_with_capacity() {
 #[test]
 fn test_insert_single_entry() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
-    let entry = create_entry(0.7, "master_ml", JohariQuadrant::Open);
+    let entry = create_entry(0.7, "master_ml");
     let memory_id = entry.memory_id;
 
     println!("[BEFORE] index.len()={}", index.len());
@@ -112,7 +111,7 @@ fn test_insert_multiple_entries() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
 
     let entries: Vec<PurposeIndexEntry> = (0..10)
-        .map(|i| create_entry(0.3 + i as f32 * 0.05, "goal", JohariQuadrant::Open))
+        .map(|i| create_entry(0.3 + i as f32 * 0.05, "goal"))
         .collect();
 
     for entry in &entries {
@@ -133,7 +132,7 @@ fn test_insert_updates_existing() {
     let entry1 = PurposeIndexEntry::new(
         memory_id,
         create_purpose_vector(0.5, 0.02),
-        create_metadata("goal1", JohariQuadrant::Open),
+        create_metadata("goal1"),
     );
     index.insert(entry1).unwrap();
 
@@ -145,7 +144,7 @@ fn test_insert_updates_existing() {
     let entry2 = PurposeIndexEntry::new(
         memory_id,
         create_purpose_vector(0.8, 0.01),
-        create_metadata("goal2", JohariQuadrant::Hidden),
+        create_metadata("goal2"),
     );
     index.insert(entry2).unwrap();
 
@@ -160,9 +159,9 @@ fn test_insert_updates_existing() {
 fn test_insert_updates_secondary_indexes() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
 
-    let entry1 = create_entry(0.5, "goal_a", JohariQuadrant::Open);
-    let entry2 = create_entry(0.6, "goal_b", JohariQuadrant::Hidden);
-    let entry3 = create_entry(0.7, "goal_a", JohariQuadrant::Open);
+    let entry1 = create_entry(0.5, "goal_a");
+    let entry2 = create_entry(0.6, "goal_b");
+    let entry3 = create_entry(0.7, "goal_a");
 
     index.insert(entry1.clone()).unwrap();
     index.insert(entry2.clone()).unwrap();
@@ -175,12 +174,6 @@ fn test_insert_updates_secondary_indexes() {
     assert!(goal_a_set.contains(&entry1.memory_id));
     assert!(goal_a_set.contains(&entry3.memory_id));
 
-    // Check quadrant index
-    let open_set = index.get_by_quadrant(JohariQuadrant::Open).unwrap();
-    assert_eq!(open_set.len(), 2);
-    let hidden_set = index.get_by_quadrant(JohariQuadrant::Hidden).unwrap();
-    assert_eq!(hidden_set.len(), 1);
-
     println!("[VERIFIED] Insert updates secondary indexes correctly");
 }
 
@@ -191,7 +184,7 @@ fn test_insert_updates_secondary_indexes() {
 #[test]
 fn test_remove_existing_entry() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
-    let entry = create_entry(0.7, "test_goal", JohariQuadrant::Blind);
+    let entry = create_entry(0.7, "test_goal");
     let memory_id = entry.memory_id;
 
     index.insert(entry).unwrap();
@@ -231,8 +224,8 @@ fn test_remove_non_existent_fails() {
 fn test_remove_updates_secondary_indexes() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
 
-    let entry1 = create_entry(0.5, "shared_goal", JohariQuadrant::Open);
-    let entry2 = create_entry(0.6, "shared_goal", JohariQuadrant::Open);
+    let entry1 = create_entry(0.5, "shared_goal");
+    let entry2 = create_entry(0.6, "shared_goal");
     let id1 = entry1.memory_id;
 
     index.insert(entry1).unwrap();
@@ -265,19 +258,17 @@ fn test_remove_updates_secondary_indexes() {
 fn test_remove_cleans_up_empty_indexes() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
 
-    let entry = create_entry(0.5, "unique_goal", JohariQuadrant::Unknown);
+    let entry = create_entry(0.5, "unique_goal");
     let id = entry.memory_id;
 
     index.insert(entry).unwrap();
     assert_eq!(index.goal_count(), 1);
-    assert!(index.get_by_quadrant(JohariQuadrant::Unknown).is_some());
 
     index.remove(id).unwrap();
 
     // Empty sets should be removed
     assert_eq!(index.goal_count(), 0);
     assert!(index.get_by_goal(&GoalId::new("unique_goal")).is_none());
-    assert!(index.get_by_quadrant(JohariQuadrant::Unknown).is_none());
 
     println!("[VERIFIED] Remove cleans up empty secondary index entries");
 }
@@ -289,7 +280,7 @@ fn test_remove_cleans_up_empty_indexes() {
 #[test]
 fn test_get_existing_entry() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
-    let entry = create_entry(0.75, "retrieve_goal", JohariQuadrant::Hidden);
+    let entry = create_entry(0.75, "retrieve_goal");
     let memory_id = entry.memory_id;
 
     index.insert(entry.clone()).unwrap();

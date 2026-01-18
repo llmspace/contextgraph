@@ -7,13 +7,12 @@ use crate::index::config::PURPOSE_VECTOR_DIM;
 use crate::index::purpose::entry::GoalId;
 use crate::index::purpose::query::PurposeSearchResult;
 use crate::types::fingerprint::PurposeVector;
-use crate::types::JohariQuadrant;
 
 #[test]
 fn test_purpose_search_result_new() {
     let id = Uuid::new_v4();
     let pv = create_purpose_vector(0.8);
-    let metadata = create_metadata("master_ml", JohariQuadrant::Open);
+    let metadata = create_metadata("master_ml");
 
     let result = PurposeSearchResult::new(id, 0.95, pv.clone(), metadata);
 
@@ -28,7 +27,7 @@ fn test_purpose_search_result_new() {
 #[test]
 fn test_purpose_search_result_aggregate_alignment() {
     let pv = PurposeVector::new([0.75; PURPOSE_VECTOR_DIM]);
-    let metadata = create_metadata("test", JohariQuadrant::Open);
+    let metadata = create_metadata("test");
     let result = PurposeSearchResult::new(Uuid::new_v4(), 0.9, pv, metadata);
 
     let aggregate = result.aggregate_alignment();
@@ -42,7 +41,7 @@ fn test_purpose_search_result_dominant_embedder() {
     let mut alignments = [0.5; PURPOSE_VECTOR_DIM];
     alignments[7] = 0.95; // E8 is dominant
     let pv = PurposeVector::new(alignments);
-    let metadata = create_metadata("test", JohariQuadrant::Open);
+    let metadata = create_metadata("test");
     let result = PurposeSearchResult::new(Uuid::new_v4(), 0.9, pv, metadata);
 
     assert_eq!(result.dominant_embedder(), 7);
@@ -53,7 +52,7 @@ fn test_purpose_search_result_dominant_embedder() {
 #[test]
 fn test_purpose_search_result_coherence() {
     let pv = PurposeVector::new([0.8; PURPOSE_VECTOR_DIM]); // Uniform = high coherence
-    let metadata = create_metadata("test", JohariQuadrant::Open);
+    let metadata = create_metadata("test");
     let result = PurposeSearchResult::new(Uuid::new_v4(), 0.9, pv, metadata);
 
     let coherence = result.coherence();
@@ -65,7 +64,7 @@ fn test_purpose_search_result_coherence() {
 #[test]
 fn test_purpose_search_result_matches_goal() {
     let pv = create_purpose_vector(0.8);
-    let metadata = create_metadata("master_ml", JohariQuadrant::Open);
+    let metadata = create_metadata("master_ml");
     let result = PurposeSearchResult::new(Uuid::new_v4(), 0.9, pv, metadata);
 
     assert!(result.matches_goal(&GoalId::new("master_ml")));
@@ -75,23 +74,9 @@ fn test_purpose_search_result_matches_goal() {
 }
 
 #[test]
-fn test_purpose_search_result_matches_quadrant() {
-    let pv = create_purpose_vector(0.8);
-    let metadata = create_metadata("test", JohariQuadrant::Hidden);
-    let result = PurposeSearchResult::new(Uuid::new_v4(), 0.9, pv, metadata);
-
-    assert!(result.matches_quadrant(JohariQuadrant::Hidden));
-    assert!(!result.matches_quadrant(JohariQuadrant::Open));
-    assert!(!result.matches_quadrant(JohariQuadrant::Blind));
-    assert!(!result.matches_quadrant(JohariQuadrant::Unknown));
-
-    println!("[VERIFIED] PurposeSearchResult::matches_quadrant filters correctly");
-}
-
-#[test]
 fn test_purpose_search_result_clone() {
     let pv = create_purpose_vector(0.8);
-    let metadata = create_metadata("test", JohariQuadrant::Open);
+    let metadata = create_metadata("test");
     let result = PurposeSearchResult::new(Uuid::new_v4(), 0.9, pv, metadata);
 
     let cloned = result.clone();
@@ -109,7 +94,7 @@ fn test_purpose_search_result_clone() {
 #[test]
 fn test_purpose_search_result_debug() {
     let pv = create_purpose_vector(0.8);
-    let metadata = create_metadata("test", JohariQuadrant::Open);
+    let metadata = create_metadata("test");
     let result = PurposeSearchResult::new(Uuid::nil(), 0.9, pv, metadata);
 
     let debug_str = format!("{:?}", result);

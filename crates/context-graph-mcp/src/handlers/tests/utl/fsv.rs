@@ -3,7 +3,7 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use context_graph_core::johari::NUM_EMBEDDERS;
+use context_graph_core::types::fingerprint::NUM_EMBEDDERS;
 
 use crate::handlers::tests::{create_test_handlers, extract_mcp_tool_data, make_request};
 use crate::protocol::JsonRpcId;
@@ -199,60 +199,7 @@ async fn test_fsv_delta_s_clamping() {
     );
 }
 
-/// FSV-04: Verify Johari classification follows exact threshold rules from constitution.yaml
-///
-/// Open: ΔS < threshold, ΔC > threshold (low surprise, high coherence)
-/// Blind: ΔS > threshold, ΔC < threshold (high surprise, low coherence)
-/// Hidden: ΔS < threshold, ΔC < threshold (low surprise, low coherence)
-/// Unknown: ΔS > threshold, ΔC > threshold (high surprise, high coherence)
-#[tokio::test]
-async fn test_fsv_johari_classification_rules() {
-    let handlers = create_test_handlers();
-
-    let old_fp = create_test_fingerprint_with_semantic(vec![0.5; 1024]);
-    let new_fp = create_test_fingerprint_with_semantic(vec![0.6; 1024]);
-
-    let request = make_request(
-        "tools/call",
-        Some(JsonRpcId::Number(1)),
-        Some(json!({
-            "name": "gwt/compute_delta_sc",
-            "arguments": {
-                "vertex_id": Uuid::new_v4().to_string(),
-                "old_fingerprint": serde_json::to_value(&old_fp).expect("serialize"),
-                "new_fingerprint": serde_json::to_value(&new_fp).expect("serialize"),
-                "include_diagnostics": true,
-            }
-        })),
-    );
-
-    let response = handlers.dispatch(request).await;
-    let result = response.result.expect("Should have result");
-    let data = extract_mcp_tool_data(&result);
-
-    let threshold = data["diagnostics"]["johari_threshold"]
-        .as_f64()
-        .expect("johari_threshold") as f32;
-    let delta_s_agg = data["delta_s_aggregate"].as_f64().expect("f64") as f32;
-    let delta_c = data["delta_c"].as_f64().expect("f64") as f32;
-    let johari_agg = data["johari_aggregate"].as_str().expect("string");
-
-    // Verify classification follows exact rules
-    let expected_quadrant = match (delta_s_agg < threshold, delta_c > threshold) {
-        (true, true) => "Open",     // Low surprise, high coherence
-        (false, false) => "Blind",  // High surprise, low coherence
-        (true, false) => "Hidden",  // Low surprise, low coherence
-        (false, true) => "Unknown", // High surprise, high coherence
-    };
-
-    assert_eq!(
-        johari_agg, expected_quadrant,
-        "FSV: Johari classification mismatch. ΔS={:.4}, ΔC={:.4}, threshold={:.4}. Expected '{}', got '{}'",
-        delta_s_agg, delta_c, threshold, expected_quadrant, johari_agg
-    );
-}
-
-/// FSV-05: Verify aggregate ΔS is mean of per-embedder values
+/// FSV-04: Verify aggregate ΔS is mean of per-embedder values
 #[tokio::test]
 async fn test_fsv_delta_s_aggregate_is_mean() {
     let handlers = create_test_handlers();

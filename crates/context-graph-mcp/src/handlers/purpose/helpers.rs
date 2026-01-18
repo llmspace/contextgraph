@@ -8,7 +8,6 @@ use serde_json::json;
 use context_graph_core::purpose::{GoalHierarchy, GoalLevel, GoalNode};
 
 /// Convert a GoalNode to JSON representation.
-/// TASK-P0-001: Updated field names (is_north_star -> is_top_level)
 pub(super) fn goal_to_json(goal: &GoalNode) -> serde_json::Value {
     json!({
         "id": goal.id.to_string(),
@@ -29,7 +28,6 @@ pub(super) fn goal_to_json(goal: &GoalNode) -> serde_json::Value {
 }
 
 /// Compute hierarchy statistics.
-/// TASK-P0-001: Updated for 3-level hierarchy (removed north_star level)
 pub(super) fn compute_hierarchy_stats(hierarchy: &GoalHierarchy) -> serde_json::Value {
     let strategic_count = hierarchy.at_level(GoalLevel::Strategic).len();
     let tactical_count = hierarchy.at_level(GoalLevel::Tactical).len();

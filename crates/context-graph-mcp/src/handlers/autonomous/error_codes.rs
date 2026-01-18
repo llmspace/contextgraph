@@ -19,6 +19,4 @@ pub mod autonomous_error_codes {
     pub const SUBGOAL_DISCOVERY_ERROR: i32 = -32115;
     /// Autonomous status aggregation failed
     pub const STATUS_AGGREGATION_ERROR: i32 = -32116;
-    /// No North Star configured for autonomous operation
-    pub const NO_NORTH_STAR_FOR_AUTONOMOUS: i32 = -32117;
 }

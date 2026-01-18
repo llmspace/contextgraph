@@ -1,6 +1,6 @@
 //! Goal hierarchy types for teleological alignment.
 //!
-//! Provides the goal tree structure that defines the North Star and sub-goals
+//! Provides the goal tree structure that defines Strategic goals and sub-goals
 //! for purpose vector computation.
 //!
 //! # Architecture (constitution.yaml)

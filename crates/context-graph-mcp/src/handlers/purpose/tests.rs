@@ -6,10 +6,10 @@ use context_graph_core::types::fingerprint::{PurposeVector, SemanticFingerprint,
 #[test]
 fn test_goal_to_json_structure() {
     // Verify the JSON structure matches expected output
-    // Per TASK-CORE-005: Use autonomous_goal() with TeleologicalArray, not north_star()
+    // Per TASK-CORE-005: Use autonomous_goal() with TeleologicalArray
     let discovery = GoalDiscoveryMetadata::bootstrap();
     let goal = GoalNode::autonomous_goal(
-        "Test North Star".into(),
+        "Test Strategic Goal".into(),
         GoalLevel::Strategic,
         SemanticFingerprint::zeroed(),
         discovery,

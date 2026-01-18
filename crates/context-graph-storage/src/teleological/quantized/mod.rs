@@ -7,7 +7,7 @@
 //!
 //! ```text
 //! StoredQuantizedFingerprint (~17KB)
-//! ├── Metadata (id, version, purpose_vector, johari, timestamps)
+//! ├── Metadata (id, version, purpose_vector, timestamps)
 //! └── embeddings: HashMap<u8, QuantizedEmbedding>
 //!     ├── emb_0: E1_Semantic (PQ-8, ~8 bytes)
 //!     ├── emb_1: E2_TemporalRecent (Float8, ~512 bytes)

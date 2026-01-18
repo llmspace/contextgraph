@@ -151,7 +151,7 @@ testing:
     pre-deploy: [integration pass, "bench regression<5%", chaos pass]
 
 # ===============================================================================
-# TOPIC SYSTEM (Replaces North Star / IC / GWT Consciousness)
+# TOPIC SYSTEM
 # ===============================================================================
 topic_system:
   overview: "Topics emerge from multi-space clustering, no manual goal setting"
@@ -229,7 +229,7 @@ topic_system:
     confidence: "topic_confidence = weighted_agreement / 8.5"
 
   # -------------------------------------------------------------------------
-  # TOPIC PORTFOLIO (Replaces North Star)
+  # TOPIC PORTFOLIO
   # -------------------------------------------------------------------------
   topic_portfolio:
     description: "Emergent topics discovered via clustering, no manual setting"
@@ -239,7 +239,7 @@ topic_system:
     profile_dimensions: 13  # All embedders stored, only semantic/relational/structural for detection
 
   # -------------------------------------------------------------------------
-  # TOPIC STABILITY (Replaces Identity Continuity)
+  # TOPIC STABILITY
   # -------------------------------------------------------------------------
   topic_stability:
     metrics:

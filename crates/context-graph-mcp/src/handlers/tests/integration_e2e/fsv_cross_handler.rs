@@ -1,6 +1,6 @@
 //! FSV TEST 6: Cross-Handler Integration
 //!
-//! Tests Store -> Align -> Johari -> Meta-UTL -> Search in one flow.
+//! Tests Store -> Align -> Meta-UTL -> Search in one flow.
 
 use super::infrastructure::*;
 use context_graph_core::traits::TeleologicalMemoryStore;
@@ -55,9 +55,9 @@ async fn test_fsv_cross_handler_integration() {
     // =========================================================================
     // STEP 2: VERIFY DEPRECATED METHOD RETURNS METHOD_NOT_FOUND (TASK-CORE-001)
     // =========================================================================
-    println!("\nSTEP 2: purpose/north_star_alignment (deprecated per ARCH-03)");
+    println!("\nSTEP 2: purpose/alignment (deprecated per ARCH-03)");
     let align_request = make_request(
-        "purpose/north_star_alignment",
+        "purpose/alignment",
         2,
         json!({
             "fingerprint_id": fingerprint_id,
@@ -80,36 +80,12 @@ async fn test_fsv_cross_handler_integration() {
     println!("   VERIFIED: Deprecated method returns METHOD_NOT_FOUND");
 
     // =========================================================================
-    // STEP 3: JOHARI DISTRIBUTION
+    // STEP 3: META-UTL PREDICTION
     // =========================================================================
-    println!("\nSTEP 3: johari/get_distribution");
-    let johari_request = make_request(
-        "johari/get_distribution",
-        3,
-        json!({
-            "memory_id": fingerprint_id,
-            "include_confidence": true
-        }),
-    );
-    let johari_response = ctx.handlers.dispatch(johari_request).await;
-    assert!(johari_response.error.is_none(), "Johari MUST succeed");
-
-    let summary = &johari_response.result.unwrap()["summary"];
-    println!(
-        "   - Open: {}, Hidden: {}, Blind: {}, Unknown: {}",
-        summary["open_count"],
-        summary["hidden_count"],
-        summary["blind_count"],
-        summary["unknown_count"]
-    );
-
-    // =========================================================================
-    // STEP 4: META-UTL PREDICTION
-    // =========================================================================
-    println!("\nSTEP 4: meta_utl/predict_storage");
+    println!("\nSTEP 3: meta_utl/predict_storage");
     let predict_request = make_request(
         "meta_utl/predict_storage",
-        4,
+        3,
         json!({
             "fingerprint_id": fingerprint_id
         }),
@@ -134,12 +110,12 @@ async fn test_fsv_cross_handler_integration() {
     }
 
     // =========================================================================
-    // STEP 5: MULTI-EMBEDDING SEARCH
+    // STEP 4: MULTI-EMBEDDING SEARCH
     // =========================================================================
-    println!("\nSTEP 5: search/multi");
+    println!("\nSTEP 4: search/multi");
     let search_request = make_request(
         "search/multi",
-        5,
+        4,
         json!({
             "query": "machine learning pipeline",
             "query_type": "semantic_search",
@@ -178,9 +154,8 @@ async fn test_fsv_cross_handler_integration() {
     println!("======================================================================");
     println!("All handlers worked together:");
     println!("  1. memory/store: Created fingerprint (verified in store)");
-    println!("  2. purpose/north_star_alignment: Returns METHOD_NOT_FOUND (deprecated per TASK-CORE-001)");
-    println!("  3. johari/get_distribution: 13 embedder quadrants");
-    println!("  4. meta_utl/predict_storage: Prediction tracked");
-    println!("  5. search/multi: Fingerprint found in results");
+    println!("  2. purpose/alignment: Returns METHOD_NOT_FOUND (deprecated per TASK-CORE-001)");
+    println!("  3. meta_utl/predict_storage: Prediction tracked");
+    println!("  4. search/multi: Fingerprint found in results");
     println!("======================================================================\n");
 }

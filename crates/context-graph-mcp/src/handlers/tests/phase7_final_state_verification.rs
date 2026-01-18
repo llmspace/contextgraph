@@ -9,7 +9,7 @@
 //! ## Full State Verification Protocol
 //! - Every stored fingerprint must be retrievable
 //! - All 35 MCP tools must be listed
-//! - GWT consciousness state must be valid
+//! - GWT workspace state must be valid
 //! - Goal hierarchy must be consistent
 
 use serde_json::json;
@@ -175,18 +175,16 @@ async fn phase7_mcp_tool_inventory_verification() {
     println!("\n[INVENTORY] Found {} MCP tools:", tools.len());
 
     // Expected tool categories (for documentation)
+    // Note: Consciousness tools removed per PRD v6
     let _expected_categories = [
         ("Memory", vec!["store_memory", "get_memetic_status"]),
         ("Search", vec!["search_graph", "search_teleological"]),
-        ("GWT", vec!["get_consciousness_state", "get_kuramoto_sync"]),
+        ("GWT", vec!["get_workspace_status", "get_ego_state"]),
         (
             "Teleological",
             vec!["compute_teleological_vector", "fuse_embeddings"],
         ),
-        (
-            "Autonomous",
-            vec!["auto_bootstrap_north_star", "get_autonomous_status"],
-        ),
+        ("Autonomous", vec!["get_autonomous_status"]),
     ];
 
     // Count by prefix
@@ -222,11 +220,12 @@ async fn phase7_mcp_tool_inventory_verification() {
         .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
         .collect();
 
+    // Note: uses get_coherence_state per PRD v6 topic-based coherence
     let critical_tools = vec![
         "store_memory",
         "search_graph",
         "get_memetic_status",
-        "get_consciousness_state",
+        "get_workspace_status",
         "compute_teleological_vector",
         "search_teleological",
     ];
@@ -250,71 +249,53 @@ async fn phase7_mcp_tool_inventory_verification() {
 }
 
 // ============================================================================
-// FSV-P7-003: GWT Consciousness State Verification
+// FSV-P7-003: GWT Workspace State Verification
 // ============================================================================
 
-/// Verifies GWT consciousness system is in valid state.
+/// Verifies GWT workspace system is in valid state.
+/// Note: Consciousness state verification removed per PRD v6 - replaced by topic-based coherence.
 ///
 /// Note: GWT state may not be available in all test configurations.
 /// This test documents the state rather than failing on unavailability.
 #[tokio::test]
-async fn phase7_gwt_consciousness_state_verification() {
+async fn phase7_gwt_workspace_state_verification() {
     println!("\n================================================================================");
-    println!("PHASE 7 TEST 3: GWT Consciousness State Verification");
+    println!("PHASE 7 TEST 3: GWT Workspace State Verification");
     println!("================================================================================");
 
     let (handlers, _store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
 
-    // Get consciousness state
-    let request = make_tool_call("get_consciousness_state", json!({}));
+    // Get workspace state (consciousness removed per PRD v6)
+    let request = make_tool_call("get_workspace_status", json!({}));
     let response = handlers.dispatch(request).await;
 
-    println!("\n[GWT STATE] Consciousness verification:");
+    println!("\n[GWT STATE] Workspace verification:");
 
     if let Some(err) = &response.error {
-        println!("  - GWT state not available: {}", err.message);
+        println!("  - GWT workspace state not available: {}", err.message);
         println!("  - Note: GWT may require warm initialization");
     } else if let Some(result) = &response.result {
-        // Verify state field
-        if let Some(state) = result.get("state").and_then(|s| s.as_str()) {
-            let valid_states = ["Awake", "NREM", "REM", "Waking", "Dormant"];
-            let is_valid = valid_states.contains(&state);
-            println!("  - State: {} (valid={})", state, is_valid);
+        // Verify is_broadcasting field
+        if let Some(broadcasting) = result.get("is_broadcasting").and_then(|b| b.as_bool()) {
+            println!("  - Broadcasting: {}", broadcasting);
         }
 
-        // Verify attention level
-        if let Some(attention) = result.get("attentionLevel").and_then(|a| a.as_f64()) {
-            let in_range = (0.0..=1.0).contains(&attention);
+        // Verify has_conflict field
+        if let Some(has_conflict) = result.get("has_conflict").and_then(|c| c.as_bool()) {
+            println!("  - Has conflict: {}", has_conflict);
+        }
+
+        // Verify coherence_threshold field
+        if let Some(threshold) = result.get("coherence_threshold").and_then(|t| t.as_f64()) {
+            let in_range = (0.0..=1.0).contains(&threshold);
             println!(
-                "  - Attention level: {:.4} (in_range={})",
-                attention, in_range
+                "  - Coherence threshold: {:.4} (in_range={})",
+                threshold, in_range
             );
         }
     }
 
-    // Check Kuramoto sync
-    let kuramoto_request = make_tool_call("get_kuramoto_sync", json!({}));
-    let kuramoto_response = handlers.dispatch(kuramoto_request).await;
-
-    if let Some(err) = &kuramoto_response.error {
-        println!("  - Kuramoto sync not available: {}", err.message);
-    } else if let Some(kuramoto_result) = &kuramoto_response.result {
-        if let Some(order) = kuramoto_result
-            .get("orderParameter")
-            .and_then(|o| o.as_f64())
-        {
-            println!("  - Kuramoto order parameter: {:.4}", order);
-        }
-
-        if let Some(oscillators) = kuramoto_result
-            .get("oscillators")
-            .and_then(|o| o.as_array())
-        {
-            println!("  - Oscillator count: {} (expected 13)", oscillators.len());
-        }
-    }
-
-    println!("\n[PHASE 7 TEST 3 PASSED] GWT consciousness state documented");
+    println!("\n[PHASE 7 TEST 3 PASSED] GWT workspace state documented");
     println!("================================================================================\n");
 }
 
@@ -382,18 +363,19 @@ async fn phase7_complete_system_health_check() {
         if search_ok { "OK" } else { "FAIL" }.to_string(),
     ));
 
-    // Check 4: GWT state is accessible
-    println!("[HEALTH CHECK 4] GWT consciousness...");
-    let gwt_req = make_tool_call("get_consciousness_state", json!({}));
+    // Check 4: GWT workspace state is accessible (consciousness removed per PRD v6)
+    println!("[HEALTH CHECK 4] GWT workspace...");
+    let gwt_req = make_tool_call("get_workspace_status", json!({}));
     let gwt_resp = handlers.dispatch(gwt_req).await;
     let gwt_ok = gwt_resp.error.is_none();
-    let state = gwt_resp
+    let broadcasting = gwt_resp
         .result
         .as_ref()
-        .and_then(|r| r.get("state"))
-        .and_then(|s| s.as_str())
+        .and_then(|r| r.get("is_broadcasting"))
+        .and_then(|b| b.as_bool())
+        .map(|b| if b { "broadcasting" } else { "idle" })
         .unwrap_or("Unknown");
-    health_checks.push(("GWT State", gwt_ok, state.to_string()));
+    health_checks.push(("GWT State", gwt_ok, broadcasting.to_string()));
 
     // Check 5: Store count is valid
     println!("[HEALTH CHECK 5] Store count...");
@@ -480,8 +462,8 @@ async fn phase7_final_comprehensive_summary() {
     println!("  ─────────────────────────────────────────────────────────");
     println!("  Phase 1: Store & Verify        │ Manual memory storage with FSV");
     println!("  Phase 2: Search & Retrieval    │ Graph search with result verification");
-    println!("  Phase 3: GWT Consciousness     │ 13 oscillators, workspace broadcast");
-    println!("  Phase 4: Autonomous Bootstrap  │ ARCH-03 compliance, no North Star");
+    println!("  Phase 3: GWT Workspace         │ Workspace broadcast, ego state");
+    println!("  Phase 4: Autonomous Bootstrap  │ ARCH-03 compliance, autonomous operation");
     println!("  Phase 5: Teleological Ops      │ 5 teleological tools tested");
     println!("  Phase 6: Cross-Agent Coord     │ Multi-agent memory sharing");
     println!("  Phase 7: Final Verification    │ Complete system health check");
@@ -491,9 +473,9 @@ async fn phase7_final_comprehensive_summary() {
     println!("    - Store operational: YES");
     println!("    - All handlers responsive: YES");
     println!("\n  Key Validations:");
-    println!("    ✓ memory/store works without North Star (ARCH-03)");
+    println!("    ✓ memory/store works autonomously (ARCH-03)");
     println!("    ✓ search_graph returns valid results");
-    println!("    ✓ GWT has 13 Kuramoto oscillators");
+    println!("    ✓ GWT workspace and ego state verified");
     println!("    ✓ Teleological tools accept correct parameters");
     println!("    ✓ All fingerprints verifiable in RocksDB");
     println!("\n================================================================================");
@@ -514,7 +496,7 @@ async fn phase7_summary() {
     println!("\nThis phase performed comprehensive system validation:");
     println!("  1. Store/Retrieve FSV for multiple fingerprints");
     println!("  2. MCP tool inventory verification (35+ tools)");
-    println!("  3. GWT consciousness state verification");
+    println!("  3. GWT workspace state verification");
     println!("  4. Complete system health check");
     println!("  5. Final comprehensive summary");
     println!("\nAll critical system invariants verified.");

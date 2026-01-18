@@ -20,12 +20,13 @@ async fn test_gwt_system_listeners_wired() {
 
     let gwt = GwtSystem::new().await.expect("GwtSystem must create");
 
-    // VERIFY: 4 listeners should be registered (TASK-IDENTITY-P0-006 adds identity listener)
+    // VERIFY: 3 listeners should be registered
+    // (DreamEventListener, NeuromodulationEventListener, MetaCognitiveEventListener)
     let listener_count = gwt.event_broadcaster.listener_count().await;
     println!("Listener count: {}", listener_count);
 
-    assert_eq!(listener_count, 4, "Should have 4 listeners registered");
-    println!("EVIDENCE: GwtSystem correctly wired 4 event listeners (including identity)");
+    assert_eq!(listener_count, 3, "Should have 3 listeners registered");
+    println!("EVIDENCE: GwtSystem correctly wired 3 event listeners");
 }
 
 // ============================================================

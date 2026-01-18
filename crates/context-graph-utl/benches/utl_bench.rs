@@ -13,7 +13,6 @@ use context_graph_utl::{
     compute_learning_magnitude, compute_learning_magnitude_validated,
     config::{CoherenceConfig, EmotionalConfig, SurpriseConfig, UtlConfig},
     emotional::EmotionalWeightCalculator,
-    johari::JohariClassifier,
     lifecycle::LifecycleManager,
     phase::PhaseOscillator,
     processor::UtlProcessor,
@@ -152,13 +151,6 @@ fn bench_coherence_tracking(c: &mut Criterion) {
     });
 }
 
-fn bench_johari_classification(c: &mut Criterion) {
-    let classifier = JohariClassifier::default();
-
-    c.bench_function("johari_classification", |b| {
-        b.iter(|| classifier.classify(black_box(0.6), black_box(0.7)))
-    });
-}
 
 fn bench_phase_oscillator(c: &mut Criterion) {
     let config = context_graph_utl::config::PhaseConfig::default();
@@ -358,7 +350,6 @@ criterion_group!(
         bench_emotional_weight,
         bench_emotional_weight_empty,
         bench_coherence_tracking,
-        bench_johari_classification,
         bench_phase_oscillator,
         bench_lifecycle_stage,
         bench_lifecycle_weights,

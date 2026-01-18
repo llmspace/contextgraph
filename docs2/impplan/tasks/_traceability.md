@@ -6,20 +6,6 @@ This matrix ensures every requirement from the functional specifications is cove
 
 ---
 
-## Phase 0: North Star Removal
-
-| Spec Item | Type | Tech Spec Section | Task ID | ✓ |
-|-----------|------|-------------------|---------|---|
-| REQ-P0-01: Delete North Star files | requirement | files_to_delete | TASK-P0-001 | ✓ |
-| REQ-P0-02: Remove MCP tools | requirement | mcp_tools_to_remove | TASK-P0-002 | ✓ |
-| REQ-P0-03: Update constitution | requirement | constitution_changes | TASK-P0-003 | ✓ |
-| REQ-P0-04: Drop database tables | requirement | database_changes | TASK-P0-004 | ✓ |
-| REQ-P0-05: Clean up imports | requirement | import_cleanup | TASK-P0-001 | ✓ |
-| EC-P0-01: No compilation errors | edge_case | verification_protocol | TASK-P0-005 | ✓ |
-| EC-P0-02: Tool count 59→53 | edge_case | verification_protocol | TASK-P0-005 | ✓ |
-
----
-
 ## Phase 1: Memory Capture
 
 | Spec Item | Type | Tech Spec Section | Task ID | ✓ |
@@ -247,7 +233,6 @@ All specification items are covered by at least one task.
 
 | Phase | Requirements | Models | Components | Methods | Configs | Total | Tasks | Coverage |
 |-------|--------------|--------|------------|---------|---------|-------|-------|----------|
-| P0 | 5 | 0 | 0 | 0 | 0 | 7 | 5 | 100% |
 | P1 | 6 | 6 | 5 | 0 | 0 | 21 | 8 | 100% |
 | P2 | 7 | 9 | 3 | 3 | 0 | 25 | 7 | 100% |
 | P3 | 7 | 5 | 4 | 7 | 4 | 29 | 7 | 100% |
@@ -255,4 +240,4 @@ All specification items are covered by at least one task.
 | P5 | 6 | 9 | 5 | 0 | 1 | 21 | 8 | 100% |
 | P6 | 8 | 2 | 0 | 0 | 0 | 12 | 10 | 100% |
 | EMB-CAT | 3 | 0 | 0 | 0 | 4 | 13 | — | 100% |
-| **Total** | **47** | **40** | **22** | **10** | **11** | **148** | **54** | **100%** |
+| **Total** | **42** | **40** | **22** | **10** | **11** | **141** | **49** | **100%** |

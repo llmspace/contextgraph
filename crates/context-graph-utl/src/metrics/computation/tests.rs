@@ -104,14 +104,13 @@ fn test_computation_metrics_learning_efficiency_zero_latency() {
 fn test_computation_metrics_record_first_computation() {
     let mut metrics = UtlComputationMetrics::default();
 
-    metrics.record_computation(0.7, 0.5, 0.6, JohariQuadrant::Open, 1000.0);
+    metrics.record_computation(0.7, 0.5, 0.6, 1000.0);
 
     assert_eq!(metrics.computation_count, 1);
     assert_eq!(metrics.avg_learning_magnitude, 0.7);
     assert_eq!(metrics.avg_delta_s, 0.5);
     assert_eq!(metrics.avg_delta_c, 0.6);
     assert_eq!(metrics.avg_latency_us, 1000.0);
-    assert_eq!(metrics.quadrant_distribution.open, 1);
 }
 
 #[test]
@@ -119,30 +118,16 @@ fn test_computation_metrics_record_multiple_computations() {
     let mut metrics = UtlComputationMetrics::default();
 
     // First computation sets baseline
-    metrics.record_computation(0.5, 0.3, 0.4, JohariQuadrant::Open, 1000.0);
+    metrics.record_computation(0.5, 0.3, 0.4, 1000.0);
 
     // Second computation uses EMA
-    metrics.record_computation(0.9, 0.7, 0.8, JohariQuadrant::Blind, 2000.0);
+    metrics.record_computation(0.9, 0.7, 0.8, 2000.0);
 
     assert_eq!(metrics.computation_count, 2);
 
     // EMA: 0.1 * new + 0.9 * old
     // avg_learning_magnitude = 0.1 * 0.9 + 0.9 * 0.5 = 0.09 + 0.45 = 0.54
     assert!((metrics.avg_learning_magnitude - 0.54).abs() < 0.01);
-
-    assert_eq!(metrics.quadrant_distribution.open, 1);
-    assert_eq!(metrics.quadrant_distribution.blind, 1);
-}
-
-#[test]
-fn test_computation_metrics_dominant_quadrant() {
-    let mut metrics = UtlComputationMetrics::default();
-
-    metrics.record_computation(0.5, 0.3, 0.4, JohariQuadrant::Blind, 1000.0);
-    metrics.record_computation(0.5, 0.3, 0.4, JohariQuadrant::Blind, 1000.0);
-    metrics.record_computation(0.5, 0.3, 0.4, JohariQuadrant::Open, 1000.0);
-
-    assert_eq!(metrics.dominant_quadrant(), JohariQuadrant::Blind);
 }
 
 #[test]
@@ -152,12 +137,6 @@ fn test_computation_metrics_serialization() {
         avg_learning_magnitude: 0.65,
         avg_delta_s: 0.4,
         avg_delta_c: 0.5,
-        quadrant_distribution: QuadrantDistribution {
-            open: 40,
-            blind: 30,
-            hidden: 20,
-            unknown: 10,
-        },
         lifecycle_stage: LifecycleStage::Growth,
         lambda_weights: LifecycleLambdaWeights::default(),
         avg_latency_us: 2500.0,

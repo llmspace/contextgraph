@@ -27,7 +27,7 @@
 |-------------|-------------|------|------------|--------------|
 | REQ-SESSION-01 | SessionIdentitySnapshot data model (14 fields, <30KB) | TASK-SESSION-01 | TC-SESSION-01, TC-SESSION-02 | - |
 | REQ-SESSION-02 | IdentityCache singleton (OnceLock<RwLock>) | TASK-SESSION-02 | TC-SESSION-03 | - |
-| REQ-SESSION-03 | ConsciousnessState.short_name() method | TASK-SESSION-03 | TC-SESSION-04 | - |
+| REQ-SESSION-03 | StabilityLevel.short_name() method | TASK-SESSION-03 | TC-SESSION-04 | - |
 | REQ-SESSION-04 | CF_SESSION_IDENTITY column family | TASK-SESSION-04 | TC-SESSION-06 | - |
 | REQ-SESSION-05 | save_snapshot/load_snapshot storage methods | TASK-SESSION-05 | TC-SESSION-05, TC-SESSION-06 | - |
 
@@ -63,7 +63,7 @@
 |------|------------------|-------|------------|----------|
 | TASK-SESSION-01 | Implement SessionIdentitySnapshot struct | TC-SESSION-01, TC-SESSION-02 | unit | Complete |
 | TASK-SESSION-02 | Implement IdentityCache singleton | TC-SESSION-03 | unit | Complete |
-| TASK-SESSION-03 | Implement ConsciousnessState.short_name() | TC-SESSION-04 | unit | Complete |
+| TASK-SESSION-03 | Implement StabilityLevel.short_name() | TC-SESSION-04 | unit | Complete |
 | TASK-SESSION-04 | Add CF_SESSION_IDENTITY column family | TC-SESSION-06 | integration | Complete |
 | TASK-SESSION-05 | Implement storage save/load methods | TC-SESSION-05, TC-SESSION-06 | integration | Complete |
 
@@ -100,7 +100,7 @@
 | TC-SESSION-01 | SessionIdentitySnapshot serialization round-trip | REQ-SESSION-01 | TASK-SESSION-01 |
 | TC-SESSION-02 | Trajectory FIFO eviction at MAX_TRAJECTORY_LEN | REQ-SESSION-01 | TASK-SESSION-01 |
 | TC-SESSION-03 | format_brief() output format | REQ-SESSION-02 | TASK-SESSION-02 |
-| TC-SESSION-04 | ConsciousnessState.short_name() all variants | REQ-SESSION-03 | TASK-SESSION-03 |
+| TC-SESSION-04 | StabilityLevel.short_name() all variants | REQ-SESSION-03 | TASK-SESSION-03 |
 | TC-SESSION-07 | Cross-session IC with identical purpose vectors | REQ-SESSION-06, REQ-SESSION-10 | TASK-SESSION-06, TASK-SESSION-10 |
 | TC-SESSION-08 | Cross-session IC with orthogonal purpose vectors | REQ-SESSION-06, REQ-SESSION-10 | TASK-SESSION-06, TASK-SESSION-10 |
 | TC-SESSION-09 | classify_ic() threshold boundaries | REQ-SESSION-07 | TASK-SESSION-07 |

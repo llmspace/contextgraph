@@ -138,10 +138,10 @@ fn test_full_state_verification_summary() {
     println!("║  - Persistence Across Reopen                                                 ║");
     println!("║    - Data survives database close/reopen cycle                               ║");
     println!("║                                                                              ║");
-    println!("║  - SELF_EGO_NODE Physical Persistence (TASK-GWT-P1-001)                      ║");
-    println!("║    - Verifies ego_node CF with get_raw_bytes()                               ║");
-    println!("║    - Physical byte-level evidence: 128 bytes, version 0x01                   ║");
-    println!("║    - Synthetic data: id=Uuid::nil(), purpose_vector=[0.1..0.13]              ║");
+    println!("║  - Topic Profile Physical Persistence (PRD v6)                               ║");
+    println!("║    - Verifies topic_profile CF with get_raw_bytes()                          ║");
+    println!("║    - Physical byte-level evidence: 13D topic profile                         ║");
+    println!("║    - Synthetic data: id=Uuid::nil(), topic_profile=[0.1..0.13]               ║");
     println!("║    - Persistence survives database reopen                                    ║");
     println!("║                                                                              ║");
     println!("╠══════════════════════════════════════════════════════════════════════════════╣");

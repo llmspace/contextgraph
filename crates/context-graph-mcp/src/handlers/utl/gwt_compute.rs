@@ -5,7 +5,6 @@
 use serde_json::json;
 use tracing::warn;
 
-use context_graph_core::johari::NUM_EMBEDDERS;
 use context_graph_core::teleological::Embedder;
 use context_graph_core::types::fingerprint::{EmbeddingRef, TeleologicalFingerprint};
 use context_graph_utl::coherence::{
@@ -14,7 +13,7 @@ use context_graph_utl::coherence::{
 use context_graph_utl::config::{CoherenceConfig, SurpriseConfig};
 use context_graph_utl::surprise::embedder_entropy::EmbedderEntropyFactory;
 
-use super::constants::{ALPHA, BETA, EMBEDDER_NAMES, GAMMA};
+use super::constants::{ALPHA, BETA, EMBEDDER_NAMES, GAMMA, NUM_EMBEDDERS};
 use super::helpers::{create_divergent_cluster, mean_pool_tokens, sparse_to_dense_truncated};
 
 /// Result of delta S computation per embedder.

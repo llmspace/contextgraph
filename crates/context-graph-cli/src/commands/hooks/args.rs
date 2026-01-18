@@ -107,7 +107,7 @@ pub struct SessionStartArgs {
     #[arg(long)]
     pub session_id: Option<String>,
 
-    /// Previous session ID for identity continuity linking
+    /// Previous session ID for session linking
     #[arg(long)]
     pub previous_session_id: Option<String>,
 
@@ -130,7 +130,7 @@ pub struct SessionStartArgs {
 /// # Performance Critical
 /// This command MUST complete within 100ms.
 /// When `fast_path` is true (default), NO database access occurs.
-/// Uses IdentityCache only for consciousness brief.
+/// Uses SessionCache only for coherence brief.
 #[derive(Args, Debug, Clone)]
 pub struct PreToolArgs {
     /// Session ID (REQUIRED)
@@ -146,7 +146,7 @@ pub struct PreToolArgs {
     pub stdin: bool,
 
     /// Skip database access for faster response (default: true)
-    /// When true, uses IdentityCache only - NO disk/DB access
+    /// When true, uses SessionCache only - NO disk/DB access
     /// MUST remain true to meet 100ms timeout requirement
     #[arg(long, action = clap::ArgAction::Set, default_value = "true")]
     pub fast_path: bool,

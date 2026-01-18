@@ -340,7 +340,7 @@ This replaces the current K-means clustering with:
     - entropy &gt; 0.7 for 5+ min → MAY trigger dream
     - churn &gt; 0.5 AND entropy &gt; 0.7 → MAY trigger dream
   </triggers>
-  <note>These replace the IC-based dream triggers from the removed North Star system.</note>
+  <note>Dream triggers use entropy and churn metrics from Topic Stability per PRD v6.</note>
 </requirement>
 </requirements>
 

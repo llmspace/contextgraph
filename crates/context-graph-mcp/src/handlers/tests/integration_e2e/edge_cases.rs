@@ -68,16 +68,16 @@ async fn test_edge_case_space_index_13() {
     assert_eq!(response.error.unwrap().code, error_codes::INVALID_PARAMS);
 }
 
-/// EDGE CASE 5: Store & Alignment work autonomously without North Star.
+/// EDGE CASE 5: Store & Alignment work autonomously without strategic goal.
 #[tokio::test]
 async fn test_edge_case_alignment_autonomous_operation() {
-    let ctx = TestContext::new_without_north_star();
+    let ctx = TestContext::new_without_strategic_goal();
     assert!(
         !ctx.hierarchy.read().has_top_level_goals(),
-        "MUST NOT have North Star"
+        "MUST NOT have strategic goal"
     );
 
-    // Store should succeed without North Star (AUTONOMOUS OPERATION)
+    // Store should succeed without strategic goal (AUTONOMOUS OPERATION)
     let store_request = make_request(
         "memory/store",
         1,
@@ -88,7 +88,7 @@ async fn test_edge_case_alignment_autonomous_operation() {
     let store_response = ctx.handlers.dispatch(store_request).await;
     assert!(
         store_response.error.is_none(),
-        "Store MUST succeed without North Star"
+        "Store MUST succeed without strategic goal"
     );
     assert!(store_response
         .result
@@ -98,7 +98,7 @@ async fn test_edge_case_alignment_autonomous_operation() {
 
     // Deprecated method returns METHOD_NOT_FOUND
     let align_request = make_request(
-        "purpose/north_star_alignment",
+        "purpose/deprecated_alignment",
         2,
         json!({
             "fingerprint_id": "00000000-0000-0000-0000-000000000001"
@@ -139,31 +139,7 @@ async fn test_edge_case_fingerprint_not_found() {
     );
 }
 
-/// EDGE CASE 7: Invalid Johari embedder index 13.
-#[tokio::test]
-async fn test_edge_case_johari_embedder_index_13() {
-    let ctx = TestContext::new();
-    let fp = create_fingerprint_with_johari([JohariQuadrant::Unknown; NUM_EMBEDDERS]);
-    let memory_id = ctx.store.store(fp).await.expect("Store should succeed");
-
-    let request = make_request(
-        "johari/transition",
-        1,
-        json!({
-            "memory_id": memory_id.to_string(),
-            "embedder_index": 13, "to_quadrant": "open", "trigger": "dream_consolidation"
-        }),
-    );
-    let response = ctx.handlers.dispatch(request).await;
-
-    assert!(response.error.is_some(), "embedder_index=13 MUST fail");
-    assert_eq!(
-        response.error.unwrap().code,
-        error_codes::JOHARI_INVALID_EMBEDDER_INDEX
-    );
-}
-
-/// EDGE CASE 8: Meta-UTL insufficient training data.
+/// EDGE CASE 7: Meta-UTL insufficient training data.
 #[tokio::test]
 async fn test_edge_case_meta_utl_insufficient_data() {
     let ctx = TestContext::new();

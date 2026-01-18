@@ -1,15 +1,13 @@
 //! Context Graph CLI
 //!
-//! CLI tools for Context Graph session identity and consciousness management.
+//! CLI tools for Context Graph memory management and hooks integration.
 //!
 //! # Commands
 //!
-//! - `consciousness check-identity`: Check identity continuity and trigger dream if crisis
-//! - `consciousness brief`: Quick consciousness status for PreToolUse hook
-//! - `session restore-identity`: Restore identity from storage
-//! - `session persist-identity`: Persist identity to storage
-//!
-//! # TASK-SESSION-08: CLI Dream Trigger Integration
+//! - `session restore-identity`: Restore session state from storage
+//! - `session persist-identity`: Persist session state to storage
+//! - `hooks`: Claude Code native hooks commands
+//! - `memory`: Memory capture and context injection commands
 //!
 //! This CLI provides hooks integration for Claude Code via .claude/settings.json.
 //! NO BACKWARDS COMPATIBILITY - FAIL FAST WITH ROBUST LOGGING.
@@ -17,8 +15,6 @@
 //! # Constitution Reference
 //! - ARCH-07: Native Claude Code hooks
 //! - AP-26: Exit code 1 on error, 2 on corruption
-//! - AP-38: IC<0.5 MUST auto-trigger dream
-//! - AP-42: entropy>0.7 MUST wire to TriggerManager
 
 use clap::{Parser, Subcommand};
 use tracing_subscriber::{fmt, EnvFilter};
@@ -28,12 +24,12 @@ mod error;
 
 pub use error::{exit_code_for_error, is_corruption_indicator, CliExitCode};
 
-/// Context Graph CLI - Session Identity and Consciousness Management
+/// Context Graph CLI - Memory Management and Hooks Integration
 #[derive(Parser)]
 #[command(name = "context-graph-cli")]
 #[command(author = "Context Graph Team")]
 #[command(version = "0.1.0")]
-#[command(about = "CLI tools for Context Graph session identity and consciousness management")]
+#[command(about = "CLI tools for Context Graph memory management and hooks integration")]
 #[command(propagate_version = true)]
 struct Cli {
     /// Verbosity level (-v, -vv, -vvv)
@@ -46,12 +42,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Consciousness state management commands
-    Consciousness {
-        #[command(subcommand)]
-        action: commands::consciousness::ConsciousnessCommands,
-    },
-    /// Session identity persistence commands
+    /// Session persistence commands
     Session {
         #[command(subcommand)]
         action: commands::session::SessionCommands,
@@ -60,6 +51,11 @@ enum Commands {
     Hooks {
         #[command(subcommand)]
         action: commands::hooks::HooksCommands,
+    },
+    /// Memory capture and context injection commands
+    Memory {
+        #[command(subcommand)]
+        action: commands::memory::MemoryCommands,
     },
 }
 
@@ -84,11 +80,9 @@ async fn main() {
 
     // Dispatch to command handlers
     let exit_code = match cli.command {
-        Commands::Consciousness { action } => {
-            commands::consciousness::handle_consciousness_command(action).await
-        }
         Commands::Session { action } => commands::session::handle_session_command(action).await,
         Commands::Hooks { action } => commands::hooks::handle_hooks_command(action).await,
+        Commands::Memory { action } => commands::memory::handle_memory_command(action).await,
     };
 
     std::process::exit(exit_code);

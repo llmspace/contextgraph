@@ -114,20 +114,3 @@ fn test_content_key_parse_invalid_length_panics() {
     schema::parse_content_key(&invalid_key);
 }
 
-// =========================================================================
-// TASK-GWT-P1-001: EGO_NODE Panic Tests
-// =========================================================================
-
-#[test]
-#[should_panic(expected = "DESERIALIZATION ERROR")]
-fn test_ego_node_deserialize_empty_panics() {
-    let _ = serialization::deserialize_ego_node(&[]);
-}
-
-#[test]
-#[should_panic(expected = "DESERIALIZATION ERROR")]
-fn test_ego_node_deserialize_wrong_version_panics() {
-    let mut data = vec![255u8]; // Wrong version
-    data.extend(vec![0u8; 100]); // Garbage payload
-    let _ = serialization::deserialize_ego_node(&data);
-}

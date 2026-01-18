@@ -17,7 +17,7 @@ pub struct MemoryContent {
     pub embedding: Vec<f32>,
     /// Text content
     pub text: String,
-    /// North Star alignment score
+    /// Topic alignment score
     pub alignment: f32,
     /// Access count for importance weighting
     pub access_count: u32,

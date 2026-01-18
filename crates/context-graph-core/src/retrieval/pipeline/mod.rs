@@ -20,7 +20,7 @@
 //! - L001: MultiEmbeddingQueryExecutor (Stages 1-3)
 //! - L002: PurposeVectorComputer (Stage 4)
 //! - L003: GoalAlignmentCalculator (Stage 4)
-//! - L004: JohariTransitionManager (Stage 4 filtering)
+//! - L004: GoalAlignmentCalculator (Stage 4 filtering)
 //! - L005: Per-Space HNSW Index (Stage 3)
 //! - L006: Purpose Pattern Index (Stage 4)
 //! - L007: CrossSpaceSimilarityEngine (Stage 3)

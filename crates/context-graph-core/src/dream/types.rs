@@ -35,7 +35,6 @@ use uuid::Uuid;
 ///
 /// let config = HebbianConfig::default();
 /// assert_eq!(config.learning_rate, 0.01);
-/// assert_eq!(config.coupling_strength, 0.9); // Constitution mandated
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HebbianConfig {
@@ -55,11 +54,6 @@ pub struct HebbianConfig {
     /// Maximum weight cap to prevent runaway strengthening.
     /// Constitution: 1.0
     pub weight_cap: f32,
-
-    /// Kuramoto coupling strength for neural synchronization.
-    /// Constitution: 0.9 during NREM (NOT 10.0)
-    /// Reference: docs2/constitution.yaml line 393
-    pub coupling_strength: f32,
 }
 
 impl Default for HebbianConfig {
@@ -69,7 +63,6 @@ impl Default for HebbianConfig {
             weight_decay: 0.001,
             weight_floor: 0.05,
             weight_cap: 1.0,
-            coupling_strength: 0.9, // CORRECTED: Constitution says 0.9, not 10.0
         }
     }
 }
@@ -101,11 +94,6 @@ impl HebbianConfig {
             self.weight_cap > self.weight_floor,
             "HebbianConfig: weight_cap={} must be > weight_floor={}, constitution defaults: 1.0 > 0.05",
             self.weight_cap, self.weight_floor
-        );
-        assert!(
-            self.coupling_strength > 0.0 && self.coupling_strength <= 10.0,
-            "HebbianConfig: coupling_strength={} must be in (0.0, 10.0], constitution default=0.9",
-            self.coupling_strength
         );
     }
 
@@ -597,12 +585,11 @@ impl Default for GpuTriggerState {
 ///
 /// Priority order (highest to lowest):
 /// 1. Manual - User-initiated with optional phase selection
-/// 2. IdentityCritical - IC < 0.5 threshold (AP-26, AP-38, IDENTITY-007)
-/// 3. GpuOverload - GPU approaching 30% budget
-/// 4. HighEntropy - Entropy > 0.7 for 5 minutes
-/// 5. MemoryPressure - Memory consolidation needed
-/// 6. IdleTimeout - Activity below 0.15 for idle_duration
-/// 7. Scheduled - Scheduled dream time
+/// 2. GpuOverload - GPU approaching 30% budget
+/// 3. HighEntropy - Entropy > 0.7 for 5 minutes
+/// 4. MemoryPressure - Memory consolidation needed
+/// 5. IdleTimeout - Activity below 0.15 for idle_duration
+/// 6. Scheduled - Scheduled dream time
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ExtendedTriggerReason {
     /// User/system manual trigger (highest priority)
@@ -610,14 +597,6 @@ pub enum ExtendedTriggerReason {
     Manual {
         /// The dream phase to execute
         phase: DreamPhase,
-    },
-
-    /// Identity Continuity crisis (IC < 0.5)
-    /// Constitution: AP-26, AP-38, IDENTITY-007
-    /// Triggers dream consolidation to restore identity coherence.
-    IdentityCritical {
-        /// The IC value that triggered the crisis (must be < 0.5)
-        ic_value: f32,
     },
 
     /// Activity below 0.15 for idle_duration (10 min)
@@ -645,9 +624,6 @@ impl std::fmt::Display for ExtendedTriggerReason {
                 } else {
                     write!(f, "manual({})", phase)
                 }
-            }
-            Self::IdentityCritical { ic_value } => {
-                write!(f, "identity_critical(IC={:.3})", ic_value)
             }
             Self::IdleTimeout => write!(f, "idle_timeout"),
             Self::HighEntropy => write!(f, "high_entropy"),
@@ -703,7 +679,7 @@ pub struct ConsolidationMetrics {
 
     /// Coherence achieved after consolidation [0.0, 1.0].
     /// Higher values indicate better graph consistency.
-    /// Computed from: Kuramoto order parameter post-consolidation.
+    /// Computed from: per-space clustering order parameter post-consolidation.
     pub coherence: f32,
 
     /// Number of edges pruned during NREM phase.
@@ -833,12 +809,6 @@ mod tests {
             "weight_floor must match constitution"
         );
         assert_eq!(config.weight_cap, 1.0, "weight_cap must match constitution");
-
-        // CRITICAL: coupling_strength is 0.9, NOT 10.0
-        assert_eq!(
-            config.coupling_strength, 0.9,
-            "coupling_strength must be 0.9 per constitution line 393, NOT 10.0"
-        );
     }
 
     #[test]
@@ -1068,10 +1038,6 @@ mod tests {
             "manual(rem)"
         );
         assert_eq!(
-            ExtendedTriggerReason::IdentityCritical { ic_value: 0.423 }.to_string(),
-            "identity_critical(IC=0.423)"
-        );
-        assert_eq!(
             ExtendedTriggerReason::IdleTimeout.to_string(),
             "idle_timeout"
         );
@@ -1088,74 +1054,6 @@ mod tests {
             "memory_pressure"
         );
         assert_eq!(ExtendedTriggerReason::Scheduled.to_string(), "scheduled");
-    }
-
-    #[test]
-    fn test_identity_critical_ic_value_serialization() {
-        // Test serialization with real IC value
-        let reason = ExtendedTriggerReason::IdentityCritical { ic_value: 0.35 };
-
-        // Serialize to JSON
-        let json = serde_json::to_string(&reason).expect("serialization should succeed");
-
-        // Verify JSON structure
-        assert!(json.contains("IdentityCritical"));
-        assert!(json.contains("0.35"));
-
-        // Deserialize back
-        let deserialized: ExtendedTriggerReason =
-            serde_json::from_str(&json).expect("deserialization should succeed");
-
-        // Verify round-trip
-        match deserialized {
-            ExtendedTriggerReason::IdentityCritical { ic_value } => {
-                assert!(
-                    (ic_value - 0.35).abs() < 0.001,
-                    "IC value should survive round-trip: got {}",
-                    ic_value
-                );
-            }
-            _ => panic!("Expected IdentityCritical variant"),
-        }
-    }
-
-    #[test]
-    fn test_identity_critical_display_precision() {
-        // Constitution requires 3 decimal places for IC display
-        let test_cases = [
-            (0.499, "identity_critical(IC=0.499)"),
-            (0.1, "identity_critical(IC=0.100)"),
-            (0.0, "identity_critical(IC=0.000)"),
-            (0.123456, "identity_critical(IC=0.123)"),
-        ];
-
-        for (ic_value, expected) in test_cases {
-            let reason = ExtendedTriggerReason::IdentityCritical { ic_value };
-            assert_eq!(
-                reason.to_string(),
-                expected,
-                "IC={} should display as {}",
-                ic_value,
-                expected
-            );
-        }
-    }
-
-    #[test]
-    fn test_identity_critical_equality() {
-        let a = ExtendedTriggerReason::IdentityCritical { ic_value: 0.42 };
-        let b = ExtendedTriggerReason::IdentityCritical { ic_value: 0.42 };
-        let c = ExtendedTriggerReason::IdentityCritical { ic_value: 0.43 };
-
-        assert_eq!(a, b, "Same IC values should be equal");
-        assert_ne!(a, c, "Different IC values should not be equal");
-        assert_ne!(
-            a,
-            ExtendedTriggerReason::Manual {
-                phase: DreamPhase::FullCycle
-            },
-            "Different variants should not be equal"
-        );
     }
 
     // ============================================================================

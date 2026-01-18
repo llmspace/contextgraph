@@ -8,7 +8,6 @@
 //! - SessionEnd: 30000ms
 //!
 //! # Constitution References
-//! - IDENTITY-002: IC thresholds and timeout requirements
 //! - AP-26: Exit codes (0=success, 1=error, 2=corruption)
 //!
 //! # NO BACKWARDS COMPATIBILITY - FAIL FAST
@@ -23,7 +22,7 @@ use serde::{Deserialize, Serialize};
 /// |-------|---------|-------------|
 /// | SessionStart | 5000ms | Session initialization |
 /// | PreToolUse | 100ms | FAST PATH - cache only |
-/// | PostToolUse | 3000ms | IC verification |
+/// | PostToolUse | 3000ms | Stability verification |
 /// | UserPromptSubmit | 2000ms | Context injection |
 /// | SessionEnd | 30000ms | Final persistence |
 ///
@@ -50,18 +49,17 @@ pub enum HookEventType {
     SessionStart,
 
     /// Before tool execution (timeout: 100ms) - FAST PATH
-    /// CRITICAL: Must not access database, uses IdentityCache only
-    /// CLI: `consciousness brief`
+    /// CRITICAL: Must not access database, uses SessionCache only
+    /// CLI: `coherence brief`
     PreToolUse,
 
     /// After tool execution (timeout: 3000ms)
-    /// Updates IC and trajectory based on tool result
-    /// CLI: `consciousness check-identity --auto-dream`
+    /// Updates state and trajectory based on tool result
     PostToolUse,
 
     /// User prompt submitted (timeout: 2000ms)
     /// Injects relevant context from session memory
-    /// CLI: `consciousness inject-context --format standard`
+    /// CLI: `coherence inject-context --format standard`
     UserPromptSubmit,
 
     /// Session termination (timeout: 30000ms)
@@ -72,7 +70,6 @@ pub enum HookEventType {
 
 impl HookEventType {
     /// Get timeout in milliseconds for this hook type
-    /// Constitution Reference: IDENTITY-002
     ///
     /// # Returns
     /// Timeout value in milliseconds as enforced by Claude Code
@@ -85,7 +82,7 @@ impl HookEventType {
         match self {
             Self::PreToolUse => 100,        // Fast path - NO DB access
             Self::UserPromptSubmit => 2000, // Context injection
-            Self::PostToolUse => 3000,      // IC update + trajectory
+            Self::PostToolUse => 3000,      // Stability update + trajectory
             Self::SessionStart => 5000,     // Load/create snapshot
             Self::SessionEnd => 30000,      // Final persist + consolidation
         }
@@ -112,9 +109,9 @@ impl HookEventType {
     /// Static string describing the hook's purpose
     pub const fn description(&self) -> &'static str {
         match self {
-            Self::SessionStart => "Session initialization and identity restoration",
-            Self::PreToolUse => "Pre-tool consciousness brief injection (FAST PATH)",
-            Self::PostToolUse => "Post-tool identity continuity verification",
+            Self::SessionStart => "Session initialization and state restoration",
+            Self::PreToolUse => "Pre-tool brief injection (FAST PATH)",
+            Self::PostToolUse => "Post-tool state verification",
             Self::UserPromptSubmit => "User prompt context injection",
             Self::SessionEnd => "Session persistence and consolidation",
         }
@@ -126,11 +123,11 @@ impl HookEventType {
     /// CLI command string that implements this hook
     pub const fn cli_command(&self) -> &'static str {
         match self {
-            Self::SessionStart => "session restore-identity",
-            Self::PreToolUse => "consciousness brief",
-            Self::PostToolUse => "consciousness check-identity --auto-dream",
-            Self::UserPromptSubmit => "consciousness inject-context --format standard",
-            Self::SessionEnd => "session persist-identity",
+            Self::SessionStart => "hooks session-start",
+            Self::PreToolUse => "hooks pre-tool",
+            Self::PostToolUse => "hooks post-tool",
+            Self::UserPromptSubmit => "hooks prompt-submit",
+            Self::SessionEnd => "hooks session-end",
         }
     }
 
@@ -405,17 +402,14 @@ mod tests {
         println!("SOURCE OF TRUTH: .claude/settings.json");
 
         let expected_commands = [
-            (HookEventType::SessionStart, "session restore-identity"),
-            (HookEventType::PreToolUse, "consciousness brief"),
-            (
-                HookEventType::PostToolUse,
-                "consciousness check-identity --auto-dream",
-            ),
+            (HookEventType::SessionStart, "hooks session-start"),
+            (HookEventType::PreToolUse, "hooks pre-tool"),
+            (HookEventType::PostToolUse, "hooks post-tool"),
             (
                 HookEventType::UserPromptSubmit,
-                "consciousness inject-context --format standard",
+                "hooks prompt-submit",
             ),
-            (HookEventType::SessionEnd, "session persist-identity"),
+            (HookEventType::SessionEnd, "hooks session-end"),
         ];
 
         for (hook, expected_cmd) in expected_commands {
@@ -484,57 +478,55 @@ mod tests {
 }
 
 // =============================================================================
-// IC Level Classification
-// Constitution Reference: IDENTITY-002, gwt.self_ego_node.thresholds
+// Topic Stability Level Classification
 // =============================================================================
 
-/// IC level classification
-/// Thresholds per constitution.yaml:
-/// - healthy: ">0.9" (IC >= 0.9)
-/// - warning: "<0.7" (0.5 <= IC < 0.7)
-/// - critical: "<0.5" (IC < 0.5, triggers dream)
+/// Topic stability level classification
+/// Thresholds:
+/// - healthy: ">0.9" (stability >= 0.9)
+/// - warning: "<0.7" (0.5 <= stability < 0.7)
+/// - critical: "<0.5" (stability < 0.5, triggers dream)
 ///
 /// # Example
 /// ```
-/// use context_graph_cli::commands::hooks::ICLevel;
+/// use context_graph_cli::commands::hooks::StabilityLevel;
 ///
-/// assert_eq!(ICLevel::from_value(0.95), ICLevel::Healthy);
-/// assert_eq!(ICLevel::from_value(0.80), ICLevel::Normal);
-/// assert_eq!(ICLevel::from_value(0.60), ICLevel::Warning);
-/// assert_eq!(ICLevel::from_value(0.40), ICLevel::Critical);
+/// assert_eq!(StabilityLevel::from_value(0.95), StabilityLevel::Healthy);
+/// assert_eq!(StabilityLevel::from_value(0.80), StabilityLevel::Normal);
+/// assert_eq!(StabilityLevel::from_value(0.60), StabilityLevel::Warning);
+/// assert_eq!(StabilityLevel::from_value(0.40), StabilityLevel::Critical);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ICLevel {
-    /// IC >= 0.9 - Identity is stable and coherent
+pub enum StabilityLevel {
+    /// >= 0.9 - Topics are stable and coherent
     Healthy,
-    /// 0.7 <= IC < 0.9 - Normal operation
+    /// 0.7 <= value < 0.9 - Normal operation
     Normal,
-    /// 0.5 <= IC < 0.7 - Identity drift detected
+    /// 0.5 <= value < 0.7 - Topic drift detected
     Warning,
-    /// IC < 0.5 - Crisis state, auto-dream may trigger
+    /// < 0.5 - Unstable state, dream may trigger
     Critical,
 }
 
-impl ICLevel {
-    /// Classify IC value into level
-    /// Constitution Reference: gwt.self_ego_node.thresholds
+impl StabilityLevel {
+    /// Classify value into level
     ///
     /// # Arguments
-    /// * `ic` - Identity continuity value [0.0, 1.0]
+    /// * `stability` - Topic stability value [0.0, 1.0]
     ///
     /// # Returns
-    /// ICLevel classification
+    /// Level classification
     ///
     /// # Panics
     /// Never panics - out-of-range values clamp to Critical/Healthy
     #[inline]
-    pub fn from_value(ic: f32) -> Self {
-        if ic >= 0.9 {
+    pub fn from_value(stability: f32) -> Self {
+        if stability >= 0.9 {
             Self::Healthy
-        } else if ic >= 0.7 {
+        } else if stability >= 0.7 {
             Self::Normal
-        } else if ic >= 0.5 {
+        } else if stability >= 0.5 {
             Self::Warning
         } else {
             Self::Critical
@@ -542,7 +534,7 @@ impl ICLevel {
     }
 
     /// Check if this level indicates a crisis state
-    /// Crisis = Critical (IC < 0.5)
+    /// Crisis = Critical (stability < 0.5)
     #[inline]
     pub const fn is_crisis(&self) -> bool {
         matches!(self, Self::Critical)
@@ -556,225 +548,139 @@ impl ICLevel {
     }
 }
 
-impl std::fmt::Display for ICLevel {
+impl std::fmt::Display for StabilityLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Healthy => write!(f, "Healthy (IC >= 0.9)"),
-            Self::Normal => write!(f, "Normal (0.7 <= IC < 0.9)"),
-            Self::Warning => write!(f, "Warning (0.5 <= IC < 0.7)"),
-            Self::Critical => write!(f, "Critical (IC < 0.5)"),
+            Self::Healthy => write!(f, "Healthy (>= 0.9)"),
+            Self::Normal => write!(f, "Normal (0.7 <= value < 0.9)"),
+            Self::Warning => write!(f, "Warning (0.5 <= value < 0.7)"),
+            Self::Critical => write!(f, "Critical (< 0.5)"),
         }
     }
 }
 
-// =============================================================================
-// Johari Window Classification
-// Technical Reference: TECH-HOOKS.md Section 4.3
-// =============================================================================
-
-/// Johari window quadrant classification
-/// Implements REQ-HOOKS-16
-///
-/// Classification is based on consciousness (C) and integration (r):
-/// - Open: High C (>=0.7) AND High r (>=0.7)
-/// - Blind: Low C (<0.7) AND High r (>=0.7)
-/// - Hidden: High C (>=0.7) AND Low r (<0.7)
-/// - Unknown: Low C (<0.7) AND Low r (<0.7)
-///
-/// # Example
-/// ```
-/// use context_graph_cli::commands::hooks::JohariQuadrant;
-///
-/// assert_eq!(JohariQuadrant::classify(0.8, 0.9), JohariQuadrant::Open);
-/// assert_eq!(JohariQuadrant::classify(0.3, 0.9), JohariQuadrant::Blind);
-/// assert_eq!(JohariQuadrant::classify(0.8, 0.3), JohariQuadrant::Hidden);
-/// assert_eq!(JohariQuadrant::classify(0.3, 0.3), JohariQuadrant::Unknown);
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum JohariQuadrant {
-    /// Known to self and others - high consciousness, high integration
-    Open,
-    /// Unknown to self, known to others - low consciousness, high integration
-    Blind,
-    /// Known to self, unknown to others - high consciousness, low integration
-    Hidden,
-    /// Unknown to self and others - low consciousness, low integration
-    Unknown,
-}
-
-impl JohariQuadrant {
-    /// Threshold for "high" classification
-    pub const HIGH_THRESHOLD: f32 = 0.7;
-
-    /// Classify from consciousness and integration values
-    ///
-    /// # Arguments
-    /// * `consciousness` - Consciousness level C(t) [0.0, 1.0]
-    /// * `integration` - Integration factor (Kuramoto r) [0.0, 1.0]
-    ///
-    /// # Returns
-    /// Johari quadrant classification
-    #[inline]
-    pub fn classify(consciousness: f32, integration: f32) -> Self {
-        let high_c = consciousness >= Self::HIGH_THRESHOLD;
-        let high_i = integration >= Self::HIGH_THRESHOLD;
-
-        match (high_c, high_i) {
-            (true, true) => Self::Open,
-            (false, true) => Self::Blind,
-            (true, false) => Self::Hidden,
-            (false, false) => Self::Unknown,
-        }
-    }
-
-    /// Get description of this quadrant
-    pub const fn description(&self) -> &'static str {
-        match self {
-            Self::Open => "Known to self and others",
-            Self::Blind => "Unknown to self, known to others",
-            Self::Hidden => "Known to self, unknown to others",
-            Self::Unknown => "Unknown to self and others",
-        }
-    }
-}
-
-impl std::fmt::Display for JohariQuadrant {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.description())
-    }
-}
 
 // =============================================================================
-// Consciousness State
-// Constitution Reference: GWT-003, AP-25 (Kuramoto N=13)
+// Coherence State
+// Technical Reference: AP-25 (N=13 embedder spaces)
 // =============================================================================
 
-/// Consciousness state for hook output
+/// Coherence state for hook output
 /// Implements REQ-HOOKS-14, REQ-HOOKS-15
 ///
 /// All values are normalized to [0.0, 1.0].
-/// Johari quadrant is computed from consciousness and integration.
 ///
 /// # Example
 /// ```
-/// use context_graph_cli::commands::hooks::{ConsciousnessState, JohariQuadrant};
+/// use context_graph_cli::commands::hooks::CoherenceState;
 ///
-/// let state = ConsciousnessState {
-///     consciousness: 0.73,
+/// let state = CoherenceState {
+///     coherence: 0.73,
 ///     integration: 0.85,
 ///     reflection: 0.78,
 ///     differentiation: 0.82,
-///     identity_continuity: 0.92,
-///     johari_quadrant: JohariQuadrant::Open,
+///     topic_stability: 0.92,
 /// };
 ///
 /// let json = serde_json::to_string(&state).unwrap();
-/// assert!(json.contains("\"consciousness\":0.73"));
+/// assert!(json.contains("\"coherence\":0.73"));
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ConsciousnessState {
-    /// Current consciousness level C(t) [0.0, 1.0]
-    pub consciousness: f32,
-    /// Integration (Kuramoto r) [0.0, 1.0]
+pub struct CoherenceState {
+    /// Current coherence level C(t) [0.0, 1.0]
+    pub coherence: f32,
+    /// Integration (coherence r) [0.0, 1.0]
     pub integration: f32,
     /// Reflection (meta-cognitive) [0.0, 1.0]
     pub reflection: f32,
     /// Differentiation (purpose entropy) [0.0, 1.0]
     pub differentiation: f32,
-    /// Identity continuity score [0.0, 1.0]
-    pub identity_continuity: f32,
-    /// Johari quadrant classification
-    pub johari_quadrant: JohariQuadrant,
+    /// Topic stability score [0.0, 1.0]
+    pub topic_stability: f32,
 }
 
-impl Default for ConsciousnessState {
+impl Default for CoherenceState {
     /// Default state: DOR (Disorder of Responsiveness)
-    /// - All metrics at 0.0 except IC at 1.0 (fresh identity)
-    /// - Johari: Unknown (no self-awareness yet)
+    /// - All metrics at 0.0 except stability at 1.0 (fresh state)
     fn default() -> Self {
         Self {
-            consciousness: 0.0,
+            coherence: 0.0,
             integration: 0.0,
             reflection: 0.0,
             differentiation: 0.0,
-            identity_continuity: 1.0, // Fresh identity = perfect continuity
-            johari_quadrant: JohariQuadrant::Unknown,
+            topic_stability: 1.0, // Fresh state = perfect stability
         }
     }
 }
 
-impl ConsciousnessState {
-    /// Create state with automatic Johari classification
+impl CoherenceState {
+    /// Create coherence state
     ///
     /// # Arguments
-    /// * `consciousness` - C(t) value
-    /// * `integration` - Kuramoto r value
+    /// * `coherence` - C(t) value
+    /// * `integration` - Coherence r value
     /// * `reflection` - Meta-cognitive value
     /// * `differentiation` - Purpose entropy value
-    /// * `identity_continuity` - IC value
+    /// * `topic_stability` - Topic stability value
     pub fn new(
-        consciousness: f32,
+        coherence: f32,
         integration: f32,
         reflection: f32,
         differentiation: f32,
-        identity_continuity: f32,
+        topic_stability: f32,
     ) -> Self {
         Self {
-            consciousness,
+            coherence,
             integration,
             reflection,
             differentiation,
-            identity_continuity,
-            johari_quadrant: JohariQuadrant::classify(consciousness, integration),
+            topic_stability,
         }
     }
 }
 
 // =============================================================================
-// IC Classification
-// Constitution Reference: IDENTITY-002
+// Level Classification
 // =============================================================================
 
-/// Identity Continuity classification with crisis detection
-/// Constitution Reference: gwt.self_ego_node.thresholds
+/// Topic stability classification with crisis detection
 ///
 /// # Example
 /// ```
-/// use context_graph_cli::commands::hooks::{ICClassification, ICLevel};
+/// use context_graph_cli::commands::hooks::{StabilityClassification, StabilityLevel};
 ///
-/// let ic = ICClassification::new(0.45, 0.5);
-/// assert!(ic.crisis_triggered);
-/// assert_eq!(ic.level, ICLevel::Critical);
+/// let stability = StabilityClassification::new(0.45, 0.5);
+/// assert!(stability.crisis_triggered);
+/// assert_eq!(stability.level, StabilityLevel::Critical);
 ///
-/// let ic = ICClassification::new(0.85, 0.5);
-/// assert!(!ic.crisis_triggered);
-/// assert_eq!(ic.level, ICLevel::Normal);
+/// let stability = StabilityClassification::new(0.85, 0.5);
+/// assert!(!stability.crisis_triggered);
+/// assert_eq!(stability.level, StabilityLevel::Normal);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ICClassification {
-    /// IC value [0.0, 1.0]
+pub struct StabilityClassification {
+    /// Topic stability value [0.0, 1.0]
     pub value: f32,
     /// Classification level
-    pub level: ICLevel,
+    pub level: StabilityLevel,
     /// Whether crisis threshold was breached
     pub crisis_triggered: bool,
 }
 
-impl ICClassification {
-    /// Default crisis threshold per constitution
+impl StabilityClassification {
+    /// Default crisis threshold
     pub const DEFAULT_CRISIS_THRESHOLD: f32 = 0.5;
 
-    /// Create new IC classification from value
+    /// Create new stability classification from value
     ///
     /// # Arguments
-    /// * `value` - IC value [0.0, 1.0]
+    /// * `value` - Topic stability value [0.0, 1.0]
     /// * `crisis_threshold` - Threshold for crisis trigger (default 0.5)
     ///
     /// # Returns
-    /// ICClassification with level and crisis state
+    /// StabilityClassification with level and crisis state
     pub fn new(value: f32, crisis_threshold: f32) -> Self {
-        let level = ICLevel::from_value(value);
+        let level = StabilityLevel::from_value(value);
         Self {
             value,
             level,
@@ -990,31 +896,31 @@ impl HookInput {
 // =============================================================================
 // Drift Metrics (session identity drift measurement)
 // Technical Reference: TASK-HOOKS-013
-// Constitution Reference: IDENTITY-002, gwt.self_ego_node.thresholds
+// Constitution Reference: topic_stability thresholds
 // =============================================================================
 
-/// Drift metrics for session identity restoration
-/// Measures deviation between current and previous session identity state
+/// Drift metrics for session topic stability tracking
+/// Measures deviation between current and previous session topic stability state
 ///
 /// # Fields
-/// - `ic_delta`: Change in identity continuity (current - previous)
+/// - `stability_delta`: Change in topic stability (current - previous)
 /// - `purpose_drift`: Cosine distance between purpose vectors [0.0, 2.0]
 /// - `time_since_snapshot_ms`: Time elapsed since previous snapshot
-/// - `kuramoto_phase_drift`: Mean absolute phase difference [0.0, π]
+/// - `coherence_phase_drift`: Mean absolute phase difference [0.0, π]
 ///
 /// # Thresholds (per TASK-HOOKS-013)
-/// - Warning: ic_delta < -0.1
-/// - Crisis: ic_delta < -0.3
+/// - Warning: stability_delta < -0.1
+/// - Crisis: stability_delta < -0.3
 ///
 /// # Example
 /// ```
 /// use context_graph_cli::commands::hooks::DriftMetrics;
 ///
 /// let metrics = DriftMetrics {
-///     ic_delta: -0.15,
+///     stability_delta: -0.15,
 ///     purpose_drift: 0.25,
 ///     time_since_snapshot_ms: 3600000,
-///     kuramoto_phase_drift: 0.3,
+///     coherence_phase_drift: 0.3,
 /// };
 ///
 /// assert!(metrics.is_warning_drift());
@@ -1022,10 +928,10 @@ impl HookInput {
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DriftMetrics {
-    /// Change in identity continuity (current IC - previous IC)
+    /// Change in topic stability (current - previous)
     /// Range: [-1.0, 1.0]
-    /// Negative = identity degradation, Positive = identity improvement
-    pub ic_delta: f32,
+    /// Negative = stability degradation, Positive = stability improvement
+    pub stability_delta: f32,
 
     /// Cosine distance between current and previous purpose vectors
     /// Range: [0.0, 2.0] where 0.0 = identical, 2.0 = opposite
@@ -1034,37 +940,37 @@ pub struct DriftMetrics {
     /// Time elapsed since the previous session snapshot in milliseconds
     pub time_since_snapshot_ms: i64,
 
-    /// Mean absolute phase difference across Kuramoto oscillators
+    /// Mean absolute phase difference across coherence metrics
     /// Range: [0.0, π] where 0.0 = perfect sync, π = opposite phases
-    pub kuramoto_phase_drift: f64,
+    pub coherence_phase_drift: f64,
 }
 
 impl DriftMetrics {
-    /// Crisis drift threshold for ic_delta
-    /// Constitution Reference: IDENTITY-002
+    /// Crisis drift threshold for stability_delta
+    /// Constitution Reference: topic_stability thresholds
     pub const CRISIS_THRESHOLD: f32 = -0.3;
 
-    /// Warning drift threshold for ic_delta
+    /// Warning drift threshold for stability_delta
     pub const WARNING_THRESHOLD: f32 = -0.1;
 
     /// Check if drift indicates a crisis state
-    /// Crisis = ic_delta < -0.3 (severe identity degradation)
+    /// Crisis = stability_delta < -0.3 (severe stability degradation)
     ///
     /// # Returns
-    /// `true` if ic_delta is below the crisis threshold
+    /// `true` if stability_delta is below the crisis threshold
     #[inline]
     pub fn is_crisis_drift(&self) -> bool {
-        self.ic_delta < Self::CRISIS_THRESHOLD
+        self.stability_delta < Self::CRISIS_THRESHOLD
     }
 
     /// Check if drift indicates a warning state
-    /// Warning = ic_delta < -0.1 (moderate identity degradation)
+    /// Warning = stability_delta < -0.1 (moderate stability degradation)
     ///
     /// # Returns
-    /// `true` if ic_delta is below the warning threshold (but not necessarily crisis)
+    /// `true` if stability_delta is below the warning threshold (but not necessarily crisis)
     #[inline]
     pub fn is_warning_drift(&self) -> bool {
-        self.ic_delta < Self::WARNING_THRESHOLD
+        self.stability_delta < Self::WARNING_THRESHOLD
     }
 }
 
@@ -1082,8 +988,8 @@ impl DriftMetrics {
 ///
 /// # Optional Fields (omitted from JSON when None)
 /// - `error`: only present when success=false
-/// - `consciousness_state`: present when state available
-/// - `ic_classification`: present when IC computed
+/// - `coherence_state`: present when state available
+/// - `stability_classification`: present when IC computed
 /// - `context_injection`: present when context to inject
 ///
 /// # JSON Schema (TECH-HOOKS.md Section 3.3)
@@ -1091,8 +997,8 @@ impl DriftMetrics {
 /// {
 ///   "success": true,
 ///   "execution_time_ms": 15,
-///   "consciousness_state": { ... },
-///   "ic_classification": { ... }
+///   "coherence_state": { ... },
+///   "stability_classification": { ... }
 /// }
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1102,12 +1008,12 @@ pub struct HookOutput {
     /// Error message if failed (omit if None)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
-    /// Consciousness state snapshot (omit if None)
+    /// Coherence state snapshot (omit if None)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub consciousness_state: Option<ConsciousnessState>,
-    /// Identity continuity classification (omit if None)
+    pub coherence_state: Option<CoherenceState>,
+    /// Topic stability classification (omit if None)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ic_classification: Option<ICClassification>,
+    pub stability_classification: Option<StabilityClassification>,
     /// Content to inject into context (omit if None)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_injection: Option<String>,
@@ -1125,8 +1031,8 @@ impl Default for HookOutput {
         Self {
             success: true,
             error: None,
-            consciousness_state: None,
-            ic_classification: None,
+            coherence_state: None,
+            stability_classification: None,
             context_injection: None,
             drift_metrics: None,
             execution_time_ms: 0,
@@ -1155,15 +1061,15 @@ impl HookOutput {
         }
     }
 
-    /// Add consciousness state to output (builder pattern)
-    pub fn with_consciousness_state(mut self, state: ConsciousnessState) -> Self {
-        self.consciousness_state = Some(state);
+    /// Add coherence state to output (builder pattern)
+    pub fn with_coherence_state(mut self, state: CoherenceState) -> Self {
+        self.coherence_state = Some(state);
         self
     }
 
-    /// Add IC classification to output (builder pattern)
-    pub fn with_ic_classification(mut self, classification: ICClassification) -> Self {
-        self.ic_classification = Some(classification);
+    /// Add stability classification to output (builder pattern)
+    pub fn with_stability_classification(mut self, classification: StabilityClassification) -> Self {
+        self.stability_classification = Some(classification);
         self
     }
 
@@ -1184,10 +1090,10 @@ impl HookOutput {
     /// use context_graph_cli::commands::hooks::{HookOutput, DriftMetrics};
     ///
     /// let metrics = DriftMetrics {
-    ///     ic_delta: -0.05,
+    ///     stability_delta: -0.05,
     ///     purpose_drift: 0.1,
     ///     time_since_snapshot_ms: 60000,
-    ///     kuramoto_phase_drift: 0.2,
+    ///     coherence_phase_drift: 0.2,
     /// };
     ///
     /// let output = HookOutput::success(50)
@@ -1210,56 +1116,56 @@ mod hook_io_tests {
     use super::*;
 
     // =========================================================================
-    // TC-HOOKS-IO-001: ICLevel Threshold Boundaries
-    // SOURCE OF TRUTH: constitution.yaml gwt.self_ego_node.thresholds
+    // TC-HOOKS-IO-001: StabilityLevel Threshold Boundaries
+    // SOURCE OF TRUTH: constitution.yaml topic_stability thresholds
     // =========================================================================
     #[test]
     fn tc_hooks_io_001_ic_level_thresholds() {
-        println!("\n=== TC-HOOKS-IO-001: ICLevel Threshold Boundaries ===");
-        println!("SOURCE: constitution.yaml gwt.self_ego_node.thresholds");
+        println!("\n=== TC-HOOKS-IO-001: StabilityLevel Threshold Boundaries ===");
+        println!("SOURCE: constitution.yaml topic_stability thresholds");
 
         // Exact boundary tests - these are from constitution
         let boundary_tests = [
-            (1.0_f32, ICLevel::Healthy, "max value"),
-            (0.9_f32, ICLevel::Healthy, "healthy boundary (>=0.9)"),
-            (0.899_f32, ICLevel::Normal, "just below healthy"),
-            (0.7_f32, ICLevel::Normal, "normal lower boundary"),
-            (0.699_f32, ICLevel::Warning, "warning boundary (<0.7)"),
-            (0.5_f32, ICLevel::Warning, "warning lower boundary"),
-            (0.499_f32, ICLevel::Critical, "critical boundary (<0.5)"),
-            (0.0_f32, ICLevel::Critical, "min value"),
+            (1.0_f32, StabilityLevel::Healthy, "max value"),
+            (0.9_f32, StabilityLevel::Healthy, "healthy boundary (>=0.9)"),
+            (0.899_f32, StabilityLevel::Normal, "just below healthy"),
+            (0.7_f32, StabilityLevel::Normal, "normal lower boundary"),
+            (0.699_f32, StabilityLevel::Warning, "warning boundary (<0.7)"),
+            (0.5_f32, StabilityLevel::Warning, "warning lower boundary"),
+            (0.499_f32, StabilityLevel::Critical, "critical boundary (<0.5)"),
+            (0.0_f32, StabilityLevel::Critical, "min value"),
         ];
 
         for (value, expected, description) in boundary_tests {
-            let actual = ICLevel::from_value(value);
+            let actual = StabilityLevel::from_value(value);
             println!(
                 "  {} ({}): expected={:?}, actual={:?}",
                 description, value, expected, actual
             );
             assert_eq!(
                 actual, expected,
-                "FAIL: IC={} ({}) must be {:?}, got {:?}",
+                "FAIL: stability={} ({}) must be {:?}, got {:?}",
                 value, description, expected, actual
             );
         }
 
-        println!("RESULT: PASS - All IC thresholds match constitution");
+        println!("RESULT: PASS - All stability thresholds match constitution");
     }
 
     // =========================================================================
-    // TC-HOOKS-IO-002: ICLevel Serialization
+    // TC-HOOKS-IO-002: StabilityLevel Serialization
     // SOURCE OF TRUTH: Claude Code hook JSON format (snake_case)
     // =========================================================================
     #[test]
-    fn tc_hooks_io_002_ic_level_serialization() {
-        println!("\n=== TC-HOOKS-IO-002: ICLevel Serialization ===");
+    fn tc_hooks_io_002_stability_level_serialization() {
+        println!("\n=== TC-HOOKS-IO-002: StabilityLevel Serialization ===");
         println!("SOURCE: Claude Code hook JSON format");
 
         let test_cases = [
-            (ICLevel::Healthy, r#""healthy""#),
-            (ICLevel::Normal, r#""normal""#),
-            (ICLevel::Warning, r#""warning""#),
-            (ICLevel::Critical, r#""critical""#),
+            (StabilityLevel::Healthy, r#""healthy""#),
+            (StabilityLevel::Normal, r#""normal""#),
+            (StabilityLevel::Warning, r#""warning""#),
+            (StabilityLevel::Critical, r#""critical""#),
         ];
 
         for (level, expected_json) in test_cases {
@@ -1273,26 +1179,26 @@ mod hook_io_tests {
             );
         }
 
-        println!("RESULT: PASS - ICLevel serializes to snake_case");
+        println!("RESULT: PASS - StabilityLevel serializes to snake_case");
     }
 
     // =========================================================================
-    // TC-HOOKS-IO-003: ICLevel Deserialization
+    // TC-HOOKS-IO-003: StabilityLevel Deserialization
     // SOURCE OF TRUTH: Claude Code hook JSON format (snake_case)
     // =========================================================================
     #[test]
-    fn tc_hooks_io_003_ic_level_deserialization() {
-        println!("\n=== TC-HOOKS-IO-003: ICLevel Deserialization ===");
+    fn tc_hooks_io_003_stability_level_deserialization() {
+        println!("\n=== TC-HOOKS-IO-003: StabilityLevel Deserialization ===");
 
         let test_cases = [
-            (r#""healthy""#, ICLevel::Healthy),
-            (r#""normal""#, ICLevel::Normal),
-            (r#""warning""#, ICLevel::Warning),
-            (r#""critical""#, ICLevel::Critical),
+            (r#""healthy""#, StabilityLevel::Healthy),
+            (r#""normal""#, StabilityLevel::Normal),
+            (r#""warning""#, StabilityLevel::Warning),
+            (r#""critical""#, StabilityLevel::Critical),
         ];
 
         for (json, expected) in test_cases {
-            let actual: ICLevel =
+            let actual: StabilityLevel =
                 serde_json::from_str(json).expect("deserialization MUST succeed - fail fast");
             println!("  {} -> {:?}", json, actual);
             assert_eq!(
@@ -1302,37 +1208,37 @@ mod hook_io_tests {
             );
         }
 
-        println!("RESULT: PASS - ICLevel deserializes from snake_case");
+        println!("RESULT: PASS - StabilityLevel deserializes from snake_case");
     }
 
     // =========================================================================
-    // TC-HOOKS-IO-004: ICLevel Crisis Detection
+    // TC-HOOKS-IO-004: StabilityLevel Crisis Detection
     // SOURCE OF TRUTH: constitution.yaml critical threshold <0.5
     // =========================================================================
     #[test]
-    fn tc_hooks_io_004_ic_level_crisis() {
-        println!("\n=== TC-HOOKS-IO-004: ICLevel Crisis Detection ===");
+    fn tc_hooks_io_004_stability_level_crisis() {
+        println!("\n=== TC-HOOKS-IO-004: StabilityLevel Crisis Detection ===");
         println!("SOURCE: constitution.yaml critical: \"<0.5\"");
 
-        assert!(ICLevel::Critical.is_crisis(), "Critical MUST be crisis");
-        assert!(!ICLevel::Warning.is_crisis(), "Warning MUST NOT be crisis");
-        assert!(!ICLevel::Normal.is_crisis(), "Normal MUST NOT be crisis");
-        assert!(!ICLevel::Healthy.is_crisis(), "Healthy MUST NOT be crisis");
+        assert!(StabilityLevel::Critical.is_crisis(), "Critical MUST be crisis");
+        assert!(!StabilityLevel::Warning.is_crisis(), "Warning MUST NOT be crisis");
+        assert!(!StabilityLevel::Normal.is_crisis(), "Normal MUST NOT be crisis");
+        assert!(!StabilityLevel::Healthy.is_crisis(), "Healthy MUST NOT be crisis");
 
         assert!(
-            ICLevel::Critical.needs_attention(),
+            StabilityLevel::Critical.needs_attention(),
             "Critical needs attention"
         );
         assert!(
-            ICLevel::Warning.needs_attention(),
+            StabilityLevel::Warning.needs_attention(),
             "Warning needs attention"
         );
         assert!(
-            !ICLevel::Normal.needs_attention(),
+            !StabilityLevel::Normal.needs_attention(),
             "Normal does NOT need attention"
         );
         assert!(
-            !ICLevel::Healthy.needs_attention(),
+            !StabilityLevel::Healthy.needs_attention(),
             "Healthy does NOT need attention"
         );
 
@@ -1340,95 +1246,17 @@ mod hook_io_tests {
     }
 
     // =========================================================================
-    // TC-HOOKS-IO-005: JohariQuadrant Classification
-    // SOURCE OF TRUTH: TECH-HOOKS.md Section 4.3 (threshold 0.7)
-    // =========================================================================
-    #[test]
-    fn tc_hooks_io_005_johari_classification() {
-        println!("\n=== TC-HOOKS-IO-005: JohariQuadrant Classification ===");
-        println!("SOURCE: TECH-HOOKS.md threshold=0.7");
-
-        // Exact boundary tests
-        let boundary_tests = [
-            (0.7_f32, 0.7_f32, JohariQuadrant::Open, "both at threshold"),
-            (
-                0.699_f32,
-                0.7_f32,
-                JohariQuadrant::Blind,
-                "C below, I at threshold",
-            ),
-            (
-                0.7_f32,
-                0.699_f32,
-                JohariQuadrant::Hidden,
-                "C at threshold, I below",
-            ),
-            (
-                0.699_f32,
-                0.699_f32,
-                JohariQuadrant::Unknown,
-                "both below threshold",
-            ),
-            (1.0_f32, 1.0_f32, JohariQuadrant::Open, "max values"),
-            (0.0_f32, 0.0_f32, JohariQuadrant::Unknown, "min values"),
-        ];
-
-        for (c, i, expected, description) in boundary_tests {
-            let actual = JohariQuadrant::classify(c, i);
-            println!(
-                "  {} (C={}, I={}): expected={:?}, actual={:?}",
-                description, c, i, expected, actual
-            );
-            assert_eq!(
-                actual, expected,
-                "FAIL: ({}) C={}, I={} must be {:?}, got {:?}",
-                description, c, i, expected, actual
-            );
-        }
-
-        println!("RESULT: PASS - Johari classification matches spec");
-    }
-
-    // =========================================================================
-    // TC-HOOKS-IO-006: JohariQuadrant Serialization
-    // SOURCE OF TRUTH: Claude Code hook JSON format (snake_case)
-    // =========================================================================
-    #[test]
-    fn tc_hooks_io_006_johari_serialization() {
-        println!("\n=== TC-HOOKS-IO-006: JohariQuadrant Serialization ===");
-
-        let test_cases = [
-            (JohariQuadrant::Open, r#""open""#),
-            (JohariQuadrant::Blind, r#""blind""#),
-            (JohariQuadrant::Hidden, r#""hidden""#),
-            (JohariQuadrant::Unknown, r#""unknown""#),
-        ];
-
-        for (quadrant, expected_json) in test_cases {
-            let json = serde_json::to_string(&quadrant).expect("serialization MUST succeed");
-            println!("  {:?} -> {}", quadrant, json);
-            assert_eq!(
-                json, expected_json,
-                "FAIL: {:?} must serialize to {}",
-                quadrant, expected_json
-            );
-        }
-
-        println!("RESULT: PASS - JohariQuadrant serializes to snake_case");
-    }
-
-    // =========================================================================
-    // TC-HOOKS-IO-007: ConsciousnessState Default
+    // TC-HOOKS-IO-005: CoherenceState Default
     // SOURCE OF TRUTH: DOR state definition
     // =========================================================================
     #[test]
-    fn tc_hooks_io_007_consciousness_state_default() {
-        println!("\n=== TC-HOOKS-IO-007: ConsciousnessState Default ===");
+    fn tc_hooks_io_005_coherence_state_default() {
+        println!("\n=== TC-HOOKS-IO-005: CoherenceState Default ===");
         println!("SOURCE: DOR (Disorder of Responsiveness) initial state");
 
-        let state = ConsciousnessState::default();
+        let state = CoherenceState::default();
 
-        assert_eq!(state.consciousness, 0.0, "Default C must be 0.0");
+        assert_eq!(state.coherence, 0.0, "Default C must be 0.0");
         assert_eq!(state.integration, 0.0, "Default r must be 0.0");
         assert_eq!(state.reflection, 0.0, "Default reflection must be 0.0");
         assert_eq!(
@@ -1436,68 +1264,58 @@ mod hook_io_tests {
             "Default differentiation must be 0.0"
         );
         assert_eq!(
-            state.identity_continuity, 1.0,
-            "Default IC must be 1.0 (fresh)"
-        );
-        assert_eq!(
-            state.johari_quadrant,
-            JohariQuadrant::Unknown,
-            "Default quadrant must be Unknown"
+            state.topic_stability, 1.0,
+            "Default topic_stability must be 1.0 (fresh)"
         );
 
         println!("RESULT: PASS - Default state matches DOR definition");
     }
 
     // =========================================================================
-    // TC-HOOKS-IO-008: ConsciousnessState JSON Round-trip
+    // TC-HOOKS-IO-006: CoherenceState JSON Round-trip
     // =========================================================================
     #[test]
-    fn tc_hooks_io_008_consciousness_state_json() {
-        println!("\n=== TC-HOOKS-IO-008: ConsciousnessState JSON Round-trip ===");
+    fn tc_hooks_io_006_coherence_state_json() {
+        println!("\n=== TC-HOOKS-IO-006: CoherenceState JSON Round-trip ===");
 
-        let state = ConsciousnessState::new(0.73, 0.85, 0.78, 0.82, 0.92);
+        let state = CoherenceState::new(0.73, 0.85, 0.78, 0.82, 0.92);
 
         let json = serde_json::to_string(&state).expect("serialize");
         println!("  Serialized: {}", json);
 
-        let parsed: ConsciousnessState = serde_json::from_str(&json).expect("deserialize");
+        let parsed: CoherenceState = serde_json::from_str(&json).expect("deserialize");
 
         assert_eq!(state, parsed, "Round-trip MUST preserve all values");
-        assert_eq!(
-            parsed.johari_quadrant,
-            JohariQuadrant::Open,
-            "C=0.73, I=0.85 must classify as Open"
-        );
 
         println!("RESULT: PASS - JSON round-trip preserves all values");
     }
 
     // =========================================================================
-    // TC-HOOKS-IO-009: ICClassification Crisis Trigger
+    // TC-HOOKS-IO-009: StabilityClassification Crisis Trigger
     // SOURCE OF TRUTH: constitution.yaml critical: "<0.5"
     // =========================================================================
     #[test]
-    fn tc_hooks_io_009_ic_classification_crisis() {
-        println!("\n=== TC-HOOKS-IO-009: ICClassification Crisis Trigger ===");
+    fn tc_hooks_io_009_stability_classification_crisis() {
+        println!("\n=== TC-HOOKS-IO-009: StabilityClassification Crisis Trigger ===");
         println!("SOURCE: constitution.yaml critical: \"<0.5\"");
 
-        let crisis = ICClassification::new(0.45, 0.5);
+        let crisis = StabilityClassification::new(0.45, 0.5);
         assert!(crisis.crisis_triggered, "0.45 < 0.5 MUST trigger crisis");
-        assert_eq!(crisis.level, ICLevel::Critical, "0.45 MUST be Critical");
+        assert_eq!(crisis.level, StabilityLevel::Critical, "0.45 MUST be Critical");
 
-        let no_crisis = ICClassification::new(0.55, 0.5);
+        let no_crisis = StabilityClassification::new(0.55, 0.5);
         assert!(
             !no_crisis.crisis_triggered,
             "0.55 >= 0.5 MUST NOT trigger crisis"
         );
-        assert_eq!(no_crisis.level, ICLevel::Warning, "0.55 MUST be Warning");
+        assert_eq!(no_crisis.level, StabilityLevel::Warning, "0.55 MUST be Warning");
 
-        let boundary = ICClassification::new(0.5, 0.5);
+        let boundary = StabilityClassification::new(0.5, 0.5);
         assert!(
             !boundary.crisis_triggered,
             "0.5 >= 0.5 MUST NOT trigger crisis"
         );
-        assert_eq!(boundary.level, ICLevel::Warning, "0.5 MUST be Warning");
+        assert_eq!(boundary.level, StabilityLevel::Warning, "0.5 MUST be Warning");
 
         println!("RESULT: PASS - Crisis trigger matches constitution threshold");
     }
@@ -1557,11 +1375,11 @@ mod hook_io_tests {
         assert!(output.success, "Default output MUST be success=true");
         assert!(output.error.is_none(), "Default MUST have no error");
         assert!(
-            output.consciousness_state.is_none(),
+            output.coherence_state.is_none(),
             "Default MUST have no state"
         );
         assert!(
-            output.ic_classification.is_none(),
+            output.stability_classification.is_none(),
             "Default MUST have no classification"
         );
         assert!(
@@ -1581,14 +1399,14 @@ mod hook_io_tests {
         println!("\n=== TC-HOOKS-IO-012: HookOutput Builders ===");
 
         let output = HookOutput::success(42)
-            .with_consciousness_state(ConsciousnessState::default())
-            .with_ic_classification(ICClassification::from_value(0.85))
+            .with_coherence_state(CoherenceState::default())
+            .with_stability_classification(StabilityClassification::from_value(0.85))
             .with_context_injection("test injection");
 
         assert!(output.success);
         assert_eq!(output.execution_time_ms, 42);
-        assert!(output.consciousness_state.is_some());
-        assert!(output.ic_classification.is_some());
+        assert!(output.coherence_state.is_some());
+        assert!(output.stability_classification.is_some());
         assert_eq!(output.context_injection, Some("test injection".into()));
 
         let error = HookOutput::error("test error", 100);
@@ -1611,17 +1429,16 @@ mod hook_io_tests {
         let output = HookOutput {
             success: true,
             error: None,
-            consciousness_state: Some(ConsciousnessState {
-                consciousness: 0.73,
+            coherence_state: Some(CoherenceState {
+                coherence: 0.73,
                 integration: 0.85,
                 reflection: 0.78,
                 differentiation: 0.82,
-                identity_continuity: 0.92,
-                johari_quadrant: JohariQuadrant::Open,
+                topic_stability: 0.92,
             }),
-            ic_classification: Some(ICClassification {
+            stability_classification: Some(StabilityClassification {
                 value: 0.92,
-                level: ICLevel::Healthy,
+                level: StabilityLevel::Healthy,
                 crisis_triggered: false,
             }),
             context_injection: None,
@@ -1651,16 +1468,14 @@ mod hook_io_tests {
 
         // Nested structure
         let cs = json
-            .get("consciousness_state")
-            .expect("consciousness_state present");
-        assert!(cs.get("consciousness").is_some());
+            .get("coherence_state")
+            .expect("coherence_state present");
+        assert!(cs.get("coherence").is_some());
         assert!(cs.get("integration").is_some());
-        assert!(cs.get("johari_quadrant").is_some());
-        assert_eq!(cs.get("johari_quadrant").unwrap(), "open");
 
         let ic = json
-            .get("ic_classification")
-            .expect("ic_classification present");
+            .get("stability_classification")
+            .expect("stability_classification present");
         assert!(ic.get("value").is_some());
         assert!(ic.get("level").is_some());
         assert_eq!(ic.get("level").unwrap(), "healthy");
@@ -1677,24 +1492,15 @@ mod hook_io_tests {
         println!("SOURCE: NO BACKWARDS COMPATIBILITY requirement");
 
         let invalid_inputs = [
-            r#""Healthy""#,  // PascalCase ICLevel
-            r#""CRITICAL""#, // UPPERCASE ICLevel
-            r#""Open""#,     // PascalCase JohariQuadrant
-            r#""UNKNOWN""#,  // UPPERCASE JohariQuadrant
+            r#""Healthy""#,  // PascalCase StabilityLevel
+            r#""CRITICAL""#, // UPPERCASE StabilityLevel
         ];
 
         for input in invalid_inputs {
-            let result_ic: Result<ICLevel, _> = serde_json::from_str(input);
-            let result_johari: Result<JohariQuadrant, _> = serde_json::from_str(input);
-            println!(
-                "  {} -> ICLevel: {:?}, Johari: {:?}",
-                input,
-                result_ic.is_err(),
-                result_johari.is_err()
-            );
-            // At least one should fail
+            let result_ic: Result<StabilityLevel, _> = serde_json::from_str(input);
+            println!("  {} -> StabilityLevel: {:?}", input, result_ic.is_err());
             assert!(
-                result_ic.is_err() || result_johari.is_err(),
+                result_ic.is_err(),
                 "FAIL: Invalid input {} should fail deserialization",
                 input
             );

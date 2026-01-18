@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::config::constants::alignment;
-use crate::types::JohariQuadrant;
 
 use super::PipelineStageTiming;
 
@@ -125,14 +124,6 @@ impl TeleologicalRetrievalResult {
             .collect()
     }
 
-    /// Get results in specific Johari quadrants.
-    pub fn results_in_quadrants(&self, quadrants: &[JohariQuadrant]) -> Vec<&ScoredMemory> {
-        self.results
-            .iter()
-            .filter(|r| quadrants.contains(&r.johari_quadrant))
-            .collect()
-    }
-
     /// Count misaligned results.
     pub fn misaligned_count(&self) -> usize {
         self.results.iter().filter(|r| r.is_misaligned).count()
@@ -147,7 +138,7 @@ impl TeleologicalRetrievalResult {
 /// A scored memory from teleological retrieval.
 ///
 /// Includes standard similarity scores plus teleological-specific
-/// alignment and Johari quadrant classification.
+/// alignment classification.
 ///
 /// # Score Components
 ///
@@ -155,7 +146,6 @@ impl TeleologicalRetrievalResult {
 /// - `content_similarity`: Raw content similarity from Stage 3
 /// - `purpose_alignment`: Purpose vector alignment from Stage 4
 /// - `goal_alignment`: Goal hierarchy alignment from Stage 4
-/// - `johari_quadrant`: Dominant quadrant classification
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ScoredMemory {
     /// Memory/fingerprint UUID.
@@ -180,13 +170,8 @@ pub struct ScoredMemory {
     /// Goal hierarchy alignment (Stage 4).
     ///
     /// Composite score from GoalAlignmentCalculator.
-    /// Includes North Star, Strategic, Tactical, Immediate levels.
+    /// Includes Strategic, Tactical, Immediate levels.
     pub goal_alignment: f32,
-
-    /// Dominant Johari quadrant for this memory.
-    ///
-    /// Determined by entropy/coherence pattern across embedding spaces.
-    pub johari_quadrant: JohariQuadrant,
 
     /// Whether this memory is misaligned.
     ///
@@ -207,7 +192,6 @@ impl ScoredMemory {
         content_similarity: f32,
         purpose_alignment: f32,
         goal_alignment: f32,
-        johari_quadrant: JohariQuadrant,
         space_count: usize,
     ) -> Self {
         // Critical threshold from constitution.yaml teleological.thresholds.critical
@@ -220,7 +204,6 @@ impl ScoredMemory {
             content_similarity,
             purpose_alignment,
             goal_alignment,
-            johari_quadrant,
             is_misaligned,
             space_count,
         }
@@ -327,9 +310,6 @@ pub struct PipelineBreakdown {
 
     /// Average alignment of filtered candidates (for debugging).
     pub stage4_filtered_avg_alignment: f32,
-
-    /// Number filtered out due to Johari quadrant.
-    pub johari_filtered_count: usize,
 }
 
 impl PipelineBreakdown {
@@ -375,12 +355,6 @@ impl PipelineBreakdown {
         self
     }
 
-    /// Set Johari filtering count.
-    pub fn with_johari_filtered(mut self, count: usize) -> Self {
-        self.johari_filtered_count = count;
-        self
-    }
-
     /// Get candidate reduction ratio (Stage 1 to Stage 5).
     pub fn reduction_ratio(&self) -> f32 {
         if self.stage1_candidates.is_empty() {
@@ -410,14 +384,13 @@ mod tests {
     #[test]
     fn test_scored_memory_creation() {
         let id = Uuid::new_v4();
-        let memory = ScoredMemory::new(id, 0.85, 0.90, 0.80, 0.75, JohariQuadrant::Open, 8);
+        let memory = ScoredMemory::new(id, 0.85, 0.90, 0.80, 0.75, 8);
 
         assert_eq!(memory.memory_id, id);
         assert!((memory.score - 0.85).abs() < f32::EPSILON);
         assert!((memory.content_similarity - 0.90).abs() < f32::EPSILON);
         assert!((memory.purpose_alignment - 0.80).abs() < f32::EPSILON);
         assert!((memory.goal_alignment - 0.75).abs() < f32::EPSILON);
-        assert_eq!(memory.johari_quadrant, JohariQuadrant::Open);
         assert!(!memory.is_misaligned);
         assert_eq!(memory.space_count, 8);
 
@@ -435,7 +408,6 @@ mod tests {
             0.90,
             0.50, // Below 0.55
             0.60,
-            JohariQuadrant::Open,
             8,
         );
         assert!(misaligned.is_misaligned);
@@ -446,13 +418,12 @@ mod tests {
             0.90,
             0.60,
             0.40, // Below 0.55
-            JohariQuadrant::Open,
             8,
         );
         assert!(misaligned2.is_misaligned);
 
         // Above threshold
-        let aligned = ScoredMemory::new(id, 0.85, 0.90, 0.60, 0.60, JohariQuadrant::Open, 8);
+        let aligned = ScoredMemory::new(id, 0.85, 0.90, 0.60, 0.60, 8);
         assert!(!aligned.is_misaligned);
 
         println!("BEFORE: purpose_alignment=0.50, goal_alignment=0.40");
@@ -467,30 +438,30 @@ mod tests {
     fn test_alignment_level_classification() {
         let id = Uuid::new_v4();
 
-        let optimal = ScoredMemory::new(id, 0.9, 0.9, 0.9, 0.80, JohariQuadrant::Open, 8);
+        let optimal = ScoredMemory::new(id, 0.9, 0.9, 0.9, 0.80, 8);
         assert_eq!(optimal.alignment_threshold(), AlignmentLevel::Optimal);
         assert!(optimal.is_optimal());
 
-        let acceptable = ScoredMemory::new(id, 0.9, 0.9, 0.9, 0.72, JohariQuadrant::Open, 8);
+        let acceptable = ScoredMemory::new(id, 0.9, 0.9, 0.9, 0.72, 8);
         assert_eq!(acceptable.alignment_threshold(), AlignmentLevel::Acceptable);
         assert!(acceptable.is_acceptable());
         assert!(!acceptable.is_optimal());
 
-        let warning = ScoredMemory::new(id, 0.9, 0.9, 0.9, 0.60, JohariQuadrant::Open, 8);
+        let warning = ScoredMemory::new(id, 0.9, 0.9, 0.9, 0.60, 8);
         assert_eq!(warning.alignment_threshold(), AlignmentLevel::Warning);
         assert!(warning.needs_attention());
 
-        let critical = ScoredMemory::new(id, 0.9, 0.9, 0.9, 0.40, JohariQuadrant::Open, 8);
+        let critical = ScoredMemory::new(id, 0.9, 0.9, 0.9, 0.40, 8);
         assert_eq!(critical.alignment_threshold(), AlignmentLevel::Critical);
         assert!(critical.is_misaligned);
 
-        println!("[VERIFIED] AlignmentLevel thresholds: Optimal≥0.75, Acceptable≥0.70, Warning≥0.55, Critical<0.55");
+        println!("[VERIFIED] AlignmentLevel thresholds: Optimal>=0.75, Acceptable>=0.70, Warning>=0.55, Critical<0.55");
     }
 
     #[test]
     fn test_teleological_result_creation() {
         let id = Uuid::new_v4();
-        let memory = ScoredMemory::new(id, 0.85, 0.90, 0.80, 0.75, JohariQuadrant::Open, 8);
+        let memory = ScoredMemory::new(id, 0.85, 0.90, 0.80, 0.75, 8);
 
         let timing = PipelineStageTiming::new(
             std::time::Duration::from_millis(4),
@@ -522,25 +493,9 @@ mod tests {
     #[test]
     fn test_result_filtering() {
         let results = vec![
-            ScoredMemory::new(Uuid::new_v4(), 0.9, 0.9, 0.9, 0.80, JohariQuadrant::Open, 8),
-            ScoredMemory::new(
-                Uuid::new_v4(),
-                0.8,
-                0.8,
-                0.8,
-                0.65,
-                JohariQuadrant::Blind,
-                6,
-            ),
-            ScoredMemory::new(
-                Uuid::new_v4(),
-                0.7,
-                0.7,
-                0.5,
-                0.40,
-                JohariQuadrant::Hidden,
-                4,
-            ),
+            ScoredMemory::new(Uuid::new_v4(), 0.9, 0.9, 0.9, 0.80, 8),
+            ScoredMemory::new(Uuid::new_v4(), 0.8, 0.8, 0.8, 0.65, 6),
+            ScoredMemory::new(Uuid::new_v4(), 0.7, 0.7, 0.5, 0.40, 4),
         ];
 
         let timing = PipelineStageTiming::default();
@@ -556,15 +511,10 @@ mod tests {
         let above_70 = result.results_above_alignment(0.70);
         assert_eq!(above_70.len(), 1);
 
-        // Filter by quadrant
-        let blind_hidden =
-            result.results_in_quadrants(&[JohariQuadrant::Blind, JohariQuadrant::Hidden]);
-        assert_eq!(blind_hidden.len(), 2);
-
         // Misaligned count
         assert_eq!(result.misaligned_count(), 1);
 
-        println!("[VERIFIED] Result filtering by alignment and quadrant works");
+        println!("[VERIFIED] Result filtering by alignment works");
     }
 
     #[test]

@@ -5,7 +5,7 @@
 //!
 //! Run with: `cargo run --package context-graph-storage --example basic_storage`
 
-use context_graph_core::types::{JohariQuadrant, MemoryNode};
+use context_graph_core::types::MemoryNode;
 use context_graph_storage::{Memex, RocksDbMemex};
 use tempfile::TempDir;
 
@@ -44,7 +44,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Configure node properties
-    node.quadrant = JohariQuadrant::Open;
     node.importance = 0.8;
     node.metadata.tags.push("programming".to_string());
     node.metadata.tags.push("rust".to_string());
@@ -59,7 +58,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     memex.store_node(&node)?;
     println!("Stored node with ID: {}", node.id);
     println!("  Content: {}", node.content);
-    println!("  Quadrant: {:?}", node.quadrant);
     println!("  Importance: {}", node.importance);
     println!("  Tags: {:?}\n", node.metadata.tags);
 
@@ -72,65 +70,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Retrieved node from database:");
     println!("  ID: {}", retrieved.id);
     println!("  Content: {}", retrieved.content);
-    println!("  Quadrant: {:?}", retrieved.quadrant);
     println!("  Tags: {:?}", retrieved.metadata.tags);
 
     // Verify retrieval matches stored data
     assert_eq!(retrieved.id, node.id);
     assert_eq!(retrieved.content, node.content);
-    assert_eq!(retrieved.quadrant, node.quadrant);
     assert_eq!(retrieved.importance, node.importance);
-    println!("  ✓ Retrieved data matches stored data\n");
+    println!("  Retrieved data matches stored data\n");
 
     // ========================================
-    // Example 3: Query by Quadrant (Secondary Index)
+    // Example 3: Query by Tag (Secondary Index)
     // ========================================
-    println!("--- Example 3: Query by Quadrant ---");
-
-    // Store a few more nodes in different quadrants
-    let mut hidden_node = MemoryNode::new(
-        "Private implementation details".to_string(),
-        create_valid_embedding(),
-    );
-    hidden_node.quadrant = JohariQuadrant::Hidden;
-    hidden_node.validate()?;
-    memex.store_node(&hidden_node)?;
-
-    let mut blind_node = MemoryNode::new(
-        "Discovered pattern from analysis".to_string(),
-        create_valid_embedding(),
-    );
-    blind_node.quadrant = JohariQuadrant::Blind;
-    blind_node.validate()?;
-    memex.store_node(&blind_node)?;
-
-    // Query node IDs by quadrant using the Memex trait
-    let open_node_ids = memex.query_by_quadrant(JohariQuadrant::Open, Some(10))?;
-    println!("Found {} node(s) in Open quadrant", open_node_ids.len());
-
-    // Fetch full nodes to display content
-    for node_id in &open_node_ids {
-        let n = memex.get_node(node_id)?;
-        println!(
-            "  - {} (ID: {})",
-            n.content.chars().take(40).collect::<String>(),
-            n.id
-        );
-    }
-
-    let hidden_node_ids = memex.query_by_quadrant(JohariQuadrant::Hidden, Some(10))?;
-    println!("Found {} node(s) in Hidden quadrant", hidden_node_ids.len());
-
-    assert!(
-        !open_node_ids.is_empty(),
-        "Open quadrant should have at least one node"
-    );
-    println!("  ✓ Quadrant queries working correctly\n");
-
-    // ========================================
-    // Example 4: Query by Tag (Secondary Index)
-    // ========================================
-    println!("--- Example 4: Query by Tag ---");
+    println!("--- Example 3: Query by Tag ---");
 
     let rust_node_ids = memex.query_by_tag("rust", Some(10))?;
     println!("Found {} node(s) with 'rust' tag", rust_node_ids.len());
@@ -148,12 +99,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         !rust_node_ids.is_empty(),
         "Should find at least one rust-tagged node"
     );
-    println!("  ✓ Tag queries working correctly\n");
+    println!("  Tag queries working correctly\n");
 
     // ========================================
-    // Example 5: Update a Node
+    // Example 4: Update a Node
     // ========================================
-    println!("--- Example 5: Update Node ---");
+    println!("--- Example 4: Update Node ---");
 
     let mut updated_node = retrieved.clone();
     updated_node.importance = 0.95;
@@ -168,31 +119,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(re_retrieved.importance, 0.95);
     assert!(re_retrieved.metadata.tags.contains(&"updated".to_string()));
     assert!(re_retrieved.access_count >= 1);
-    println!("  ✓ Update verified in database\n");
+    println!("  Update verified in database\n");
 
     // ========================================
-    // Example 6: Delete a Node (Soft Delete)
+    // Example 5: Delete a Node (Soft Delete)
     // ========================================
-    println!("--- Example 6: Delete Node (Soft Delete) ---");
+    println!("--- Example 5: Delete Node (Soft Delete) ---");
 
-    // Soft delete the blind node (SEC-06: 30-day recovery)
-    memex.delete_node(&blind_node.id, true)?;
-    println!("Soft deleted node: {}", blind_node.id);
+    // Create another node to delete
+    let mut to_delete = MemoryNode::new(
+        "This node will be deleted".to_string(),
+        create_valid_embedding(),
+    );
+    to_delete.validate()?;
+    memex.store_node(&to_delete)?;
+
+    // Soft delete the node (SEC-06: 30-day recovery)
+    memex.delete_node(&to_delete.id, true)?;
+    println!("Soft deleted node: {}", to_delete.id);
 
     // Soft delete still allows retrieval but marks as deleted
-    let soft_deleted = memex.get_node(&blind_node.id)?;
+    let soft_deleted = memex.get_node(&to_delete.id)?;
     println!("  Soft deleted node still retrievable");
     println!("  metadata.deleted = {}", soft_deleted.metadata.deleted);
     assert!(
         soft_deleted.metadata.deleted,
         "Node should be marked as deleted"
     );
-    println!("  ✓ Soft delete verified\n");
+    println!("  Soft delete verified\n");
 
     // ========================================
-    // Example 7: Embedding Storage
+    // Example 6: Embedding Storage
     // ========================================
-    println!("--- Example 7: Embedding Operations ---");
+    println!("--- Example 6: Embedding Operations ---");
 
     // Store an embedding separately (useful for vector search)
     let node_id = node.id;
@@ -210,12 +169,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Check if embedding exists
     let exists = memex.embedding_exists(&node_id)?;
     assert!(exists);
-    println!("  ✓ Embedding exists check passed\n");
+    println!("  Embedding exists check passed\n");
 
     // ========================================
-    // Example 8: Database Health Check
+    // Example 7: Database Health Check
     // ========================================
-    println!("--- Example 8: Health Check ---");
+    println!("--- Example 7: Health Check ---");
 
     // Use the Memex trait for health_check to get StorageHealth
     let memex_trait: &dyn Memex = &memex;
@@ -226,19 +185,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Edge Count: {}", health.edge_count);
     println!("  Storage Bytes: {}", health.storage_bytes);
 
-    // We stored 3 nodes total
-    // Note: RocksDB estimates may not be exact immediately after writes
     assert!(health.is_healthy, "Database should be healthy");
-    println!("  ✓ Health check verified\n");
+    println!("  Health check verified\n");
 
     // ========================================
-    // Example 9: Flush to Disk
+    // Example 8: Flush to Disk
     // ========================================
-    println!("--- Example 9: Flush to Disk ---");
+    println!("--- Example 8: Flush to Disk ---");
 
     memex.flush_all()?;
     println!("Flushed all data to disk");
-    println!("  ✓ Flush completed successfully\n");
+    println!("  Flush completed successfully\n");
 
     println!("=== All Examples Completed Successfully ===");
     println!("Database will be cleaned up when temp directory is dropped");

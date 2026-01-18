@@ -122,7 +122,6 @@ pub enum GpuMonitorError {
 ///
 /// # Constitution Compliance
 ///
-/// - `ic_threshold`: default 0.5 per `gwt.self_ego_node.thresholds.critical`
 /// - `entropy_threshold`: default 0.7 per `dream.trigger.entropy`
 /// - `cooldown`: default 60s to prevent trigger spam
 ///
@@ -132,21 +131,14 @@ pub enum GpuMonitorError {
 /// use context_graph_core::dream::TriggerConfig;
 ///
 /// let config = TriggerConfig::default();
-/// assert_eq!(config.ic_threshold, 0.5);
 ///
 /// // Custom configuration
 /// let custom = TriggerConfig::default()
-///     .with_ic_threshold(0.4)
 ///     .with_entropy_threshold(0.8);
 /// custom.validate(); // Panics if invalid
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct TriggerConfig {
-    /// IC threshold for identity crisis (default: 0.5)
-    /// Constitution: `gwt.self_ego_node.thresholds.critical = 0.5`
-    /// When IC drops below this, triggers `ExtendedTriggerReason::IdentityCritical`
-    pub ic_threshold: f32,
-
     /// Entropy threshold for high entropy trigger (default: 0.7)
     /// Constitution: `dream.trigger.entropy > 0.7 for 5min`
     pub entropy_threshold: f32,
@@ -160,7 +152,6 @@ impl Default for TriggerConfig {
     /// Create config with constitution-mandated defaults.
     fn default() -> Self {
         Self {
-            ic_threshold: 0.5,      // Constitution: gwt.self_ego_node.thresholds.critical
             entropy_threshold: 0.7, // Constitution: dream.trigger.entropy
             cooldown: Duration::from_secs(60),
         }
@@ -177,17 +168,10 @@ impl TriggerConfig {
     ///
     /// # Constitution Bounds
     ///
-    /// - `ic_threshold`: MUST be in [0.0, 1.0]
     /// - `entropy_threshold`: MUST be in [0.0, 1.0]
     /// - `cooldown`: No explicit bound, but Duration::ZERO is unusual
     #[track_caller]
     pub fn validate(&self) {
-        assert!(
-            (0.0..=1.0).contains(&self.ic_threshold),
-            "TriggerConfig: ic_threshold must be in [0.0, 1.0], got {}. \
-             Constitution: gwt.self_ego_node.thresholds.critical = 0.5",
-            self.ic_threshold
-        );
         assert!(
             (0.0..=1.0).contains(&self.entropy_threshold),
             "TriggerConfig: entropy_threshold must be in [0.0, 1.0], got {}. \
@@ -202,16 +186,6 @@ impl TriggerConfig {
     #[track_caller]
     pub fn validated(self) -> Self {
         self.validate();
-        self
-    }
-
-    /// Builder: set IC threshold.
-    ///
-    /// # Arguments
-    ///
-    /// * `threshold` - IC threshold [0.0, 1.0]. Values < 0.5 are more sensitive.
-    pub fn with_ic_threshold(mut self, threshold: f32) -> Self {
-        self.ic_threshold = threshold;
         self
     }
 
@@ -233,20 +207,6 @@ impl TriggerConfig {
     pub fn with_cooldown(mut self, cooldown: Duration) -> Self {
         self.cooldown = cooldown;
         self
-    }
-
-    /// Check if IC value indicates identity crisis.
-    ///
-    /// # Arguments
-    ///
-    /// * `ic_value` - Current Identity Continuity value [0.0, 1.0]
-    ///
-    /// # Returns
-    ///
-    /// `true` if `ic_value < ic_threshold` (crisis state)
-    #[inline]
-    pub fn is_identity_critical(&self, ic_value: f32) -> bool {
-        ic_value < self.ic_threshold
     }
 
     /// Check if entropy value exceeds threshold.
@@ -300,12 +260,10 @@ impl TriggerHistoryItem {
 /// Combines all trigger mechanisms into a single interface:
 /// - High entropy (>0.7 sustained for 5 minutes)
 /// - GPU overload (approaching 30% usage)
-/// - Identity Critical (IC < 0.5)
 /// - Manual trigger
 ///
 /// # Constitution Compliance
 ///
-/// - IC threshold: 0.5 (Constitution gwt.self_ego_node.thresholds.critical)
 /// - Entropy threshold: 0.7 (Constitution dream.trigger)
 /// - Entropy window: 5 minutes (Constitution dream.trigger)
 /// - GPU threshold: 0.30 (Constitution dream.constraints.gpu)
@@ -314,19 +272,14 @@ impl TriggerHistoryItem {
 /// # Priority Order (highest to lowest)
 ///
 /// 1. Manual - User-initiated, bypasses cooldown
-/// 2. IdentityCritical - IC < 0.5 (AP-26, AP-38, IDENTITY-007)
-/// 3. GpuOverload - GPU approaching 30% budget
-/// 4. HighEntropy - Entropy > 0.7 for 5 minutes
+/// 2. GpuOverload - GPU approaching 30% budget
+/// 3. HighEntropy - Entropy > 0.7 for 5 minutes
 #[derive(Debug)]
 pub struct TriggerManager {
     /// Trigger history (TASK-S03) - capped at 100 entries
     trigger_history: Vec<TriggerHistoryItem>,
-    /// Configuration with thresholds (TASK-21)
+    /// Configuration with thresholds
     config: TriggerConfig,
-
-    /// Current Identity Continuity value (TASK-21)
-    /// None = not yet measured, Some(x) = current IC
-    current_ic: Option<f32>,
 
     /// Entropy tracking window
     entropy_window: EntropyWindow,
@@ -360,7 +313,6 @@ impl TriggerManager {
     /// Create a new trigger manager with constitution defaults.
     ///
     /// # Constitution Values Applied
-    /// - IC threshold: 0.5 (gwt.self_ego_node.thresholds.critical)
     /// - Entropy threshold: 0.7 (dream.trigger.entropy)
     /// - Entropy window: 5 minutes (dream.trigger)
     /// - GPU threshold: 0.30 (30%) (dream.constraints.gpu)
@@ -371,7 +323,6 @@ impl TriggerManager {
             trigger_history: Vec::new(),       // TASK-S03: Start with empty history
             trigger_cooldown: config.cooldown, // Use config cooldown
             config,
-            current_ic: None,
             entropy_window: EntropyWindow::new(), // Uses Constitution defaults
             gpu_state: GpuTriggerState::new(),    // Uses Constitution defaults
             manual_trigger: None, // TASK-DREAM-PH-002: Now stores Option<DreamPhase>
@@ -396,7 +347,6 @@ impl TriggerManager {
             trigger_history: Vec::new(), // TASK-S03: Start with empty history
             trigger_cooldown: config.cooldown,
             config,
-            current_ic: None,
             entropy_window: EntropyWindow::new(),
             gpu_state: GpuTriggerState::new(),
             manual_trigger: None, // TASK-DREAM-PH-002: Now stores Option<DreamPhase>
@@ -467,67 +417,6 @@ impl TriggerManager {
         }
     }
 
-    /// Update the current Identity Continuity value.
-    ///
-    /// # Arguments
-    ///
-    /// * `ic` - Current IC value, expected in [0.0, 1.0]
-    ///
-    /// # Clamping Behavior
-    ///
-    /// - NaN → clamped to 0.0 (worst case) with warning
-    /// - Infinity → clamped to 1.0 (best case) with warning
-    /// - Out of range → clamped to [0.0, 1.0] with warning
-    ///
-    /// # Constitution
-    ///
-    /// Per AP-10: No NaN/Infinity in UTL values.
-    /// Per IDENTITY-007: IC < 0.5 → auto-trigger dream.
-    pub fn update_identity_coherence(&mut self, ic: f32) {
-        if !self.enabled {
-            return;
-        }
-
-        let ic = if ic.is_nan() {
-            tracing::warn!("Invalid IC value NaN, clamping to 0.0 per AP-10");
-            0.0
-        } else if ic.is_infinite() {
-            tracing::warn!("Invalid IC value Infinity, clamping to 1.0 per AP-10");
-            1.0
-        } else if !(0.0..=1.0).contains(&ic) {
-            tracing::warn!("IC value {} out of range, clamping to [0.0, 1.0]", ic);
-            ic.clamp(0.0, 1.0)
-        } else {
-            ic
-        };
-
-        self.current_ic = Some(ic);
-
-        if self.config.is_identity_critical(ic) {
-            debug!(
-                "IC {} < threshold {} - identity critical state",
-                ic, self.config.ic_threshold
-            );
-        }
-    }
-
-    /// Check if identity continuity is in crisis state.
-    ///
-    /// # Returns
-    ///
-    /// `true` if `current_ic < config.ic_threshold`
-    ///
-    /// # Constitution
-    ///
-    /// Per gwt.self_ego_node.thresholds.critical: IC < 0.5 is critical.
-    #[inline]
-    pub fn check_identity_continuity(&self) -> bool {
-        match self.current_ic {
-            Some(ic) => self.config.is_identity_critical(ic),
-            None => false, // No IC measured yet, cannot be critical
-        }
-    }
-
     /// Request a manual dream trigger with specific phase.
     ///
     /// TASK-DREAM-PH-002: Now accepts a phase parameter.
@@ -550,9 +439,8 @@ impl TriggerManager {
     /// # Priority Order (highest first)
     ///
     /// 1. Manual - User-initiated, bypasses cooldown
-    /// 2. IdentityCritical - IC < 0.5 (AP-26, AP-38, IDENTITY-007)
-    /// 3. GpuOverload - GPU approaching 30% budget
-    /// 4. HighEntropy - Entropy > 0.7 for 5 minutes
+    /// 2. GpuOverload - GPU approaching 30% budget
+    /// 3. HighEntropy - Entropy > 0.7 for 5 minutes
     ///
     /// # Returns
     ///
@@ -562,7 +450,6 @@ impl TriggerManager {
     /// # Constitution Compliance
     ///
     /// - Manual bypasses cooldown (highest priority)
-    /// - IdentityCritical MUST trigger when IC < 0.5 (AP-26, AP-38)
     /// - GpuOverload when GPU > 30% (Constitution dream.constraints.gpu)
     /// - HighEntropy when entropy > 0.7 for 5min (Constitution dream.trigger.entropy)
     pub fn check_triggers(&self) -> Option<ExtendedTriggerReason> {
@@ -585,19 +472,12 @@ impl TriggerManager {
             return Some(ExtendedTriggerReason::Manual { phase });
         }
 
-        // Priority 2: IdentityCritical (CONSTITUTION CRITICAL - AP-26, AP-38)
-        if let Some(ic) = self.current_ic {
-            if self.config.is_identity_critical(ic) {
-                return Some(ExtendedTriggerReason::IdentityCritical { ic_value: ic });
-            }
-        }
-
-        // Priority 3: GpuOverload
+        // Priority 2: GpuOverload
         if self.gpu_state.should_trigger() {
             return Some(ExtendedTriggerReason::GpuOverload);
         }
 
-        // Priority 4: HighEntropy
+        // Priority 3: HighEntropy
         if self.entropy_window.should_trigger() {
             return Some(ExtendedTriggerReason::HighEntropy);
         }
@@ -668,28 +548,6 @@ impl TriggerManager {
     #[inline]
     pub fn current_gpu_usage(&self) -> f32 {
         self.gpu_state.current_usage
-    }
-
-    /// Get current Identity Continuity value.
-    ///
-    /// # Returns
-    ///
-    /// * `Some(ic)` - Current IC value [0.0, 1.0] if measured
-    /// * `None` - If no IC has been set yet
-    #[inline]
-    pub fn current_ic(&self) -> Option<f32> {
-        self.current_ic
-    }
-
-    /// Get current IC threshold from config.
-    ///
-    /// # Returns
-    ///
-    /// The IC threshold below which triggers IdentityCritical.
-    /// Default: 0.5 per Constitution gwt.self_ego_node.thresholds.critical.
-    #[inline]
-    pub fn ic_threshold(&self) -> f32 {
-        self.config.ic_threshold
     }
 
     /// Get entropy threshold for high entropy trigger.
@@ -1910,233 +1768,12 @@ mod tests {
         ));
     }
 
-    // ============ Identity Continuity Trigger Tests ============
-
-    #[test]
-    fn test_trigger_manager_ic_check_triggers_below_threshold() {
-        let mut manager = TriggerManager::new();
-
-        // IC = 0.49 < 0.5 threshold → should trigger IdentityCritical
-        manager.update_identity_coherence(0.49);
-
-        let trigger = manager.check_triggers();
-        assert!(trigger.is_some(), "IC below threshold should trigger");
-
-        match trigger.unwrap() {
-            ExtendedTriggerReason::IdentityCritical { ic_value } => {
-                assert!(
-                    (ic_value - 0.49).abs() < 0.001,
-                    "IC value should be preserved: got {}",
-                    ic_value
-                );
-            }
-            other => panic!("Expected IdentityCritical, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn test_trigger_manager_ic_at_threshold_no_trigger() {
-        let mut manager = TriggerManager::new();
-
-        // IC = 0.5 (exactly at threshold) → should NOT trigger
-        // Constitution: IC < 0.5 is critical (strict less than)
-        manager.update_identity_coherence(0.5);
-
-        assert!(
-            !manager.check_identity_continuity(),
-            "IC at threshold should not be critical"
-        );
-    }
-
-    #[test]
-    fn test_trigger_manager_ic_above_threshold_no_trigger() {
-        let mut manager = TriggerManager::new();
-
-        // IC = 0.9 (healthy) → should not trigger
-        manager.update_identity_coherence(0.9);
-
-        assert!(
-            !manager.check_identity_continuity(),
-            "IC above threshold should not be critical"
-        );
-        assert!(
-            manager.check_triggers().is_none(),
-            "No trigger expected for healthy IC"
-        );
-    }
-
-    #[test]
-    fn test_trigger_manager_ic_priority_over_gpu() {
-        let mut manager = TriggerManager::new();
-
-        // Set up BOTH IC crisis AND GPU overload
-        manager.update_identity_coherence(0.3);
-        manager.update_gpu_usage(0.35);
-
-        // IdentityCritical should have higher priority than GpuOverload
-        let trigger = manager.check_triggers();
-        match trigger {
-            Some(ExtendedTriggerReason::IdentityCritical { .. }) => {} // Expected
-            other => panic!(
-                "Expected IdentityCritical to have priority, got {:?}",
-                other
-            ),
-        }
-    }
-
-    #[test]
-    fn test_trigger_manager_manual_priority_over_ic() {
-        let mut manager = TriggerManager::new();
-
-        // Set up IC crisis
-        manager.update_identity_coherence(0.3);
-
-        // Request manual trigger
-        manager.request_manual_trigger(DreamPhase::FullCycle);
-
-        // Manual should have highest priority
-        assert!(matches!(
-            manager.check_triggers(),
-            Some(ExtendedTriggerReason::Manual { .. })
-        ));
-    }
-
-    #[test]
-    fn test_trigger_manager_ic_nan_handling() {
-        let mut manager = TriggerManager::new();
-
-        // NaN should be clamped to 0.0 per AP-10
-        manager.update_identity_coherence(f32::NAN);
-
-        // Should trigger (0.0 < 0.5)
-        let trigger = manager.check_triggers();
-        match trigger {
-            Some(ExtendedTriggerReason::IdentityCritical { ic_value }) => {
-                assert_eq!(ic_value, 0.0, "NaN should clamp to 0.0");
-            }
-            other => panic!("Expected IdentityCritical, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn test_trigger_manager_ic_infinity_handling() {
-        let mut manager = TriggerManager::new();
-
-        // Infinity should be clamped to 1.0 per AP-10
-        manager.update_identity_coherence(f32::INFINITY);
-
-        // Should NOT trigger (1.0 >= 0.5)
-        assert!(!manager.check_identity_continuity());
-    }
-
-    #[test]
-    fn test_trigger_manager_with_custom_config() {
-        let config = TriggerConfig::default().with_ic_threshold(0.6); // Higher threshold for more sensitive detection
-
-        let mut manager = TriggerManager::with_config(config);
-
-        // IC = 0.55 < 0.6 (custom threshold) → should trigger
-        manager.update_identity_coherence(0.55);
-
-        assert!(manager.check_identity_continuity());
-
-        match manager.check_triggers() {
-            Some(ExtendedTriggerReason::IdentityCritical { ic_value }) => {
-                assert!((ic_value - 0.55).abs() < 0.001);
-            }
-            other => panic!("Expected IdentityCritical, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn test_trigger_manager_no_ic_measured_no_trigger() {
-        let manager = TriggerManager::new();
-
-        // No IC has been set → should not be critical
-        assert!(!manager.check_identity_continuity());
-        assert!(manager.current_ic().is_none());
-    }
-
-    #[test]
-    fn test_trigger_manager_ic_accessors() {
-        let mut manager = TriggerManager::new();
-
-        // Initially no IC
-        assert!(manager.current_ic().is_none());
-        assert_eq!(manager.ic_threshold(), 0.5); // Default threshold
-
-        // Set IC
-        manager.update_identity_coherence(0.42);
-
-        assert_eq!(manager.current_ic(), Some(0.42));
-        assert_eq!(manager.ic_threshold(), 0.5);
-    }
-
-    #[test]
-    fn test_trigger_manager_ic_negative_clamping() {
-        let mut manager = TriggerManager::new();
-
-        // Negative value should be clamped to 0.0
-        manager.update_identity_coherence(-0.5);
-
-        assert_eq!(manager.current_ic(), Some(0.0));
-        assert!(manager.check_identity_continuity()); // 0.0 < 0.5 = critical
-    }
-
-    #[test]
-    fn test_trigger_manager_ic_over_one_clamping() {
-        let mut manager = TriggerManager::new();
-
-        // Value > 1.0 should be clamped to 1.0
-        manager.update_identity_coherence(1.5);
-
-        assert_eq!(manager.current_ic(), Some(1.0));
-        assert!(!manager.check_identity_continuity()); // 1.0 >= 0.5 = not critical
-    }
-
-    #[test]
-    fn test_trigger_manager_ic_minimum_value() {
-        let mut manager = TriggerManager::new();
-
-        // IC = 0.0 (minimum) → should trigger
-        manager.update_identity_coherence(0.0);
-
-        assert!(manager.check_identity_continuity());
-        match manager.check_triggers() {
-            Some(ExtendedTriggerReason::IdentityCritical { ic_value }) => {
-                assert_eq!(ic_value, 0.0);
-            }
-            other => panic!("Expected IdentityCritical, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn test_trigger_manager_ic_disabled_no_update() {
-        let mut manager = TriggerManager::new();
-
-        // Disable triggers
-        manager.set_enabled(false);
-
-        // Update IC while disabled
-        manager.update_identity_coherence(0.3);
-
-        // IC should not have been updated
-        assert!(
-            manager.current_ic().is_none(),
-            "IC should not update when disabled"
-        );
-    }
-
     // ============ TriggerConfig Tests ============
 
     #[test]
     fn test_trigger_config_constitution_defaults() {
         let config = TriggerConfig::default();
 
-        assert_eq!(
-            config.ic_threshold, 0.5,
-            "ic_threshold must be 0.5 per Constitution gwt.self_ego_node.thresholds.critical"
-        );
         assert_eq!(
             config.entropy_threshold, 0.7,
             "entropy_threshold must be 0.7 per Constitution dream.trigger.entropy"
@@ -2155,26 +1792,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "ic_threshold must be in [0.0, 1.0]")]
-    fn test_trigger_config_validate_panics_negative_ic() {
-        let config = TriggerConfig {
-            ic_threshold: -0.1,
-            ..Default::default()
-        };
-        config.validate();
-    }
-
-    #[test]
-    #[should_panic(expected = "ic_threshold must be in [0.0, 1.0]")]
-    fn test_trigger_config_validate_panics_ic_over_one() {
-        let config = TriggerConfig {
-            ic_threshold: 1.5,
-            ..Default::default()
-        };
-        config.validate();
-    }
-
-    #[test]
     #[should_panic(expected = "entropy_threshold must be in [0.0, 1.0]")]
     fn test_trigger_config_validate_panics_negative_entropy() {
         let config = TriggerConfig {
@@ -2187,11 +1804,9 @@ mod tests {
     #[test]
     fn test_trigger_config_builder_pattern() {
         let config = TriggerConfig::default()
-            .with_ic_threshold(0.4)
             .with_entropy_threshold(0.8)
             .with_cooldown(Duration::from_secs(30));
 
-        assert_eq!(config.ic_threshold, 0.4);
         assert_eq!(config.entropy_threshold, 0.8);
         assert_eq!(config.cooldown, Duration::from_secs(30));
     }
@@ -2199,42 +1814,7 @@ mod tests {
     #[test]
     fn test_trigger_config_validated_returns_self() {
         let config = TriggerConfig::default().validated();
-        assert_eq!(config.ic_threshold, 0.5);
-    }
-
-    #[test]
-    #[should_panic(expected = "ic_threshold must be in [0.0, 1.0]")]
-    fn test_trigger_config_validated_panics_invalid() {
-        TriggerConfig::default().with_ic_threshold(-1.0).validated();
-    }
-
-    #[test]
-    fn test_trigger_config_is_identity_critical() {
-        let config = TriggerConfig::default(); // ic_threshold = 0.5
-
-        // Below threshold = crisis
-        assert!(
-            config.is_identity_critical(0.49),
-            "0.49 < 0.5 should be critical"
-        );
-        assert!(
-            config.is_identity_critical(0.0),
-            "0.0 < 0.5 should be critical"
-        );
-
-        // At or above threshold = not crisis
-        assert!(
-            !config.is_identity_critical(0.5),
-            "0.5 >= 0.5 should NOT be critical"
-        );
-        assert!(
-            !config.is_identity_critical(0.51),
-            "0.51 > 0.5 should NOT be critical"
-        );
-        assert!(
-            !config.is_identity_critical(1.0),
-            "1.0 > 0.5 should NOT be critical"
-        );
+        assert_eq!(config.entropy_threshold, 0.7);
     }
 
     #[test]
@@ -2270,14 +1850,12 @@ mod tests {
     fn test_trigger_config_edge_case_boundary_values() {
         // Test exact boundary values
         let config = TriggerConfig {
-            ic_threshold: 0.0,
             entropy_threshold: 1.0,
             cooldown: Duration::ZERO,
         };
         config.validate(); // Should pass - 0.0 and 1.0 are valid
 
         let config_max = TriggerConfig {
-            ic_threshold: 1.0,
             entropy_threshold: 0.0,
             cooldown: Duration::from_secs(86400), // 24 hours
         };
@@ -2289,7 +1867,6 @@ mod tests {
         // TriggerConfig does not derive Serialize/Deserialize by default
         // but if it did, this test would verify roundtrip
         let config = TriggerConfig::default()
-            .with_ic_threshold(0.45)
             .with_entropy_threshold(0.75);
 
         // Verify config fields survive clone (basic roundtrip)

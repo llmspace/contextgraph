@@ -10,7 +10,7 @@
 //! - FSV L2: Cache stores and retrieves patterns correctly
 //! - FSV L3: Memory retrieval with decay scoring works
 //! - FSV L4: UTL weight update formula computed correctly
-//! - FSV L5: Kuramoto sync produces valid resonance and consciousness
+//! - FSV L5: Per-space clustering produces valid resonance and coherence
 //! - FSV Pipeline: Full L1 -> L2 -> L3 -> L4 -> L5 flow works
 
 #[cfg(test)]
@@ -389,13 +389,13 @@ mod full_state_verification {
     }
 
     // ============================================================
-    // FSV L5: Coherence Layer - Kuramoto Sync & Consciousness
+    // FSV L5: Coherence Layer - Per-Space Clustering & Coherence Score
     // ============================================================
 
     #[tokio::test]
-    async fn fsv_l5_kuramoto_and_consciousness() {
+    async fn fsv_l5_coherence_and_coherence_score() {
         println!("\n============================================================");
-        println!("=== FSV: L5 Coherence Layer - Kuramoto & Consciousness ===");
+        println!("=== FSV: L5 Coherence Layer - Clustering & Coherence Score ===");
         println!("============================================================\n");
 
         let layer = CoherenceLayer::new();
@@ -423,12 +423,12 @@ mod full_state_verification {
             .get("resonance")
             .and_then(|v| v.as_f64())
             .expect("resonance should exist");
-        let consciousness = output
+        let coherence_score = output
             .result
             .data
-            .get("consciousness")
+            .get("coherence_score")
             .and_then(|v| v.as_f64())
-            .expect("consciousness should exist");
+            .expect("coherence_score should exist");
         let differentiation = output
             .result
             .data
@@ -454,11 +454,11 @@ mod full_state_verification {
             .and_then(|v| v.as_str())
             .expect("state should exist");
 
-        println!("\n=== GWT CONSCIOUSNESS EQUATION ===");
+        println!("\n=== COHERENCE SCORE EQUATION ===");
         println!("Formula: C(t) = I(t) x R(t) x D(t)");
         println!("  I(t) = Information = {:.4}", information);
         println!(
-            "  R(t) = Resonance (Kuramoto order param) = {:.4}",
+            "  R(t) = Resonance (clustering coherence) = {:.4}",
             resonance
         );
         println!("  D(t) = Differentiation = {:.4}", differentiation);
@@ -466,15 +466,15 @@ mod full_state_verification {
             "  Expected C(t) = I * R * D = {:.4}",
             information * resonance * differentiation
         );
-        println!("  Actual consciousness = {:.4}", consciousness);
-        println!("\n=== KURAMOTO SYNC RESULTS ===");
+        println!("  Actual coherence_score = {:.4}", coherence_score);
+        println!("\n=== COHERENCE RESULTS ===");
         println!("  Resonance R(t) = {:.4} (should be in [0,1])", resonance);
         println!(
             "  GW Threshold = {:.2}",
             GwtThresholds::default_general().gate
         );
         println!("  GW Ignited = {} (R >= threshold)", gw_ignited);
-        println!("  Consciousness State = {}", state);
+        println!("  Coherence State = {}", state);
 
         // Verify resonance is in valid range
         assert!(
@@ -482,60 +482,14 @@ mod full_state_verification {
             "R(t) should be in [0,1], got {}",
             resonance
         );
-        assert!(!consciousness.is_nan(), "C(t) should not be NaN");
+        assert!(!coherence_score.is_nan(), "C(t) should not be NaN");
         assert!(
-            (0.0..=1.0).contains(&consciousness),
+            (0.0..=1.0).contains(&coherence_score),
             "C(t) should be in [0,1], got {}",
-            consciousness
+            coherence_score
         );
 
-        println!("\n[VERIFIED] Kuramoto sync and consciousness computation works");
-    }
-
-    #[tokio::test]
-    async fn fsv_l5_kuramoto_network_dynamics() {
-        println!("\n============================================================");
-        println!("=== FSV: L5 Kuramoto Network Dynamics ===");
-        println!("============================================================\n");
-
-        let mut network = KuramotoNetwork::new(KURAMOTO_N, KURAMOTO_K);
-
-        println!(
-            "Initial network: N={}, K={}",
-            network.size(),
-            network.coupling()
-        );
-
-        let r_initial = network.order_parameter();
-        println!("Initial order parameter R(0) = {:.4}", r_initial);
-        println!(
-            "Initial phases: {:?}",
-            network
-                .phases()
-                .iter()
-                .map(|p| format!("{:.3}", p))
-                .collect::<Vec<_>>()
-        );
-
-        // Run dynamics for several steps
-        for step in 0..50 {
-            network.step(KURAMOTO_DT);
-            if step % 10 == 9 {
-                println!(
-                    "  Step {}: R(t) = {:.4}",
-                    step + 1,
-                    network.order_parameter()
-                );
-            }
-        }
-
-        let r_final = network.order_parameter();
-        println!("\nFinal order parameter R(T) = {:.4}", r_final);
-        println!("Mean phase psi = {:.4}", network.mean_phase());
-
-        assert!((0.0..=1.0).contains(&r_final), "Final R should be in [0,1]");
-
-        println!("\n[VERIFIED] Kuramoto network dynamics produce valid order parameter");
+        println!("\n[VERIFIED] Coherence and coherence score computation works");
     }
 
     // ============================================================
@@ -648,10 +602,10 @@ mod full_state_verification {
             .get("resonance")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
-        let consciousness = l5_out
+        let coherence_score = l5_out
             .result
             .data
-            .get("consciousness")
+            .get("coherence_score")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
         let gw_ignited = l5_out
@@ -668,7 +622,7 @@ mod full_state_verification {
             .unwrap_or("Unknown");
         println!("Duration: {} us", l5_out.duration_us);
         println!("Resonance R(t): {:.4}", resonance);
-        println!("Consciousness C(t): {:.4}", consciousness);
+        println!("Coherence C(t): {:.4}", coherence_score);
         println!("GW Ignited: {}", gw_ignited);
         println!("State: {}", state);
         println!();

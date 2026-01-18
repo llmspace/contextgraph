@@ -2,7 +2,7 @@
 //!
 //! This module defines comprehensive error types for all UTL (Unified Trace Likelihood)
 //! computations, including surprise, coherence, emotional weighting, phase oscillation,
-//! lifecycle transitions, and Johari quadrant classification.
+//! and lifecycle transitions.
 
 use thiserror::Error;
 
@@ -66,10 +66,6 @@ pub enum UtlError {
         /// Reason for invalidity
         reason: String,
     },
-
-    /// Johari quadrant classification error
-    #[error("Johari classification error: {0}")]
-    JohariError(String),
 
     /// Phase oscillator error
     #[error("Phase oscillator error: {0}")]
@@ -362,14 +358,6 @@ mod tests {
         assert!(msg.contains("Nascent"));
         assert!(msg.contains("Archived"));
         assert!(msg.contains("skip intermediate"));
-    }
-
-    #[test]
-    fn test_johari_error() {
-        let err = UtlError::JohariError("Invalid awareness scores".to_string());
-        let msg = format!("{}", err);
-        assert!(msg.contains("Johari"));
-        assert!(msg.contains("awareness scores"));
     }
 
     #[test]

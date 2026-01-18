@@ -1,9 +1,9 @@
 //! Helper functions for UTL computation.
 //!
-//! TASK-UTL-P1-001: Embedding manipulation and Johari classification.
+//! TASK-UTL-P1-001: Embedding manipulation.
+//! Note: Uses embedder categories per PRD v6.
 
 use context_graph_core::types::fingerprint::SparseVector;
-use context_graph_core::types::JohariQuadrant;
 
 /// Create a synthetic "nearest cluster" for ClusterFit computation.
 ///
@@ -41,22 +41,6 @@ pub(super) fn create_divergent_cluster(old: &[f32], new: &[f32]) -> Vec<Vec<f32>
         .collect();
 
     vec![opposite]
-}
-
-/// Classify a (ΔS, ΔC) pair into a JohariQuadrant.
-///
-/// Per constitution.yaml johari mapping:
-/// - Open: ΔS < threshold, ΔC > threshold (low surprise, high coherence)
-/// - Blind: ΔS > threshold, ΔC < threshold (high surprise, low coherence)
-/// - Hidden: ΔS < threshold, ΔC < threshold (low surprise, low coherence)
-/// - Unknown: ΔS > threshold, ΔC > threshold (high surprise, high coherence)
-pub(super) fn classify_johari(delta_s: f32, delta_c: f32, threshold: f32) -> JohariQuadrant {
-    match (delta_s < threshold, delta_c > threshold) {
-        (true, true) => JohariQuadrant::Open, // Low surprise, high coherence
-        (false, false) => JohariQuadrant::Blind, // High surprise, low coherence
-        (true, false) => JohariQuadrant::Hidden, // Low surprise, low coherence
-        (false, true) => JohariQuadrant::Unknown, // High surprise, high coherence
-    }
 }
 
 /// Convert sparse vector to truncated dense representation.

@@ -3,7 +3,9 @@
 //! TASK-S005: Embedder names and constitution.yaml targets.
 //! TASK-FIX-003: Fixed to match canonical Embedder::name() values.
 
-use context_graph_core::johari::NUM_EMBEDDERS;
+/// Number of embedders in the teleological system.
+/// Per CLAUDE.md: 13 embedders (E1-E13).
+pub(super) const NUM_EMBEDDERS: usize = 13;
 
 /// Embedder names for trajectory reporting.
 /// 13 embedders: E1-E13.

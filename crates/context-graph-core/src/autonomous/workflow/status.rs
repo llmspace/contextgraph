@@ -1,6 +1,6 @@
 //! Autonomous system status types.
 //!
-//! TASK-P0-005: Renamed north_star_configured to strategic_goal_configured per ARCH-03.
+//! TASK-P0-005: Uses strategic_goal_configured per ARCH-03.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

@@ -10,8 +10,8 @@ use super::super::{create_test_handlers, make_request};
 
 /// FULL STATE VERIFICATION: Complete purpose workflow test.
 ///
-/// TASK-CORE-001: Updated to remove deprecated north_star_alignment step.
-/// TASK-P0-001: Updated for 3-level hierarchy (has_north_star → has_top_level_goals).
+/// TASK-CORE-001: Updated to remove deprecated alignment step.
+/// TASK-P0-001: Updated for 3-level hierarchy (has_top_level_goals).
 ///
 /// Tests the full purpose lifecycle with real data:
 /// 1. Create handlers with test hierarchy
@@ -21,7 +21,7 @@ use super::super::{create_test_handlers, make_request};
 /// 5. Find aligned memories via goal/aligned_memories
 /// 6. Check drift via purpose/drift_check
 ///
-/// NOTE: purpose/north_star_alignment removed per ARCH-03.
+/// NOTE: Purpose alignment removed per ARCH-03.
 /// Uses real GoalHierarchy with STUB storage (InMemoryTeleologicalStore).
 #[tokio::test]
 async fn test_full_state_verification_purpose_workflow() {
@@ -46,7 +46,7 @@ async fn test_full_state_verification_purpose_workflow() {
     let stats = hierarchy_result
         .get("hierarchy_stats")
         .expect("Must have stats");
-    // TASK-P0-001: Check has_top_level_goals instead of has_north_star
+    // TASK-P0-001: Check has_top_level_goals
     assert_eq!(
         stats.get("has_top_level_goals").and_then(|v| v.as_bool()),
         Some(true),
@@ -138,9 +138,8 @@ async fn test_full_state_verification_purpose_workflow() {
         purpose_results.len()
     );
 
-    // NOTE: STEP 4 (purpose/north_star_alignment) REMOVED per TASK-CORE-001 (ARCH-03)
-    // Manual North Star alignment creates single 1024D embeddings incompatible with 13-embedder arrays.
-    // Use auto_bootstrap_north_star tool for autonomous goal discovery instead.
+    // NOTE: Legacy alignment step REMOVED per TASK-CORE-001 (ARCH-03)
+    // Goals now emerge autonomously from topic clustering.
 
     // =========================================================================
     // STEP 4: Find aligned memories via goal/aligned_memories

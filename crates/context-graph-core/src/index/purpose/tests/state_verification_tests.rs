@@ -5,7 +5,6 @@ use crate::index::purpose::entry::{GoalId, PurposeIndexEntry, PurposeMetadata};
 use crate::index::purpose::hnsw_purpose::{HnswPurposeIndex, PurposeIndexOps};
 use crate::index::purpose::query::{PurposeQuery, PurposeQueryTarget, PurposeSearchResult};
 use crate::types::fingerprint::PurposeVector;
-use crate::types::JohariQuadrant;
 use std::time::{Duration, SystemTime};
 use uuid::Uuid;
 
@@ -24,13 +23,13 @@ fn test_full_state_verification_complete_workflow() {
         index.goal_count()
     );
 
-    // Step 1: Insert multiple entries with diverse goals/quadrants
+    // Step 1: Insert multiple entries with diverse goals
     let entries: Vec<PurposeIndexEntry> = vec![
-        create_entry_with_id(Uuid::new_v4(), 0.3, "goal_alpha", JohariQuadrant::Open),
-        create_entry_with_id(Uuid::new_v4(), 0.4, "goal_alpha", JohariQuadrant::Hidden),
-        create_entry_with_id(Uuid::new_v4(), 0.5, "goal_beta", JohariQuadrant::Open),
-        create_entry_with_id(Uuid::new_v4(), 0.6, "goal_beta", JohariQuadrant::Blind),
-        create_entry_with_id(Uuid::new_v4(), 0.7, "goal_gamma", JohariQuadrant::Unknown),
+        create_entry_with_id(Uuid::new_v4(), 0.3, "goal_alpha"),
+        create_entry_with_id(Uuid::new_v4(), 0.4, "goal_alpha"),
+        create_entry_with_id(Uuid::new_v4(), 0.5, "goal_beta"),
+        create_entry_with_id(Uuid::new_v4(), 0.6, "goal_beta"),
+        create_entry_with_id(Uuid::new_v4(), 0.7, "goal_gamma"),
     ];
 
     let ids: Vec<Uuid> = entries.iter().map(|e| e.memory_id).collect();
@@ -54,13 +53,7 @@ fn test_full_state_verification_complete_workflow() {
     // Step 2: Verify secondary indexes updated
     let alpha_set = index.get_by_goal(&GoalId::new("goal_alpha")).unwrap();
     assert_eq!(alpha_set.len(), 2);
-    let open_set = index.get_by_quadrant(JohariQuadrant::Open).unwrap();
-    assert_eq!(open_set.len(), 2);
-    println!(
-        "[STATE] Secondary indexes: goal_alpha={}, quadrant_open={}",
-        alpha_set.len(),
-        open_set.len()
-    );
+    println!("[STATE] Secondary indexes: goal_alpha={}", alpha_set.len());
 
     // Step 3: Search with each query type
     // Vector search
@@ -100,20 +93,17 @@ fn test_full_state_verification_complete_workflow() {
     );
 
     // Step 4: Remove entries and verify cleanup
-    let to_remove = ids[0]; // goal_alpha, Open
+    let to_remove = ids[0]; // goal_alpha
     index.remove(to_remove).unwrap();
 
     assert_eq!(index.len(), 4);
     assert!(!index.contains(to_remove));
     let alpha_set = index.get_by_goal(&GoalId::new("goal_alpha")).unwrap();
     assert_eq!(alpha_set.len(), 1); // Reduced from 2 to 1
-    let open_set = index.get_by_quadrant(JohariQuadrant::Open).unwrap();
-    assert_eq!(open_set.len(), 1); // Reduced from 2 to 1
     println!(
-        "[STATE] After remove: len={}, goal_alpha={}, quadrant_open={}",
+        "[STATE] After remove: len={}, goal_alpha={}",
         index.len(),
-        alpha_set.len(),
-        open_set.len()
+        alpha_set.len()
     );
 
     // Step 5: Clear and verify
@@ -137,9 +127,9 @@ fn test_full_state_secondary_indexes_consistency() {
 
     // Insert entries
     let entries = vec![
-        create_entry_with_id(Uuid::new_v4(), 0.3, "shared_goal", JohariQuadrant::Open),
-        create_entry_with_id(Uuid::new_v4(), 0.5, "shared_goal", JohariQuadrant::Open),
-        create_entry_with_id(Uuid::new_v4(), 0.7, "unique_goal", JohariQuadrant::Unknown),
+        create_entry_with_id(Uuid::new_v4(), 0.3, "shared_goal"),
+        create_entry_with_id(Uuid::new_v4(), 0.5, "shared_goal"),
+        create_entry_with_id(Uuid::new_v4(), 0.7, "unique_goal"),
     ];
 
     let ids: Vec<Uuid> = entries.iter().map(|e| e.memory_id).collect();
@@ -178,8 +168,7 @@ fn test_full_state_results_contain_complete_data() {
         0.8, 0.7, 0.9, 0.6, 0.75, 0.65, 0.85, 0.72, 0.78, 0.68, 0.82, 0.71, 0.76,
     ];
     let pv = PurposeVector::new(alignments);
-    let metadata =
-        PurposeMetadata::new(GoalId::new("complete_test"), 0.95, JohariQuadrant::Blind).unwrap();
+    let metadata = PurposeMetadata::new(GoalId::new("complete_test"), 0.95).unwrap();
     let entry = PurposeIndexEntry::new(Uuid::new_v4(), pv.clone(), metadata);
     let memory_id = entry.memory_id;
 
@@ -195,7 +184,6 @@ fn test_full_state_results_contain_complete_data() {
     assert_eq!(result.purpose_vector.alignments, alignments);
     assert_eq!(result.metadata.primary_goal.as_str(), "complete_test");
     assert!((result.metadata.confidence - 0.95).abs() < f32::EPSILON);
-    assert_eq!(result.metadata.dominant_quadrant, JohariQuadrant::Blind);
 
     println!("[VERIFIED] Search results contain complete entry data");
 }
@@ -203,23 +191,19 @@ fn test_full_state_results_contain_complete_data() {
 #[test]
 fn test_purpose_search_result_matches_methods() {
     let pv = create_purpose_vector(0.8, 0.02);
-    let metadata = super::helpers::create_metadata("test_goal", JohariQuadrant::Hidden);
+    let metadata = super::helpers::create_metadata("test_goal");
     let result = PurposeSearchResult::new(Uuid::new_v4(), 0.95, pv, metadata);
 
     assert!(result.matches_goal(&GoalId::new("test_goal")));
     assert!(!result.matches_goal(&GoalId::new("other_goal")));
-    assert!(result.matches_quadrant(JohariQuadrant::Hidden));
-    assert!(!result.matches_quadrant(JohariQuadrant::Open));
 
-    println!("[VERIFIED] PurposeSearchResult matches_* methods work correctly");
+    println!("[VERIFIED] PurposeSearchResult matches_goal method works correctly");
 }
 
 #[test]
 fn test_entry_stale_detection() {
     let past = SystemTime::now() - Duration::from_secs(3600);
-    let metadata =
-        PurposeMetadata::with_timestamp(GoalId::new("test"), 0.75, past, JohariQuadrant::Open)
-            .unwrap();
+    let metadata = PurposeMetadata::with_timestamp(GoalId::new("test"), 0.75, past).unwrap();
 
     let entry = PurposeIndexEntry::new(Uuid::new_v4(), PurposeVector::default(), metadata);
 

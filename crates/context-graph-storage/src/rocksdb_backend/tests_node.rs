@@ -11,7 +11,7 @@ use super::helpers::{format_tag_key, format_temporal_key};
 use crate::column_families::cf_names;
 use crate::serialization::serialize_uuid;
 use context_graph_core::types::{
-    EmbeddingVector, JohariQuadrant, MemoryNode, NodeMetadata, DEFAULT_EMBEDDING_DIM,
+    EmbeddingVector, MemoryNode, NodeMetadata, DEFAULT_EMBEDDING_DIM,
 };
 
 // =========================================================================
@@ -36,7 +36,6 @@ pub(crate) fn create_valid_test_node() -> MemoryNode {
     let mut node = MemoryNode::new("Test content for CRUD operations".to_string(), embedding);
     node.importance = 0.75;
     node.emotional_valence = 0.5;
-    node.quadrant = JohariQuadrant::Open;
     node.metadata = NodeMetadata::new()
         .with_source("test-source")
         .with_language("en");
@@ -83,7 +82,6 @@ fn test_store_node_and_get_roundtrip() {
     assert_eq!(node.id, retrieved.id);
     assert_eq!(node.content, retrieved.content);
     assert_eq!(node.embedding, retrieved.embedding);
-    assert_eq!(node.quadrant, retrieved.quadrant);
     assert_eq!(node.importance, retrieved.importance);
     println!("RESULT: All fields preserved in roundtrip");
 }
@@ -150,40 +148,6 @@ fn test_update_node_not_found_fails() {
 }
 
 #[test]
-fn edge_case_quadrant_transition() {
-    println!("=== EDGE CASE: Quadrant Transition ===");
-    let (_tmp, db) = create_temp_db();
-    let mut node = create_valid_test_node();
-    node.quadrant = JohariQuadrant::Open;
-    let node_key = serialize_uuid(&node.id);
-
-    db.store_node(&node).expect("store failed");
-
-    let cf_open = db.get_cf(cf_names::JOHARI_OPEN).unwrap();
-    let before_open = db.db().get_cf(cf_open, node_key).unwrap();
-    println!(
-        "BEFORE: johari_open entry exists = {}",
-        before_open.is_some()
-    );
-    assert!(before_open.is_some());
-
-    node.quadrant = JohariQuadrant::Hidden;
-    db.update_node(&node).expect("update failed");
-
-    let after_open = db.db().get_cf(cf_open, node_key).unwrap();
-    let cf_hidden = db.get_cf(cf_names::JOHARI_HIDDEN).unwrap();
-    let after_hidden = db.db().get_cf(cf_hidden, node_key).unwrap();
-
-    println!(
-        "AFTER: johari_open={}, johari_hidden={}",
-        after_open.is_some(),
-        after_hidden.is_some()
-    );
-    assert!(after_open.is_none(), "Should be REMOVED from johari_open");
-    assert!(after_hidden.is_some(), "Should be ADDED to johari_hidden");
-}
-
-#[test]
 fn edge_case_empty_tags_update() {
     println!("=== EDGE CASE: Empty Tags Update ===");
     let (_tmp, db) = create_temp_db();
@@ -232,10 +196,6 @@ fn evidence_store_node_creates_all_indexes() {
     // Verify embedding
     let cf_emb = db.get_cf(cf_names::EMBEDDINGS).unwrap();
     assert!(db.db().get_cf(cf_emb, node_key).unwrap().is_some());
-
-    // Verify johari index
-    let cf_johari = db.get_cf(node.quadrant.column_family()).unwrap();
-    assert!(db.db().get_cf(cf_johari, node_key).unwrap().is_some());
 
     // Verify temporal index
     let cf_temporal = db.get_cf(cf_names::TEMPORAL).unwrap();

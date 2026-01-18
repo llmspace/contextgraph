@@ -3,7 +3,6 @@
 //! Tests for UtlState, LearningSignal, and processor state management
 
 use context_graph_utl::{
-    johari::{JohariQuadrant, SuggestedAction},
     lifecycle::{LifecycleLambdaWeights, LifecycleStage},
     processor::UtlProcessor,
     LearningIntensity, LearningSignal, UtlState,
@@ -25,8 +24,6 @@ fn test_learning_intensity_categories() {
         1.0,
         0.5,
         None,
-        JohariQuadrant::Hidden,
-        SuggestedAction::GetNeighborhood,
         false,
         false,
         100,
@@ -44,8 +41,6 @@ fn test_learning_intensity_categories() {
         1.0,
         0.5,
         None,
-        JohariQuadrant::Open,
-        SuggestedAction::DirectRecall,
         false,
         true,
         100,
@@ -63,8 +58,6 @@ fn test_learning_intensity_categories() {
         1.2,
         0.3,
         None,
-        JohariQuadrant::Unknown,
-        SuggestedAction::EpistemicAction,
         true,
         true,
         100,
@@ -88,8 +81,6 @@ fn test_utl_state_from_signal() {
         1.2,
         0.5,
         Some(LifecycleLambdaWeights::for_stage(LifecycleStage::Growth)),
-        JohariQuadrant::Open,
-        SuggestedAction::DirectRecall,
         true,
         true,
         1500,
@@ -103,7 +94,6 @@ fn test_utl_state_from_signal() {
     assert_eq!(state.w_e, signal.w_e);
     assert_eq!(state.phi, signal.phi);
     assert_eq!(state.learning_magnitude, signal.magnitude);
-    assert_eq!(state.quadrant, signal.quadrant);
 }
 
 #[test]
@@ -128,7 +118,6 @@ fn test_utl_state_serialization() {
         w_e: 1.2,
         phi: 0.5,
         learning_magnitude: 0.7,
-        quadrant: JohariQuadrant::Blind,
         last_computed: chrono::Utc::now(),
     };
 
@@ -136,7 +125,6 @@ fn test_utl_state_serialization() {
     let deserialized: UtlState = serde_json::from_str(&json).expect("deserialization must succeed");
 
     assert_eq!(deserialized.delta_s, state.delta_s);
-    assert_eq!(deserialized.quadrant, state.quadrant);
 }
 
 // =============================================================================

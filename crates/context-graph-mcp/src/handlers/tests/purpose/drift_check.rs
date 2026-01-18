@@ -176,20 +176,20 @@ async fn test_drift_check_empty_ids_fails() {
     );
 }
 
-/// Test autonomous operation: store succeeds without North Star.
+/// Test autonomous operation: store succeeds without goals configured.
 ///
-/// AUTONOMOUS OPERATION: Per contextprd.md, memory storage works without North Star
+/// AUTONOMOUS OPERATION: Per contextprd.md, memory storage works without goals
 /// by using a default purpose vector [0.0; 13]. The 13-embedding array IS the
 /// teleological vector - purpose alignment is secondary metadata.
 ///
-/// Note: drift_check inherently requires a North Star (to compare alignment drift),
+/// Note: drift_check compares alignment drift across fingerprints,
 /// so this test focuses on verifying that store works autonomously. Drift detection
-/// becomes meaningful only after a North Star is established.
+/// becomes meaningful only after goals are established.
 #[tokio::test]
 async fn test_store_autonomous_operation_for_drift() {
     let handlers = create_test_handlers_no_goals();
 
-    // Store content - should SUCCEED without North Star (AUTONOMOUS OPERATION)
+    // Store content - should SUCCEED without goals (AUTONOMOUS OPERATION)
     let store_params = json!({
         "content": "Test content for autonomous drift check",
         "importance": 0.8
@@ -204,7 +204,7 @@ async fn test_store_autonomous_operation_for_drift() {
     // Store should succeed with default purpose vector
     assert!(
         store_response.error.is_none(),
-        "memory/store must succeed without North Star (AUTONOMOUS OPERATION). Error: {:?}",
+        "memory/store must succeed without goals (AUTONOMOUS OPERATION). Error: {:?}",
         store_response.error
     );
     let result = store_response.result.expect("Should have result");
@@ -219,7 +219,7 @@ async fn test_store_autonomous_operation_for_drift() {
     );
 
     println!(
-        "Successfully stored fingerprint {} autonomously (no North Star)",
+        "Successfully stored fingerprint {} autonomously (no goals)",
         fingerprint_id
     );
 }

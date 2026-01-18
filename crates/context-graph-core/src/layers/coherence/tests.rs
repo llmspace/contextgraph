@@ -19,7 +19,7 @@ async fn test_coherence_layer_process() {
     assert_eq!(result.layer, LayerId::Coherence);
     assert!(result.result.success);
     assert!(result.result.data.get("resonance").is_some());
-    assert!(result.result.data.get("consciousness").is_some());
+    assert!(result.result.data.get("coherence_score").is_some());
     assert!(result.result.data.get("gw_ignited").is_some());
 
     println!("[VERIFIED] CoherenceLayer.process() returns valid output");
@@ -42,19 +42,19 @@ async fn test_coherence_layer_resonance_range() {
 }
 
 #[tokio::test]
-async fn test_coherence_layer_consciousness_range() {
+async fn test_coherence_layer_coherence_score_range() {
     let layer = CoherenceLayer::new();
-    let input = LayerInput::new("test-789".to_string(), "consciousness test".to_string());
+    let input = LayerInput::new("test-789".to_string(), "coherence_score test".to_string());
 
     let result = layer.process(input).await.unwrap();
 
-    let consciousness = result.result.data["consciousness"].as_f64().unwrap() as f32;
+    let coherence_score = result.result.data["coherence_score"].as_f64().unwrap() as f32;
     assert!(
-        (0.0..=1.0).contains(&consciousness),
-        "Consciousness should be in [0,1], got {}",
-        consciousness
+        (0.0..=1.0).contains(&coherence_score),
+        "Coherence score should be in [0,1], got {}",
+        coherence_score
     );
-    println!("[VERIFIED] Consciousness C ∈ [0, 1]: C = {}", consciousness);
+    println!("[VERIFIED] Coherence score C ∈ [0, 1]: C = {}", coherence_score);
 }
 
 #[tokio::test]
@@ -116,7 +116,7 @@ async fn test_coherence_layer_health_check() {
 
 #[tokio::test]
 async fn test_coherence_layer_custom_config() {
-    let layer = CoherenceLayer::with_kuramoto(6, 3.0)
+    let layer = CoherenceLayer::new()
         .with_gw_threshold(0.75)
         .with_integration_steps(15);
 
@@ -139,7 +139,7 @@ async fn test_gw_ignition_tracking() {
     // Should have some ignitions with low threshold
     let count = layer.ignition_count();
     println!("[INFO] Ignition count with low threshold: {}", count);
-    // Note: ignition depends on Kuramoto dynamics, may not always ignite
+    // Note: ignition depends on coherence dynamics, may not always ignite
 }
 
 #[tokio::test]
@@ -275,48 +275,47 @@ async fn test_full_pipeline_context() {
     // Verify all expected fields are present
     let data = &result.result.data;
     assert!(data.get("resonance").is_some());
-    assert!(data.get("consciousness").is_some());
+    assert!(data.get("coherence_score").is_some());
     assert!(data.get("differentiation").is_some());
     assert!(data.get("gw_ignited").is_some());
     assert!(data.get("state").is_some());
-    assert!(data.get("oscillator_phases").is_some());
     assert!(data.get("learning_signal").is_some());
 
     let resonance = data["resonance"].as_f64().unwrap() as f32;
-    let consciousness = data["consciousness"].as_f64().unwrap() as f32;
+    let coherence_score = data["coherence_score"].as_f64().unwrap() as f32;
     let learning_signal = data["learning_signal"].as_f64().unwrap() as f32;
 
     // Verify values are in expected ranges
     assert!((0.0..=1.0).contains(&resonance));
-    assert!((0.0..=1.0).contains(&consciousness));
+    assert!((0.0..=1.0).contains(&coherence_score));
     assert!((learning_signal - 0.3).abs() < 1e-6);
 
     println!("[VERIFIED] Full pipeline context processed correctly");
     println!("  Resonance: {}", resonance);
-    println!("  Consciousness: {}", consciousness);
+    println!("  Coherence score: {}", coherence_score);
     println!("  Learning signal: {}", learning_signal);
 }
 
 #[tokio::test]
-async fn test_consciousness_equation() {
+async fn test_coherence_score_equation() {
     // Test C(t) = I(t) × R(t) × D(t)
     let layer = CoherenceLayer::new();
 
     // Test with known values
-    let c1 = layer.compute_consciousness(1.0, 1.0, 1.0);
+    let c1 = layer.compute_coherence_score(1.0, 1.0, 1.0);
     assert!((c1 - 1.0).abs() < 1e-6, "C(1,1,1) should be 1.0");
 
-    let c2 = layer.compute_consciousness(0.5, 0.5, 0.5);
+    let c2 = layer.compute_coherence_score(0.5, 0.5, 0.5);
     assert!((c2 - 0.125).abs() < 1e-6, "C(0.5,0.5,0.5) should be 0.125");
 
-    let c3 = layer.compute_consciousness(0.0, 0.8, 0.8);
+    let c3 = layer.compute_coherence_score(0.0, 0.8, 0.8);
     assert!((c3).abs() < 1e-6, "C(0,0.8,0.8) should be 0");
 
     // Test NaN handling
-    let c_nan = layer.compute_consciousness(f32::NAN, 0.5, 0.5);
+    let c_nan = layer.compute_coherence_score(f32::NAN, 0.5, 0.5);
     assert!((c_nan).abs() < 1e-6, "NaN input should return 0");
 
-    println!("[VERIFIED] Consciousness equation C(t) = I × R × D");
+    println!("[VERIFIED] Coherence score equation C(t) = I × R × D");
 }
 
 // ============================================================

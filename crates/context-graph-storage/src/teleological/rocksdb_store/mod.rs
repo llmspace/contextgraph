@@ -30,7 +30,7 @@
 //! # Module Structure
 //!
 //! - `types`: Error types, configuration, and result aliases
-//! - `helpers`: Utility functions for similarity computation and Johari analysis
+//! - `helpers`: Utility functions for similarity computation
 //! - `store`: Core RocksDbTeleologicalStore struct and constructors
 //! - `index_ops`: HNSW index add/remove operations
 //! - `inverted_index`: SPLADE inverted index operations
@@ -38,13 +38,11 @@
 //! - `search`: Search operation implementations
 //! - `persistence`: Batch, statistics, persistence operations
 //! - `content`: Content storage operations
-//! - `ego_node`: Ego node storage operations
 //! - `trait_impl`: TeleologicalMemoryStore trait implementation (thin wrapper)
 //! - `tests`: Comprehensive test suite
 
 mod content;
 mod crud;
-mod ego_node;
 mod helpers;
 mod index_ops;
 mod inverted_index;
@@ -58,8 +56,6 @@ mod types;
 mod tests;
 
 // Re-export all public types for backwards compatibility
-pub use helpers::{
-    compute_cosine_similarity, get_aggregate_dominant_quadrant, query_purpose_alignment,
-};
+pub use helpers::{compute_cosine_similarity, query_purpose_alignment};
 pub use store::RocksDbTeleologicalStore;
 pub use types::{TeleologicalStoreConfig, TeleologicalStoreError, TeleologicalStoreResult};

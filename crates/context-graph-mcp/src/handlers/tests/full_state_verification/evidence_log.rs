@@ -107,14 +107,6 @@ async fn verify_complete_evidence_log() {
         "    - purpose_vector.coherence: {:.6}",
         stored_fp.purpose_vector.coherence
     );
-    println!(
-        "    - johari.quadrants[0] (E1): {:?}",
-        stored_fp.johari.quadrants[0]
-    );
-    println!(
-        "    - johari.confidence[0] (E1): {:.6}",
-        stored_fp.johari.confidence[0]
-    );
 
     // Verify content hash
     let mut hasher = Sha256::new();

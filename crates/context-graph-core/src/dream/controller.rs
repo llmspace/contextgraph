@@ -334,7 +334,7 @@ impl DreamController {
 
         // Compute quality and coherence from consolidation results
         // Quality: ratio of pruned edges to total processed (approximated by memories_replayed * edges per memory)
-        // Coherence: placeholder computed from shortcuts ratio (will be replaced with Kuramoto order parameter)
+        // Coherence: placeholder computed from shortcuts ratio (will be replaced with clustering order parameter)
         let quality = {
             let memories = nrem_report
                 .as_ref()

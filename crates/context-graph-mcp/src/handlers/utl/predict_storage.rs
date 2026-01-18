@@ -8,9 +8,9 @@ use serde_json::json;
 use tracing::{debug, warn};
 use uuid::Uuid;
 
-use context_graph_core::johari::NUM_EMBEDDERS;
-
 use crate::protocol::{error_codes, JsonRpcId, JsonRpcResponse};
+
+use super::constants::NUM_EMBEDDERS;
 
 use super::super::core::{PredictionType, StoredPrediction};
 use super::super::Handlers;

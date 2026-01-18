@@ -1,11 +1,10 @@
-//! NORTH Autonomous System MCP Handlers
+//! Autonomous System MCP Handlers
 //!
 //! TASK-AUTONOMOUS-MCP: MCP tool handlers for autonomous topic-based management.
-//! SPEC-AUTONOMOUS-001: Added 5 new tools (learner, health, execute_prune).
-//! TASK-P0-001: REMOVED auto_bootstrap_north_star per ARCH-03 (goals emerge from topic clustering).
+//! SPEC-AUTONOMOUS-001: Added 5 tools (learner, health, execute_prune).
 //! NO BACKWARDS COMPATIBILITY - FAIL FAST WITH ROBUST LOGGING.
 //!
-//! ## Tools Implemented (12 tools after TASK-P0-001 removal)
+//! ## Tools Implemented (12 tools)
 //!
 //! 1. `get_alignment_drift` - Get drift state and history using DriftDetector
 //! 2. `trigger_drift_correction` - Manually trigger correction using DriftCorrector
@@ -56,7 +55,6 @@ pub use prediction_history::{PredictionEntry, PredictionHistory};
 mod tests;
 
 // Re-export all parameter structs for backwards compatibility
-// TASK-P0-001: Removed AutoBootstrapParams (ARCH-03)
 #[allow(unused_imports)]
 pub use params::{
     DiscoverSubGoalsParams, ExecutePruneParams, GetAlignmentDriftParams, GetAutonomousStatusParams,

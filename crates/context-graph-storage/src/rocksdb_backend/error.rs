@@ -293,15 +293,15 @@ pub enum StorageError {
     /// use context_graph_storage::StorageError;
     ///
     /// let error = StorageError::IndexCorrupted {
-    ///     index_name: "johari_open".to_string(),
+    ///     index_name: "temporal".to_string(),
     ///     details: "UUID parse failed for key".to_string(),
     /// };
-    /// assert!(error.to_string().contains("johari_open"));
+    /// assert!(error.to_string().contains("temporal"));
     /// assert!(error.to_string().contains("UUID parse failed"));
     /// ```
     #[error("Index corruption detected in {index_name}: {details}")]
     IndexCorrupted {
-        /// Name of the corrupted index (e.g., "johari_open", "temporal", "tags")
+        /// Name of the corrupted index (e.g., "temporal", "tags", "sources")
         index_name: String,
         /// Details about what corruption was detected
         details: String,
@@ -343,6 +343,12 @@ impl From<SerializationError> for StorageError {
 impl From<ValidationError> for StorageError {
     fn from(e: ValidationError) -> Self {
         StorageError::ValidationFailed(e.to_string())
+    }
+}
+
+impl From<rocksdb::Error> for StorageError {
+    fn from(e: rocksdb::Error) -> Self {
+        StorageError::Internal(e.to_string())
     }
 }
 
@@ -548,11 +554,11 @@ mod tests {
     #[test]
     fn test_error_index_corrupted() {
         let error = StorageError::IndexCorrupted {
-            index_name: "johari_open".to_string(),
+            index_name: "temporal".to_string(),
             details: "UUID parse failed".to_string(),
         };
         let msg = error.to_string();
-        assert!(msg.contains("johari_open"));
+        assert!(msg.contains("temporal"));
         assert!(msg.contains("UUID parse failed"));
         assert!(msg.contains("Index corruption"));
     }

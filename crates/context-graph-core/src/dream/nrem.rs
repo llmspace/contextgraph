@@ -14,7 +14,7 @@
 //!
 //! 1. **Memory Selection**: Select recent memories weighted by recency and importance
 //! 2. **Hebbian Replay**: Strengthen connections between co-activated memories
-//! 3. **Tight Coupling**: Apply Kuramoto coupling K=0.9 for synchronization
+//! 3. **Tight Coupling**: Apply coupling K=0.9 for synchronization
 //! 4. **Shortcut Detection**: Identify 3+ hop paths for amortization
 //!
 //! ## Memory Provider Architecture

@@ -93,20 +93,6 @@ mod tests {
     }
 
     #[test]
-    fn test_johari_config_validation() {
-        let valid = JohariConfig::default();
-        assert!(valid.validate().is_ok());
-        assert_eq!(valid.surprise_threshold, 0.5);
-        assert_eq!(valid.coherence_threshold, 0.5);
-
-        let invalid = JohariConfig {
-            boundary_width: 0.5, // Out of range
-            ..Default::default()
-        };
-        assert!(invalid.validate().is_err());
-    }
-
-    #[test]
     fn test_stage_config_validation() {
         let infancy = StageConfig::infancy();
         assert!(infancy.validate().is_ok());
@@ -213,10 +199,6 @@ mod tests {
         // Phase range: [0, pi]
         assert_eq!(config.phase.min_phase, 0.0);
         assert!((config.phase.max_phase - std::f32::consts::PI).abs() < 0.001);
-
-        // Johari thresholds
-        assert_eq!(config.johari.surprise_threshold, 0.5);
-        assert_eq!(config.johari.coherence_threshold, 0.5);
 
         // Lifecycle stages
         let stages = &config.lifecycle.stages;

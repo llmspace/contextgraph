@@ -6,7 +6,6 @@
 //! # Index Key Formats
 //! | Column Family | Key Format | Description |
 //! |---------------|------------|-------------|
-//! | `johari_{quadrant}` | 16-byte NodeId | Raw UUID bytes |
 //! | `tags` | `{tag_string}:{16-byte NodeId}` | Prefix-scannable by tag |
 //! | `sources` | `{source_string}:{16-byte NodeId}` | Prefix-scannable by source |
 //! | `temporal` | `{8-byte timestamp BE}:{16-byte NodeId}` | Range-scannable by time |
@@ -24,7 +23,7 @@ use rocksdb::IteratorMode;
 use uuid::Uuid;
 
 use crate::column_families::cf_names;
-use context_graph_core::types::{JohariQuadrant, NodeId};
+use context_graph_core::types::NodeId;
 
 use super::core::RocksDbMemex;
 use super::error::StorageError;
@@ -50,74 +49,6 @@ fn uuid_from_slice(bytes: &[u8]) -> Result<Uuid, StorageError> {
 }
 
 impl RocksDbMemex {
-    /// Gets all node IDs in a specific Johari quadrant.
-    ///
-    /// Uses the `johari_{quadrant}` column family full scan.
-    /// Keys in Johari CFs are raw 16-byte NodeId.
-    ///
-    /// # Arguments
-    /// * `quadrant` - The Johari quadrant to query
-    /// * `limit` - Maximum number of results (None = unlimited)
-    /// * `offset` - Number of results to skip
-    ///
-    /// # Returns
-    /// * `Ok(Vec<NodeId>)` - List of node IDs in the quadrant
-    /// * Empty Vec if no nodes in quadrant (NOT an error)
-    ///
-    /// # Performance
-    /// Target: O(n) where n = nodes in quadrant. Uses iterator, not full load.
-    ///
-    /// # Example
-    /// ```
-    /// use context_graph_core::types::JohariQuadrant;
-    ///
-    /// // JohariQuadrant can be used for filtering
-    /// let quadrant = JohariQuadrant::Open;
-    /// assert_eq!(format!("{:?}", quadrant), "Open");
-    /// ```
-    pub fn get_nodes_by_quadrant(
-        &self,
-        quadrant: JohariQuadrant,
-        limit: Option<usize>,
-        offset: usize,
-    ) -> Result<Vec<NodeId>, StorageError> {
-        // Handle limit=0 early (no results requested)
-        if limit == Some(0) {
-            return Ok(Vec::new());
-        }
-
-        let cf = self.get_cf(quadrant.column_family())?;
-        let iter = self.db.iterator_cf(cf, IteratorMode::Start);
-
-        let mut results = Vec::new();
-        let mut skipped = 0;
-
-        for item in iter {
-            let (key, _) = item.map_err(|e| StorageError::ReadFailed(e.to_string()))?;
-
-            // Handle offset
-            if skipped < offset {
-                skipped += 1;
-                continue;
-            }
-
-            // Parse 16-byte key as UUID
-            if key.len() == 16 {
-                let node_id = uuid_from_slice(&key)?;
-                results.push(node_id);
-            }
-
-            // Handle limit
-            if let Some(max) = limit {
-                if results.len() >= max {
-                    break;
-                }
-            }
-        }
-
-        Ok(results)
-    }
-
     /// Gets all node IDs with a specific tag.
     ///
     /// Uses the `tags` column family with prefix scan.

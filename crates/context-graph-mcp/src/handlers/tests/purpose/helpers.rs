@@ -51,7 +51,7 @@ pub(crate) async fn get_goal_ids_from_hierarchy(
         }
     }
 
-    // TASK-P0-001: Return first Strategic as the top-level goal (was NorthStar)
+    // TASK-P0-001: Return first Strategic as the top-level goal
     let first_strategic = strategic_ids.first().cloned().unwrap_or_default();
     (first_strategic, strategic_ids, tactical_ids, immediate_ids)
 }

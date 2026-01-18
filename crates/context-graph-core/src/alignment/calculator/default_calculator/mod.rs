@@ -69,7 +69,7 @@ impl DefaultAlignmentCalculator {
     /// - Immediate: 0.3
     #[inline]
     pub(crate) fn get_propagation_weight(level: GoalLevel) -> f32 {
-        // TASK-P0-001: Removed NorthStar, Strategic is now top-level
+        // Strategic is top-level in 3-level hierarchy (per PRD v6)
         match level {
             GoalLevel::Strategic => 1.0,
             GoalLevel::Tactical => 0.6,
@@ -100,8 +100,7 @@ impl GoalAlignmentCalculator for DefaultAlignmentCalculator {
             config.validate().map_err(AlignmentError::InvalidConfig)?;
         }
 
-        // TASK-P0-001: Check hierarchy has goals
-        // No longer require North Star specifically - goals emerge autonomously
+        // Topics emerge autonomously from clustering (per PRD v6)
         if config.hierarchy.is_empty() {
             return Err(AlignmentError::NoTopLevelGoals);
         }

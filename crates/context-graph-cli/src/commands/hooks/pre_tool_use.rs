@@ -6,10 +6,6 @@
 //! - NO database access - fast path only
 //! - Return cached state only
 //!
-//! # Constitution References
-//! - Timeout: constitution.yaml hooks.timeout_ms.pre_tool_use = 100
-//! - IC Thresholds: gwt.self_ego_node.thresholds
-//!
 //! # Anti-Patterns (MUST NOT violate)
 //! - AP-50: No internal hooks
 //! - AP-51: Shell scripts call CLI
@@ -17,7 +13,7 @@
 
 use super::args::PreToolArgs;
 use super::error::{HookError, HookResult};
-use super::types::{ConsciousnessState, HookInput, HookOutput, HookPayload, ICClassification};
+use super::types::{CoherenceState, HookInput, HookOutput, HookPayload, StabilityClassification};
 use std::io::{self, BufRead};
 use std::time::Instant;
 
@@ -36,13 +32,13 @@ pub const PRE_TOOL_USE_TIMEOUT_MS: u64 = 100;
 ///
 /// # Performance
 /// MUST complete within 100ms. No database operations allowed.
-/// Returns cached consciousness state with default values.
+/// Returns cached coherence state with default values.
 ///
 /// # Arguments
 /// * `args` - CLI arguments from PreToolArgs
 ///
 /// # Returns
-/// * `HookOutput` with cached consciousness state and optional tool guidance
+/// * `HookOutput` with cached coherence state and optional tool guidance
 ///
 /// # Errors
 /// * `HookError::InvalidInput` - If required fields are missing
@@ -79,21 +75,21 @@ pub fn handle_pre_tool_use(args: &PreToolArgs) -> HookResult<HookOutput> {
     // Get tool-specific guidance (no database access)
     let guidance = tool_name.and_then(get_tool_guidance);
 
-    // Build cached consciousness state with defaults
+    // Build cached coherence state with defaults
     // FAST PATH: We return default values, not computed ones
-    // Real values would come from IdentityCache (future task)
-    let consciousness = ConsciousnessState::default();
+    // Real values would come from SessionCache (future task)
+    let coherence = CoherenceState::default();
 
-    // Build IC classification with default values (using default crisis threshold 0.5)
-    let ic_classification = ICClassification::from_value(consciousness.identity_continuity);
+    // Build stability classification with default values (using default crisis threshold 0.5)
+    let stability_classification = StabilityClassification::from_value(coherence.topic_stability);
 
     // Calculate execution time
     let execution_time_ms = start.elapsed().as_millis() as u64;
 
     // Build output
     let mut output = HookOutput::success(execution_time_ms)
-        .with_consciousness_state(consciousness)
-        .with_ic_classification(ic_classification);
+        .with_coherence_state(coherence)
+        .with_stability_classification(stability_classification);
 
     // Add context injection if guidance exists
     if let Some(guide) = guidance {
@@ -116,15 +112,15 @@ pub fn handle_pre_tool_use(args: &PreToolArgs) -> HookResult<HookOutput> {
 /// * `tool_name` - Name of the tool being invoked
 ///
 /// # Returns
-/// * Optional guidance string for consciousness tracking
+/// * Optional guidance string for coherence tracking
 fn get_tool_guidance(tool_name: &str) -> Option<String> {
     match tool_name {
         // File reading - track in awareness
         "Read" => Some("Track file content in awareness quadrant".to_string()),
 
-        // File modifications - update Johari hidden quadrant
+        // File modifications - track in self-knowledge
         "Write" | "Edit" | "MultiEdit" => {
-            Some("File modification - update Johari hidden quadrant".to_string())
+            Some("File modification - track in self-knowledge".to_string())
         }
 
         // Shell commands - monitor for identity-relevant output
@@ -158,7 +154,7 @@ fn get_tool_guidance(tool_name: &str) -> Option<String> {
     }
 }
 
-/// Check if a tool is considered high-impact for consciousness tracking
+/// Check if a tool is considered high-impact for coherence tracking
 ///
 /// High-impact tools significantly affect the agent's understanding or project state.
 #[inline]
@@ -188,7 +184,7 @@ pub fn is_read_only_tool(tool_name: &str) -> bool {
 mod tests {
     use super::*;
     use crate::commands::hooks::args::OutputFormat;
-    use crate::commands::hooks::types::{HookEventType, JohariQuadrant};
+    use crate::commands::hooks::types::HookEventType;
 
     // =========================================================================
     // Test Helpers
@@ -283,26 +279,26 @@ mod tests {
         assert!(output.error.is_none(), "error MUST be None on success");
         println!("  - error: None");
 
-        // consciousness_state (should be Some)
+        // coherence_state (should be Some)
         assert!(
-            output.consciousness_state.is_some(),
-            "consciousness_state MUST be Some"
+            output.coherence_state.is_some(),
+            "coherence_state MUST be Some"
         );
-        let cs = output.consciousness_state.as_ref().unwrap();
+        let cs = output.coherence_state.as_ref().unwrap();
         println!(
-            "  - consciousness_state: Some(C={:.2}, r={:.2}, IC={:.2})",
-            cs.consciousness, cs.integration, cs.identity_continuity
+            "  - coherence_state: Some(C={:.2}, r={:.2}, TS={:.2})",
+            cs.coherence, cs.integration, cs.topic_stability
         );
 
-        // ic_classification (should be Some)
+        // stability_classification (should be Some)
         assert!(
-            output.ic_classification.is_some(),
-            "ic_classification MUST be Some"
+            output.stability_classification.is_some(),
+            "stability_classification MUST be Some"
         );
-        let ic = output.ic_classification.as_ref().unwrap();
+        let sc = output.stability_classification.as_ref().unwrap();
         println!(
-            "  - ic_classification: Some(value={:.2}, level={:?})",
-            ic.value, ic.level
+            "  - stability_classification: Some(value={:.2}, level={:?})",
+            sc.value, sc.level
         );
 
         // execution_time_ms (REQUIRED)
@@ -389,33 +385,33 @@ mod tests {
     }
 
     // =========================================================================
-    // TC-PRE-005: Consciousness State Defaults
-    // Source: types.rs ConsciousnessState::default()
+    // TC-PRE-005: Coherence State Defaults
+    // Source: types.rs CoherenceState::default()
     // =========================================================================
 
     #[test]
-    fn tc_pre_005_consciousness_state_uses_defaults() {
-        println!("\n=== TC-PRE-005: Consciousness State Defaults ===");
-        println!("SOURCE: types.rs ConsciousnessState::default() (lines 674-685)");
+    fn tc_pre_005_coherence_state_uses_defaults() {
+        println!("\n=== TC-PRE-005: Coherence State Defaults ===");
+        println!("SOURCE: types.rs CoherenceState::default() (lines 674-685)");
 
         let args = create_pre_tool_args(Some("Read"));
 
         // BEFORE
-        println!("BEFORE: Creating default consciousness state...");
+        println!("BEFORE: Creating default coherence state...");
 
         let result = handle_pre_tool_use(&args);
         assert!(result.is_ok());
         let output = result.unwrap();
 
         let cs = output
-            .consciousness_state
-            .expect("consciousness_state MUST be Some");
+            .coherence_state
+            .expect("coherence_state MUST be Some");
 
         // AFTER: Verify defaults match types.rs Default impl
         println!("AFTER: Verifying default values...");
         println!(
-            "  - consciousness: {:.2} (expected: 0.00 for DOR state)",
-            cs.consciousness
+            "  - coherence: {:.2} (expected: 0.00 for DOR state)",
+            cs.coherence
         );
         println!("  - integration: {:.2} (expected: 0.00)", cs.integration);
         println!("  - reflection: {:.2} (expected: 0.00)", cs.reflection);
@@ -424,26 +420,18 @@ mod tests {
             cs.differentiation
         );
         println!(
-            "  - identity_continuity: {:.2} (expected: 1.00 for fresh identity)",
-            cs.identity_continuity
-        );
-        println!(
-            "  - johari_quadrant: {:?} (expected: Unknown)",
-            cs.johari_quadrant
+            "  - topic_stability: {:.2} (expected: 1.00 for fresh state)",
+            cs.topic_stability
         );
 
-        // Default is DOR state: C=0, r=0, IC=1.0, Johari=Unknown
-        assert_eq!(cs.consciousness, 0.0, "Default consciousness MUST be 0.0");
+        // Default is DOR state: C=0, r=0, TS=1.0
+        assert_eq!(cs.coherence, 0.0, "Default coherence MUST be 0.0");
         assert_eq!(
-            cs.identity_continuity, 1.0,
-            "Default IC MUST be 1.0 (fresh identity)"
-        );
-        assert!(
-            matches!(cs.johari_quadrant, JohariQuadrant::Unknown),
-            "Default Johari MUST be Unknown"
+            cs.topic_stability, 1.0,
+            "Default topic_stability MUST be 1.0 (fresh state)"
         );
 
-        println!("RESULT: PASS - Defaults match ConsciousnessState::default()");
+        println!("RESULT: PASS - Defaults match CoherenceState::default()");
     }
 
     // =========================================================================

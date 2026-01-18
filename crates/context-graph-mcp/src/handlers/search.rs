@@ -341,11 +341,6 @@ impl Handlers {
                             result["alignment_score"] = json!(r.fingerprint.alignment_score);
                         }
 
-                        // Johari quadrant
-                        let dominant_quadrant =
-                            format!("{:?}", r.fingerprint.johari.dominant_quadrant(0));
-                        result["johari_quadrant"] = json!(dominant_quadrant);
-
                         result
                     })
                     .collect();
@@ -736,8 +731,7 @@ impl Handlers {
                             "fingerprintId": r.fingerprint.id.to_string(),
                             "purpose_alignment": r.purpose_alignment,
                             "alignment_score": r.fingerprint.alignment_score,
-                            "purpose_vector": r.fingerprint.purpose_vector.alignments.to_vec(),
-                            "johari_quadrant": format!("{:?}", r.fingerprint.johari.dominant_quadrant(0))
+                            "purpose_vector": r.fingerprint.purpose_vector.alignments.to_vec()
                         })
                     })
                     .collect();

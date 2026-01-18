@@ -48,7 +48,7 @@ crates/context-graph-cli/src/commands/
 │   ├── mod.rs                    # HooksCommands dispatcher
 │   ├── args.rs                   # SessionStartArgs, SessionEndArgs
 │   ├── error.rs                  # HookError (9 variants)
-│   ├── types.rs                  # HookInput, HookOutput, ConsciousnessState
+│   ├── types.rs                  # HookInput, HookOutput, CoherenceState, StabilityLevel
 │   ├── session_start.rs          # TASK-HOOKS-006 (fully implemented)
 │   └── session_end.rs            # TASK-HOOKS-012 (fully implemented)
 └── session/
@@ -169,11 +169,11 @@ echo '{"session_id":"verify-test"}' | ./target/debug/context-graph-cli hooks ses
 
 # 4. Test session-end hook
 ./target/debug/context-graph-cli hooks session-end --session-id verify-test --db-path /tmp/test-db
-# Expected: exit 0, JSON with ic_classification
+# Expected: exit 0, JSON with session state
 
 # 5. Test restore-identity
 ./target/debug/context-graph-cli session restore-identity --format json --db-path /tmp/test-db
-# Expected: JSON with session_id, ic, status, kuramoto_r
+# Expected: JSON with session_id, status, topic_stability
 
 # 6. Verify RocksDB files exist
 ls -la /tmp/test-db/

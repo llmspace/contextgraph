@@ -1,10 +1,9 @@
 //! Integration tests for all workspace event listeners
 //!
-//! # Constitution Compliance
+//! # Constitution Compliance (v6.0.0)
 //!
-//! Per AP-26: DreamEventListener requires TriggerManager and callback.
-//! Tests that include IdentityCritical events below threshold MUST use
-//! the full `new()` constructor with proper callback handling.
+//! Per Constitution v6.0.0, dreams are triggered by entropy > 0.7 AND churn > 0.5.
+//! Topic-based coherence governs workspace state transitions.
 
 use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -26,12 +25,16 @@ use chrono::Utc;
 // Integration test: All listeners receive events
 // ============================================================
 
+/// Test that all listeners correctly handle all event types.
+///
+/// # Constitution Compliance (v6.0.0)
+///
+/// Per Constitution v6.0.0, dreams are triggered by entropy/churn conditions.
 #[tokio::test]
 async fn test_all_listeners_receive_all_events() {
     println!("=== INTEGRATION: All listeners receive all event types ===");
 
     // Setup all listeners
-    // AP-26: Use full constructor with TriggerManager and callback for IC event handling
     let dream_queue = Arc::new(RwLock::new(Vec::new()));
     let trigger_manager = Arc::new(Mutex::new(TriggerManager::new()));
     let dream_trigger_count = Arc::new(AtomicUsize::new(0));
@@ -50,13 +53,13 @@ async fn test_all_listeners_receive_all_events() {
     let meta_listener =
         MetaCognitiveEventListener::new(meta_cognitive.clone(), epistemic_flag.clone());
 
-    // Create events - IC=0.4 < 0.5 threshold will trigger dream consolidation
+    // Create events
     let events = vec![
         WorkspaceEvent::MemoryEnters {
             id: Uuid::new_v4(),
             order_parameter: 0.85,
             timestamp: Utc::now(),
-            fingerprint: None, // TASK-IDENTITY-P0-006
+            fingerprint: None,
         },
         WorkspaceEvent::MemoryExits {
             id: Uuid::new_v4(),
@@ -69,13 +72,6 @@ async fn test_all_listeners_receive_all_events() {
         },
         WorkspaceEvent::WorkspaceConflict {
             memories: vec![Uuid::new_v4(), Uuid::new_v4()],
-            timestamp: Utc::now(),
-        },
-        WorkspaceEvent::IdentityCritical {
-            identity_coherence: 0.4, // Below threshold 0.5 - will trigger dream
-            previous_status: "Warning".to_string(),
-            current_status: "Critical".to_string(),
-            reason: "Test".to_string(),
             timestamp: Utc::now(),
         },
     ];
@@ -105,16 +101,12 @@ async fn test_all_listeners_receive_all_events() {
         "Epistemic flag should be set"
     );
 
-    // AP-26: Verify dream consolidation was triggered by IC < 0.5
+    // Dreams are triggered by entropy/churn, not workspace events directly
     let triggers = dream_trigger_count.load(Ordering::SeqCst);
     assert_eq!(
-        triggers, 1,
-        "Dream should trigger once for IC=0.4 < 0.5 threshold"
+        triggers, 0,
+        "No dream triggers expected from workspace events alone"
     );
 
     println!("EVIDENCE: All listeners correctly processed all event types without panic");
-    println!(
-        "EVIDENCE: Dream consolidation triggered {} time(s) per AP-26",
-        triggers
-    );
 }

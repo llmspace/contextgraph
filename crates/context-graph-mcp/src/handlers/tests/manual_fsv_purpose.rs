@@ -132,26 +132,26 @@ async fn manual_fsv_purpose_handlers() {
 
     // Direct query to GoalHierarchy
     // Extract all needed data in a block to ensure guard is dropped before any await calls
-    let (initial_goal_count, has_north_star, north_star_info) = {
+    let (initial_goal_count, has_strategic_goal, strategic_goal_info) = {
         let hierarchy_read = hierarchy.read();
-        let ns_info = hierarchy_read
+        let sg_info = hierarchy_read
             .top_level_goals()
             .first()
-            .map(|ns| (ns.id, ns.description.clone()));
+            .map(|sg| (sg.id, sg.description.clone()));
         (
             hierarchy_read.len(),
             hierarchy_read.has_top_level_goals(),
-            ns_info,
+            sg_info,
         )
     }; // guard dropped here
     println!();
     println!("🎯 GoalHierarchy (Source of Truth #2):");
     println!("   ├─ Type: HashMap<GoalId, GoalNode>");
     println!("   ├─ Goal count: {}", initial_goal_count);
-    println!("   ├─ Has North Star: {}", has_north_star);
-    if let Some((ns_id, ns_desc)) = north_star_info {
-        println!("   ├─ North Star ID: {}", ns_id);
-        println!("   └─ North Star description: {}", ns_desc);
+    println!("   ├─ Has Strategic Goal: {}", has_strategic_goal);
+    if let Some((sg_id, sg_desc)) = strategic_goal_info {
+        println!("   ├─ Strategic Goal ID: {}", sg_id);
+        println!("   └─ Strategic Goal description: {}", sg_desc);
     }
 
     println!();
@@ -207,7 +207,7 @@ async fn manual_fsv_purpose_handlers() {
         &stored_fp.purpose_vector.alignments[0..5]
     );
     println!(
-        "   ├─ Theta to North Star: {:.4}",
+        "   ├─ Alignment score: {:.4}",
         stored_fp.alignment_score
     );
     println!("   └─ Created at: {:?}", stored_fp.created_at);
@@ -233,9 +233,9 @@ async fn manual_fsv_purpose_handlers() {
     println!("│         (TASK-CORE-001 - ARCH-03 autonomous-first)             │");
     println!("└─────────────────────────────────────────────────────────────────┘");
 
-    println!("📝 Executing: purpose/north_star_alignment (deprecated)");
+    println!("📝 Executing: purpose/alignment (deprecated)");
     let alignment_request = make_request(
-        "purpose/north_star_alignment",
+        "purpose/deprecated_alignment",
         2,
         json!({
             "fingerprint_id": fingerprint_id_str,
@@ -373,9 +373,9 @@ async fn manual_fsv_purpose_handlers() {
         );
     }
 
-    // Verify North Star specifically
-    let (ns_id, ns_desc) = ns_info.expect("Must have North Star");
-    println!("   └─ North Star from SoT: {} - {}", ns_id, ns_desc);
+    // Verify Strategic Goal specifically
+    let (sg_id, sg_desc) = ns_info.expect("Must have Strategic Goal");
+    println!("   └─ Strategic Goal from SoT: {} - {}", sg_id, sg_desc);
 
     println!();
     println!("   ✅ VERIFIED: All goals exist in Source of Truth");
@@ -561,7 +561,7 @@ async fn manual_fsv_purpose_handlers() {
         "   │      Purpose vector[0..3]: {:?}",
         &final_fp.purpose_vector.alignments[0..3]
     );
-    println!("   │      Theta to NS: {:.4}", final_fp.alignment_score);
+    println!("   │      Alignment score: {:.4}", final_fp.alignment_score);
     println!("   └─ END OF STORE");
     println!();
 
@@ -570,11 +570,11 @@ async fn manual_fsv_purpose_handlers() {
     let hierarchy_read = hierarchy.read();
     println!("   ├─ Total goals: {}", hierarchy_read.len());
     println!(
-        "   ├─ Has North Star: {}",
+        "   ├─ Has Strategic Goal: {}",
         hierarchy_read.has_top_level_goals()
     );
-    if let Some(ns) = hierarchy_read.top_level_goals().first() {
-        println!("   ├─ North Star: {} - {}", ns.id, ns.description);
+    if let Some(sg) = hierarchy_read.top_level_goals().first() {
+        println!("   ├─ Strategic Goal: {} - {}", sg.id, sg.description);
     }
 
     // Verify goals exist by checking counts per level

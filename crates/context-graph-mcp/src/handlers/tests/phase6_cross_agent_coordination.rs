@@ -3,13 +3,11 @@
 //! This test suite simulates multi-agent scenarios where:
 //! 1. Multiple "agents" store memories with different contexts
 //! 2. Agents retrieve and share knowledge across sessions
-//! 3. The Johari window tracks inter-agent awareness
-//! 4. Steering vectors guide agent behavior
+//! 3. Steering vectors guide agent behavior
 //!
 //! ## Test Scenarios
 //! - Agent A stores ML knowledge, Agent B stores systems knowledge
 //! - Agents search for each other's stored memories
-//! - Johari quadrants track what's known/unknown across agents
 //! - Full State Verification confirms data persistence across operations
 
 use serde_json::json;
@@ -258,75 +256,14 @@ async fn phase6_cross_agent_memory_search() {
 }
 
 // ============================================================================
-// COORD-P6-003: Johari Window Inter-Agent Awareness
-// ============================================================================
-
-/// Tests Johari window quadrants for inter-agent knowledge awareness.
-#[tokio::test]
-async fn phase6_johari_inter_agent_awareness() {
-    println!("\n================================================================================");
-    println!("PHASE 6 TEST 4: Johari Window Inter-Agent Awareness");
-    println!("================================================================================");
-
-    let (handlers, _store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
-
-    // Store a memory
-    let store_request = make_request(
-        "memory/store",
-        Some(JsonRpcId::Number(1)),
-        Some(json!({
-            "content": "Shared knowledge about API design patterns and REST principles",
-            "importance": 0.9
-        })),
-    );
-    handlers.dispatch(store_request).await;
-
-    // Get Johari status
-    let johari_request = make_tool_call("get_johari_status", json!({}));
-
-    println!("\n[REQUEST] Getting Johari window status");
-    let johari_response = handlers.dispatch(johari_request).await;
-
-    if let Some(err) = &johari_response.error {
-        println!("  - Error: {}", err.message);
-    } else {
-        let result = johari_response.result.expect("Should have result");
-        println!("\n[RESULT] Johari Window Quadrants:");
-
-        // Check quadrant sizes
-        let quadrants = ["open", "blind", "hidden", "unknown"];
-        for q in quadrants {
-            if let Some(size) = result
-                .get(q)
-                .and_then(|v| v.get("size"))
-                .and_then(|s| s.as_i64())
-            {
-                println!("  - {} quadrant size: {}", q, size);
-            }
-        }
-
-        // Open quadrant = known to self AND others
-        // This represents shared inter-agent knowledge
-        if let Some(open) = result.get("open") {
-            if let Some(items) = open.get("items").and_then(|i| i.as_array()) {
-                println!("\n  Open (shared) knowledge items: {}", items.len());
-            }
-        }
-    }
-
-    println!("\n[PHASE 6 TEST 4 PASSED] Johari awareness checked");
-    println!("================================================================================\n");
-}
-
-// ============================================================================
-// COORD-P6-004: Steering Vectors for Agent Coordination
+// COORD-P6-003: Steering Vectors for Agent Coordination
 // ============================================================================
 
 /// Tests steering vectors to guide agent behavior toward goals.
 #[tokio::test]
 async fn phase6_steering_vectors_agent_guidance() {
     println!("\n================================================================================");
-    println!("PHASE 6 TEST 5: Steering Vectors for Agent Guidance");
+    println!("PHASE 6 TEST 4: Steering Vectors for Agent Guidance");
     println!("================================================================================");
 
     let (handlers, _store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
@@ -370,19 +307,19 @@ async fn phase6_steering_vectors_agent_guidance() {
         println!("  - Success: {:?}", result.get("success"));
     }
 
-    println!("\n[PHASE 6 TEST 5 PASSED] Steering vectors tested");
+    println!("\n[PHASE 6 TEST 4 PASSED] Steering vectors tested");
     println!("================================================================================\n");
 }
 
 // ============================================================================
-// COORD-P6-005: Context Injection Across Sessions
+// COORD-P6-004: Context Injection Across Sessions
 // ============================================================================
 
 /// Tests inject_context for sharing context between agent sessions.
 #[tokio::test]
 async fn phase6_context_injection_across_sessions() {
     println!("\n================================================================================");
-    println!("PHASE 6 TEST 6: Context Injection Across Sessions");
+    println!("PHASE 6 TEST 5: Context Injection Across Sessions");
     println!("================================================================================");
 
     let (handlers, store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
@@ -421,19 +358,19 @@ async fn phase6_context_injection_across_sessions() {
         }
     }
 
-    println!("\n[PHASE 6 TEST 6 PASSED] Context injection works");
+    println!("\n[PHASE 6 TEST 5 PASSED] Context injection works");
     println!("================================================================================\n");
 }
 
 // ============================================================================
-// COORD-P6-006: Full Multi-Agent Coordination Flow
+// COORD-P6-005: Full Multi-Agent Coordination Flow
 // ============================================================================
 
 /// Tests complete multi-agent coordination scenario with FSV.
 #[tokio::test]
 async fn phase6_full_multi_agent_coordination() {
     println!("\n================================================================================");
-    println!("PHASE 6 TEST 7: Full Multi-Agent Coordination Flow");
+    println!("PHASE 6 TEST 6: Full Multi-Agent Coordination Flow");
     println!("================================================================================");
 
     let (handlers, store, _tempdir) = create_test_handlers_with_rocksdb_store_access().await;
@@ -544,14 +481,14 @@ async fn phase6_full_multi_agent_coordination() {
 
     // === SUMMARY ===
     println!("\n================================================================================");
-    println!("PHASE 6 TEST 7 RESULTS:");
+    println!("PHASE 6 TEST 6 RESULTS:");
     println!("================================================================================");
     println!("  [1] Agent A store: PASSED");
     println!("  [2] Agent B store: PASSED");
     println!("  [3] FSV verification: PASSED (count={})", count);
     println!("  [4] Cross-search: COMPLETED ({} results)", results_count);
     println!("  [5] Status check: COMPLETED");
-    println!("\n[PHASE 6 TEST 7 PASSED] Full multi-agent coordination verified!");
+    println!("\n[PHASE 6 TEST 6 PASSED] Full multi-agent coordination verified!");
     println!("================================================================================\n");
 }
 
@@ -569,10 +506,9 @@ async fn phase6_summary() {
     println!("  1. Agent A stores ML knowledge");
     println!("  2. Agent B stores Systems knowledge");
     println!("  3. Cross-agent memory search");
-    println!("  4. Johari window inter-agent awareness");
-    println!("  5. Steering vectors for agent guidance");
-    println!("  6. Context injection across sessions");
-    println!("  7. Full multi-agent coordination flow");
+    println!("  4. Steering vectors for agent guidance");
+    println!("  5. Context injection across sessions");
+    println!("  6. Full multi-agent coordination flow");
     println!("\nAll coordination scenarios verified with FSV.");
     println!("================================================================================\n");
 }

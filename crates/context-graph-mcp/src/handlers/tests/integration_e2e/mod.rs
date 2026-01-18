@@ -18,7 +18,6 @@
 //! - `fsv_lifecycle` - Complete memory lifecycle tests
 //! - `fsv_search` - Multi-embedding search tests
 //! - `fsv_alignment` - Purpose alignment with goal hierarchy
-//! - `fsv_johari` - Johari quadrant operations
 //! - `fsv_meta_utl` - Meta-UTL prediction and validation
 //! - `fsv_cross_handler` - Cross-handler integration
 //! - `edge_cases` - Error handling and boundary conditions
@@ -46,7 +45,6 @@
 mod edge_cases;
 mod fsv_alignment;
 mod fsv_cross_handler;
-mod fsv_johari;
 mod fsv_lifecycle;
 mod fsv_meta_utl;
 mod fsv_search;

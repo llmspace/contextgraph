@@ -732,13 +732,13 @@ mod tests {
     #[test]
     fn test_mcp_sse_event_notification() {
         let event = McpSseEvent::notification(
-            "consciousness/state_changed",
-            serde_json::json!({"level": 0.85}),
+            "topic/state_changed",
+            serde_json::json!({"stability": 0.85}),
         );
 
         let json = event.to_json().unwrap();
         assert!(json.contains(r#""type":"Notification""#));
-        assert!(json.contains(r#""method":"consciousness/state_changed""#));
+        assert!(json.contains(r#""method":"topic/state_changed""#));
     }
 
     #[test]

@@ -106,7 +106,7 @@ mod tests {
         let discovery = test_discovery();
 
         let goal = GoalNode::autonomous_goal(
-            "Test North Star".into(),
+            "Test Strategic Goal".into(),
             GoalLevel::Strategic,
             fp,
             discovery,
@@ -146,7 +146,7 @@ mod tests {
     // TASK-P0-001: Updated - Strategic goals cannot have a parent (they are top-level)
     #[test]
     #[should_panic(expected = "Strategic goals cannot have a parent")]
-    fn test_child_goal_cannot_be_north_star() {
+    fn test_child_goal_cannot_be_strategic() {
         let fp = test_fingerprint();
         let discovery = test_discovery();
         let parent_id = Uuid::new_v4();
@@ -210,19 +210,19 @@ mod tests {
     }
 
     #[test]
-    fn test_goal_hierarchy_single_north_star() {
+    fn test_goal_hierarchy_multiple_strategic() {
         let mut hierarchy = GoalHierarchy::new();
 
-        let ns1 = GoalNode::autonomous_goal(
-            "NS1".into(),
+        let s1 = GoalNode::autonomous_goal(
+            "Strategic1".into(),
             GoalLevel::Strategic,
             test_fingerprint(),
             test_discovery(),
         )
         .unwrap();
 
-        let ns2 = GoalNode::autonomous_goal(
-            "NS2".into(),
+        let s2 = GoalNode::autonomous_goal(
+            "Strategic2".into(),
             GoalLevel::Strategic,
             test_fingerprint(),
             test_discovery(),
@@ -230,8 +230,8 @@ mod tests {
         .unwrap();
 
         // TASK-P0-001/ARCH-03: Multiple Strategic goals are now allowed
-        assert!(hierarchy.add_goal(ns1).is_ok());
-        let result = hierarchy.add_goal(ns2);
+        assert!(hierarchy.add_goal(s1).is_ok());
+        let result = hierarchy.add_goal(s2);
         assert!(
             result.is_ok(),
             "Multiple Strategic goals should be allowed per ARCH-03"
@@ -311,7 +311,6 @@ mod tests {
         assert_eq!(hierarchy.children(&strategic_id).len(), 1);
         assert!(hierarchy.validate().is_ok());
 
-        // TASK-P0-001: Renamed from path_to_north_star to path_to_root
         let path = hierarchy.path_to_root(&immediate_id);
         assert_eq!(path.len(), 3);
         assert_eq!(path[0], immediate_id);

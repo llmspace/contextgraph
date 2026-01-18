@@ -10,19 +10,16 @@ pub const SEARCH_GRAPH: &str = "search_graph";
 pub const UTL_STATUS: &str = "utl_status";
 
 // ========== GWT TOOLS (TASK-GWT-001) ==========
+// Note: Consciousness tools removed in PRD v6.
+// Topic-based coherence scoring replaces consciousness calculations.
+// Phase synchronization is handled by per-space clustering coordination.
 
-/// TASK-GWT-001: Get consciousness state from GWT/Kuramoto system
-pub const GET_CONSCIOUSNESS_STATE: &str = "get_consciousness_state";
-/// TASK-GWT-001: Get Kuramoto oscillator network synchronization state
-pub const GET_KURAMOTO_SYNC: &str = "get_kuramoto_sync";
 /// TASK-GWT-001: Get Global Workspace status (active memory, competing, broadcast)
 pub const GET_WORKSPACE_STATUS: &str = "get_workspace_status";
-/// TASK-GWT-001: Get Self-Ego Node state (purpose vector, identity continuity)
+/// TASK-GWT-001: Get Topic Profile state (purpose vector, topic stability)
 pub const GET_EGO_STATE: &str = "get_ego_state";
 /// TASK-GWT-001: Trigger workspace broadcast with a memory
 pub const TRIGGER_WORKSPACE_BROADCAST: &str = "trigger_workspace_broadcast";
-/// TASK-GWT-001: Adjust Kuramoto coupling strength K
-pub const ADJUST_COUPLING: &str = "adjust_coupling";
 
 // ========== UTL TOOLS (TASK-UTL-P1-001) ==========
 
@@ -74,10 +71,6 @@ pub const GET_STEERING_FEEDBACK: &str = "get_steering_feedback";
 /// TASK-CAUSAL-001: Perform omni-directional causal inference
 pub const OMNI_INFER: &str = "omni_infer";
 
-// NOTE: Manual North Star tools have been REMOVED.
-// They created single 1024D embeddings incompatible with 13-embedder teleological arrays.
-// Use the autonomous system tools which work with proper teleological embeddings.
-
 // ========== TELEOLOGICAL TOOLS (TELEO-007 through TELEO-011) ==========
 
 /// TELEO-007: Cross-correlation search across all 13 embedders
@@ -92,9 +85,6 @@ pub const UPDATE_SYNERGY_MATRIX: &str = "update_synergy_matrix";
 pub const MANAGE_TELEOLOGICAL_PROFILE: &str = "manage_teleological_profile";
 
 // ========== AUTONOMOUS TOOLS (TASK-AUTONOMOUS-MCP) ==========
-
-// REMOVED: AUTO_BOOTSTRAP_NORTH_STAR per TASK-P0-001 (ARCH-03)
-// Goals emerge autonomously from topic clustering, no manual bootstrap needed
 
 /// TASK-AUTONOMOUS-MCP: Get current drift state and history
 pub const GET_ALIGNMENT_DRIFT: &str = "get_alignment_drift";
@@ -133,7 +123,7 @@ pub const GET_META_LEARNING_LOG: &str = "get_meta_learning_log";
 // ========== EPISTEMIC TOOLS (TASK-MCP-001) ==========
 
 /// TASK-MCP-001: Perform epistemic action on GWT workspace
-/// Used when Johari quadrant is Unknown (high entropy + high coherence)
+/// Used when embedder category indicates Unknown (high entropy + high coherence)
 pub const EPISTEMIC_ACTION: &str = "epistemic_action";
 
 // ========== MERGE TOOLS (TASK-MCP-003) ==========
@@ -142,38 +132,12 @@ pub const EPISTEMIC_ACTION: &str = "epistemic_action";
 /// Returns reversal_hash for 30-day undo per SEC-06
 pub const MERGE_CONCEPTS: &str = "merge_concepts";
 
-// ========== JOHARI CLASSIFICATION TOOLS (TASK-MCP-005) ==========
-
-/// TASK-MCP-005: Get Johari quadrant classification from delta_s/delta_c
-/// Constitution: utl.johari lines 154-157
-pub const GET_JOHARI_CLASSIFICATION: &str = "get_johari_classification";
-
 // ========== COHERENCE STATE TOOL (TASK-34) ==========
 
-/// TASK-34: Get high-level coherence state from Kuramoto/GWT system
-/// Returns order_parameter, coherence_level (High/Medium/Low), is_broadcasting, has_conflict
-/// Unlike get_kuramoto_sync (raw oscillator data) or get_consciousness_state (full state),
-/// this returns a focused coherence summary for quick status checks.
+/// TASK-34: Get high-level coherence state from GWT system
+/// Returns coherence_level (High/Medium/Low), is_broadcasting, has_conflict
+/// This returns a focused coherence summary for quick status checks.
 pub const GET_COHERENCE_STATE: &str = "get_coherence_state";
-
-// ========== IDENTITY CONTINUITY TOOL (TASK-38) ==========
-
-/// TASK-38: Get focused identity continuity (IC) status.
-/// Returns IC value (0.0-1.0), status (Healthy/Warning/Degraded/Critical),
-/// in_crisis flag, and thresholds.
-/// Unlike get_ego_state (full purpose vector, trajectory), this provides
-/// a minimal snapshot for monitoring identity health without bulk data.
-/// Requires GWT providers to be initialized via with_gwt() constructor.
-pub const GET_IDENTITY_CONTINUITY: &str = "get_identity_continuity";
-
-// ========== KURAMOTO STATE TOOL (TASK-39) ==========
-
-/// TASK-39: Get detailed Kuramoto network state including stepper status.
-/// Unlike get_kuramoto_sync (network data only), this includes is_running
-/// which indicates whether the KuramotoStepper background task is active.
-/// Returns: is_running, phases (13), frequencies (13), coupling, order_parameter, mean_phase.
-/// Requires GWT providers to be initialized via with_gwt() constructor.
-pub const GET_KURAMOTO_STATE: &str = "get_kuramoto_state";
 
 // ========== SESSION TOOLS (TASK-013) ==========
 

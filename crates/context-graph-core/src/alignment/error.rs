@@ -2,8 +2,6 @@
 //!
 //! Defines errors that can occur during goal alignment calculations.
 //! All errors are designed for robust debugging with specific context.
-//!
-//! TASK-P0-001: Renamed NoNorthStar to NoTopLevelGoals per ARCH-03.
 
 use uuid::Uuid;
 
@@ -15,8 +13,6 @@ use uuid::Uuid;
 /// - Suggestions for resolution
 #[derive(Debug, thiserror::Error)]
 pub enum AlignmentError {
-    // REMOVED: NoNorthStar per TASK-P0-001 (ARCH-03)
-    // Renamed to NoTopLevelGoals
     /// No top-level (Strategic) goals defined in the hierarchy.
     ///
     /// Resolution: Goals emerge autonomously from data patterns.

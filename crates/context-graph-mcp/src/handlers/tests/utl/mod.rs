@@ -4,7 +4,7 @@
 //! Tests verify:
 //! - Per-embedder ΔS computation
 //! - Aggregate ΔS/ΔC values
-//! - Johari quadrant classification
+//! - UTL learning potential
 //! - AP-10 compliance (all values in [0,1], no NaN/Inf)
 //! - FAIL FAST error handling
 

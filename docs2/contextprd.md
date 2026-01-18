@@ -81,7 +81,7 @@ ChunkMetadata {
 - Preserve sentence boundaries when possible
 - Each chunk becomes a separate Memory with ChunkMetadata
 
-### 2.3 Topic Portfolio (Replaces North Star)
+### 2.3 Topic Portfolio
 
 Topics emerge autonomously from clustering, not from manual goal setting.
 
@@ -102,7 +102,7 @@ Topic {
 }
 ```
 
-### 2.4 Topic Stability (Replaces Identity Continuity)
+### 2.4 Topic Stability
 
 ```
 TopicStabilityTracker {
@@ -626,28 +626,24 @@ TeleologicalFingerprint {
 
 ---
 
-## 14. WHAT THIS SYSTEM DOES NOT HAVE
+## 14. DESIGN PRINCIPLES
 
-The following concepts from previous versions have been **removed**:
+This architecture is built on the following core principles:
 
-| Removed | Replacement |
-|---------|-------------|
-| North Star | Emergent Topic Portfolio |
-| SELF_EGO_NODE | Topic Profile (13D) |
-| Identity Continuity (IC) | Topic Stability (churn tracking) |
-| IC < 0.5 triggers dream | entropy > 0.7 + churn > 0.5 triggers consolidation |
-| GWT Consciousness C(t) | Topic-based coherence scoring |
-| Kuramoto oscillators | Per-space clustering coordination |
-| Johari quadrants | Embedder category weights |
-| Manual goal setting | Goals emerge from topic clustering |
+| Principle | Implementation |
+|-----------|----------------|
+| Emergent Topics | Topics emerge from clustering, not manual goal setting |
+| Topic Stability | Churn and entropy metrics track stability over time |
+| Consolidation Triggers | entropy > 0.7 AND churn > 0.5 triggers dream consolidation |
+| Coherence Scoring | Topic-based coherence from weighted agreement |
+| Per-Space Clustering | Independent clustering in each embedding space |
+| Category Weights | Semantic (1.0), Relational/Structural (0.5), Temporal (0.0) |
 
-**Rationale**: The previous architecture conflated several concepts that don't scale well:
-1. Identity as a single vector doesn't capture multi-topic work
-2. North Star assumes a single guiding purpose
-3. Temporal proximity was incorrectly treated as semantic similarity
-4. GWT consciousness added complexity without clear benefit for retrieval
-
-The new architecture treats topics as emergent from data, uses weighted multi-space agreement, and explicitly separates temporal metadata from semantic clustering.
+**Key Design Decisions**:
+1. Topics emerge from data clustering, supporting multi-topic work
+2. Temporal proximity is metadata only, not semantic similarity
+3. Weighted agreement (threshold >= 2.5) defines topic membership
+4. Explicit separation of temporal metadata from semantic clustering
 
 ---
 

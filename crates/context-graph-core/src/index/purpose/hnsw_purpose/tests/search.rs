@@ -4,7 +4,6 @@ use uuid::Uuid;
 
 use crate::index::config::{DistanceMetric, HnswConfig, PURPOSE_VECTOR_DIM};
 use crate::types::fingerprint::PurposeVector;
-use crate::types::JohariQuadrant;
 
 use crate::index::purpose::entry::{GoalId, PurposeIndexEntry, PurposeMetadata};
 use crate::index::purpose::hnsw_purpose::{HnswPurposeIndex, PurposeIndexOps};
@@ -22,13 +21,13 @@ fn create_purpose_vector(base: f32, variation: f32) -> PurposeVector {
     PurposeVector::new(alignments)
 }
 
-fn create_metadata(goal: &str, quadrant: JohariQuadrant) -> PurposeMetadata {
-    PurposeMetadata::new(GoalId::new(goal), 0.85, quadrant).unwrap()
+fn create_metadata(goal: &str) -> PurposeMetadata {
+    PurposeMetadata::new(GoalId::new(goal), 0.85).unwrap()
 }
 
-fn create_entry(base: f32, goal: &str, quadrant: JohariQuadrant) -> PurposeIndexEntry {
+fn create_entry(base: f32, goal: &str) -> PurposeIndexEntry {
     let pv = create_purpose_vector(base, 0.02);
-    let metadata = create_metadata(goal, quadrant);
+    let metadata = create_metadata(goal);
     PurposeIndexEntry::new(Uuid::new_v4(), pv, metadata)
 }
 
@@ -73,7 +72,7 @@ fn test_search_vector_target() {
 
     // Insert entries with varying similarity to query
     let entries: Vec<PurposeIndexEntry> = (0..5)
-        .map(|i| create_entry(0.4 + i as f32 * 0.1, "goal", JohariQuadrant::Open))
+        .map(|i| create_entry(0.4 + i as f32 * 0.1, "goal"))
         .collect();
 
     for entry in &entries {
@@ -104,11 +103,7 @@ fn test_search_with_min_similarity_filter() {
 
     for i in 0..10 {
         index
-            .insert(create_entry(
-                0.1 + i as f32 * 0.08,
-                "goal",
-                JohariQuadrant::Open,
-            ))
+            .insert(create_entry(0.1 + i as f32 * 0.08, "goal"))
             .unwrap();
     }
 
@@ -139,18 +134,10 @@ fn test_search_with_goal_filter() {
     // Insert entries with different goals
     for i in 0..5 {
         index
-            .insert(create_entry(
-                0.5 + i as f32 * 0.02,
-                "goal_a",
-                JohariQuadrant::Open,
-            ))
+            .insert(create_entry(0.5 + i as f32 * 0.02, "goal_a"))
             .unwrap();
         index
-            .insert(create_entry(
-                0.5 + i as f32 * 0.02,
-                "goal_b",
-                JohariQuadrant::Open,
-            ))
+            .insert(create_entry(0.5 + i as f32 * 0.02, "goal_b"))
             .unwrap();
     }
 
@@ -173,79 +160,12 @@ fn test_search_with_goal_filter() {
 }
 
 #[test]
-fn test_search_with_quadrant_filter() {
-    let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
-
-    // Insert entries in different quadrants
-    for quadrant in JohariQuadrant::all() {
-        for i in 0..3 {
-            index
-                .insert(create_entry(0.5 + i as f32 * 0.05, "goal", quadrant))
-                .unwrap();
-        }
-    }
-
-    let query_vector = create_purpose_vector(0.55, 0.02);
-    let query = PurposeQuery::new(PurposeQueryTarget::vector(query_vector), 10, 0.0)
-        .unwrap()
-        .with_quadrant_filter(JohariQuadrant::Hidden);
-
-    let results = index.search(&query).unwrap();
-
-    // All results should be in Hidden quadrant
-    for result in &results {
-        assert_eq!(result.metadata.dominant_quadrant, JohariQuadrant::Hidden);
-    }
-
-    println!(
-        "[VERIFIED] Search with quadrant filter returns only matching quadrant ({} results)",
-        results.len()
-    );
-}
-
-#[test]
-fn test_search_with_combined_filters() {
-    let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
-
-    // Insert varied entries
-    let quadrants = JohariQuadrant::all();
-    let goals = ["goal_a", "goal_b", "goal_c"];
-
-    for (i, goal) in goals.iter().enumerate() {
-        for quadrant in &quadrants {
-            index
-                .insert(create_entry(0.4 + i as f32 * 0.1, goal, *quadrant))
-                .unwrap();
-        }
-    }
-
-    let query_vector = create_purpose_vector(0.5, 0.02);
-    let query = PurposeQuery::new(PurposeQueryTarget::vector(query_vector), 10, 0.0)
-        .unwrap()
-        .with_goal_filter(GoalId::new("goal_b"))
-        .with_quadrant_filter(JohariQuadrant::Open);
-
-    let results = index.search(&query).unwrap();
-
-    // All results should match both filters
-    for result in &results {
-        assert_eq!(result.metadata.primary_goal.as_str(), "goal_b");
-        assert_eq!(result.metadata.dominant_quadrant, JohariQuadrant::Open);
-    }
-
-    println!(
-        "[VERIFIED] Search with combined filters returns only fully matching entries ({} results)",
-        results.len()
-    );
-}
-
-#[test]
 fn test_search_from_memory_target() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
 
     // Insert entries
     let entries: Vec<PurposeIndexEntry> = (0..5)
-        .map(|i| create_entry(0.4 + i as f32 * 0.1, "goal", JohariQuadrant::Open))
+        .map(|i| create_entry(0.4 + i as f32 * 0.1, "goal"))
         .collect();
 
     for entry in &entries {
@@ -291,11 +211,7 @@ fn test_search_respects_limit() {
 
     for i in 0..20 {
         index
-            .insert(create_entry(
-                0.3 + i as f32 * 0.03,
-                "goal",
-                JohariQuadrant::Open,
-            ))
+            .insert(create_entry(0.3 + i as f32 * 0.03, "goal"))
             .unwrap();
     }
 
@@ -325,22 +241,14 @@ fn test_search_pattern_target() {
     // Cluster 1: low values
     for i in 0..5 {
         index
-            .insert(create_entry(
-                0.1 + i as f32 * 0.02,
-                "goal_low",
-                JohariQuadrant::Open,
-            ))
+            .insert(create_entry(0.1 + i as f32 * 0.02, "goal_low"))
             .unwrap();
     }
 
     // Cluster 2: high values
     for i in 0..5 {
         index
-            .insert(create_entry(
-                0.8 + i as f32 * 0.02,
-                "goal_high",
-                JohariQuadrant::Hidden,
-            ))
+            .insert(create_entry(0.8 + i as f32 * 0.02, "goal_high"))
             .unwrap();
     }
 

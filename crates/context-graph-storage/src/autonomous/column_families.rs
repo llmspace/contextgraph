@@ -1,6 +1,6 @@
 //! RocksDB column family definitions for autonomous topic-based storage.
 //!
-//! TASK-P0-004: Reduced from 7 to 5 CFs after North Star removal (TASK-P0-001).
+//! TASK-P0-004: Reduced from 7 to 5 CFs (TASK-P0-001).
 //! Removed CFs:
 //! - drift_history: Old drift detection replaced by topic_stability.churn_rate (ARCH-10)
 //! - goal_activity_metrics: Manual goals forbidden by ARCH-03 (topics emerge from clustering)

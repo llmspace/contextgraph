@@ -10,7 +10,7 @@
 //! 4. Per-memory data operates correctly
 //! 5. Data survives close/reopen cycles (persistence verification)
 //!
-//! TASK-P0-004: Removed drift_history and goal_activity_metrics tests after North Star removal.
+//! TASK-P0-004: Removed drift_history and goal_activity_metrics tests.
 //! - drift_history removed - old drift detection replaced by topic_stability.churn_rate (ARCH-10)
 //! - goal_activity_metrics removed - manual goals forbidden by ARCH-03
 
@@ -134,7 +134,7 @@ fn test_memory_curation_state_crud_real_db() {
 // PHASE 2: Persistence Verification (Source of Truth)
 // =========================================================================
 
-// TASK-P0-004: Updated test to remove drift_history and goal_activity_metrics after North Star removal.
+// TASK-P0-004: Updated test to remove drift_history and goal_activity_metrics.
 // Only tests remaining 5 CFs: autonomous_config, adaptive_threshold_state, autonomous_lineage,
 // consolidation_history, and memory_curation.
 #[test]
@@ -314,7 +314,7 @@ fn test_health_check_reports_correct_status() {
     println!("[PASS] Health check reports correct status");
 }
 
-// TASK-P0-004: Updated test to use lineage events instead of drift_history after North Star removal.
+// TASK-P0-004: Updated test to use lineage events instead of drift_history.
 #[test]
 fn test_flush_and_compact_operations() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
@@ -346,7 +346,7 @@ fn test_flush_and_compact_operations() {
 // PHASE 5: Update Operations
 // =========================================================================
 
-// TASK-P0-004: Updated test to use memory curation instead of goal_activity_metrics after North Star removal.
+// TASK-P0-004: Updated test to use memory curation instead of goal_activity_metrics.
 // Goal activity metrics removed - manual goals forbidden by ARCH-03.
 #[test]
 fn test_update_overwrites_previous_value() {

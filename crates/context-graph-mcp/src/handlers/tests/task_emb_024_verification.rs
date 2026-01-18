@@ -19,7 +19,6 @@ use parking_lot::RwLock;
 use serde_json::json;
 
 use context_graph_core::alignment::{DefaultAlignmentCalculator, GoalAlignmentCalculator};
-use context_graph_core::johari::{DynDefaultJohariManager, JohariTransitionManager};
 use context_graph_core::purpose::GoalHierarchy;
 use context_graph_core::stubs::{
     InMemoryTeleologicalStore, StubMultiArrayProvider, StubUtlProcessor,
@@ -60,8 +59,6 @@ fn create_handlers_with_tracker() -> (Handlers, Arc<RwLock<MetaUtlTracker>>) {
     let alignment_calc: Arc<dyn GoalAlignmentCalculator> =
         Arc::new(DefaultAlignmentCalculator::new());
     let goal_hierarchy = Arc::new(RwLock::new(GoalHierarchy::default()));
-    let johari_manager: Arc<dyn JohariTransitionManager> =
-        Arc::new(DynDefaultJohariManager::new(store.clone()));
     let meta_utl_tracker = Arc::new(RwLock::new(MetaUtlTracker::new()));
 
     // Uses StubSystemMonitor and StubLayerStatusProvider
@@ -71,7 +68,6 @@ fn create_handlers_with_tracker() -> (Handlers, Arc<RwLock<MetaUtlTracker>>) {
         multi_array,
         alignment_calc,
         goal_hierarchy,
-        johari_manager,
         meta_utl_tracker.clone(),
     );
 

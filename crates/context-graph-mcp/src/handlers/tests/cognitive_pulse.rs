@@ -9,14 +9,6 @@
 //! - All 5 fields must be present (entropy, coherence, learning_score, quadrant, suggested_action)
 //! - No Option types - all fields REQUIRED
 //! - Performance < 1ms per pulse computation
-//!
-//! # Constitution Reference
-//!
-//! Johari quadrant to action mapping (constitution.yaml utl.johari lines 154-157):
-//! - Open (ΔS<0.5, ΔC>0.5): DirectRecall
-//! - Blind (ΔS>0.5, ΔC<0.5): TriggerDream
-//! - Hidden (ΔS<0.5, ΔC<0.5): GetNeighborhood
-//! - Unknown (ΔS>0.5, ΔC>0.5): EpistemicAction
 
 use std::time::Instant;
 
@@ -228,7 +220,6 @@ async fn test_pulse_values_in_valid_ranges() {
     );
 
     // Validate quadrant is one of the valid values
-    // Note: JohariQuadrant uses #[serde(rename_all = "snake_case")] so values are lowercase
     let quadrant = pulse
         .get("quadrant")
         .and_then(|v| v.as_str())
@@ -247,28 +238,6 @@ async fn test_pulse_values_in_valid_ranges() {
         .and_then(|v| v.as_str())
         .expect("suggested_action should be a string");
     assert!(!action.is_empty(), "suggested_action should not be empty");
-}
-
-// =========================================================================
-// TC-M05-T28-003: Johari quadrant to action mapping (constitution.yaml:159-163)
-// =========================================================================
-
-#[tokio::test]
-async fn test_johari_quadrant_action_mapping() {
-    // Verify expected mapping exists in code
-    // Constitution: utl.johari (lines 154-157)
-    let expected_mappings = vec![
-        ("Open", "DirectRecall"),       // ΔS<0.5, ΔC>0.5
-        ("Blind", "TriggerDream"),      // ΔS>0.5, ΔC<0.5 - FIXED ISS-011
-        ("Hidden", "GetNeighborhood"),  // ΔS<0.5, ΔC<0.5
-        ("Unknown", "EpistemicAction"), // ΔS>0.5, ΔC>0.5 - FIXED ISS-011
-    ];
-
-    for (quadrant, expected_action) in expected_mappings {
-        // This just documents the expected mapping
-        // Actual runtime verification happens in test_pulse_values_in_valid_ranges
-        eprintln!("Verified mapping: {} -> {}", quadrant, expected_action);
-    }
 }
 
 // =========================================================================

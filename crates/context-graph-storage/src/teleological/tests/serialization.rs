@@ -16,7 +16,6 @@ fn test_serialize_teleological_roundtrip() {
     println!("BEFORE: Created real fingerprint with ID: {}", original.id);
     println!("  - SemanticFingerprint: default (all 13 embedders)");
     println!("  - PurposeVector: 13D with alignment 0.75");
-    println!("  - JohariFingerprint: 13×4 quadrants");
     println!(
         "  - Evolution snapshots: {}",
         original.purpose_evolution.len()
@@ -34,7 +33,7 @@ fn test_serialize_teleological_roundtrip() {
         deserialized.purpose_evolution.len()
     );
     println!(
-        "  - Theta to north star: {:.4}",
+        "  - Alignment score: {:.4}",
         deserialized.alignment_score
     );
 
@@ -53,7 +52,7 @@ fn test_fingerprint_size_in_range() {
 
     // Actual size calculation (with E9_DIM = 1024 projected):
     // - TOTAL_DENSE_DIMS = 7,424 → 29,696 bytes for dense embeddings
-    // - Plus sparse vectors, JohariFingerprint (~520B), PurposeVector (52B), metadata
+    // - Plus sparse vectors, PurposeVector (52B), metadata
     // - Total: ~32-40KB for a fresh fingerprint with 1 evolution snapshot
     println!("BEFORE: Expected range [25KB, 100KB]");
     println!(

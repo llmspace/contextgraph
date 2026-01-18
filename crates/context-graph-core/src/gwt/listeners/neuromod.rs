@@ -60,7 +60,6 @@ impl WorkspaceEventListener for NeuromodulationEventListener {
             WorkspaceEvent::MemoryExits { .. } => {}
             WorkspaceEvent::WorkspaceConflict { .. } => {}
             WorkspaceEvent::WorkspaceEmpty { .. } => {}
-            WorkspaceEvent::IdentityCritical { .. } => {}
         }
     }
 }

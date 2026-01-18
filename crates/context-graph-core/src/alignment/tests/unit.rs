@@ -22,7 +22,6 @@ fn test_level_weights_invariant() {
     let weights = LevelWeights::default();
 
     println!("\nBEFORE STATE:");
-    println!("  - north_star: {}", weights.strategic);
     println!("  - strategic: {}", weights.strategic);
     println!("  - tactical: {}", weights.tactical);
     println!("  - immediate: {}", weights.immediate);
@@ -83,7 +82,7 @@ fn test_goal_score_weighted_contribution() {
     println!("============================================================");
 
     // Use literal weights from LevelWeights::default() for clarity
-    // NorthStar=0.4, Strategic=0.3, Tactical=0.2, Immediate=0.1
+    // Strategic=0.4, Tactical=0.3, Immediate=0.2 (3-level hierarchy per PRD v6)
     let test_cases = [
         (GoalLevel::Strategic, 0.8, 0.4, 0.32),
         (GoalLevel::Strategic, 0.7, 0.3, 0.21),
@@ -165,7 +164,7 @@ fn test_pattern_type_classification() {
         PatternType::DivergentHierarchy,
         PatternType::CriticalMisalignment,
         PatternType::InconsistentAlignment,
-        PatternType::StrategicDrift, // TASK-P0-001: Renamed from NorthStarDrift
+        PatternType::StrategicDrift,
     ];
 
     println!("\nPOSITIVE PATTERNS:");

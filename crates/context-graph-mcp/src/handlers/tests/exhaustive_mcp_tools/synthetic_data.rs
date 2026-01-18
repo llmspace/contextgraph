@@ -37,34 +37,6 @@ pub mod uuids {
     pub const NON_EXISTENT: &str = "00000000-0000-0000-0000-000000000000";
 }
 
-/// Expected Kuramoto network parameters.
-pub mod kuramoto {
-    pub const NUM_OSCILLATORS: usize = 13;
-    pub const COUPLING_MIN: f64 = 0.0;
-    pub const COUPLING_MAX: f64 = 10.0;
-    pub const COUPLING_DEFAULT: f64 = 1.0;
-    pub const ORDER_PARAM_MIN: f64 = 0.0;
-    pub const ORDER_PARAM_MAX: f64 = 1.0;
-    /// Synchronized state threshold (r > 0.9 indicates synchronization)
-    pub const SYNC_THRESHOLD: f64 = 0.9;
-}
-
-/// Expected GWT consciousness equation components.
-pub mod consciousness {
-    /// Consciousness = Integration × Resonance × Differentiation
-    /// C = I × R × D where each is in [0, 1]
-    pub const C_MIN: f64 = 0.0;
-    pub const C_MAX: f64 = 1.0;
-}
-
-/// Johari quadrant valid values.
-pub mod johari {
-    pub const OPEN: &str = "Open";
-    pub const BLIND: &str = "Blind";
-    pub const HIDDEN: &str = "Hidden";
-    pub const UNKNOWN: &str = "Unknown";
-    pub const VALID_QUADRANTS: [&str; 4] = [OPEN, BLIND, HIDDEN, UNKNOWN];
-}
 
 /// Dream system states (accepts both cases from different implementations).
 pub mod dream {

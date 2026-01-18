@@ -22,7 +22,6 @@ impl Handlers {
     ///
     /// # Constitution References
     /// - UTL formula: constitution.yaml:152
-    /// - Johari quadrant actions: constitution.yaml:159-163
     pub(crate) async fn call_get_memetic_status(&self, id: Option<JsonRpcId>) -> JsonRpcResponse {
         let fingerprint_count = match self.teleological_store.count().await {
             Ok(count) => count,
@@ -100,20 +99,6 @@ impl Handlers {
             }
         };
 
-        let johari_quadrant = match utl_status.get("johari_quadrant").and_then(|v| v.as_str()) {
-            Some(q) => q,
-            None => {
-                error!("get_memetic_status: UTL processor missing 'johari_quadrant' field - system is broken");
-                return JsonRpcResponse::error(
-                    id,
-                    error_codes::INTERNAL_ERROR,
-                    "UTL processor returned incomplete status: missing 'johari_quadrant'. \
-                     This indicates a broken UTL system that must be fixed."
-                        .to_string(),
-                );
-            }
-        };
-
         let consolidation_phase = match utl_status
             .get("consolidation_phase")
             .and_then(|v| v.as_str())
@@ -127,28 +112,6 @@ impl Handlers {
                     "UTL processor returned incomplete status: missing 'consolidation_phase'. \
                      This indicates a broken UTL system that must be fixed."
                         .to_string(),
-                );
-            }
-        };
-
-        // Map Johari quadrant to suggested action per constitution.yaml:159-163
-        let suggested_action = match johari_quadrant {
-            "Open" => "direct_recall",
-            "Blind" => "trigger_dream",
-            "Hidden" => "get_neighborhood",
-            "Unknown" => "epistemic_action",
-            _ => "continue",
-        };
-
-        // Get quadrant counts from teleological store
-        let quadrant_counts = match self.teleological_store.count_by_quadrant().await {
-            Ok(counts) => counts,
-            Err(e) => {
-                error!(error = %e, "get_memetic_status: count_by_quadrant() FAILED");
-                return JsonRpcResponse::error(
-                    id,
-                    error_codes::STORAGE_ERROR,
-                    format!("Failed to get quadrant counts: {}", e),
                 );
             }
         };
@@ -208,19 +171,11 @@ impl Handlers {
                 "embedderCount": NUM_EMBEDDERS,
                 "storageBackend": self.teleological_store.backend_type().to_string(),
                 "storageSizeBytes": self.teleological_store.storage_size_bytes(),
-                "quadrantCounts": {
-                    "open": quadrant_counts[0],
-                    "hidden": quadrant_counts[1],
-                    "blind": quadrant_counts[2],
-                    "unknown": quadrant_counts[3]
-                },
                 "utl": {
                     "entropy": entropy,
                     "coherence": coherence,
                     "learningScore": learning_score,
-                    "johariQuadrant": johari_quadrant,
-                    "consolidationPhase": consolidation_phase,
-                    "suggestedAction": suggested_action
+                    "consolidationPhase": consolidation_phase
                 },
                 "layers": {
                     "perception": perception_status,
@@ -325,9 +280,8 @@ impl Handlers {
                     "formula": "L(x) = H(P) - H(P|x) + alpha * C(x)"
                 },
                 "teleological": {
-                    "description": "Purpose-aware retrieval with North Star alignment",
-                    "purposeVectorDimension": NUM_EMBEDDERS,
-                    "johariQuadrants": ["Open", "Hidden", "Blind", "Unknown"]
+                    "description": "Purpose-aware retrieval with topic alignment",
+                    "purposeVectorDimension": NUM_EMBEDDERS
                 }
             }),
         )
@@ -336,7 +290,7 @@ impl Handlers {
     /// utl_status tool implementation.
     ///
     /// Returns current UTL system state including lifecycle phase, entropy,
-    /// coherence, learning score, Johari quadrant, and consolidation phase.
+    /// coherence, learning score, and consolidation phase.
     /// Response includes `_cognitive_pulse` with live system state.
     pub(crate) async fn call_utl_status(&self, id: Option<JsonRpcId>) -> JsonRpcResponse {
         debug!("Handling utl_status tool call");

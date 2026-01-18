@@ -4,10 +4,8 @@
 
 use std::collections::HashSet;
 
-use chrono::Utc;
 use context_graph_core::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
-    NUM_EMBEDDERS,
+    PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint, NUM_EMBEDDERS,
 };
 use context_graph_storage::teleological::RocksDbTeleologicalStore;
 use rand::Rng;
@@ -83,59 +81,12 @@ pub fn generate_real_purpose_vector() -> PurposeVector {
     }
 }
 
-pub fn generate_real_johari_fingerprint() -> JohariFingerprint {
-    let mut rng = rand::thread_rng();
-
-    // Create quadrants: [[Open, Hidden, Blind, Unknown]; NUM_EMBEDDERS]
-    // Each row must sum to 1.0
-    let mut quadrants = [[0.0f32; 4]; NUM_EMBEDDERS];
-    for quad in quadrants.iter_mut() {
-        let a: f32 = rng.gen_range(0.1..0.4);
-        let b: f32 = rng.gen_range(0.1..0.3);
-        let c: f32 = rng.gen_range(0.1..0.3);
-        let d: f32 = 1.0 - a - b - c; // Ensure sum = 1.0
-        *quad = [a, b, c, d.max(0.0)];
-    }
-
-    // Confidence per embedder
-    let mut confidence = [0.0f32; NUM_EMBEDDERS];
-    for c in &mut confidence {
-        *c = rng.gen_range(0.5..1.0);
-    }
-
-    // Transition probabilities: each row must sum to 1.0
-    let mut transition_probs = [[[0.0f32; 4]; 4]; NUM_EMBEDDERS];
-    for embedder_probs in transition_probs.iter_mut() {
-        for from_q_probs in embedder_probs.iter_mut() {
-            let a: f32 = rng.gen_range(0.1..0.4);
-            let b: f32 = rng.gen_range(0.1..0.3);
-            let c: f32 = rng.gen_range(0.1..0.3);
-            let d: f32 = 1.0 - a - b - c;
-            *from_q_probs = [a, b, c, d.max(0.0)];
-        }
-    }
-
-    JohariFingerprint {
-        quadrants,
-        confidence,
-        transition_probs,
-    }
-}
-
-pub fn generate_real_teleological_fingerprint(id: Uuid) -> TeleologicalFingerprint {
-    let now = Utc::now();
-    TeleologicalFingerprint {
-        id,
-        semantic: generate_real_semantic_fingerprint(),
-        purpose_vector: generate_real_purpose_vector(),
-        johari: generate_real_johari_fingerprint(),
-        purpose_evolution: Vec::new(),
-        alignment_score: 0.5,
-        content_hash: [0u8; 32],
-        created_at: now,
-        last_updated: now,
-        access_count: 0,
-    }
+pub fn generate_real_teleological_fingerprint(_id: Uuid) -> TeleologicalFingerprint {
+    TeleologicalFingerprint::new(
+        generate_real_semantic_fingerprint(),
+        generate_real_purpose_vector(),
+        [0u8; 32],
+    )
 }
 
 pub fn create_test_store(temp_dir: &TempDir) -> RocksDbTeleologicalStore {

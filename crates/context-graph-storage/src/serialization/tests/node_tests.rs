@@ -1,8 +1,7 @@
 //! Tests for MemoryNode serialization.
 
 use context_graph_core::types::{
-    EmbeddingVector, JohariQuadrant, MemoryNode, NodeMetadata, DEFAULT_EMBEDDING_DIM,
-    MAX_CONTENT_SIZE,
+    EmbeddingVector, MemoryNode, NodeMetadata, DEFAULT_EMBEDDING_DIM, MAX_CONTENT_SIZE,
 };
 use serde_json::json;
 
@@ -21,7 +20,6 @@ fn create_test_node() -> MemoryNode {
     let mut node = MemoryNode::new("Test content for serialization".to_string(), embedding);
     node.importance = 0.75;
     node.emotional_valence = 0.5;
-    node.quadrant = JohariQuadrant::Open;
     node.metadata = NodeMetadata::new()
         .with_source("test-source")
         .with_language("en");
@@ -61,7 +59,6 @@ fn test_node_preserves_all_fields() {
     node.importance = 0.999;
     node.emotional_valence = -0.555;
     node.access_count = 12345;
-    node.quadrant = JohariQuadrant::Hidden;
     node.metadata.add_tag("important");
     node.metadata.add_tag("verified");
     node.metadata.set_custom("priority", json!(5));
@@ -72,7 +69,6 @@ fn test_node_preserves_all_fields() {
     assert_eq!(node.id, restored.id);
     assert_eq!(node.content, restored.content);
     assert_eq!(node.embedding, restored.embedding);
-    assert_eq!(node.quadrant, restored.quadrant);
     assert_eq!(node.importance, restored.importance);
     assert_eq!(node.emotional_valence, restored.emotional_valence);
     assert_eq!(node.created_at, restored.created_at);

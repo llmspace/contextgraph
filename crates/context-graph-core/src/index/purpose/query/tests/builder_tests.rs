@@ -3,7 +3,6 @@
 use super::helpers::create_purpose_vector;
 use crate::index::purpose::entry::GoalId;
 use crate::index::purpose::query::{PurposeQuery, PurposeQueryBuilder, PurposeQueryTarget};
-use crate::types::JohariQuadrant;
 
 #[test]
 fn test_purpose_query_builder_full() {
@@ -14,7 +13,6 @@ fn test_purpose_query_builder_full() {
         .limit(20)
         .min_similarity(0.8)
         .goal_filter(GoalId::new("learn_pytorch"))
-        .quadrant_filter(JohariQuadrant::Blind)
         .build()
         .unwrap();
 
@@ -24,7 +22,6 @@ fn test_purpose_query_builder_full() {
         query.goal_filter.as_ref().unwrap().as_str(),
         "learn_pytorch"
     );
-    assert_eq!(query.quadrant_filter.unwrap(), JohariQuadrant::Blind);
 
     println!("[VERIFIED] PurposeQueryBuilder builds complete query with all fields");
 }
@@ -43,7 +40,6 @@ fn test_purpose_query_builder_minimal() {
     assert_eq!(query.limit, 5);
     assert_eq!(query.min_similarity, 0.0);
     assert!(query.goal_filter.is_none());
-    assert!(query.quadrant_filter.is_none());
 
     println!("[VERIFIED] PurposeQueryBuilder builds minimal query without filters");
 }
@@ -114,7 +110,6 @@ fn test_purpose_query_builder_chained() {
     let query = PurposeQuery::builder()
         .min_similarity(0.6)
         .limit(15)
-        .quadrant_filter(JohariQuadrant::Unknown)
         .target(PurposeQueryTarget::Vector(pv))
         .goal_filter(GoalId::new("frontier"))
         .build()

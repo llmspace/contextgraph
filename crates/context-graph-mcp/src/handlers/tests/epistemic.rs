@@ -187,9 +187,9 @@ async fn test_epistemic_action_hypothesize_happy_path() {
         "name": tool_names::EPISTEMIC_ACTION,
         "arguments": {
             "action_type": "hypothesize",
-            "target": "IC < 0.5 triggers dream consolidation",
+            "target": "entropy > 0.7 triggers dream consolidation",
             "confidence": 0.75,
-            "rationale": "Per constitution.yaml gwt.self_ego_node.thresholds.critical"
+            "rationale": "Per constitution.yaml dream.trigger.conditions"
         }
     });
     let request = make_request("tools/call", Some(JsonRpcId::Number(1)), Some(params));

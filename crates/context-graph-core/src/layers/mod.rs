@@ -9,7 +9,7 @@
 //! - [`ReflexLayer`] - L2 Modern Hopfield Network cache for instant responses
 //! - [`MemoryLayer`] - L3 Modern Hopfield Network associative memory with decay scoring
 //! - [`LearningLayer`] - L4 UTL-driven weight optimization with consolidation triggers
-//! - [`CoherenceLayer`] - L5 Kuramoto sync and Global Workspace broadcast
+//! - [`CoherenceLayer`] - L5 Per-space clustering coordination and Global Workspace broadcast
 //!
 //! # Constitution Compliance
 //!
@@ -29,8 +29,7 @@ mod thresholds;
 mod tests_full_state_verification;
 
 pub use coherence::{
-    CoherenceLayer, ConsciousnessState, GlobalWorkspace, GwtThresholds, KuramotoNetwork,
-    KuramotoOscillator, INTEGRATION_STEPS, KURAMOTO_DT, KURAMOTO_K, KURAMOTO_N,
+    CoherenceLayer, CoherenceState, GlobalWorkspace, GwtThresholds, INTEGRATION_STEPS,
 };
 // Re-export deprecated constants with warning suppression for backwards compatibility
 #[allow(deprecated)]

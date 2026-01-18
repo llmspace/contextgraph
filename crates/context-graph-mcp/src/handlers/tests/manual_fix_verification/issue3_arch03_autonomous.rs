@@ -1,28 +1,28 @@
-//! Issue 3 / ARCH-03: Autonomous Operation Without North Star Tests
+//! Issue 3 / ARCH-03: Autonomous Operation Without Goals Tests
 //!
 //! Per constitution ARCH-03: "System MUST operate autonomously without manual goal setting"
 //!
-//! These tests verify that autonomous handlers work correctly when no North Star is configured.
+//! These tests verify that autonomous handlers work correctly when no goals are configured.
 
 use crate::handlers::tests::{create_test_handlers_no_goals, make_request};
 use crate::protocol::JsonRpcId;
 use serde_json::json;
 
-/// ARCH-03 VERIFICATION: get_autonomous_status works WITHOUT North Star.
+/// ARCH-03 VERIFICATION: get_autonomous_status works WITHOUT goals configured.
 ///
-/// BEFORE: Would fail or return error when no North Star configured
+/// BEFORE: Would fail or return error when no goals configured
 /// AFTER: Returns status with recommendations to store memories first
 ///
 /// Per constitution ARCH-03: "System MUST operate autonomously without manual goal setting"
 #[tokio::test]
-async fn test_arch03_get_autonomous_status_without_north_star() {
+async fn test_arch03_get_autonomous_status_without_goals() {
     println!("\n{}", "=".repeat(60));
-    println!("ARCH-03 VERIFICATION: get_autonomous_status without North Star");
+    println!("ARCH-03 VERIFICATION: get_autonomous_status without goals");
     println!("{}", "=".repeat(60));
 
-    // BEFORE STATE: Create handlers WITHOUT North Star
+    // BEFORE STATE: Create handlers WITHOUT goals
     let handlers = create_test_handlers_no_goals();
-    println!("[BEFORE] Handlers created WITHOUT North Star (empty goal hierarchy)");
+    println!("[BEFORE] Handlers created WITHOUT goals (empty goal hierarchy)");
 
     // SYNTHETIC DATA: Request status with all optional params
     let request = make_request(
@@ -38,7 +38,7 @@ async fn test_arch03_get_autonomous_status_without_north_star() {
         })),
     );
 
-    println!("[EXECUTE] Calling get_autonomous_status without North Star...");
+    println!("[EXECUTE] Calling get_autonomous_status without goals...");
     let response = handlers.dispatch(request).await;
 
     // SOURCE OF TRUTH: Check response
@@ -47,10 +47,10 @@ async fn test_arch03_get_autonomous_status_without_north_star() {
     // VERIFY: No protocol error
     assert!(
         response.error.is_none(),
-        "[FAIL] Protocol error when no North Star: {:?}",
+        "[FAIL] Protocol error when no goals: {:?}",
         response.error
     );
-    println!("[VERIFY] No protocol error without North Star - PASS");
+    println!("[VERIFY] No protocol error without goals - PASS");
 
     // VERIFY: Result exists
     let result = response.result.expect("[FAIL] Must have result");
@@ -63,7 +63,7 @@ async fn test_arch03_get_autonomous_status_without_north_star() {
         .unwrap_or(false);
     assert!(
         !is_error,
-        "[FAIL] Returned isError=true without North Star - should still work"
+        "[FAIL] Returned isError=true without goals - should still work"
     );
     println!("[VERIFY] Not an error response (isError=false) - PASS");
 
@@ -124,7 +124,7 @@ async fn test_arch03_get_autonomous_status_without_north_star() {
     // PHYSICAL EVIDENCE
     println!("\n[PHYSICAL EVIDENCE]");
     println!("  Tool: get_autonomous_status");
-    println!("  North Star configured: false");
+    println!("  Goals configured: false");
     println!("  Response error: {:?}", response.error);
     println!("  Response has valid result: true");
     println!("\n[ARCH-03 get_autonomous_status VERIFICATION COMPLETE]\n");
@@ -132,7 +132,6 @@ async fn test_arch03_get_autonomous_status_without_north_star() {
 
 // REMOVED: test_arch03_auto_bootstrap_discovers_from_stored_fingerprints per TASK-P0-001 (ARCH-03)
 //
-// The `auto_bootstrap_north_star` tool has been REMOVED per constitution v6.0.0.
 // Goals now emerge autonomously from topic clustering (HDBSCAN/BIRCH).
 //
 // See constitution ARCH-03: "Autonomous operation - goals emerge from topic clustering, no manual goal setting"
@@ -142,20 +141,20 @@ async fn test_arch03_get_autonomous_status_without_north_star() {
 // - `get_topic_portfolio` - Get current emergent topic portfolio
 // - `get_topic_stability` - Get topic stability metrics (churn, entropy)
 
-/// ARCH-03 VERIFICATION: get_alignment_drift works without North Star.
+/// ARCH-03 VERIFICATION: get_alignment_drift works without goals configured.
 ///
-/// BEFORE: Would fail when no North Star configured
+/// BEFORE: Would fail when no goals configured
 /// AFTER: Computes drift relative to computed centroid of memories
 #[tokio::test]
-async fn test_arch03_get_alignment_drift_without_north_star() {
+async fn test_arch03_get_alignment_drift_without_goals() {
     println!("\n{}", "=".repeat(60));
-    println!("ARCH-03 VERIFICATION: get_alignment_drift without North Star");
+    println!("ARCH-03 VERIFICATION: get_alignment_drift without goals");
     println!("{}", "=".repeat(60));
 
     let handlers = create_test_handlers_no_goals();
-    println!("[BEFORE] Handlers created WITHOUT North Star");
+    println!("[BEFORE] Handlers created WITHOUT goals");
 
-    // EXECUTE: Get drift without North Star
+    // EXECUTE: Get drift without goals
     let request = make_request(
         "tools/call",
         Some(JsonRpcId::Number(1)),
@@ -168,13 +167,13 @@ async fn test_arch03_get_alignment_drift_without_north_star() {
         })),
     );
 
-    println!("[EXECUTE] Calling get_alignment_drift without North Star...");
+    println!("[EXECUTE] Calling get_alignment_drift without goals...");
     let response = handlers.dispatch(request).await;
 
     // VERIFY: No protocol error
     assert!(
         response.error.is_none(),
-        "[FAIL] Protocol error without North Star: {:?}",
+        "[FAIL] Protocol error without goals: {:?}",
         response.error
     );
     println!("[VERIFY] No protocol error - PASS");
@@ -186,14 +185,14 @@ async fn test_arch03_get_alignment_drift_without_north_star() {
         .get("isError")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
-    assert!(!is_error, "[FAIL] Should not be error without North Star");
+    assert!(!is_error, "[FAIL] Should not be error without goals");
     println!("[VERIFY] Not an error response - PASS");
 
     if let Some(content) = result.get("content").and_then(|v| v.as_array()) {
         if let Some(first) = content.first() {
             if let Some(text) = first.get("text").and_then(|v| v.as_str()) {
                 if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) {
-                    // Check reference_type - should be "no_reference" or "centroid" when no North Star
+                    // Check reference_type - should be "no_reference" or "centroid" when no goals
                     if let Some(ref_type) = parsed.get("reference_type").and_then(|v| v.as_str()) {
                         println!("[VERIFY] reference_type = \"{}\"", ref_type);
                         // Without memory_ids, returns no_reference

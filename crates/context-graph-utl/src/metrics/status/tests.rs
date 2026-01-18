@@ -185,7 +185,6 @@ fn test_status_response_serialization() {
         entropy: 0.45,
         coherence: 0.55,
         learning_score: 0.7,
-        johari_quadrant: "Open".to_string(),
         consolidation_phase: "Wake".to_string(),
         phase_angle: 1.0,
         thresholds: ThresholdsResponse::default(),

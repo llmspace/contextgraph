@@ -14,7 +14,7 @@
 //! 1. Compute cosine similarity between fingerprint's semantic embedding
 //!    and goal embedding for each of the 13 embedding spaces
 //! 2. Aggregate per-embedder similarities using teleological weights
-//! 3. Apply level-based weights (NorthStar=0.4, Strategic=0.3, etc.)
+//! 3. Apply level-based weights (Strategic=0.5, Tactical=0.3, etc.)
 //! 4. Detect misalignment patterns
 //! 5. Return composite score with breakdown
 //!

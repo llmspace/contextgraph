@@ -1,14 +1,12 @@
 //! Integration tests for UTL metrics module (M05-T24)
 //!
 //! These tests verify the integration between metrics types and other UTL components,
-//! ensuring proper interaction between StageThresholds, QuadrantDistribution,
-//! UtlComputationMetrics, and UtlStatus with lifecycle and phase components.
+//! ensuring proper interaction between StageThresholds, UtlComputationMetrics,
+//! and UtlStatus with lifecycle and phase components.
 
 use context_graph_utl::{
-    johari::JohariQuadrant,
     metrics::{
-        QuadrantDistribution, StageThresholds, ThresholdsResponse, UtlComputationMetrics,
-        UtlStatus, UtlStatusResponse,
+        StageThresholds, ThresholdsResponse, UtlComputationMetrics, UtlStatus, UtlStatusResponse,
     },
     phase::ConsolidationPhase,
     LifecycleLambdaWeights, LifecycleStage,
@@ -56,28 +54,6 @@ fn test_for_stage_factory_consistency() {
     );
 }
 
-/// Test QuadrantDistribution integration with JohariQuadrant
-#[test]
-fn test_quadrant_distribution_johari_integration() {
-    let mut dist = QuadrantDistribution::default();
-
-    // Increment each quadrant
-    dist.increment(JohariQuadrant::Open);
-    dist.increment(JohariQuadrant::Open);
-    dist.increment(JohariQuadrant::Blind);
-    dist.increment(JohariQuadrant::Hidden);
-    dist.increment(JohariQuadrant::Unknown);
-
-    assert_eq!(dist.open, 2);
-    assert_eq!(dist.blind, 1);
-    assert_eq!(dist.hidden, 1);
-    assert_eq!(dist.unknown, 1);
-    assert_eq!(dist.total(), 5);
-
-    // Dominant should return Open (highest count)
-    assert_eq!(dist.dominant(), JohariQuadrant::Open);
-}
-
 /// Test UtlComputationMetrics lifecycle stage integration
 #[test]
 fn test_computation_metrics_lifecycle_integration() {
@@ -87,13 +63,11 @@ fn test_computation_metrics_lifecycle_integration() {
     assert_eq!(metrics.lifecycle_stage, LifecycleStage::Infancy);
 
     // Record some computations
-    metrics.record_computation(0.5, 0.3, 0.2, JohariQuadrant::Open, 100.0);
-    metrics.record_computation(0.4, 0.2, 0.3, JohariQuadrant::Blind, 150.0);
+    metrics.record_computation(0.5, 0.3, 0.2, 100.0);
+    metrics.record_computation(0.4, 0.2, 0.3, 150.0);
 
     assert_eq!(metrics.computation_count, 2);
     assert!(metrics.avg_learning_magnitude > 0.0);
-    assert_eq!(metrics.quadrant_distribution.open, 1);
-    assert_eq!(metrics.quadrant_distribution.blind, 1);
 }
 
 /// Test UtlStatus full lifecycle with transitions
@@ -225,38 +199,6 @@ fn test_metrics_health_across_stages() {
     }
 }
 
-/// Test quadrant distribution percentages with real data
-#[test]
-fn test_quadrant_percentages_real_distribution() {
-    let mut dist = QuadrantDistribution::default();
-
-    // Simulate a realistic learning session distribution
-    // Open: 40%, Blind: 25%, Hidden: 20%, Unknown: 15%
-    for _ in 0..40 {
-        dist.increment(JohariQuadrant::Open);
-    }
-    for _ in 0..25 {
-        dist.increment(JohariQuadrant::Blind);
-    }
-    for _ in 0..20 {
-        dist.increment(JohariQuadrant::Hidden);
-    }
-    for _ in 0..15 {
-        dist.increment(JohariQuadrant::Unknown);
-    }
-
-    let pcts = dist.percentages();
-
-    // percentages() returns fractions [0,1], not percentages [0,100]
-    assert!((pcts[0] - 0.40).abs() < 0.01); // open
-    assert!((pcts[1] - 0.25).abs() < 0.01); // blind
-    assert!((pcts[2] - 0.20).abs() < 0.01); // hidden
-    assert!((pcts[3] - 0.15).abs() < 0.01); // unknown
-
-    // Dominant should be Open
-    assert_eq!(dist.dominant(), JohariQuadrant::Open);
-}
-
 /// Test computation metrics EMA behavior
 #[test]
 fn test_computation_metrics_ema_convergence() {
@@ -264,7 +206,7 @@ fn test_computation_metrics_ema_convergence() {
 
     // Record many computations with same values - EMA should converge
     for _ in 0..100 {
-        metrics.record_computation(0.5, 0.3, 0.2, JohariQuadrant::Open, 1000.0);
+        metrics.record_computation(0.5, 0.3, 0.2, 1000.0);
     }
 
     // After 100 iterations, EMA should be very close to actual values
@@ -350,7 +292,7 @@ fn test_lifecycle_stage_behaviors() {
 #[test]
 fn test_mcp_response_completeness() {
     let mut metrics = UtlComputationMetrics::new();
-    metrics.record_computation(0.7, 0.4, 0.5, JohariQuadrant::Open, 500.0);
+    metrics.record_computation(0.7, 0.4, 0.5, 500.0);
 
     let status = UtlStatus {
         lifecycle_stage: LifecycleStage::Growth,
@@ -370,7 +312,6 @@ fn test_mcp_response_completeness() {
     assert!(response.entropy >= 0.0 && response.entropy <= 1.0);
     assert!(response.coherence >= 0.0 && response.coherence <= 1.0);
     assert!(response.learning_score >= 0.0 && response.learning_score <= 1.0);
-    assert!(!response.johari_quadrant.is_empty());
     assert!(!response.consolidation_phase.is_empty());
     assert!(response.phase_angle >= 0.0);
 

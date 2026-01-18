@@ -3,7 +3,6 @@
 use crate::index::config::{DistanceMetric, HnswConfig, PURPOSE_VECTOR_DIM};
 use crate::index::purpose::entry::{GoalId, PurposeIndexEntry, PurposeMetadata};
 use crate::types::fingerprint::PurposeVector;
-use crate::types::JohariQuadrant;
 use uuid::Uuid;
 
 /// Create a purpose vector with deterministic values based on base and variation.
@@ -16,27 +15,22 @@ pub fn create_purpose_vector(base: f32, variation: f32) -> PurposeVector {
     PurposeVector::new(alignments)
 }
 
-/// Create metadata with a specific goal and quadrant.
-pub fn create_metadata(goal: &str, quadrant: JohariQuadrant) -> PurposeMetadata {
-    PurposeMetadata::new(GoalId::new(goal), 0.85, quadrant).unwrap()
+/// Create metadata with a specific goal.
+pub fn create_metadata(goal: &str) -> PurposeMetadata {
+    PurposeMetadata::new(GoalId::new(goal), 0.85).unwrap()
 }
 
 /// Create a complete purpose index entry with real data.
-pub fn create_entry(base: f32, goal: &str, quadrant: JohariQuadrant) -> PurposeIndexEntry {
+pub fn create_entry(base: f32, goal: &str) -> PurposeIndexEntry {
     let pv = create_purpose_vector(base, 0.02);
-    let metadata = create_metadata(goal, quadrant);
+    let metadata = create_metadata(goal);
     PurposeIndexEntry::new(Uuid::new_v4(), pv, metadata)
 }
 
 /// Create a purpose index entry with a specific memory ID.
-pub fn create_entry_with_id(
-    memory_id: Uuid,
-    base: f32,
-    goal: &str,
-    quadrant: JohariQuadrant,
-) -> PurposeIndexEntry {
+pub fn create_entry_with_id(memory_id: Uuid, base: f32, goal: &str) -> PurposeIndexEntry {
     let pv = create_purpose_vector(base, 0.02);
-    let metadata = create_metadata(goal, quadrant);
+    let metadata = create_metadata(goal);
     PurposeIndexEntry::new(memory_id, pv, metadata)
 }
 
@@ -51,29 +45,17 @@ pub fn create_clustered_entries() -> Vec<PurposeIndexEntry> {
 
     // Cluster 1: low values (base around 0.2)
     for i in 0..5 {
-        entries.push(create_entry(
-            0.15 + i as f32 * 0.02,
-            "goal_low",
-            JohariQuadrant::Open,
-        ));
+        entries.push(create_entry(0.15 + i as f32 * 0.02, "goal_low"));
     }
 
     // Cluster 2: medium values (base around 0.5)
     for i in 0..5 {
-        entries.push(create_entry(
-            0.45 + i as f32 * 0.02,
-            "goal_mid",
-            JohariQuadrant::Hidden,
-        ));
+        entries.push(create_entry(0.45 + i as f32 * 0.02, "goal_mid"));
     }
 
     // Cluster 3: high values (base around 0.8)
     for i in 0..5 {
-        entries.push(create_entry(
-            0.75 + i as f32 * 0.02,
-            "goal_high",
-            JohariQuadrant::Blind,
-        ));
+        entries.push(create_entry(0.75 + i as f32 * 0.02, "goal_high"));
     }
 
     entries

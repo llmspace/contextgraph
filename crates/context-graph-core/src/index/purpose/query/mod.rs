@@ -21,7 +21,6 @@
 //! };
 //! use context_graph_core::types::fingerprint::PurposeVector;
 //! use context_graph_core::purpose::GoalId;
-//! use context_graph_core::types::JohariQuadrant;
 //!
 //! // Create a query from a purpose vector
 //! let query = PurposeQuery::builder()
@@ -31,9 +30,7 @@
 //!     .build()?;
 //!
 //! // Add optional filters
-//! let filtered_query = query
-//!     .with_goal_filter(GoalId::new("master_ml"))
-//!     .with_quadrant_filter(JohariQuadrant::Open);
+//! let filtered_query = query.with_goal_filter(GoalId::new("master_ml"));
 //! ```
 //!
 //! # Fail-Fast Semantics

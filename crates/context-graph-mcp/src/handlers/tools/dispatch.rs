@@ -72,14 +72,11 @@ impl Handlers {
             tool_names::GET_GRAPH_MANIFEST => self.call_get_graph_manifest(id).await,
             tool_names::SEARCH_GRAPH => self.call_search_graph(id, arguments).await,
             tool_names::UTL_STATUS => self.call_utl_status(id).await,
-            tool_names::GET_CONSCIOUSNESS_STATE => self.call_get_consciousness_state(id).await,
-            tool_names::GET_KURAMOTO_SYNC => self.call_get_kuramoto_sync(id).await,
             tool_names::GET_WORKSPACE_STATUS => self.call_get_workspace_status(id).await,
             tool_names::GET_EGO_STATE => self.call_get_ego_state(id).await,
             tool_names::TRIGGER_WORKSPACE_BROADCAST => {
                 self.call_trigger_workspace_broadcast(id, arguments).await
             }
-            tool_names::ADJUST_COUPLING => self.call_adjust_coupling(id, arguments).await,
             // TASK-UTL-P1-001: UTL delta S/C computation
             tool_names::COMPUTE_DELTA_SC => {
                 self.handle_gwt_compute_delta_sc(id, Some(arguments)).await
@@ -132,7 +129,7 @@ impl Handlers {
                 self.call_manage_teleological_profile(id, arguments).await
             }
             // TASK-AUTONOMOUS-MCP: Autonomous tools
-            // REMOVED: AUTO_BOOTSTRAP_NORTH_STAR per TASK-P0-001 (ARCH-03)
+            // REMOVED: AUTO_BOOTSTRAP per TASK-P0-001 (ARCH-03)
             tool_names::GET_ALIGNMENT_DRIFT => self.call_get_alignment_drift(id, arguments).await,
             tool_names::GET_DRIFT_HISTORY => self.call_get_drift_history(id, arguments).await,
             tool_names::TRIGGER_DRIFT_CORRECTION => {
@@ -168,18 +165,8 @@ impl Handlers {
             tool_names::EPISTEMIC_ACTION => self.call_epistemic_action(id, arguments).await,
             // TASK-MCP-004: Merge concepts for node consolidation
             tool_names::MERGE_CONCEPTS => self.call_merge_concepts(id, arguments).await,
-            // TASK-MCP-005: Johari classification from delta_s/delta_c
-            tool_names::GET_JOHARI_CLASSIFICATION => {
-                self.call_get_johari_classification(id, arguments).await
-            }
             // TASK-34: Coherence state summary
             tool_names::GET_COHERENCE_STATE => self.call_get_coherence_state(id, arguments).await,
-            // TASK-38: Identity continuity focused status
-            tool_names::GET_IDENTITY_CONTINUITY => {
-                self.call_get_identity_continuity(id, arguments).await
-            }
-            // TASK-39: Kuramoto state with stepper status
-            tool_names::GET_KURAMOTO_STATE => self.call_get_kuramoto_state(id).await,
             // TASK-013/014: Session lifecycle hooks per ARCH-07
             tool_names::SESSION_START => self.call_session_start(id, arguments).await,
             tool_names::SESSION_END => self.call_session_end(id, arguments).await,

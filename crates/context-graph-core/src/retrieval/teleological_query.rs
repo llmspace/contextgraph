@@ -14,7 +14,6 @@ use uuid::Uuid;
 
 use crate::error::{CoreError, CoreResult};
 use crate::types::fingerprint::{PurposeVector, SemanticFingerprint};
-use crate::types::JohariQuadrant;
 
 use super::PipelineStageConfig;
 
@@ -29,7 +28,6 @@ use super::PipelineStageConfig;
 ///
 /// - `purpose`: Pre-computed purpose vector (computed if not provided)
 /// - `target_goals`: Goal IDs for alignment filtering
-/// - `johari_filter`: Restrict results to specific quadrants
 /// - `pipeline_config`: Override default stage configuration
 /// - `include_breakdown`: Enable detailed per-stage breakdown
 ///
@@ -67,12 +65,6 @@ pub struct TeleologicalQuery {
     /// If provided, results below `min_alignment_threshold` are filtered.
     pub target_goals: Vec<Uuid>,
 
-    /// Johari quadrant filter (only return results in these quadrants).
-    ///
-    /// If None, all quadrants are included.
-    /// If Some(vec), only results with dominant quadrant in the vec pass.
-    pub johari_filter: Option<Vec<JohariQuadrant>>,
-
     /// Pipeline stage configuration overrides.
     ///
     /// If None, uses `PipelineStageConfig::default()` with:
@@ -109,7 +101,6 @@ impl TeleologicalQuery {
             embeddings: None,
             purpose: None,
             target_goals: Vec::new(),
-            johari_filter: None,
             pipeline_config: None,
             include_breakdown: false,
         }
@@ -133,7 +124,6 @@ impl TeleologicalQuery {
             embeddings: Some(embeddings),
             purpose: None,
             target_goals: Vec::new(),
-            johari_filter: None,
             pipeline_config: None,
             include_breakdown: false,
         }
@@ -154,12 +144,6 @@ impl TeleologicalQuery {
     /// Add a single target goal.
     pub fn with_goal(mut self, goal: Uuid) -> Self {
         self.target_goals.push(goal);
-        self
-    }
-
-    /// Set Johari quadrant filter.
-    pub fn with_johari_filter(mut self, quadrants: Vec<JohariQuadrant>) -> Self {
-        self.johari_filter = Some(quadrants);
         self
     }
 
@@ -197,8 +181,7 @@ impl TeleologicalQuery {
     ///
     /// 1. Either `text` or `embeddings` must be provided (not both empty)
     /// 2. If `text` is provided, it must not be only whitespace
-    /// 3. If `johari_filter` is provided, it must not be empty
-    /// 4. If `pipeline_config` thresholds must be in valid ranges
+    /// 3. If `pipeline_config` thresholds must be in valid ranges
     ///
     /// # Errors
     ///
@@ -237,21 +220,7 @@ impl TeleologicalQuery {
             });
         }
 
-        // Rule 3: Johari filter must not be empty if provided
-        if let Some(ref filter) = self.johari_filter {
-            if filter.is_empty() {
-                tracing::error!(
-                    target: "pipeline",
-                    "TeleologicalQuery validation failed: johari_filter is empty"
-                );
-                return Err(CoreError::ValidationError {
-                    field: "johari_filter".to_string(),
-                    message: "Johari filter cannot be empty - use None instead".to_string(),
-                });
-            }
-        }
-
-        // Rule 4: Validate pipeline config if provided
+        // Rule 3: Validate pipeline config if provided
         if let Some(ref config) = self.pipeline_config {
             config.validate()?;
         }
@@ -275,12 +244,6 @@ impl TeleologicalQuery {
     #[inline]
     pub fn has_goals(&self) -> bool {
         !self.target_goals.is_empty()
-    }
-
-    /// Check if query has Johari quadrant filtering.
-    #[inline]
-    pub fn has_johari_filter(&self) -> bool {
-        self.johari_filter.is_some()
     }
 
     /// Get the effective pipeline config (uses default if not set).
@@ -355,39 +318,6 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_empty_johari_filter_fails() {
-        let query = TeleologicalQuery::from_text("test").with_johari_filter(Vec::new());
-        let result = query.validate();
-
-        assert!(result.is_err(), "Empty johari_filter must fail");
-
-        match result {
-            Err(CoreError::ValidationError { field, .. }) => {
-                assert_eq!(field, "johari_filter");
-            }
-            other => panic!("Expected ValidationError, got: {:?}", other),
-        }
-
-        println!("[VERIFIED] Empty johari_filter fails validation");
-    }
-
-    #[test]
-    fn test_with_johari_filter() {
-        let query = TeleologicalQuery::from_text("test")
-            .with_johari_filter(vec![JohariQuadrant::Open, JohariQuadrant::Blind]);
-
-        assert!(query.has_johari_filter());
-        assert!(query.validate().is_ok());
-
-        let filter = query.johari_filter.unwrap();
-        assert_eq!(filter.len(), 2);
-        assert!(filter.contains(&JohariQuadrant::Open));
-        assert!(filter.contains(&JohariQuadrant::Blind));
-
-        println!("[VERIFIED] with_johari_filter sets filter correctly");
-    }
-
-    #[test]
     fn test_with_goals() {
         let goal1 = Uuid::new_v4();
         let goal2 = Uuid::new_v4();
@@ -451,13 +381,11 @@ mod tests {
         let goal = Uuid::new_v4();
         let query = TeleologicalQuery::from_text("complex query")
             .with_goal(goal)
-            .with_johari_filter(vec![JohariQuadrant::Open])
             .with_min_alignment(0.75)
             .with_breakdown(true);
 
         assert_eq!(query.text, "complex query");
         assert!(query.has_goals());
-        assert!(query.has_johari_filter());
         assert!(query.include_breakdown);
         assert!(query.validate().is_ok());
 

@@ -6,7 +6,6 @@ use uuid::Uuid;
 use crate::index::config::{HnswConfig, PURPOSE_VECTOR_DIM};
 use crate::index::hnsw_impl::RealHnswIndex;
 use crate::types::fingerprint::PurposeVector;
-use crate::types::JohariQuadrant;
 
 use super::super::clustering::{KMeansConfig, KMeansPurposeClustering, StandardKMeans};
 use super::super::entry::{GoalId, PurposeIndexEntry, PurposeMetadata};
@@ -47,7 +46,6 @@ impl HnswPurposeIndex {
             inner,
             metadata: HashMap::new(),
             vectors: HashMap::new(),
-            quadrant_index: HashMap::new(),
             goal_index: HashMap::new(),
         })
     }
@@ -79,17 +77,8 @@ impl HnswPurposeIndex {
             inner,
             metadata: HashMap::with_capacity(capacity),
             vectors: HashMap::with_capacity(capacity),
-            quadrant_index: HashMap::new(),
             goal_index: HashMap::new(),
         })
-    }
-
-    /// Get memories in a specific quadrant.
-    ///
-    /// Returns all memory IDs that are in the given Johari quadrant.
-    #[inline]
-    pub fn get_by_quadrant(&self, quadrant: JohariQuadrant) -> Option<&HashSet<Uuid>> {
-        self.quadrant_index.get(&quadrant)
     }
 
     /// Get memories with a specific goal.
@@ -113,12 +102,6 @@ impl HnswPurposeIndex {
 
     /// Update secondary indexes when inserting an entry.
     pub(crate) fn update_secondary_indexes(&mut self, memory_id: Uuid, metadata: &PurposeMetadata) {
-        // Update quadrant index
-        self.quadrant_index
-            .entry(metadata.dominant_quadrant)
-            .or_default()
-            .insert(memory_id);
-
         // Update goal index
         self.goal_index
             .entry(metadata.primary_goal.as_str().to_string())
@@ -132,14 +115,6 @@ impl HnswPurposeIndex {
         memory_id: Uuid,
         metadata: &PurposeMetadata,
     ) {
-        // Remove from quadrant index
-        if let Some(set) = self.quadrant_index.get_mut(&metadata.dominant_quadrant) {
-            set.remove(&memory_id);
-            if set.is_empty() {
-                self.quadrant_index.remove(&metadata.dominant_quadrant);
-            }
-        }
-
         // Remove from goal index
         let goal_key = metadata.primary_goal.as_str();
         if let Some(set) = self.goal_index.get_mut(goal_key) {
@@ -199,13 +174,6 @@ impl HnswPurposeIndex {
                     }
                 }
 
-                // Apply quadrant filter
-                if let Some(quadrant_filter) = query.quadrant_filter {
-                    if metadata.dominant_quadrant != quadrant_filter {
-                        return None;
-                    }
-                }
-
                 Some(PurposeSearchResult::new(
                     memory_id,
                     similarity,
@@ -234,32 +202,17 @@ impl HnswPurposeIndex {
             return None;
         }
 
-        let mut candidates: Option<HashSet<Uuid>> = None;
-
         // Apply goal filter
         if let Some(ref goal) = query.goal_filter {
             if let Some(goal_set) = self.goal_index.get(goal.as_str()) {
-                candidates = Some(goal_set.clone());
+                return Some(goal_set.clone());
             } else {
                 // No memories with this goal - return empty set
                 return Some(HashSet::new());
             }
         }
 
-        // Apply quadrant filter
-        if let Some(quadrant) = query.quadrant_filter {
-            if let Some(quadrant_set) = self.quadrant_index.get(&quadrant) {
-                candidates = Some(match candidates {
-                    Some(cands) => cands.intersection(quadrant_set).copied().collect(),
-                    None => quadrant_set.clone(),
-                });
-            } else {
-                // No memories in this quadrant - return empty set
-                return Some(HashSet::new());
-            }
-        }
-
-        candidates
+        None
     }
 
     /// Search using pattern clustering.
@@ -308,11 +261,6 @@ impl HnswPurposeIndex {
                         // Apply additional filters
                         if let Some(ref goal_filter) = query.goal_filter {
                             if metadata.primary_goal.as_str() != goal_filter.as_str() {
-                                continue;
-                            }
-                        }
-                        if let Some(quadrant_filter) = query.quadrant_filter {
-                            if metadata.dominant_quadrant != quadrant_filter {
                                 continue;
                             }
                         }

@@ -3,8 +3,6 @@
 //! This module provides [`PurposeQueryBuilder`] for constructing
 //! [`PurposeQuery`] instances with validation.
 
-use crate::types::JohariQuadrant;
-
 use super::super::entry::GoalId;
 use super::super::error::{PurposeIndexError, PurposeIndexResult};
 use super::target::PurposeQueryTarget;
@@ -23,7 +21,6 @@ use super::types::PurposeQuery;
 ///     .limit(10)
 ///     .min_similarity(0.7)
 ///     .goal_filter(GoalId::new("learn_pytorch"))
-///     .quadrant_filter(JohariQuadrant::Open)
 ///     .build()?;
 /// ```
 #[derive(Clone, Debug, Default)]
@@ -32,7 +29,6 @@ pub struct PurposeQueryBuilder {
     limit: Option<usize>,
     min_similarity: Option<f32>,
     goal_filter: Option<GoalId>,
-    quadrant_filter: Option<JohariQuadrant>,
 }
 
 impl PurposeQueryBuilder {
@@ -90,13 +86,6 @@ impl PurposeQueryBuilder {
         self
     }
 
-    /// Set an optional quadrant filter.
-    #[must_use]
-    pub fn quadrant_filter(mut self, quadrant: JohariQuadrant) -> Self {
-        self.quadrant_filter = Some(quadrant);
-        self
-    }
-
     /// Build the query with validation.
     ///
     /// # Errors
@@ -122,9 +111,6 @@ impl PurposeQueryBuilder {
 
         if let Some(goal) = self.goal_filter {
             query = query.with_goal_filter(goal);
-        }
-        if let Some(quadrant) = self.quadrant_filter {
-            query = query.with_quadrant_filter(quadrant);
         }
 
         Ok(query)

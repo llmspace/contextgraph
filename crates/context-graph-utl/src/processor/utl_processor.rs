@@ -6,19 +6,17 @@ use crate::coherence::CoherenceTracker;
 use crate::config::UtlConfig;
 use crate::emotional::EmotionalWeightCalculator;
 use crate::error::{UtlError, UtlResult};
-use crate::johari::JohariClassifier;
 use crate::lifecycle::LifecycleManager;
 use crate::phase::PhaseOscillator;
 use crate::surprise::SurpriseCalculator;
 use crate::{
-    compute_learning_magnitude_validated, JohariQuadrant, LearningSignal, LifecycleLambdaWeights,
-    LifecycleStage, SuggestedAction,
+    compute_learning_magnitude_validated, LearningSignal, LifecycleLambdaWeights, LifecycleStage,
 };
 use context_graph_core::types::EmotionalState;
 
-/// Main UTL computation orchestrator integrating all 6 UTL components:
+/// Main UTL computation orchestrator integrating all 5 UTL components:
 /// surprise (delta_s), coherence (delta_c), emotional weight (w_e),
-/// phase angle (phi), lifecycle lambda weights, and Johari classification.
+/// phase angle (phi), and lifecycle lambda weights.
 ///
 /// # Performance Budget
 /// Full `compute_learning()`: < 10ms (constitution perf.latency)
@@ -45,7 +43,6 @@ pub struct UtlProcessor {
     coherence_tracker: CoherenceTracker,
     emotional_calculator: EmotionalWeightCalculator,
     phase_oscillator: PhaseOscillator,
-    johari_classifier: JohariClassifier,
     lifecycle_manager: LifecycleManager,
     config: UtlConfig,
     computation_count: u64,
@@ -76,7 +73,6 @@ impl UtlProcessor {
             coherence_tracker: CoherenceTracker::new(&config.coherence),
             emotional_calculator: EmotionalWeightCalculator::new(&config.emotional),
             phase_oscillator: PhaseOscillator::new(&config.phase),
-            johari_classifier: JohariClassifier::new(&config.johari),
             lifecycle_manager: LifecycleManager::new(&config.lifecycle),
             config,
             computation_count: 0,
@@ -157,10 +153,6 @@ impl UtlProcessor {
             phi.clamp(0.0, std::f32::consts::PI),
         )?;
 
-        // Classify Johari quadrant using raw (unweighted) values
-        let quadrant = self.johari_classifier.classify(delta_s, delta_c);
-        let suggested_action = suggested_action_for_quadrant(quadrant);
-
         // Determine consolidation and storage decisions
         let should_consolidate = magnitude > self.config.thresholds.high_quality;
         let should_store = magnitude > self.config.thresholds.low_quality;
@@ -175,8 +167,6 @@ impl UtlProcessor {
             w_e,
             phi,
             Some(lambda_weights),
-            quadrant,
-            suggested_action,
             should_consolidate,
             should_store,
             latency_us,
@@ -229,17 +219,5 @@ impl UtlProcessor {
     /// Restore lifecycle state from persistence.
     pub fn restore_lifecycle(&mut self, interaction_count: u64) {
         self.lifecycle_manager.increment_by(interaction_count);
-    }
-}
-
-/// Map Johari quadrant to suggested action.
-/// Per constitution.yaml:159-163: Open->DirectRecall, Blind->TriggerDream,
-/// Hidden->GetNeighborhood, Unknown->EpistemicAction
-fn suggested_action_for_quadrant(quadrant: JohariQuadrant) -> SuggestedAction {
-    match quadrant {
-        JohariQuadrant::Open => SuggestedAction::DirectRecall,
-        JohariQuadrant::Blind => SuggestedAction::TriggerDream,
-        JohariQuadrant::Hidden => SuggestedAction::GetNeighborhood,
-        JohariQuadrant::Unknown => SuggestedAction::EpistemicAction,
     }
 }

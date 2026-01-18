@@ -23,11 +23,7 @@ pub struct TeleologicalSearchOptions {
     /// Default: false
     pub include_deleted: bool,
 
-    /// Filter by dominant Johari quadrant.
-    /// None = no filtering.
-    pub johari_quadrant_filter: Option<usize>,
-
-    /// Filter by minimum alignment to North Star.
+    /// Filter by minimum alignment to Strategic goals.
     /// None = no filtering.
     pub min_alignment: Option<f32>,
 
@@ -61,7 +57,6 @@ impl Default for TeleologicalSearchOptions {
             top_k: 10,
             min_similarity: 0.0,
             include_deleted: false,
-            johari_quadrant_filter: None,
             min_alignment: None,
             embedder_indices: Vec::new(),
             semantic_query: None,
@@ -133,7 +128,6 @@ mod tests {
         assert_eq!(opts.top_k, 10);
         assert_eq!(opts.min_similarity, 0.0);
         assert!(!opts.include_deleted);
-        assert!(opts.johari_quadrant_filter.is_none());
         assert!(opts.min_alignment.is_none());
         assert!(opts.embedder_indices.is_empty());
     }

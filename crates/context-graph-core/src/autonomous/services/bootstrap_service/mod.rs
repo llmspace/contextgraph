@@ -1,8 +1,8 @@
 //! NORTH-008: BootstrapService Implementation
 //!
-//! Service for initializing North Star goal from documentation sources.
+//! Service for initializing Strategic goals from documentation sources.
 //! Extracts goal candidates from project documents and selects the best
-//! goal to serve as the North Star for the context graph system.
+//! goal to serve as the Strategic goal for the context graph system.
 //!
 //! # Architecture
 //!
@@ -10,7 +10,7 @@
 //! 1. Scan document directory for matching files by extension
 //! 2. Extract goal candidates from each document using keyword analysis
 //! 3. Score candidates using section weights and confidence metrics
-//! 4. Select the highest-scoring candidate as the North Star goal
+//! 4. Select the highest-scoring candidate as the Strategic goal
 //!
 //! # Pattern: FAIL FAST
 //!

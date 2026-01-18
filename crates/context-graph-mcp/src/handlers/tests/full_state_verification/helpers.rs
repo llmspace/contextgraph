@@ -33,7 +33,7 @@ pub(crate) fn create_handlers_with_store_access() -> (
         Arc::new(StubMultiArrayProvider::new());
     let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
         Arc::new(DefaultAlignmentCalculator::new());
-    // Must use test hierarchy with North Star - store handler requires it (AP-007)
+    // Must use test hierarchy with strategic goal - store handler requires it (AP-007)
     let goal_hierarchy = create_test_hierarchy();
 
     let handlers = Handlers::new(

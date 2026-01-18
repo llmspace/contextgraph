@@ -8,14 +8,13 @@
 //! # Test Categories
 //! 1. Node lifecycle (CRUD)
 //! 2. Marblestone edge features (NT weights, steering, shortcuts)
-//! 3. Johari quadrant index consistency
-//! 4. Cognitive pulse action matrix
-//! 5. Tag and temporal index operations
-//! 6. Concurrent access patterns
-//! 7. Performance benchmarks
-//! 8. Error handling paths
-//! 9. Memex trait compliance
-//! 10. Edge cases (empty, limits, NaN)
+//! 3. Cognitive pulse action matrix
+//! 4. Tag and temporal index operations
+//! 5. Concurrent access patterns
+//! 6. Performance benchmarks
+//! 7. Error handling paths
+//! 8. Memex trait compliance
+//! 9. Edge cases (empty, limits, NaN)
 //!
 //! # Full State Verification Protocol
 //! After each operation:
@@ -32,7 +31,6 @@ mod edge_crud;
 mod edge_marblestone;
 mod embedding_ops;
 mod error_handling;
-mod index_johari;
 mod index_tags_temporal;
 mod memex_trait;
 mod node_lifecycle;

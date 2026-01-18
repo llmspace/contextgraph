@@ -2,7 +2,7 @@
 //!
 //! Each submodule contains operations for a specific data type or category.
 //!
-//! TASK-P0-004: Removed drift and goal modules (obsolete after North Star removal).
+//! TASK-P0-004: Removed drift and goal modules (obsolete).
 
 pub mod consolidation;
 pub mod curation;

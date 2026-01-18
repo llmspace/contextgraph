@@ -1,6 +1,5 @@
 //! Bootstrap configuration types for autonomous Strategic goal initialization.
 //!
-//! TASK-P0-005: Renamed north_star_id to strategic_goal_id per ARCH-03.
 //! This module defines the types needed to bootstrap a Strategic goal from
 //! project documents when no explicit configuration exists.
 
@@ -47,7 +46,7 @@ impl Default for SectionWeights {
 /// Configuration for autonomous bootstrap
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BootstrapConfig {
-    /// Enable auto-initialization when no North Star exists
+    /// Enable auto-initialization when no Strategic goal exists
     pub auto_init: bool,
 
     /// Fallback description if no documents found
@@ -88,7 +87,6 @@ impl Default for BootstrapConfig {
 #[derive(Clone, Debug)]
 pub struct BootstrapResult {
     pub success: bool,
-    /// TASK-P0-005: Renamed from strategic_goal_id per ARCH-03
     pub strategic_goal_id: Option<GoalId>,
     pub description: String,
     pub source_documents: Vec<String>,

@@ -80,7 +80,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             "get_memetic_status",
             "Get current system status with LIVE UTL metrics from the UtlProcessor: \
              entropy (novelty), coherence (understanding), learning score (magnitude), \
-             Johari quadrant classification, consolidation phase, and suggested action. \
+             consolidation phase, and suggested action. \
              Also returns node count and 5-layer bio-nervous system status.",
             json!({
                 "type": "object",
@@ -140,7 +140,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
         ToolDefinition::new(
             "utl_status",
             "Query current UTL (Unified Theory of Learning) system state including lifecycle phase, \
-             entropy, coherence, learning score, Johari quadrant, and consolidation phase.",
+             entropy, coherence, learning score, and consolidation phase.",
             json!({
                 "type": "object",
                 "properties": {},

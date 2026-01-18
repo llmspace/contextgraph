@@ -1,12 +1,12 @@
 //! Teleological fingerprint storage extensions.
 //!
-//! Adds 20 column families for TeleologicalFingerprint storage:
-//! - 7 core teleological CFs (~63KB fingerprints, purpose vectors, indexes, teleological vectors)
+//! Adds 22 column families for TeleologicalFingerprint storage:
+//! - 9 core teleological CFs (~63KB fingerprints, purpose vectors, indexes, teleological vectors)
 //! - 13 quantized embedder CFs (per-embedder quantized storage)
 //!
-//! # Column Families (20 new, 32 total with base 12)
+//! # Column Families (22 new, 30 total with base 8)
 //!
-//! ## Core Teleological (7 CFs)
+//! ## Core Teleological (9 CFs)
 //! | Name | Purpose | Key Format | Value Size |
 //! |------|---------|------------|------------|
 //! | fingerprints | Primary ~63KB TeleologicalFingerprints | UUID (16 bytes) | ~63KB |
@@ -58,8 +58,6 @@ pub use column_families::{
     e12_late_interaction_cf_options,
     e13_splade_inverted_cf_options,
     e1_matryoshka_128_cf_options,
-    // TASK-GWT-P1-001: Ego node column family
-    ego_node_cf_options,
     fingerprint_cf_options,
     get_all_teleological_cf_descriptors,
     get_quantized_embedder_cf_descriptors,
@@ -67,8 +65,6 @@ pub use column_families::{
     purpose_vector_cf_options,
     // Quantized embedder column families (TASK-EMB-022)
     quantized_embedder_cf_options,
-    // TASK-SESSION-04: Session identity column family
-    session_identity_cf_options,
     synergy_matrix_cf_options,
     teleological_profiles_cf_options,
     teleological_vectors_cf_options,
@@ -78,8 +74,6 @@ pub use column_families::{
     CF_E12_LATE_INTERACTION,
     CF_E13_SPLADE_INVERTED,
     CF_E1_MATRYOSHKA_128,
-    // TASK-GWT-P1-001: Ego node column family constant
-    CF_EGO_NODE,
     CF_EMB_0,
     CF_EMB_1,
     CF_EMB_10,
@@ -95,8 +89,6 @@ pub use column_families::{
     CF_EMB_9,
     CF_FINGERPRINTS,
     CF_PURPOSE_VECTORS,
-    // TASK-SESSION-04: Session identity column family constant
-    CF_SESSION_IDENTITY,
     // TASK-TELEO-006: New teleological vector column families
     CF_SYNERGY_MATRIX,
     CF_TELEOLOGICAL_PROFILES,
@@ -114,28 +106,16 @@ pub use quantized::{QuantizedFingerprintStorage, QuantizedStorageError, Quantize
 pub use schema::{
     e13_splade_inverted_key,
     e1_matryoshka_128_key,
-    // TASK-GWT-P1-001: Ego node key functions
-    ego_node_key,
     fingerprint_key,
     parse_e13_splade_key,
     parse_e1_matryoshka_key,
     parse_fingerprint_key,
     parse_purpose_vector_key,
-    // TASK-SESSION-04: Session identity key functions
-    parse_session_identity_key,
-    parse_session_temporal_key,
     parse_teleological_profile_key,
     parse_teleological_vector_key,
     purpose_vector_key,
-    // TASK-SESSION-04: Session identity key functions
-    session_identity_key,
-    session_temporal_key,
     teleological_profile_key,
     teleological_vector_key,
-    // TASK-GWT-P1-001: Ego node key constant
-    EGO_NODE_KEY,
-    // TASK-SESSION-04: Session latest key constant
-    SESSION_LATEST_KEY,
     // TASK-TELEO-006: New key format functions
     SYNERGY_MATRIX_KEY,
 };
@@ -143,19 +123,13 @@ pub use schema::{
 // Re-export serialization types
 pub use serialization::{
     deserialize_e1_matryoshka_128,
-    // TASK-GWT-P1-001: Ego node serialization
-    deserialize_ego_node,
     deserialize_memory_id_list,
     deserialize_purpose_vector,
     deserialize_teleological_fingerprint,
     serialize_e1_matryoshka_128,
-    // TASK-GWT-P1-001: Ego node serialization
-    serialize_ego_node,
     serialize_memory_id_list,
     serialize_purpose_vector,
     serialize_teleological_fingerprint,
-    // TASK-GWT-P1-001: Ego node version constant
-    EGO_NODE_VERSION,
     TELEOLOGICAL_VERSION,
 };
 

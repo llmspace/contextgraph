@@ -41,14 +41,12 @@
 
 mod causal;
 mod cognitive_pulse;
-mod consciousness_dispatch;
 mod content_storage_verification;
 mod epistemic;
 mod error_codes;
 mod exhaustive_mcp_tools;
 mod full_state_verification;
 mod full_state_verification_gwt;
-mod full_state_verification_johari;
 mod full_state_verification_meta_utl;
 mod full_state_verification_purpose;
 mod full_state_verification_search;
@@ -65,7 +63,6 @@ mod memory;
 mod meta_cognitive;
 mod phase1_manual_store_verify;
 mod phase2_search_retrieval;
-mod phase3_gwt_consciousness;
 mod phase4_autonomous_bootstrap;
 mod phase5_teleological_operations;
 mod phase6_cross_agent_coordination;
@@ -289,7 +286,7 @@ pub(crate) fn create_test_handlers_no_goals() -> Handlers {
 /// - **UTL**: UtlProcessorAdapter with defaults (real UTL computation)
 /// - **Embeddings**: StubMultiArrayProvider (until GPU embedding ready - FAIL FAST on embed ops)
 /// - **Alignment**: DefaultAlignmentCalculator (real cosine similarity)
-/// - **Goals**: Test hierarchy with North Star
+/// - **Goals**: Test hierarchy with strategic goals
 ///
 /// # HNSW Initialization
 ///
@@ -717,30 +714,24 @@ pub(crate) fn make_request(
 use parking_lot::RwLock as ParkingRwLock;
 use tokio::sync::RwLock as TokioRwLock;
 
-use context_graph_core::johari::{DynDefaultJohariManager, JohariTransitionManager};
 use context_graph_core::monitoring::{StubLayerStatusProvider, StubSystemMonitor};
 use context_graph_core::{LayerStatusProvider, SystemMonitor};
 
 use crate::handlers::core::MetaUtlTracker;
 use crate::handlers::gwt_providers::{
-    GwtSystemProviderImpl, KuramotoProviderImpl, MetaCognitiveProviderImpl, SelfEgoProviderImpl,
-    WorkspaceProviderImpl,
+    GwtSystemProviderImpl, MetaCognitiveProviderImpl, WorkspaceProviderImpl,
 };
-use crate::handlers::gwt_traits::{
-    GwtSystemProvider, KuramotoProvider, MetaCognitiveProvider, SelfEgoProvider, WorkspaceProvider,
-};
+use crate::handlers::gwt_traits::{GwtSystemProvider, MetaCognitiveProvider, WorkspaceProvider};
 
-/// Create test handlers with WARM GWT state (synchronized Kuramoto, non-zero purpose vector).
+/// Create test handlers with WARM GWT state (non-zero purpose vector).
 ///
 /// This helper creates handlers with GWT components in a "warm" state:
-/// - Kuramoto network SYNCHRONIZED (r ≈ 1.0, state = CONSCIOUS)
-/// - Purpose vector with non-zero values (aligned to North Star)
+/// - Purpose vector with non-zero values (aligned to strategic goal)
 /// - All other GWT components at default/initial state
 ///
 /// # Use Case
 ///
 /// Use this helper when testing GWT tools that should return meaningful non-zero values.
-/// For example, `get_kuramoto_sync` should return r ≈ 1.0 instead of r ≈ 0.0.
 ///
 /// # Returns
 ///
@@ -752,31 +743,21 @@ use crate::handlers::gwt_traits::{
 /// #[tokio::test]
 /// async fn test_gwt_returns_non_zero_values() {
 ///     let handlers = create_test_handlers_with_warm_gwt();
-///
-///     // Kuramoto should return high r value
-///     let response = handlers.dispatch(kuramoto_request).await;
-///     let r = response.result["r"].as_f64().unwrap();
-///     assert!(r > 0.9, "Kuramoto r should be ≈ 1 for synchronized network");
+///     // GWT tools should return meaningful values
 /// }
 /// ```
 pub(crate) fn create_test_handlers_with_warm_gwt() -> Handlers {
-    let store = Arc::new(InMemoryTeleologicalStore::new());
-    let teleological_store: Arc<dyn TeleologicalMemoryStore> = store.clone();
+    let teleological_store: Arc<dyn TeleologicalMemoryStore> =
+        Arc::new(InMemoryTeleologicalStore::new());
     let utl_processor: Arc<dyn UtlProcessor> = Arc::new(StubUtlProcessor::new());
     let multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider> =
         Arc::new(StubMultiArrayProvider::new());
     let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
         Arc::new(DefaultAlignmentCalculator::new());
     let goal_hierarchy = Arc::new(ParkingRwLock::new(create_test_hierarchy()));
-    let johari_manager: Arc<dyn JohariTransitionManager> =
-        Arc::new(DynDefaultJohariManager::new(store));
     let meta_utl_tracker = Arc::new(ParkingRwLock::new(MetaUtlTracker::new()));
     let system_monitor: Arc<dyn SystemMonitor> = Arc::new(StubSystemMonitor);
     let layer_status_provider: Arc<dyn LayerStatusProvider> = Arc::new(StubLayerStatusProvider);
-
-    // WARM STATE: Create synchronized Kuramoto network (r ≈ 1.0)
-    let kuramoto_network: Arc<ParkingRwLock<dyn KuramotoProvider>> =
-        Arc::new(ParkingRwLock::new(KuramotoProviderImpl::synchronized()));
 
     let gwt_system: Arc<dyn GwtSystemProvider> = Arc::new(GwtSystemProviderImpl::new());
     let workspace_provider: Arc<TokioRwLock<dyn WorkspaceProvider>> =
@@ -784,42 +765,18 @@ pub(crate) fn create_test_handlers_with_warm_gwt() -> Handlers {
     let meta_cognitive: Arc<TokioRwLock<dyn MetaCognitiveProvider>> =
         Arc::new(TokioRwLock::new(MetaCognitiveProviderImpl::new()));
 
-    // WARM STATE: Create purpose vector with non-zero values (aligned to North Star)
-    // Using values based on embedder natural frequencies for realistic distribution
-    let warm_purpose_vector: [f32; 13] = [
-        0.85, // E1: Semantic - high alignment
-        0.72, // E2: Temporal (recent)
-        0.68, // E3: Temporal (medium)
-        0.65, // E4: Temporal (long)
-        0.78, // E5: Causal
-        0.55, // E6: Sparse (SPLADE)
-        0.82, // E7: Code
-        0.71, // E8: Graph
-        0.63, // E9: HDC
-        0.59, // E10: Multimodal
-        0.76, // E11: Entity
-        0.69, // E12: Late-interaction
-        0.52, // E13: SPLADE auxiliary
-    ];
-    let self_ego: Arc<TokioRwLock<dyn SelfEgoProvider>> = Arc::new(TokioRwLock::new(
-        SelfEgoProviderImpl::with_purpose_vector(warm_purpose_vector),
-    ));
-
     Handlers::with_gwt(
         teleological_store,
         utl_processor,
         multi_array_provider,
         alignment_calculator,
         goal_hierarchy,
-        johari_manager,
         meta_utl_tracker,
         system_monitor,
         layer_status_provider,
-        kuramoto_network,
         gwt_system,
         workspace_provider,
         meta_cognitive,
-        self_ego,
     )
 }
 
@@ -839,9 +796,6 @@ pub(crate) async fn create_test_handlers_with_warm_gwt_rocksdb() -> (Handlers, T
         RocksDbTeleologicalStore::open(&db_path).expect("Failed to open RocksDbTeleologicalStore");
     // Note: EmbedderIndexRegistry is initialized in constructor
 
-    // Create in-memory store for Johari manager (separate from RocksDB)
-    let johari_store = Arc::new(InMemoryTeleologicalStore::new());
-
     let teleological_store: Arc<dyn TeleologicalMemoryStore> = Arc::new(rocksdb_store);
     let utl_processor: Arc<dyn UtlProcessor> = Arc::new(UtlProcessorAdapter::with_defaults());
     let multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider> =
@@ -849,15 +803,9 @@ pub(crate) async fn create_test_handlers_with_warm_gwt_rocksdb() -> (Handlers, T
     let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
         Arc::new(DefaultAlignmentCalculator::new());
     let goal_hierarchy = Arc::new(ParkingRwLock::new(create_test_hierarchy()));
-    let johari_manager: Arc<dyn JohariTransitionManager> =
-        Arc::new(DynDefaultJohariManager::new(johari_store));
     let meta_utl_tracker = Arc::new(ParkingRwLock::new(MetaUtlTracker::new()));
     let system_monitor: Arc<dyn SystemMonitor> = Arc::new(StubSystemMonitor);
     let layer_status_provider: Arc<dyn LayerStatusProvider> = Arc::new(StubLayerStatusProvider);
-
-    // WARM STATE: Synchronized Kuramoto network
-    let kuramoto_network: Arc<ParkingRwLock<dyn KuramotoProvider>> =
-        Arc::new(ParkingRwLock::new(KuramotoProviderImpl::synchronized()));
 
     let gwt_system: Arc<dyn GwtSystemProvider> = Arc::new(GwtSystemProviderImpl::new());
     let workspace_provider: Arc<TokioRwLock<dyn WorkspaceProvider>> =
@@ -865,29 +813,18 @@ pub(crate) async fn create_test_handlers_with_warm_gwt_rocksdb() -> (Handlers, T
     let meta_cognitive: Arc<TokioRwLock<dyn MetaCognitiveProvider>> =
         Arc::new(TokioRwLock::new(MetaCognitiveProviderImpl::new()));
 
-    // WARM STATE: Non-zero purpose vector
-    let warm_purpose_vector: [f32; 13] = [
-        0.85, 0.72, 0.68, 0.65, 0.78, 0.55, 0.82, 0.71, 0.63, 0.59, 0.76, 0.69, 0.52,
-    ];
-    let self_ego: Arc<TokioRwLock<dyn SelfEgoProvider>> = Arc::new(TokioRwLock::new(
-        SelfEgoProviderImpl::with_purpose_vector(warm_purpose_vector),
-    ));
-
     let handlers = Handlers::with_gwt(
         teleological_store,
         utl_processor,
         multi_array_provider,
         alignment_calculator,
         goal_hierarchy,
-        johari_manager,
         meta_utl_tracker,
         system_monitor,
         layer_status_provider,
-        kuramoto_network,
         gwt_system,
         workspace_provider,
         meta_cognitive,
-        self_ego,
     );
 
     (handlers, tempdir)
@@ -896,7 +833,7 @@ pub(crate) async fn create_test_handlers_with_warm_gwt_rocksdb() -> (Handlers, T
 /// Create test handlers with ALL components initialized for exhaustive MCP tool testing.
 ///
 /// TASK-EXHAUSTIVE-MCP: This function initializes:
-/// - GWT providers (Kuramoto, Workspace, MetaCognitive, SelfEgo) with WARM state
+/// - GWT providers (Workspace, MetaCognitive) with WARM state
 /// - ATC (Adaptive Threshold Calibration) - enables get_threshold_status, get_calibration_metrics, trigger_recalibration
 /// - Dream system (DreamController, DreamScheduler, AmortizedLearner) - enables trigger_dream, get_dream_status, abort_dream, get_amortized_shortcuts
 /// - Neuromodulation (NeuromodulationManager) - enables get_neuromodulation_state, adjust_neuromodulator
@@ -907,47 +844,30 @@ pub(crate) async fn create_test_handlers_with_warm_gwt_rocksdb() -> (Handlers, T
 ///
 /// `Handlers` - Fully configured handlers with all components
 pub(crate) fn create_test_handlers_with_all_components() -> Handlers {
-    use super::gwt_providers::{
-        GwtSystemProviderImpl, KuramotoProviderImpl, MetaCognitiveProviderImpl,
-        SelfEgoProviderImpl, WorkspaceProviderImpl,
-    };
+    use super::gwt_providers::{GwtSystemProviderImpl, MetaCognitiveProviderImpl, WorkspaceProviderImpl};
     use context_graph_core::atc::AdaptiveThresholdCalibration;
     use context_graph_core::dream::{
         AmortizedLearner, DreamController, DreamScheduler, TriggerManager,
     };
     use context_graph_core::neuromod::NeuromodulationManager;
 
-    let store = Arc::new(InMemoryTeleologicalStore::new());
-    let teleological_store: Arc<dyn TeleologicalMemoryStore> = store.clone();
+    let teleological_store: Arc<dyn TeleologicalMemoryStore> =
+        Arc::new(InMemoryTeleologicalStore::new());
     let utl_processor: Arc<dyn UtlProcessor> = Arc::new(StubUtlProcessor::new());
     let multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider> =
         Arc::new(StubMultiArrayProvider::new());
     let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
         Arc::new(DefaultAlignmentCalculator::new());
     let goal_hierarchy = Arc::new(ParkingRwLock::new(create_test_hierarchy()));
-    let johari_manager: Arc<dyn JohariTransitionManager> =
-        Arc::new(DynDefaultJohariManager::new(store));
     let meta_utl_tracker = Arc::new(ParkingRwLock::new(MetaUtlTracker::new()));
     let system_monitor: Arc<dyn SystemMonitor> = Arc::new(StubSystemMonitor);
     let layer_status_provider: Arc<dyn LayerStatusProvider> = Arc::new(StubLayerStatusProvider);
-
-    // WARM STATE: Synchronized Kuramoto network (r ≈ 1.0)
-    let kuramoto_network: Arc<ParkingRwLock<dyn KuramotoProvider>> =
-        Arc::new(ParkingRwLock::new(KuramotoProviderImpl::synchronized()));
 
     let gwt_system: Arc<dyn GwtSystemProvider> = Arc::new(GwtSystemProviderImpl::new());
     let workspace_provider: Arc<TokioRwLock<dyn WorkspaceProvider>> =
         Arc::new(TokioRwLock::new(WorkspaceProviderImpl::new()));
     let meta_cognitive: Arc<TokioRwLock<dyn MetaCognitiveProvider>> =
         Arc::new(TokioRwLock::new(MetaCognitiveProviderImpl::new()));
-
-    // WARM STATE: Non-zero purpose vector for good alignment
-    let warm_purpose_vector: [f32; 13] = [
-        0.85, 0.72, 0.68, 0.65, 0.78, 0.55, 0.82, 0.71, 0.63, 0.59, 0.76, 0.69, 0.52,
-    ];
-    let self_ego: Arc<TokioRwLock<dyn SelfEgoProvider>> = Arc::new(TokioRwLock::new(
-        SelfEgoProviderImpl::with_purpose_vector(warm_purpose_vector),
-    ));
 
     // TASK-NEUROMOD-MCP: Create REAL NeuromodulationManager
     let neuromod_manager: Arc<ParkingRwLock<NeuromodulationManager>> =
@@ -977,15 +897,12 @@ pub(crate) fn create_test_handlers_with_all_components() -> Handlers {
         multi_array_provider,
         alignment_calculator,
         goal_hierarchy,
-        johari_manager,
         meta_utl_tracker,
         system_monitor,
         layer_status_provider,
-        kuramoto_network,
         gwt_system,
         workspace_provider,
         meta_cognitive,
-        self_ego,
         atc,
         dream_controller,
         dream_scheduler,

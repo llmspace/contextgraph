@@ -7,7 +7,7 @@
 //! - Edge cases and boundary conditions
 //! - Integration with real data types
 //!
-//! TASK-P0-004: Removed drift_history and goal_activity_metrics tests after North Star removal.
+//! TASK-P0-004: Removed drift_history and goal_activity_metrics tests.
 
 use super::*;
 use rocksdb::Cache;

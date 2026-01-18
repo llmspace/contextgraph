@@ -36,7 +36,27 @@ pub use metadata::NodeMetadata;
 pub use node::MemoryNode;
 pub use validation::ValidationError;
 
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+/// Content modality type for memory nodes.
+///
+/// Indicates the type of content stored in a memory node, which affects
+/// how the content is processed, indexed, and retrieved.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum Modality {
+    /// Plain text content (default)
+    #[default]
+    Text,
+    /// Source code content
+    Code,
+    /// Image content
+    Image,
+    /// Audio content
+    Audio,
+    /// Structured data (JSON, YAML, etc.)
+    Structured,
+}
 
 /// Unique identifier for memory nodes
 pub type NodeId = Uuid;

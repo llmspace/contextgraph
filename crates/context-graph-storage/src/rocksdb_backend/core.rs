@@ -12,7 +12,6 @@
 //! │   ├── CF: nodes        - Primary node storage
 //! │   ├── CF: edges        - Graph edge storage
 //! │   ├── CF: embeddings   - Vector embeddings (1536D)
-//! │   ├── CF: johari_*     - Quadrant indexes (4 CFs)
 //! │   ├── CF: temporal     - Time-based index
 //! │   ├── CF: tags         - Tag index
 //! │   ├── CF: sources      - Source index
@@ -65,7 +64,7 @@ use super::error::StorageError;
 /// | `nodes` | Primary node storage | 16KB |
 /// | `edges` | Graph edge storage | 16KB |
 /// | `embeddings` | Vector embeddings | 64KB (write-optimized) |
-/// | `johari_open/blind/hidden/unknown` | Quadrant indexes | 4KB |
+/// | `metadata` | Node metadata | 4KB |
 /// | `temporal` | Time-based index | 4KB |
 /// | `tags` | Tag index | 4KB |
 /// | `sources` | Source index | 4KB |
@@ -80,7 +79,7 @@ use super::error::StorageError;
 /// # Example: Basic Usage
 ///
 /// ```rust
-/// use context_graph_storage::{RocksDbMemex, Memex, MemoryNode, JohariQuadrant};
+/// use context_graph_storage::{RocksDbMemex, Memex, MemoryNode};
 /// use tempfile::TempDir;
 ///
 /// // Create database
@@ -93,7 +92,6 @@ use super::error::StorageError;
 /// let embedding = vec![val; dim];
 ///
 /// let mut node = MemoryNode::new("Hello, RocksDB!".to_string(), embedding);
-/// node.quadrant = JohariQuadrant::Open;
 /// memex.store_node(&node).unwrap();
 ///
 /// // Retrieve the node

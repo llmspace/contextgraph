@@ -19,7 +19,6 @@
 //! use context_graph_core::index::purpose::entry::{PurposeMetadata, PurposeIndexEntry};
 //! use context_graph_core::types::fingerprint::purpose::PurposeVector;
 //! use context_graph_core::purpose::goals::GoalId;
-//! use context_graph_core::types::johari::quadrant::JohariQuadrant;
 //! use std::time::SystemTime;
 //! use uuid::Uuid;
 //!
@@ -27,7 +26,6 @@
 //! let metadata = PurposeMetadata::new(
 //!     GoalId::new("master_ml"),
 //!     0.85,
-//!     JohariQuadrant::Open,
 //! )?;
 //!
 //! // Create entry with all fields
@@ -42,7 +40,6 @@
 //! ```
 
 use crate::types::fingerprint::PurposeVector;
-use crate::types::JohariQuadrant;
 
 use super::error::{PurposeIndexError, PurposeIndexResult};
 use serde::{Deserialize, Serialize};
@@ -116,12 +113,6 @@ pub struct PurposeMetadata {
     ///
     /// Used for staleness detection and recomputation scheduling.
     pub computed_at: SystemTime,
-
-    /// The dominant Johari quadrant for this memory.
-    ///
-    /// Indicates the visibility/awareness classification of the memory
-    /// from the Johari Window model.
-    pub dominant_quadrant: JohariQuadrant,
 }
 
 impl PurposeMetadata {
@@ -131,7 +122,6 @@ impl PurposeMetadata {
     ///
     /// * `primary_goal` - The goal this memory primarily aligns with
     /// * `confidence` - Confidence level in [0.0, 1.0]
-    /// * `dominant_quadrant` - The Johari quadrant classification
     ///
     /// # Errors
     ///
@@ -147,28 +137,21 @@ impl PurposeMetadata {
     /// ```ignore
     /// use context_graph_core::index::purpose::entry::PurposeMetadata;
     /// use context_graph_core::purpose::goals::GoalId;
-    /// use context_graph_core::types::johari::quadrant::JohariQuadrant;
     ///
     /// // Valid confidence
     /// let metadata = PurposeMetadata::new(
     ///     GoalId::new("learn_pytorch"),
     ///     0.85,
-    ///     JohariQuadrant::Open,
     /// ).expect("Valid metadata");
     ///
     /// // Invalid confidence fails immediately
     /// let result = PurposeMetadata::new(
     ///     GoalId::new("learn_pytorch"),
     ///     1.5, // INVALID
-    ///     JohariQuadrant::Open,
     /// );
     /// assert!(result.is_err());
     /// ```
-    pub fn new(
-        primary_goal: GoalId,
-        confidence: f32,
-        dominant_quadrant: JohariQuadrant,
-    ) -> PurposeIndexResult<Self> {
+    pub fn new(primary_goal: GoalId, confidence: f32) -> PurposeIndexResult<Self> {
         // Fail-fast validation: confidence must be in [0.0, 1.0]
         if !(0.0..=1.0).contains(&confidence) {
             return Err(PurposeIndexError::invalid_confidence(
@@ -181,7 +164,6 @@ impl PurposeMetadata {
             primary_goal,
             confidence,
             computed_at: SystemTime::now(),
-            dominant_quadrant,
         })
     }
 
@@ -196,7 +178,6 @@ impl PurposeMetadata {
         primary_goal: GoalId,
         confidence: f32,
         computed_at: SystemTime,
-        dominant_quadrant: JohariQuadrant,
     ) -> PurposeIndexResult<Self> {
         // Fail-fast validation: confidence must be in [0.0, 1.0]
         if !(0.0..=1.0).contains(&confidence) {
@@ -210,7 +191,6 @@ impl PurposeMetadata {
             primary_goal,
             confidence,
             computed_at,
-            dominant_quadrant,
         })
     }
 
@@ -276,13 +256,11 @@ impl PurposeIndexEntry {
     /// use context_graph_core::index::purpose::entry::{PurposeMetadata, PurposeIndexEntry};
     /// use context_graph_core::types::fingerprint::purpose::PurposeVector;
     /// use context_graph_core::purpose::goals::GoalId;
-    /// use context_graph_core::types::johari::quadrant::JohariQuadrant;
     /// use uuid::Uuid;
     ///
     /// let metadata = PurposeMetadata::new(
     ///     GoalId::new("master_ml"),
     ///     0.9,
-    ///     JohariQuadrant::Open,
     /// ).unwrap();
     ///
     /// let alignments = [0.8, 0.7, 0.9, 0.6, 0.75, 0.65, 0.85, 0.72, 0.78, 0.68, 0.82, 0.71, 0.76];
@@ -310,7 +288,7 @@ impl PurposeIndexEntry {
     /// # Returns
     ///
     /// Reference to the 13-element alignment array where each value
-    /// is the cosine similarity to the North Star goal for that embedder.
+    /// is the cosine similarity to the emergent topic centroid for that embedder.
     ///
     /// # Example
     ///
@@ -370,14 +348,13 @@ mod tests {
     #[test]
     fn test_purpose_metadata_new_valid() {
         let goal = GoalId::new("master_ml");
-        let result = PurposeMetadata::new(goal.clone(), 0.85, JohariQuadrant::Open);
+        let result = PurposeMetadata::new(goal.clone(), 0.85);
 
         assert!(result.is_ok());
         let metadata = result.unwrap();
 
         assert_eq!(metadata.primary_goal.as_str(), "master_ml");
         assert!((metadata.confidence - 0.85).abs() < f32::EPSILON);
-        assert_eq!(metadata.dominant_quadrant, JohariQuadrant::Open);
 
         // Verify computed_at is recent
         let elapsed = metadata.computed_at.elapsed().unwrap();
@@ -389,17 +366,17 @@ mod tests {
     #[test]
     fn test_purpose_metadata_valid_boundary_values() {
         // Test confidence = 0.0 (valid minimum)
-        let result = PurposeMetadata::new(GoalId::new("test"), 0.0, JohariQuadrant::Hidden);
+        let result = PurposeMetadata::new(GoalId::new("test"), 0.0);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().confidence, 0.0);
 
         // Test confidence = 1.0 (valid maximum)
-        let result = PurposeMetadata::new(GoalId::new("test"), 1.0, JohariQuadrant::Blind);
+        let result = PurposeMetadata::new(GoalId::new("test"), 1.0);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().confidence, 1.0);
 
         // Test confidence = 0.5 (valid middle)
-        let result = PurposeMetadata::new(GoalId::new("test"), 0.5, JohariQuadrant::Unknown);
+        let result = PurposeMetadata::new(GoalId::new("test"), 0.5);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().confidence, 0.5);
 
@@ -409,7 +386,7 @@ mod tests {
     #[test]
     fn test_purpose_metadata_invalid_confidence_over() {
         // FAIL FAST: confidence > 1.0 must fail immediately
-        let result = PurposeMetadata::new(GoalId::new("test"), 1.5, JohariQuadrant::Open);
+        let result = PurposeMetadata::new(GoalId::new("test"), 1.5);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -426,7 +403,7 @@ mod tests {
     #[test]
     fn test_purpose_metadata_invalid_confidence_under() {
         // FAIL FAST: confidence < 0.0 must fail immediately
-        let result = PurposeMetadata::new(GoalId::new("test"), -0.1, JohariQuadrant::Open);
+        let result = PurposeMetadata::new(GoalId::new("test"), -0.1);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -443,7 +420,7 @@ mod tests {
     #[test]
     fn test_purpose_metadata_invalid_confidence_nan() {
         // FAIL FAST: NaN must fail
-        let result = PurposeMetadata::new(GoalId::new("test"), f32::NAN, JohariQuadrant::Open);
+        let result = PurposeMetadata::new(GoalId::new("test"), f32::NAN);
 
         assert!(result.is_err());
         println!("[VERIFIED] FAIL FAST: PurposeMetadata::new rejects NaN confidence");
@@ -452,11 +429,10 @@ mod tests {
     #[test]
     fn test_purpose_metadata_invalid_confidence_infinity() {
         // FAIL FAST: Infinity must fail
-        let result = PurposeMetadata::new(GoalId::new("test"), f32::INFINITY, JohariQuadrant::Open);
+        let result = PurposeMetadata::new(GoalId::new("test"), f32::INFINITY);
         assert!(result.is_err());
 
-        let result =
-            PurposeMetadata::new(GoalId::new("test"), f32::NEG_INFINITY, JohariQuadrant::Open);
+        let result = PurposeMetadata::new(GoalId::new("test"), f32::NEG_INFINITY);
         assert!(result.is_err());
 
         println!("[VERIFIED] FAIL FAST: PurposeMetadata::new rejects infinite confidence values");
@@ -467,12 +443,7 @@ mod tests {
         use std::time::Duration;
 
         let past = SystemTime::now() - Duration::from_secs(3600);
-        let result = PurposeMetadata::with_timestamp(
-            GoalId::new("test"),
-            0.75,
-            past,
-            JohariQuadrant::Unknown,
-        );
+        let result = PurposeMetadata::with_timestamp(GoalId::new("test"), 0.75, past);
 
         assert!(result.is_ok());
         let metadata = result.unwrap();
@@ -486,9 +457,7 @@ mod tests {
         use std::time::Duration;
 
         let past = SystemTime::now() - Duration::from_secs(3600);
-        let metadata =
-            PurposeMetadata::with_timestamp(GoalId::new("test"), 0.75, past, JohariQuadrant::Open)
-                .unwrap();
+        let metadata = PurposeMetadata::with_timestamp(GoalId::new("test"), 0.75, past).unwrap();
 
         // 1 hour old, max age 30 min = stale
         assert!(metadata.is_stale(Duration::from_secs(1800)));
@@ -501,19 +470,16 @@ mod tests {
 
     #[test]
     fn test_purpose_metadata_serialization() {
-        let metadata =
-            PurposeMetadata::new(GoalId::new("test_goal"), 0.75, JohariQuadrant::Hidden).unwrap();
+        let metadata = PurposeMetadata::new(GoalId::new("test_goal"), 0.75).unwrap();
 
         let json = serde_json::to_string(&metadata).expect("Serialization should work");
         assert!(json.contains("test_goal"));
         assert!(json.contains("0.75"));
-        assert!(json.contains("hidden"));
 
         let deserialized: PurposeMetadata =
             serde_json::from_str(&json).expect("Deserialization should work");
         assert_eq!(deserialized.primary_goal.as_str(), "test_goal");
         assert!((deserialized.confidence - 0.75).abs() < f32::EPSILON);
-        assert_eq!(deserialized.dominant_quadrant, JohariQuadrant::Hidden);
 
         println!("[VERIFIED] PurposeMetadata serializes and deserializes correctly");
     }
@@ -527,8 +493,7 @@ mod tests {
             0.8, 0.7, 0.9, 0.6, 0.75, 0.65, 0.85, 0.72, 0.78, 0.68, 0.82, 0.71, 0.76,
         ];
         let purpose_vector = PurposeVector::new(alignments);
-        let metadata =
-            PurposeMetadata::new(GoalId::new("master_ml"), 0.9, JohariQuadrant::Open).unwrap();
+        let metadata = PurposeMetadata::new(GoalId::new("master_ml"), 0.9).unwrap();
 
         let entry = PurposeIndexEntry::new(memory_id, purpose_vector.clone(), metadata);
 
@@ -546,8 +511,7 @@ mod tests {
             0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.11, 0.22, 0.33,
         ];
         let purpose_vector = PurposeVector::new(alignments);
-        let metadata =
-            PurposeMetadata::new(GoalId::new("test"), 0.5, JohariQuadrant::Unknown).unwrap();
+        let metadata = PurposeMetadata::new(GoalId::new("test"), 0.5).unwrap();
 
         let entry = PurposeIndexEntry::new(Uuid::new_v4(), purpose_vector, metadata);
 
@@ -565,8 +529,7 @@ mod tests {
     #[test]
     fn test_purpose_index_entry_aggregate_alignment() {
         let uniform = PurposeVector::new([0.75; 13]);
-        let metadata =
-            PurposeMetadata::new(GoalId::new("test"), 0.8, JohariQuadrant::Open).unwrap();
+        let metadata = PurposeMetadata::new(GoalId::new("test"), 0.8).unwrap();
 
         let entry = PurposeIndexEntry::new(Uuid::new_v4(), uniform, metadata);
 
@@ -582,8 +545,7 @@ mod tests {
         alignments[7] = 0.95; // E8 is dominant
 
         let purpose_vector = PurposeVector::new(alignments);
-        let metadata =
-            PurposeMetadata::new(GoalId::new("test"), 0.8, JohariQuadrant::Blind).unwrap();
+        let metadata = PurposeMetadata::new(GoalId::new("test"), 0.8).unwrap();
 
         let entry = PurposeIndexEntry::new(Uuid::new_v4(), purpose_vector, metadata);
 
@@ -596,8 +558,7 @@ mod tests {
     fn test_purpose_index_entry_coherence() {
         // Uniform alignments = perfect coherence
         let uniform = PurposeVector::new([0.8; 13]);
-        let metadata =
-            PurposeMetadata::new(GoalId::new("test"), 0.8, JohariQuadrant::Open).unwrap();
+        let metadata = PurposeMetadata::new(GoalId::new("test"), 0.8).unwrap();
 
         let entry = PurposeIndexEntry::new(Uuid::new_v4(), uniform, metadata);
 
@@ -613,13 +574,7 @@ mod tests {
         use std::time::Duration;
 
         let past = SystemTime::now() - Duration::from_secs(7200); // 2 hours ago
-        let metadata = PurposeMetadata::with_timestamp(
-            GoalId::new("test"),
-            0.75,
-            past,
-            JohariQuadrant::Hidden,
-        )
-        .unwrap();
+        let metadata = PurposeMetadata::with_timestamp(GoalId::new("test"), 0.75, past).unwrap();
 
         let entry = PurposeIndexEntry::new(Uuid::new_v4(), PurposeVector::default(), metadata);
 
@@ -635,7 +590,7 @@ mod tests {
         let entry = PurposeIndexEntry::new(
             Uuid::new_v4(),
             PurposeVector::default(),
-            PurposeMetadata::new(GoalId::new("clone_test"), 0.5, JohariQuadrant::Unknown).unwrap(),
+            PurposeMetadata::new(GoalId::new("clone_test"), 0.5).unwrap(),
         );
 
         let cloned = entry.clone();
@@ -658,7 +613,7 @@ mod tests {
         let entry = PurposeIndexEntry::new(
             Uuid::nil(),
             PurposeVector::default(),
-            PurposeMetadata::new(GoalId::new("debug_test"), 0.5, JohariQuadrant::Open).unwrap(),
+            PurposeMetadata::new(GoalId::new("debug_test"), 0.5).unwrap(),
         );
 
         let debug_str = format!("{:?}", entry);
@@ -667,23 +622,5 @@ mod tests {
         assert!(debug_str.contains("memory_id"));
 
         println!("[VERIFIED] PurposeIndexEntry implements Debug correctly");
-    }
-
-    // ===== Integration Tests =====
-
-    #[test]
-    fn test_entry_with_all_quadrants() {
-        for quadrant in JohariQuadrant::all() {
-            let metadata =
-                PurposeMetadata::new(GoalId::new("multi_quadrant_test"), 0.8, quadrant).unwrap();
-
-            assert_eq!(metadata.dominant_quadrant, quadrant);
-
-            let entry = PurposeIndexEntry::new(Uuid::new_v4(), PurposeVector::default(), metadata);
-
-            assert_eq!(entry.metadata.dominant_quadrant, quadrant);
-        }
-
-        println!("[VERIFIED] PurposeIndexEntry works with all JohariQuadrant variants");
     }
 }

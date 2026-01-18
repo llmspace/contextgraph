@@ -3,17 +3,7 @@
 use std::time::Instant;
 
 use super::{SessionContext, UtlProcessor};
-use crate::{JohariQuadrant, LifecycleStage, SuggestedAction, UtlConfig};
-
-/// Map Johari quadrant to suggested action (test helper).
-fn suggested_action_for_quadrant(quadrant: JohariQuadrant) -> SuggestedAction {
-    match quadrant {
-        JohariQuadrant::Open => SuggestedAction::DirectRecall,
-        JohariQuadrant::Blind => SuggestedAction::TriggerDream,
-        JohariQuadrant::Hidden => SuggestedAction::GetNeighborhood,
-        JohariQuadrant::Unknown => SuggestedAction::EpistemicAction,
-    }
-}
+use crate::{LifecycleStage, UtlConfig};
 
 fn test_embedding(dim: usize, value: f32) -> Vec<f32> {
     vec![value; dim]
@@ -104,27 +94,6 @@ fn test_lambda_weights_change_with_stage() {
     let growth_weights = processor.lambda_weights();
     assert!((growth_weights.lambda_s() - 0.5).abs() < 0.01);
     assert!((growth_weights.lambda_c() - 0.5).abs() < 0.01);
-}
-
-#[test]
-fn test_johari_quadrant_classification() {
-    let _processor = UtlProcessor::with_defaults();
-
-    // Open: low surprise, high coherence
-    let open_action = suggested_action_for_quadrant(JohariQuadrant::Open);
-    assert_eq!(open_action, SuggestedAction::DirectRecall);
-
-    // Blind: high surprise, low coherence
-    let blind_action = suggested_action_for_quadrant(JohariQuadrant::Blind);
-    assert_eq!(blind_action, SuggestedAction::TriggerDream);
-
-    // Hidden: low surprise, low coherence
-    let hidden_action = suggested_action_for_quadrant(JohariQuadrant::Hidden);
-    assert_eq!(hidden_action, SuggestedAction::GetNeighborhood);
-
-    // Unknown: high surprise, high coherence
-    let unknown_action = suggested_action_for_quadrant(JohariQuadrant::Unknown);
-    assert_eq!(unknown_action, SuggestedAction::EpistemicAction);
 }
 
 #[test]
@@ -322,7 +291,7 @@ fn test_identical_embeddings() {
     let signal = processor.compute_learning(content, &embedding, &context);
     assert!(signal.is_ok());
 
-    // Identical embeddings = low surprise, high coherence = Open quadrant
+    // Identical embeddings = low surprise, high coherence
     let signal = signal.unwrap();
     // Surprise should be low (similar to context)
     assert!(signal.delta_s < 0.5);

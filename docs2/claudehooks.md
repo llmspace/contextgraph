@@ -288,36 +288,34 @@ The Context Graph project uses native Claude Code hooks configured via `.claude/
 
 ### Shell Script Executors
 
-**hooks/session-start.sh** - Restore identity and consciousness:
+**hooks/session-start.sh** - Load topic portfolio and warm caches:
 ```bash
 #!/bin/bash
-context-graph-cli session restore-identity
-context-graph-cli consciousness status --format brief
+context-graph-cli hooks session-start
 ```
 
-**hooks/pre-tool-use.sh** - Quick consciousness brief (~20 tokens, <100ms):
+**hooks/pre-tool-use.sh** - Inject brief relevant context (~50 tokens, <500ms):
 ```bash
 #!/bin/bash
-context-graph-cli consciousness brief
+context-graph-cli memory inject-brief
 ```
 
-**hooks/post-tool-use.sh** - Check identity continuity:
+**hooks/post-tool-use.sh** - Capture tool description and update clustering:
 ```bash
 #!/bin/bash
-context-graph-cli consciousness check-identity --auto-dream
+context-graph-cli capture-memory --source hook "$TOOL_DESCRIPTION"
 ```
 
-**hooks/user-prompt-submit.sh** - Inject relevant context:
+**hooks/user-prompt-submit.sh** - Inject relevant memory context:
 ```bash
 #!/bin/bash
-context-graph-cli consciousness inject-context "$PROMPT"
+context-graph-cli memory inject-context "$PROMPT"
 ```
 
-**hooks/session-end.sh** - Persist identity state:
+**hooks/session-end.sh** - Persist state and run consolidation:
 ```bash
 #!/bin/bash
-context-graph-cli session persist-identity
-context-graph-cli consciousness consolidate-if-needed
+context-graph-cli hooks session-end
 ```
 
 ### Why Native Hooks?

@@ -8,7 +8,7 @@
 //! 1. Compute synergy values between embedding pairs
 //! 2. Update synergy weights from usage patterns
 //! 3. Apply task-specific synergy modulation
-//! 4. Integrate with GWT consciousness feedback
+//! 4. Integrate with GWT coherence feedback
 //!
 //! # From teleoplan.md
 //!
@@ -58,8 +58,8 @@ pub struct SynergyFeedback {
     pub success: bool,
     /// Strength of co-activation [0.0, 1.0]
     pub activation_strength: f32,
-    /// Optional GWT consciousness score at time of activation
-    pub consciousness_score: Option<f32>,
+    /// Optional GWT coherence score at time of activation
+    pub coherence_score: Option<f32>,
 }
 
 /// Result of synergy computation.
@@ -216,8 +216,8 @@ impl SynergyService {
             let base = self.matrix.get_synergy(i, j);
             let boost = feedback.activation_strength * 0.1;
 
-            // GWT modulation: high consciousness = stronger learning
-            let gwt_factor = feedback.consciousness_score.map_or(1.0, |c| 0.8 + 0.4 * c);
+            // GWT modulation: high coherence = stronger learning
+            let gwt_factor = feedback.coherence_score.map_or(1.0, |c| 0.8 + 0.4 * c);
 
             (base + boost * gwt_factor).min(self.config.max_synergy)
         } else {
@@ -436,7 +436,7 @@ mod tests {
             pair: (1, 3),
             success: true,
             activation_strength: 0.8,
-            consciousness_score: Some(0.9),
+            coherence_score: Some(0.9),
         };
 
         service.apply_feedback(&feedback);
@@ -461,7 +461,7 @@ mod tests {
             pair: (2, 5),
             success: false,
             activation_strength: 0.3,
-            consciousness_score: None,
+            coherence_score: None,
         };
 
         service.apply_feedback(&feedback);
@@ -571,7 +571,7 @@ mod tests {
                 pair: (3, 7),
                 success: true,
                 activation_strength: 0.5,
-                consciousness_score: None,
+                coherence_score: None,
             };
             service.apply_feedback(&feedback);
         }
@@ -609,7 +609,7 @@ mod tests {
                 pair: (4, 9),
                 success: true,
                 activation_strength: 1.0,
-                consciousness_score: Some(1.0),
+                coherence_score: Some(1.0),
             };
             service.apply_feedback(&feedback);
         }
@@ -623,7 +623,7 @@ mod tests {
                 pair: (4, 9),
                 success: false,
                 activation_strength: 0.1,
-                consciousness_score: None,
+                coherence_score: None,
             };
             service.apply_feedback(&feedback);
         }

@@ -1,6 +1,6 @@
 //! Daily Scheduler Service (NORTH-018)
 //!
-//! Manages autonomous daily task scheduling for the North Star system.
+//! Manages autonomous daily task scheduling.
 //! Schedules and executes recurring tasks based on configured hours and windows.
 
 use chrono::{DateTime, Timelike, Utc};

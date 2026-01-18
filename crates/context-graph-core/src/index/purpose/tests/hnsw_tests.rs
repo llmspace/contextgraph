@@ -6,13 +6,12 @@ use super::helpers::{
 use crate::index::purpose::entry::GoalId;
 use crate::index::purpose::hnsw_purpose::{HnswPurposeIndex, PurposeIndexOps};
 use crate::index::purpose::query::{PurposeQuery, PurposeQueryTarget};
-use crate::types::JohariQuadrant;
 use uuid::Uuid;
 
 #[test]
 fn test_hnsw_insert_remove_get_cycle() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
-    let entry = create_entry(0.7, "test_goal", JohariQuadrant::Open);
+    let entry = create_entry(0.7, "test_goal");
     let memory_id = entry.memory_id;
 
     println!(
@@ -60,7 +59,7 @@ fn test_hnsw_search_with_vector_target() {
 
     // Insert entries with varying purpose vectors
     for i in 0..10 {
-        let entry = create_entry(0.3 + i as f32 * 0.05, "goal", JohariQuadrant::Open);
+        let entry = create_entry(0.3 + i as f32 * 0.05, "goal");
         index.insert(entry).unwrap();
     }
 
@@ -108,7 +107,7 @@ fn test_hnsw_search_with_from_memory_target() {
 
     // Insert entries
     let entries: Vec<_> = (0..5)
-        .map(|i| create_entry(0.4 + i as f32 * 0.1, "goal", JohariQuadrant::Open))
+        .map(|i| create_entry(0.4 + i as f32 * 0.1, "goal"))
         .collect();
 
     for entry in &entries {
@@ -135,7 +134,7 @@ fn test_hnsw_search_with_goal_filtering() {
     // Insert entries with different goals
     for i in 0..10 {
         let goal = if i % 2 == 0 { "goal_a" } else { "goal_b" };
-        let entry = create_entry(0.5 + i as f32 * 0.02, goal, JohariQuadrant::Open);
+        let entry = create_entry(0.5 + i as f32 * 0.02, goal);
         index.insert(entry).unwrap();
     }
 
@@ -160,43 +159,11 @@ fn test_hnsw_search_with_goal_filtering() {
 }
 
 #[test]
-fn test_hnsw_search_with_quadrant_filtering() {
-    let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
-
-    // Insert entries in different quadrants
-    for quadrant in JohariQuadrant::all() {
-        for i in 0..3 {
-            let entry = create_entry(0.5 + i as f32 * 0.05, "goal", quadrant);
-            index.insert(entry).unwrap();
-        }
-    }
-
-    let query = PurposeQuery::new(
-        PurposeQueryTarget::Vector(create_purpose_vector(0.55, 0.02)),
-        10,
-        0.0,
-    )
-    .unwrap()
-    .with_quadrant_filter(JohariQuadrant::Hidden);
-
-    let results = index.search(&query).unwrap();
-
-    for result in &results {
-        assert_eq!(result.metadata.dominant_quadrant, JohariQuadrant::Hidden);
-    }
-
-    println!(
-        "[VERIFIED] Quadrant filtering returns only matching entries ({} results)",
-        results.len()
-    );
-}
-
-#[test]
 fn test_hnsw_search_min_similarity_threshold() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
 
     for i in 0..10 {
-        let entry = create_entry(0.1 + i as f32 * 0.08, "goal", JohariQuadrant::Open);
+        let entry = create_entry(0.1 + i as f32 * 0.08, "goal");
         index.insert(entry).unwrap();
     }
 
@@ -293,7 +260,7 @@ fn test_hnsw_duplicate_handling_updates_entry() {
     let entry1 = crate::index::purpose::entry::PurposeIndexEntry::new(
         memory_id,
         create_purpose_vector(0.5, 0.02),
-        super::helpers::create_metadata("goal1", JohariQuadrant::Open),
+        super::helpers::create_metadata("goal1"),
     );
     index.insert(entry1).unwrap();
     assert_eq!(index.len(), 1);
@@ -302,7 +269,7 @@ fn test_hnsw_duplicate_handling_updates_entry() {
     let entry2 = crate::index::purpose::entry::PurposeIndexEntry::new(
         memory_id,
         create_purpose_vector(0.8, 0.01),
-        super::helpers::create_metadata("goal2", JohariQuadrant::Hidden),
+        super::helpers::create_metadata("goal2"),
     );
     index.insert(entry2).unwrap();
 
@@ -310,7 +277,6 @@ fn test_hnsw_duplicate_handling_updates_entry() {
     assert_eq!(index.len(), 1);
     let retrieved = index.get(memory_id).unwrap();
     assert_eq!(retrieved.metadata.primary_goal.as_str(), "goal2");
-    assert_eq!(retrieved.metadata.dominant_quadrant, JohariQuadrant::Hidden);
 
     println!("[VERIFIED] Duplicate handling updates existing entry");
 }

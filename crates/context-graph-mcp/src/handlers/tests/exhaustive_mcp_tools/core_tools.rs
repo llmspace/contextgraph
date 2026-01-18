@@ -397,31 +397,6 @@ async fn test_utl_status_basic() {
         data.get("learning_score").is_some(),
         "Must have learning_score"
     );
-    assert!(
-        data.get("johari_quadrant").is_some(),
-        "Must have johari_quadrant"
-    );
-}
-
-#[tokio::test]
-async fn test_utl_status_johari_valid_quadrant() {
-    let handlers = create_test_handlers();
-    let request = make_tool_call("utl_status", json!({}));
-
-    let response = handlers.dispatch(request).await;
-    assert_success(&response, "utl_status");
-
-    let data = get_tool_data(&response);
-    let johari = data["johari_quadrant"]
-        .as_str()
-        .expect("johari_quadrant must be string");
-
-    assert!(
-        synthetic_data::johari::VALID_QUADRANTS.contains(&johari),
-        "Johari quadrant '{}' must be one of {:?}",
-        johari,
-        synthetic_data::johari::VALID_QUADRANTS
-    );
 }
 
 #[tokio::test]

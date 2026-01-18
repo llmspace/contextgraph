@@ -55,10 +55,10 @@ pub enum HookError {
     #[error("Corruption detected: {0}")]
     Corruption(String),
 
-    /// Identity continuity crisis triggered (IC below threshold)
+    /// Topic stability crisis triggered (stability below threshold)
     /// Exit code: 6 (special state, not failure)
-    /// Constitution: IDENTITY-002 defines IC < 0.5 as crisis
-    #[error("Crisis threshold breached: IC={0}")]
+    /// Constitution: topic_stability defines < 0.5 as crisis
+    #[error("Crisis threshold breached: stability={0}")]
     CrisisTriggered(f32),
 
     /// IO operation failed

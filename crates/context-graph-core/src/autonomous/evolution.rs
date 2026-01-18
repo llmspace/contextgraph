@@ -2,8 +2,6 @@
 //!
 //! This module defines types for goal evolution including sub-goal discovery,
 //! obsolescence detection, and weight adjustment for the autonomous goal system.
-//!
-//! TASK-P0-001: Removed NorthStar, Strategic is now top-level per ARCH-03.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -12,11 +10,9 @@ use super::bootstrap::GoalId;
 use super::curation::MemoryId;
 
 /// Goal levels in the hierarchy
-///
-/// TASK-P0-001: Removed NorthStar variant. Strategic is now the top level.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum GoalLevel {
-    Strategic,   // Top-level goals (was NorthStar)
+    Strategic,   // Top-level goals
     Tactical,    // Mid-level goals
     Operational, // Low-level goals
 }

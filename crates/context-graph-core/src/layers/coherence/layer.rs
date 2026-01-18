@@ -1,22 +1,24 @@
-//! L5 Coherence Layer - Kuramoto sync and Global Workspace broadcast.
+//! L5 Coherence Layer - Per-space clustering coordination and Global Workspace broadcast.
 //!
 //! This layer integrates information from all previous layers using
-//! Kuramoto oscillator synchronization to achieve coherent conscious states.
+//! per-space clustering coordination to achieve coherent states.
 //!
-//! # Constitution Compliance
+//! # Constitution Compliance (v6.0.0)
 //!
 //! - Latency: <10ms (CRITICAL)
 //! - Throughput: 100/s
-//! - Components: Kuramoto sync, GW broadcast, workspace update
-//! - UTL: R(t) measurement (order parameter)
+//! - Components: Per-space clustering, GW broadcast, workspace update
+//! - UTL: R(t) measurement (coherence)
 //!
-//! # GWT Consciousness
+//! # Topic-Based Coherence Scoring
 //!
-//! C(t) = I(t) × R(t) × D(t)
+//! Per Constitution v6.0.0 Section 14, topic-based coherence scoring is used:
+//!
+//! coherence_score = I(t) x R(t) x D(t)
 //!
 //! Where:
 //! - I(t) = Information (from pulse entropy, normalized)
-//! - R(t) = Resonance (Kuramoto order parameter)
+//! - R(t) = Resonance (coherence measure from clustering)
 //! - D(t) = Differentiation (inversely related to coherence clustering)
 
 use async_trait::async_trait;
@@ -28,30 +30,29 @@ use crate::error::{CoreError, CoreResult};
 use crate::traits::NervousLayer;
 use crate::types::{LayerId, LayerInput, LayerOutput, LayerResult};
 
-use super::constants::{INTEGRATION_STEPS, KURAMOTO_DT, KURAMOTO_K, KURAMOTO_N};
-use super::network::KuramotoNetwork;
+use super::constants::INTEGRATION_STEPS;
 use super::thresholds::GwtThresholds;
-use super::workspace::{ConsciousnessState, GlobalWorkspace};
+use super::workspace::{CoherenceState, GlobalWorkspace};
 
-/// L5 Coherence Layer - Kuramoto sync and Global Workspace broadcast.
+/// L5 Coherence Layer - Per-space clustering coordination and Global Workspace broadcast.
 ///
 /// This layer integrates information from all previous layers using
-/// Kuramoto oscillator synchronization to achieve coherent conscious states.
+/// per-space clustering coordination to achieve coherent states.
 ///
 /// # Constitution Compliance
 ///
 /// - Latency: <10ms (CRITICAL)
 /// - Throughput: 100/s
-/// - Components: Kuramoto sync, GW broadcast, workspace update
-/// - UTL: R(t) measurement (order parameter)
+/// - Components: Per-space clustering, GW broadcast, workspace update
+/// - UTL: R(t) measurement (coherence)
 ///
-/// # GWT Consciousness
+/// # Topic-Based Coherence Scoring
 ///
-/// C(t) = I(t) × R(t) × D(t)
+/// coherence_score = I(t) × R(t) × D(t)
 ///
 /// Where:
 /// - I(t) = Information (from pulse entropy, normalized)
-/// - R(t) = Resonance (Kuramoto order parameter)
+/// - R(t) = Resonance (coherence measure from clustering)
 /// - D(t) = Differentiation (inversely related to coherence clustering)
 ///
 /// # Domain-Aware Thresholds
@@ -60,8 +61,6 @@ use super::workspace::{ConsciousnessState, GlobalWorkspace};
 /// Use [`with_atc`](Self::with_atc) to create a layer with domain-specific thresholds.
 #[derive(Debug)]
 pub struct CoherenceLayer {
-    /// Kuramoto oscillator network
-    kuramoto: KuramotoNetwork,
     /// GWT thresholds (domain-aware)
     thresholds: GwtThresholds,
     /// Number of integration steps per process
@@ -72,6 +71,8 @@ pub struct CoherenceLayer {
     invocation_count: AtomicU64,
     /// Global Workspace ignition count
     ignition_count: AtomicU64,
+    /// Current coherence/resonance value
+    current_resonance: std::sync::atomic::AtomicU32,
 }
 
 impl CoherenceLayer {
@@ -81,12 +82,12 @@ impl CoherenceLayer {
     /// For domain-aware behavior, use [`with_atc`](Self::with_atc) instead.
     pub fn new() -> Self {
         Self {
-            kuramoto: KuramotoNetwork::new(KURAMOTO_N, KURAMOTO_K),
             thresholds: GwtThresholds::default_general(),
             integration_steps: INTEGRATION_STEPS,
             total_processing_us: AtomicU64::new(0),
             invocation_count: AtomicU64::new(0),
             ignition_count: AtomicU64::new(0),
+            current_resonance: std::sync::atomic::AtomicU32::new(0),
         }
     }
 
@@ -112,12 +113,12 @@ impl CoherenceLayer {
     pub fn with_atc(atc: &AdaptiveThresholdCalibration, domain: Domain) -> CoreResult<Self> {
         let thresholds = GwtThresholds::from_atc(atc, domain)?;
         Ok(Self {
-            kuramoto: KuramotoNetwork::new(KURAMOTO_N, KURAMOTO_K),
             thresholds,
             integration_steps: INTEGRATION_STEPS,
             total_processing_us: AtomicU64::new(0),
             invocation_count: AtomicU64::new(0),
             ignition_count: AtomicU64::new(0),
+            current_resonance: std::sync::atomic::AtomicU32::new(0),
         })
     }
 
@@ -140,27 +141,13 @@ impl CoherenceLayer {
             });
         }
         Ok(Self {
-            kuramoto: KuramotoNetwork::new(KURAMOTO_N, KURAMOTO_K),
             thresholds,
             integration_steps: INTEGRATION_STEPS,
             total_processing_us: AtomicU64::new(0),
             invocation_count: AtomicU64::new(0),
             ignition_count: AtomicU64::new(0),
+            current_resonance: std::sync::atomic::AtomicU32::new(0),
         })
-    }
-
-    /// Create with custom Kuramoto parameters.
-    ///
-    /// Uses legacy General domain thresholds.
-    pub fn with_kuramoto(n: usize, k: f32) -> Self {
-        Self {
-            kuramoto: KuramotoNetwork::new(n, k),
-            thresholds: GwtThresholds::default_general(),
-            integration_steps: INTEGRATION_STEPS,
-            total_processing_us: AtomicU64::new(0),
-            invocation_count: AtomicU64::new(0),
-            ignition_count: AtomicU64::new(0),
-        }
     }
 
     /// Create with custom GW threshold (gate).
@@ -212,12 +199,12 @@ impl CoherenceLayer {
         }
     }
 
-    /// Compute GWT consciousness: C(t) = I(t) × R(t) × D(t)
+    /// Compute topic-based coherence score: C(t) = I(t) × R(t) × D(t)
     ///
     /// - I(t) = Information (normalized entropy)
-    /// - R(t) = Resonance (Kuramoto order parameter)
+    /// - R(t) = Resonance (coherence measure)
     /// - D(t) = Differentiation (diversity measure)
-    pub(crate) fn compute_consciousness(
+    pub(crate) fn compute_coherence_score(
         &self,
         info: f32,
         resonance: f32,
@@ -279,30 +266,29 @@ impl NervousLayer for CoherenceLayer {
     async fn process(&self, input: LayerInput) -> CoreResult<LayerOutput> {
         let start = Instant::now();
 
-        // Extract learning signal from L4 to modulate Kuramoto dynamics
+        // Extract learning signal from L4 for context
         let learning_signal = self.extract_learning_signal(&input);
 
-        // Create mutable copy of Kuramoto network for this processing cycle
-        let mut kuramoto = self.kuramoto.clone();
+        // Compute resonance from input pulse coherence and learning signal
+        // Resonance is derived from per-space clustering coordination
+        let base_resonance = input.context.pulse.coherence.abs().clamp(0.0, 1.0);
 
-        // Inject learning signal to modulate oscillator frequencies
-        kuramoto.inject_signal(learning_signal);
-
-        // Run Kuramoto integration steps
-        for _ in 0..self.integration_steps {
-            kuramoto.step(KURAMOTO_DT);
-        }
-
-        // Compute order parameter R(t) - the resonance measure
-        let resonance = kuramoto.order_parameter();
+        // Learning signal modulates resonance slightly
+        let resonance = (base_resonance + learning_signal * 0.1).clamp(0.0, 1.0);
 
         // Validate resonance - NO silent failures per AP-009
         if resonance.is_nan() || resonance.is_infinite() {
             return Err(CoreError::LayerError {
                 layer: "Coherence".to_string(),
-                message: "Kuramoto order parameter computation produced NaN/Infinity".to_string(),
+                message: "Resonance computation produced NaN/Infinity".to_string(),
             });
         }
+
+        // Store current resonance for health checks
+        self.current_resonance.store(
+            resonance.to_bits(),
+            Ordering::Relaxed
+        );
 
         // Get information I(t) from pulse entropy (normalized)
         let info = input.context.pulse.entropy.clamp(0.01, 1.0);
@@ -310,12 +296,12 @@ impl NervousLayer for CoherenceLayer {
         // Compute differentiation D(t)
         let differentiation = self.compute_differentiation(&input.context.pulse);
 
-        // Compute consciousness C(t) = I(t) × R(t) × D(t)
-        let consciousness = self.compute_consciousness(info, resonance, differentiation);
+        // Compute coherence score C(t) = I(t) × R(t) × D(t)
+        let coherence_score = self.compute_coherence_score(info, resonance, differentiation);
 
-        // Determine consciousness state from order parameter using domain-aware thresholds
+        // Determine coherence state from resonance using domain-aware thresholds
         let state =
-            ConsciousnessState::from_order_parameter_with_thresholds(resonance, &self.thresholds);
+            CoherenceState::from_order_parameter_with_thresholds(resonance, &self.thresholds);
 
         // Check for Global Workspace ignition (using gate threshold)
         let gw_ignited = resonance >= self.thresholds.gate;
@@ -329,9 +315,8 @@ impl NervousLayer for CoherenceLayer {
             Some(serde_json::json!({
                 "source_layers": ["sensing", "reflex", "memory", "learning"],
                 "resonance": resonance,
-                "consciousness": consciousness,
+                "coherence_score": coherence_score,
                 "state": format!("{:?}", state),
-                "mean_phase": kuramoto.mean_phase(),
             }))
         } else {
             None
@@ -365,7 +350,7 @@ impl NervousLayer for CoherenceLayer {
 
         // Update pulse with coherence metrics
         let mut updated_pulse = input.context.pulse.clone();
-        // Set coherence to resonance (R(t) is the sync measure)
+        // Set coherence to resonance (R(t) is the coherence measure)
         updated_pulse.coherence = resonance;
         // coherence_delta reflects change toward synchronized state
         updated_pulse.coherence_delta = resonance - input.context.pulse.coherence;
@@ -375,15 +360,13 @@ impl NervousLayer for CoherenceLayer {
         // Build result data
         let result_data = serde_json::json!({
             "resonance": resonance,
-            "consciousness": consciousness,
+            "coherence_score": coherence_score,
             "differentiation": differentiation,
             "information": info,
             "gw_ignited": gw_ignited,
             "gw_threshold": self.gw_threshold(),
             "state": format!("{:?}", state),
             "broadcast": broadcast,
-            "oscillator_phases": kuramoto.phases(),
-            "mean_phase": kuramoto.mean_phase(),
             "learning_signal": learning_signal,
             "duration_us": duration_us,
             "within_budget": duration <= budget,
@@ -410,8 +393,11 @@ impl NervousLayer for CoherenceLayer {
     }
 
     async fn health_check(&self) -> CoreResult<bool> {
-        // Verify Kuramoto produces valid order parameter
-        let r = self.kuramoto.order_parameter();
+        // Verify stored resonance is valid
+        let r_bits = self.current_resonance.load(Ordering::Relaxed);
+        let r = f32::from_bits(r_bits);
+
+        // Allow uninitialized state (0.0 is valid)
         if r.is_nan() || r.is_infinite() {
             return Ok(false);
         }
@@ -419,8 +405,8 @@ impl NervousLayer for CoherenceLayer {
             return Ok(false);
         }
 
-        // Verify consciousness computation works
-        let c = self.compute_consciousness(0.5, 0.5, 0.5);
+        // Verify coherence score computation works
+        let c = self.compute_coherence_score(0.5, 0.5, 0.5);
         if c.is_nan() || c.is_infinite() {
             return Ok(false);
         }

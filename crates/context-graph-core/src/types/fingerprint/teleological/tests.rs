@@ -6,9 +6,7 @@ use uuid::Uuid;
 use crate::types::fingerprint::evolution::EvolutionTrigger;
 use crate::types::fingerprint::purpose::AlignmentThreshold;
 
-use super::test_helpers::{
-    make_test_hash, make_test_johari, make_test_purpose, make_test_semantic,
-};
+use super::test_helpers::{make_test_hash, make_test_purpose, make_test_semantic};
 use super::TeleologicalFingerprint;
 
 // ===== Creation Tests =====
@@ -17,11 +15,10 @@ use super::TeleologicalFingerprint;
 fn test_teleological_new() {
     let semantic = make_test_semantic();
     let purpose = make_test_purpose(0.80);
-    let johari = make_test_johari();
     let hash = make_test_hash();
 
     let before = Utc::now();
-    let fp = TeleologicalFingerprint::new(semantic, purpose, johari, hash);
+    let fp = TeleologicalFingerprint::new(semantic, purpose, hash);
     let after = Utc::now();
 
     // ID is valid UUID
@@ -61,7 +58,6 @@ fn test_teleological_with_id() {
         specific_id,
         make_test_semantic(),
         make_test_purpose(0.75),
-        make_test_johari(),
         make_test_hash(),
     );
 
@@ -77,7 +73,6 @@ fn test_teleological_record_snapshot() {
     let mut fp = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.80),
-        make_test_johari(),
         make_test_hash(),
     );
 
@@ -106,7 +101,6 @@ fn test_teleological_record_snapshot_respects_limit() {
     let mut fp = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.80),
-        make_test_johari(),
         make_test_hash(),
     );
 
@@ -142,7 +136,6 @@ fn test_teleological_alignment_delta_single_snapshot() {
     let fp = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.80),
-        make_test_johari(),
         make_test_hash(),
     );
 
@@ -157,7 +150,6 @@ fn test_teleological_alignment_delta_improvement() {
     let mut fp = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.70),
-        make_test_johari(),
         make_test_hash(),
     );
 
@@ -180,7 +172,6 @@ fn test_teleological_alignment_delta_degradation() {
     let mut fp = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.80),
-        make_test_johari(),
         make_test_hash(),
     );
 
@@ -205,7 +196,6 @@ fn test_teleological_misalignment_warning_not_triggered() {
     let mut fp = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.80),
-        make_test_johari(),
         make_test_hash(),
     );
 
@@ -224,7 +214,6 @@ fn test_teleological_misalignment_warning_triggered() {
     let mut fp = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.80),
-        make_test_johari(),
         make_test_hash(),
     );
 
@@ -251,7 +240,6 @@ fn test_teleological_misalignment_warning_exact_threshold() {
     let mut fp = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.80),
-        make_test_johari(),
         make_test_hash(),
     );
 
@@ -273,7 +261,6 @@ fn test_teleological_alignment_status() {
     let fp_optimal = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.80),
-        make_test_johari(),
         make_test_hash(),
     );
     assert_eq!(fp_optimal.alignment_status(), AlignmentThreshold::Optimal);
@@ -281,7 +268,6 @@ fn test_teleological_alignment_status() {
     let fp_critical = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.40),
-        make_test_johari(),
         make_test_hash(),
     );
     assert_eq!(fp_critical.alignment_status(), AlignmentThreshold::Critical);
@@ -296,7 +282,6 @@ fn test_teleological_record_access() {
     let mut fp = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.80),
-        make_test_johari(),
         make_test_hash(),
     );
 
@@ -322,7 +307,6 @@ fn test_teleological_is_concerning() {
     let fp_ok = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.80),
-        make_test_johari(),
         make_test_hash(),
     );
     assert!(!fp_ok.is_concerning());
@@ -331,7 +315,6 @@ fn test_teleological_is_concerning() {
     let fp_critical = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.40),
-        make_test_johari(),
         make_test_hash(),
     );
     assert!(fp_critical.is_concerning());
@@ -346,7 +329,6 @@ fn test_teleological_alignment_history_stats() {
     let mut fp = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.70),
-        make_test_johari(),
         make_test_hash(),
     );
 
@@ -399,7 +381,6 @@ fn test_teleological_zero_alignment() {
     let fp = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.0),
-        make_test_johari(),
         make_test_hash(),
     );
 
@@ -414,7 +395,6 @@ fn test_teleological_negative_alignment() {
     let fp = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(-0.5),
-        make_test_johari(),
         make_test_hash(),
     );
 
@@ -429,7 +409,6 @@ fn test_teleological_serialization() {
     let fp = TeleologicalFingerprint::new(
         make_test_semantic(),
         make_test_purpose(0.75),
-        make_test_johari(),
         make_test_hash(),
     );
 

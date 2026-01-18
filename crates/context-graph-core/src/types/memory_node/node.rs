@@ -7,7 +7,6 @@ use uuid::Uuid;
 use super::{
     EmbeddingVector, NodeId, NodeMetadata, ValidationError, DEFAULT_EMBEDDING_DIM, MAX_CONTENT_SIZE,
 };
-use crate::types::JohariQuadrant;
 
 /// A memory node representing a single knowledge unit in the Context Graph.
 ///
@@ -20,7 +19,6 @@ use crate::types::JohariQuadrant;
 /// - `id`: UUID v4 unique identifier
 /// - `content`: str[<=65536] - actual stored knowledge (max 1MB enforced)
 /// - `embedding`: Vec1536 - dense vector representation
-/// - `quadrant`: Johari Window classification
 /// - `importance`: f32 \[0,1\] - relevance score
 /// - `emotional_valence`: f32[-1,1] - emotional charge
 /// - `created_at`: Creation timestamp
@@ -42,9 +40,6 @@ pub struct MemoryNode {
 
     /// Dense embedding vector (1536 dimensions by default).
     pub embedding: EmbeddingVector,
-
-    /// Johari Window quadrant classification.
-    pub quadrant: JohariQuadrant,
 
     /// Importance/relevance score [0.0, 1.0].
     pub importance: f32,
@@ -82,7 +77,6 @@ impl MemoryNode {
     /// # Default Values
     /// - `importance`: 0.5
     /// - `emotional_valence`: 0.0 (neutral)
-    /// - `quadrant`: JohariQuadrant::Open
     /// - `access_count`: 0
     pub fn new(content: String, embedding: EmbeddingVector) -> Self {
         let now = Utc::now();
@@ -90,7 +84,6 @@ impl MemoryNode {
             id: Uuid::new_v4(),
             content,
             embedding,
-            quadrant: JohariQuadrant::default(),
             importance: 0.5,
             emotional_valence: 0.0,
             created_at: now,

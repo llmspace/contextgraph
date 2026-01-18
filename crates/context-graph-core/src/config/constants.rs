@@ -14,7 +14,6 @@
 //! All values here come from `/docs2/constitution.yaml` sections:
 //! - `teleological.thresholds` - Alignment thresholds
 //! - `embeddings.similarity` - RRF and similarity constants
-//! - `utl.johari` - Johari quadrant boundaries
 //! - `forbidden.AP-003` - "Magic numbers -> define constants"
 
 /// Teleological alignment thresholds from constitution.yaml teleological.thresholds.
@@ -33,7 +32,7 @@ pub mod alignment {
     /// Optimal alignment threshold: θ ≥ 0.75
     ///
     /// Constitution: `teleological.thresholds.optimal`
-    /// Meaning: Excellent alignment with North Star goal
+    /// Meaning: Excellent alignment with Strategic goals
     pub const OPTIMAL: f32 = 0.75;
 
     /// Acceptable alignment threshold: θ ∈ [0.70, 0.75)
@@ -87,40 +86,6 @@ pub mod similarity {
     pub const RRF_K: f32 = 60.0;
 }
 
-/// Johari quadrant thresholds from constitution.yaml utl.johari.
-///
-/// These define the entropy (ΔS) and coherence (ΔC) boundaries for
-/// classifying memories into Johari quadrants.
-///
-/// ```yaml
-/// utl:
-///   johari:
-///     Open: "ΔSᵢ<0.5, ΔCᵢ>0.5 → aware in this space"
-///     Blind: "ΔSᵢ>0.5, ΔCᵢ<0.5 → discovery opportunity in this space"
-///     Hidden: "ΔSᵢ<0.5, ΔCᵢ<0.5 → latent in this space"
-///     Unknown: "ΔSᵢ>0.5, ΔCᵢ>0.5 → frontier in this space"
-/// ```
-pub mod johari {
-    /// Johari quadrant boundary threshold.
-    ///
-    /// Constitution: `utl.johari` (all quadrant definitions use 0.5)
-    /// This is the midpoint that separates high/low for both ΔS and ΔC.
-    #[deprecated(
-        since = "0.5.0",
-        note = "Use JohariThresholds from types::fingerprint::johari instead"
-    )]
-    pub const BOUNDARY: f32 = 0.5;
-
-    /// Default blind spot detection threshold.
-    ///
-    /// Constitution: `utl.johari.Blind` - when external signals exceed this,
-    /// a memory may be in a blind spot (known by others, not by self).
-    #[deprecated(
-        since = "0.5.0",
-        note = "Use JohariThresholds.blind_spot from types::fingerprint::johari instead"
-    )]
-    pub const BLIND_SPOT_THRESHOLD: f32 = 0.5;
-}
 
 /// Pipeline configuration defaults from constitution.yaml embeddings.retrieval_pipeline.
 ///
@@ -210,22 +175,6 @@ mod tests {
         assert!(
             (similarity::RRF_K - 60.0).abs() < f32::EPSILON,
             "RRF_K must be 60.0 per constitution"
-        );
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn test_johari_boundary_matches_constitution() {
-        // Johari boundary is 0.5 per constitution.yaml utl.johari
-        // NOTE: These constants are deprecated; use JohariThresholds instead.
-        // This test is kept to ensure backwards compatibility.
-        assert!(
-            (johari::BOUNDARY - 0.5).abs() < f32::EPSILON,
-            "BOUNDARY must be 0.5 per constitution"
-        );
-        assert!(
-            (johari::BLIND_SPOT_THRESHOLD - 0.5).abs() < f32::EPSILON,
-            "BLIND_SPOT_THRESHOLD must be 0.5 per constitution"
         );
     }
 

@@ -9,16 +9,16 @@ This crate provides persistent storage for MemoryNodes, GraphEdges, and embeddin
 ## Features
 
 - **RocksDbMemex**: Main storage backend implementing the Memex trait
-- **12 Column Families**: Optimized for nodes, edges, embeddings, and secondary indexes
+- **8 Column Families**: Optimized for nodes, edges, embeddings, and secondary indexes
 - **CRUD Operations**: Store, get, update, delete for nodes and edges
-- **Secondary Indexes**: Query by Johari quadrant, tags, source, and time range
+- **Secondary Indexes**: Query by tags, source, and time range
 - **Embedding Storage**: Separate optimized storage for 1536D vectors
 - **Hybrid Serialization**: MessagePack for nodes/edges, bincode for embeddings
 
 ## Quick Start
 
 ```rust
-use context_graph_core::types::{MemoryNode, JohariQuadrant};
+use context_graph_core::types::MemoryNode;
 use context_graph_storage::{RocksDbMemex, Memex};
 use tempfile::TempDir;
 
@@ -32,7 +32,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Rust programming concepts".to_string(),
         create_embedding(),
     );
-    node.quadrant = JohariQuadrant::Open;
     node.validate()?;
 
     memex.store_node(&node)?;
@@ -40,8 +39,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Retrieve by ID
     let retrieved = memex.get_node(&node.id)?;
 
-    // Query by quadrant (returns Vec<NodeId>)
-    let open_node_ids = memex.query_by_quadrant(JohariQuadrant::Open, Some(10))?;
+    // Query by tag (returns Vec<NodeId>)
+    node.metadata.add_tag("rust");
+    memex.update_node(&node)?;
+    let rust_nodes = memex.query_by_tag("rust", Some(10))?;
 
     // Health check
     let health = memex.health_check()?;
@@ -65,10 +66,6 @@ fn create_embedding() -> Vec<f32> {
 | `edges` | Graph edges | source:target:type |
 | `embeddings` | Vector storage | UUID bytes |
 | `metadata` | Node metadata | UUID bytes |
-| `johari_open` | Open quadrant index | UUID bytes |
-| `johari_hidden` | Hidden quadrant index | UUID bytes |
-| `johari_blind` | Blind quadrant index | UUID bytes |
-| `johari_unknown` | Unknown quadrant index | UUID bytes |
 | `temporal` | Time-based index | timestamp:UUID |
 | `tags` | Tag index | tag:UUID |
 | `sources` | Source index | source:UUID |
@@ -93,7 +90,6 @@ pub trait Memex: Send + Sync {
     fn get_edges_to(&self, target: &NodeId) -> StorageResult<Vec<GraphEdge>>;
 
     // Index queries (return NodeIds for efficiency)
-    fn query_by_quadrant(&self, quadrant: JohariQuadrant, limit: Option<usize>) -> StorageResult<Vec<NodeId>>;
     fn query_by_tag(&self, tag: &str, limit: Option<usize>) -> StorageResult<Vec<NodeId>>;
 
     // Health
@@ -111,7 +107,7 @@ cargo run --package context-graph-storage --example basic_storage
 
 Demonstrates:
 - Node creation, storage, and retrieval
-- Quadrant and tag queries
+- Tag queries
 - Update and delete operations
 - Embedding storage
 - Health checks

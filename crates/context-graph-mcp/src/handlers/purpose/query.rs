@@ -160,9 +160,6 @@ impl Handlers {
                             result["coherence"] = json!(r.fingerprint.purpose_vector.coherence);
                         }
 
-                        result["johari_quadrant"] =
-                            json!(format!("{:?}", r.fingerprint.johari.dominant_quadrant(0)));
-
                         result
                     })
                     .collect();
@@ -199,8 +196,4 @@ impl Handlers {
         }
     }
 
-    // NOTE: handle_north_star_alignment REMOVED per TASK-CORE-001 (ARCH-03)
-    // Manual North Star alignment creates single 1024D embeddings incompatible with 13-embedder arrays.
-    // Calls to purpose/north_star_alignment now return METHOD_NOT_FOUND (-32601).
-    // Use auto_bootstrap_north_star tool for autonomous goal discovery instead.
 }

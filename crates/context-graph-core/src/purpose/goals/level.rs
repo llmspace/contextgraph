@@ -1,8 +1,7 @@
 //! Goal hierarchy level definition.
 //!
-//! TASK-P0-001: Removed NorthStar level per ARCH-03 (autonomous operation).
-//! Goals now emerge autonomously from data patterns, not manual definition.
-//! Strategic is now the top level (value 0).
+//! Goals emerge autonomously from data patterns, not manual definition.
+//! Strategic is the top level (value 0).
 
 use serde::{Deserialize, Serialize};
 
@@ -18,12 +17,9 @@ use serde::{Deserialize, Serialize};
 ///
 /// # ARCH-03 Compliance
 /// Goals emerge autonomously from teleological fingerprints.
-/// Manual goal setting (set_north_star, define_goal) is forbidden.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum GoalLevel {
-    // REMOVED: NorthStar per TASK-P0-001 (ARCH-03)
-    // North Star was a manual goal concept - goals now emerge autonomously
     /// Top-level strategic objectives (emergent from data patterns).
     /// Highest level in hierarchy.
     Strategic = 0,
@@ -47,8 +43,7 @@ impl GoalLevel {
     #[inline]
     pub fn propagation_weight(&self) -> f32 {
         match self {
-            // REMOVED: NorthStar per TASK-P0-001
-            GoalLevel::Strategic => 1.0, // Now top-level
+            GoalLevel::Strategic => 1.0,
             GoalLevel::Tactical => 0.6,
             GoalLevel::Immediate => 0.3,
         }
@@ -61,8 +56,6 @@ impl GoalLevel {
     }
 
     /// Check if this is the top level (Strategic).
-    ///
-    /// Replaces the old `is_north_star()` check.
     #[inline]
     pub fn is_top_level(&self) -> bool {
         *self == GoalLevel::Strategic

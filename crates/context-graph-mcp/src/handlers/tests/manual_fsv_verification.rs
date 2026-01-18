@@ -9,7 +9,6 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use context_graph_core::alignment::{DefaultAlignmentCalculator, GoalAlignmentCalculator};
-use context_graph_core::johari::{DynDefaultJohariManager, JohariTransitionManager, NUM_EMBEDDERS};
 use context_graph_core::purpose::{GoalDiscoveryMetadata, GoalHierarchy, GoalLevel, GoalNode};
 use context_graph_core::stubs::{
     InMemoryTeleologicalStore, StubMultiArrayProvider, StubUtlProcessor,
@@ -18,7 +17,6 @@ use context_graph_core::traits::{
     MultiArrayEmbeddingProvider, TeleologicalMemoryStore, UtlProcessor,
 };
 use context_graph_core::types::fingerprint::SemanticFingerprint;
-use context_graph_core::types::JohariQuadrant;
 
 use crate::handlers::core::MetaUtlTracker;
 use crate::handlers::Handlers;
@@ -83,8 +81,6 @@ async fn manual_fsv_memory_store_physical_verification() {
     let multi_array: Arc<dyn MultiArrayEmbeddingProvider> = Arc::new(StubMultiArrayProvider::new());
     let alignment: Arc<dyn GoalAlignmentCalculator> = Arc::new(DefaultAlignmentCalculator::new());
     let hierarchy = Arc::new(RwLock::new(create_test_hierarchy()));
-    let johari: Arc<dyn JohariTransitionManager> =
-        Arc::new(DynDefaultJohariManager::new(store.clone()));
     let tracker = Arc::new(RwLock::new(MetaUtlTracker::new()));
 
     let handlers = Handlers::with_meta_utl_tracker(
@@ -93,7 +89,6 @@ async fn manual_fsv_memory_store_physical_verification() {
         multi_array,
         alignment,
         hierarchy,
-        johari,
         tracker,
     );
 
@@ -206,13 +201,6 @@ async fn manual_fsv_memory_store_physical_verification() {
         println!("   - E{} alignment: {:.4}", i + 1, alignment);
     }
 
-    // 5. Verify Johari fingerprint
-    println!("\n   JOHARI FINGERPRINT (13 quadrants):");
-    for i in 0..NUM_EMBEDDERS {
-        let quadrant = stored_fp.johari.dominant_quadrant(i);
-        println!("   - E{} quadrant: {:?}", i + 1, quadrant);
-    }
-
     // =========================================================================
     // EVIDENCE OF SUCCESS
     // =========================================================================
@@ -245,8 +233,6 @@ async fn manual_fsv_delete_physical_verification() {
     let multi_array: Arc<dyn MultiArrayEmbeddingProvider> = Arc::new(StubMultiArrayProvider::new());
     let alignment: Arc<dyn GoalAlignmentCalculator> = Arc::new(DefaultAlignmentCalculator::new());
     let hierarchy = Arc::new(RwLock::new(create_test_hierarchy()));
-    let johari: Arc<dyn JohariTransitionManager> =
-        Arc::new(DynDefaultJohariManager::new(store.clone()));
     let tracker = Arc::new(RwLock::new(MetaUtlTracker::new()));
 
     let handlers = Handlers::with_meta_utl_tracker(
@@ -255,7 +241,6 @@ async fn manual_fsv_delete_physical_verification() {
         multi_array,
         alignment,
         hierarchy,
-        johari,
         tracker,
     );
 
@@ -345,138 +330,7 @@ async fn manual_fsv_delete_physical_verification() {
 }
 
 /// =============================================================================
-/// MANUAL FSV TEST 3: JOHARI TRANSITION VERIFICATION
-/// Source of Truth: InMemoryTeleologicalStore.johari field
-/// =============================================================================
-#[tokio::test]
-async fn manual_fsv_johari_transition_physical_verification() {
-    println!("\n================================================================================");
-    println!("MANUAL FSV: JOHARI TRANSITION - PHYSICAL VERIFICATION");
-    println!("Source of Truth: TeleologicalFingerprint.johari in store");
-    println!("================================================================================\n");
-
-    let store: Arc<dyn TeleologicalMemoryStore> = Arc::new(InMemoryTeleologicalStore::new());
-    let utl_processor: Arc<dyn UtlProcessor> = Arc::new(StubUtlProcessor::new());
-    let multi_array: Arc<dyn MultiArrayEmbeddingProvider> = Arc::new(StubMultiArrayProvider::new());
-    let alignment: Arc<dyn GoalAlignmentCalculator> = Arc::new(DefaultAlignmentCalculator::new());
-    let hierarchy = Arc::new(RwLock::new(create_test_hierarchy()));
-    let johari: Arc<dyn JohariTransitionManager> =
-        Arc::new(DynDefaultJohariManager::new(store.clone()));
-    let tracker = Arc::new(RwLock::new(MetaUtlTracker::new()));
-
-    let handlers = Handlers::with_meta_utl_tracker(
-        store.clone(),
-        utl_processor,
-        multi_array,
-        alignment,
-        hierarchy,
-        johari,
-        tracker,
-    );
-
-    // Store a fingerprint first
-    let store_response = handlers
-        .dispatch(make_request(
-            "memory/store",
-            1,
-            json!({
-                "content": "Knowledge for Johari testing",
-                "importance": 0.7
-            }),
-        ))
-        .await;
-    let memory_id_str = store_response.result.unwrap()["fingerprintId"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let memory_id = Uuid::parse_str(&memory_id_str).unwrap();
-
-    // =========================================================================
-    // BEFORE TRANSITION - PHYSICAL VERIFICATION
-    // =========================================================================
-    println!("📊 BEFORE TRANSITION - PHYSICAL VERIFICATION:");
-    let fp_before = store.retrieve(memory_id).await.unwrap().unwrap();
-
-    println!(
-        "   E1 (semantic) quadrant: {:?}",
-        fp_before.johari.dominant_quadrant(0)
-    );
-    println!(
-        "   E2 (episodic) quadrant: {:?}",
-        fp_before.johari.dominant_quadrant(1)
-    );
-    println!(
-        "   E3 (procedural) quadrant: {:?}",
-        fp_before.johari.dominant_quadrant(2)
-    );
-
-    let e1_before = fp_before.johari.dominant_quadrant(0);
-    println!(
-        "\n   Target: E1 currently {:?}, will transition to Open",
-        e1_before
-    );
-
-    // =========================================================================
-    // EXECUTE: Johari transition E1 -> Open
-    // =========================================================================
-    println!("\n📝 EXECUTE: johari/transition (E1 -> Open)");
-    let transition_response = handlers
-        .dispatch(make_request(
-            "johari/transition",
-            2,
-            json!({
-                "memory_id": memory_id_str,
-                "embedder_index": 0,
-                "to_quadrant": "open",
-                "trigger": "pattern_discovery"
-            }),
-        ))
-        .await;
-    println!("   Handler returned: {:?}", transition_response.result);
-
-    // =========================================================================
-    // AFTER TRANSITION - PHYSICAL VERIFICATION
-    // =========================================================================
-    println!("\n🔍 AFTER TRANSITION - PHYSICAL VERIFICATION:");
-    let fp_after = store.retrieve(memory_id).await.unwrap().unwrap();
-
-    let e1_after = fp_after.johari.dominant_quadrant(0);
-    println!(
-        "   E1 (semantic) quadrant: {:?} (was {:?})",
-        e1_after, e1_before
-    );
-
-    // Print all 13 quadrants for full visibility
-    println!("\n   ALL 13 QUADRANTS IN SOURCE OF TRUTH:");
-    for i in 0..NUM_EMBEDDERS {
-        let q = fp_after.johari.dominant_quadrant(i);
-        let changed = if i == 0 { " ← CHANGED" } else { "" };
-        println!("   - E{}: {:?}{}", i + 1, q, changed);
-    }
-
-    assert_eq!(
-        e1_after,
-        JohariQuadrant::Open,
-        "E1 MUST be Open after transition"
-    );
-
-    // =========================================================================
-    // EVIDENCE OF SUCCESS
-    // =========================================================================
-    println!("\n================================================================================");
-    println!("EVIDENCE OF SUCCESS - JOHARI TRANSITION PHYSICALLY VERIFIED");
-    println!("================================================================================");
-    println!("Source of Truth: TeleologicalFingerprint.johari in InMemoryTeleologicalStore");
-    println!("Physical Evidence:");
-    println!("  - Memory ID: {}", memory_id);
-    println!("  - E1 Before: {:?}", e1_before);
-    println!("  - E1 After: {:?}", e1_after);
-    println!("  - Transition persisted: YES");
-    println!("================================================================================\n");
-}
-
-/// =============================================================================
-/// MANUAL FSV TEST 4: META-UTL TRACKER VERIFICATION
+/// MANUAL FSV TEST 3: META-UTL TRACKER VERIFICATION
 /// Source of Truth: MetaUtlTracker (pending_predictions HashMap)
 /// =============================================================================
 #[tokio::test]
@@ -491,8 +345,6 @@ async fn manual_fsv_meta_utl_tracker_physical_verification() {
     let multi_array: Arc<dyn MultiArrayEmbeddingProvider> = Arc::new(StubMultiArrayProvider::new());
     let alignment: Arc<dyn GoalAlignmentCalculator> = Arc::new(DefaultAlignmentCalculator::new());
     let hierarchy = Arc::new(RwLock::new(create_test_hierarchy()));
-    let johari: Arc<dyn JohariTransitionManager> =
-        Arc::new(DynDefaultJohariManager::new(store.clone()));
     let tracker = Arc::new(RwLock::new(MetaUtlTracker::new()));
 
     let handlers = Handlers::with_meta_utl_tracker(
@@ -501,7 +353,6 @@ async fn manual_fsv_meta_utl_tracker_physical_verification() {
         multi_array,
         alignment,
         hierarchy.clone(),
-        johari,
         tracker.clone(),
     );
 
@@ -656,8 +507,6 @@ async fn manual_fsv_edge_case_empty_content() {
     let multi_array: Arc<dyn MultiArrayEmbeddingProvider> = Arc::new(StubMultiArrayProvider::new());
     let alignment: Arc<dyn GoalAlignmentCalculator> = Arc::new(DefaultAlignmentCalculator::new());
     let hierarchy = Arc::new(RwLock::new(create_test_hierarchy()));
-    let johari: Arc<dyn JohariTransitionManager> =
-        Arc::new(DynDefaultJohariManager::new(store.clone()));
     let tracker = Arc::new(RwLock::new(MetaUtlTracker::new()));
 
     let handlers = Handlers::with_meta_utl_tracker(
@@ -666,7 +515,6 @@ async fn manual_fsv_edge_case_empty_content() {
         multi_array,
         alignment,
         hierarchy,
-        johari,
         tracker,
     );
 
@@ -718,8 +566,6 @@ async fn manual_fsv_edge_case_invalid_uuid() {
     let multi_array: Arc<dyn MultiArrayEmbeddingProvider> = Arc::new(StubMultiArrayProvider::new());
     let alignment: Arc<dyn GoalAlignmentCalculator> = Arc::new(DefaultAlignmentCalculator::new());
     let hierarchy = Arc::new(RwLock::new(create_test_hierarchy()));
-    let johari: Arc<dyn JohariTransitionManager> =
-        Arc::new(DynDefaultJohariManager::new(store.clone()));
     let tracker = Arc::new(RwLock::new(MetaUtlTracker::new()));
 
     let handlers = Handlers::with_meta_utl_tracker(
@@ -728,7 +574,6 @@ async fn manual_fsv_edge_case_invalid_uuid() {
         multi_array,
         alignment,
         hierarchy,
-        johari,
         tracker,
     );
 
@@ -779,8 +624,6 @@ async fn manual_fsv_edge_case_nonexistent_fingerprint() {
     let multi_array: Arc<dyn MultiArrayEmbeddingProvider> = Arc::new(StubMultiArrayProvider::new());
     let alignment: Arc<dyn GoalAlignmentCalculator> = Arc::new(DefaultAlignmentCalculator::new());
     let hierarchy = Arc::new(RwLock::new(create_test_hierarchy()));
-    let johari: Arc<dyn JohariTransitionManager> =
-        Arc::new(DynDefaultJohariManager::new(store.clone()));
     let tracker = Arc::new(RwLock::new(MetaUtlTracker::new()));
 
     let handlers = Handlers::with_meta_utl_tracker(
@@ -789,7 +632,6 @@ async fn manual_fsv_edge_case_nonexistent_fingerprint() {
         multi_array,
         alignment,
         hierarchy,
-        johari,
         tracker,
     );
 

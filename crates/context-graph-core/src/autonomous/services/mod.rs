@@ -6,7 +6,7 @@
 //! # Architecture
 //!
 //! The Logic Layer provides operational services that:
-//! - Bootstrap and configure the North Star goal
+//! - Bootstrap and configure Strategic goals
 //! - Learn and adapt alignment thresholds
 //! - Detect and correct goal drift
 //! - Prune and consolidate memories
@@ -15,7 +15,7 @@
 //!
 //! # Services
 //!
-//! - `BootstrapService` (NORTH-008): Initialize North Star from documents
+//! - `BootstrapService` (NORTH-008): Initialize Strategic goals from documents
 //! - `ThresholdLearner` (NORTH-009): Adaptive threshold optimization
 //! - `DriftDetector` (NORTH-010): Goal alignment drift detection
 //! - `DriftCorrector` (NORTH-011): Drift correction strategies

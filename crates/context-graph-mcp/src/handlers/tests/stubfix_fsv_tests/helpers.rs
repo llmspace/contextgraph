@@ -3,7 +3,7 @@
 use sha2::{Digest, Sha256};
 
 use context_graph_core::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
+    PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
 };
 
 // ============================================================================
@@ -43,9 +43,8 @@ pub(crate) fn create_test_fingerprint(
 
     let semantic = create_test_semantic(&content_hash);
     let purpose_vector = create_test_purpose_vector(theta);
-    let johari = JohariFingerprint::zeroed();
 
-    let mut fp = TeleologicalFingerprint::new(semantic, purpose_vector, johari, content_hash);
+    let mut fp = TeleologicalFingerprint::new(semantic, purpose_vector, content_hash);
     // Override theta and access_count for test control
     fp.alignment_score = theta;
     fp.access_count = access_count;

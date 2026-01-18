@@ -112,15 +112,15 @@ async fn test_special_characters_in_content() {
 }
 
 #[tokio::test]
-async fn test_no_north_star_error_handling() {
+async fn test_no_goals_error_handling() {
     let handlers = create_test_handlers_no_goals();
     let request = make_tool_call("discover_sub_goals", json!({}));
 
     let response = handlers.dispatch(request).await;
-    // Should handle missing North Star gracefully (may return empty or error)
+    // Should handle missing goals gracefully (may return empty or error)
     assert!(
         response.error.is_none(),
-        "Should not crash without North Star"
+        "Should not crash without goals configured"
     );
 }
 

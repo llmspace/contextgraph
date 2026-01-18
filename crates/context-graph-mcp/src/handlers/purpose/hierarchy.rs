@@ -20,7 +20,7 @@ impl Handlers {
     /// # Request Parameters
     /// - `operation` (required): "get_children", "get_ancestors", "get_subtree", "get_all", "get_goal"
     /// - `goal_id` (optional): Goal ID for targeted operations
-    /// - `level` (optional): Filter by GoalLevel ("NorthStar", "Strategic", "Tactical", "Immediate")
+    /// - `level` (optional): Filter by GoalLevel ("Strategic", "Tactical", "Immediate")
     ///
     /// # Response
     /// - `goals`: Array of goal objects with hierarchy info
@@ -187,7 +187,6 @@ impl Handlers {
                     }
                 };
 
-                // TASK-P0-001: Renamed from path_to_north_star to path_to_root
                 let path = hierarchy.path_to_root(&goal_id);
                 if path.is_empty() {
                     error!(goal_id = %goal_id, "goal/hierarchy_query: Goal not found for ancestors");

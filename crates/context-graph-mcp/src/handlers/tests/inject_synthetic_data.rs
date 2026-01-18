@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use context_graph_core::traits::TeleologicalMemoryStore;
 use context_graph_core::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
+    PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
 };
 
 use context_graph_storage::teleological::RocksDbTeleologicalStore;
@@ -75,8 +75,8 @@ const SYNTHETIC_MEMORIES: [(&str, &str); 10] = [
          cosine similarity metrics, and approximate nearest neighbor search with HNSW indexes.",
     ),
     (
-        "consciousness_models",
-        "Computational models of consciousness including Global Workspace Theory, \
+        "cognitive_models",
+        "Computational models of cognition including Global Workspace Theory, \
          Integrated Information Theory (IIT), attention mechanisms, and meta-cognitive loops.",
     ),
     (
@@ -87,7 +87,7 @@ const SYNTHETIC_MEMORIES: [(&str, &str); 10] = [
     (
         "teleological_systems",
         "Teleological system design with purpose vectors, goal alignment metrics, \
-         North Star guidance, and autonomous self-improvement through learning feedback loops.",
+         topic portfolio guidance, and autonomous self-improvement through learning feedback loops.",
     ),
 ];
 
@@ -108,10 +108,7 @@ fn create_synthetic_fingerprint(content: &str, topic: &str) -> TeleologicalFinge
     // Create purpose vector with varied alignment scores
     let purpose_vector = create_synthetic_purpose_vector(topic);
 
-    // Create Johari fingerprint (all start in "unknown" quadrant)
-    let johari = JohariFingerprint::zeroed();
-
-    TeleologicalFingerprint::new(semantic, purpose_vector, johari, content_hash)
+    TeleologicalFingerprint::new(semantic, purpose_vector, content_hash)
 }
 
 /// Create synthetic SemanticFingerprint with realistic embedding patterns.
@@ -226,7 +223,7 @@ fn create_synthetic_purpose_vector(topic: &str) -> PurposeVector {
         "api_design" => 0.65,
         "rust_memory_safety" => 0.80,
         "vector_embeddings" => 0.95,
-        "consciousness_models" => 0.88,
+        "cognitive_models" => 0.88,
         "knowledge_graphs" => 0.82,
         "teleological_systems" => 0.92,
         _ => 0.5,
@@ -344,17 +341,6 @@ async fn inject_synthetic_production() {
             }
         }
     }
-
-    // Check quadrant distribution
-    let quadrant_counts = store
-        .count_by_quadrant()
-        .await
-        .expect("Failed to count by quadrant");
-    println!("\n[QUADRANT DISTRIBUTION]");
-    println!("  Open:    {}", quadrant_counts[0]);
-    println!("  Blind:   {}", quadrant_counts[1]);
-    println!("  Hidden:  {}", quadrant_counts[2]);
-    println!("  Unknown: {}", quadrant_counts[3]);
 
     // Summary
     println!("\n================================================================================");

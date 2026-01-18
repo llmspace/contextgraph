@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use tracing::{debug, error, warn};
 use uuid::Uuid;
 
-use super::similarity::{compute_semantic_scores, get_dominant_quadrant};
+use super::similarity::compute_semantic_scores;
 use super::InMemoryTeleologicalStore;
 use crate::error::{CoreError, CoreResult};
 use crate::traits::{TeleologicalSearchOptions, TeleologicalSearchResult};
@@ -61,13 +61,6 @@ impl InMemoryTeleologicalStore {
 
             if let Some(min_align) = options.min_alignment {
                 if fp.alignment_score < min_align {
-                    continue;
-                }
-            }
-
-            if let Some(quadrant) = options.johari_quadrant_filter {
-                let dominant = get_dominant_quadrant(&fp.johari);
-                if dominant != quadrant {
                     continue;
                 }
             }

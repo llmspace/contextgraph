@@ -1,6 +1,6 @@
 //! Autonomous topic-based storage extensions.
 //!
-//! TASK-P0-004: Reduced from 7 to 5 column families after North Star removal (TASK-P0-001).
+//! TASK-P0-004: Reduced from 7 to 5 column families (TASK-P0-001).
 //!
 //! Adds 5 column families for autonomous system storage:
 //! - `autonomous_config` - Singleton AutonomousConfig storage

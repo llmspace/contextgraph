@@ -94,69 +94,7 @@ async fn test_pbt_all_outputs_valid_range() {
     }
 }
 
-/// PBT-02: Johari quadrant must ALWAYS be a valid enum value
-#[tokio::test]
-async fn test_pbt_johari_always_valid_enum() {
-    let handlers = create_test_handlers();
-    let valid_quadrants = ["Open", "Blind", "Hidden", "Unknown"];
-
-    // Test various input combinations
-    let test_values: Vec<f32> = vec![0.0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0];
-
-    for old_val in &test_values {
-        for new_val in &test_values {
-            let old_fp = create_test_fingerprint_with_semantic(vec![*old_val; 1024]);
-            let new_fp = create_test_fingerprint_with_semantic(vec![*new_val; 1024]);
-
-            let request = make_request(
-                "tools/call",
-                Some(JsonRpcId::Number(1)),
-                Some(json!({
-                    "name": "gwt/compute_delta_sc",
-                    "arguments": {
-                        "vertex_id": Uuid::new_v4().to_string(),
-                        "old_fingerprint": serde_json::to_value(&old_fp).expect("serialize"),
-                        "new_fingerprint": serde_json::to_value(&new_fp).expect("serialize"),
-                    }
-                })),
-            );
-
-            let response = handlers.dispatch(request).await;
-            if response.error.is_some() {
-                continue; // Skip failed requests
-            }
-
-            let result = response.result.expect("result");
-            let data = extract_mcp_tool_data(&result);
-
-            // Verify aggregate quadrant
-            let johari_agg = data["johari_aggregate"].as_str().expect("string");
-            assert!(
-                valid_quadrants.contains(&johari_agg),
-                "PBT-02: johari_aggregate '{}' is not a valid quadrant (old={}, new={})",
-                johari_agg,
-                old_val,
-                new_val
-            );
-
-            // Verify all per-embedder quadrants
-            let johari_quadrants = data["johari_quadrants"].as_array().expect("array");
-            for (i, q) in johari_quadrants.iter().enumerate() {
-                let quadrant = q.as_str().expect("string");
-                assert!(
-                    valid_quadrants.contains(&quadrant),
-                    "PBT-02: johari_quadrants[{}] = '{}' is not valid (old={}, new={})",
-                    i,
-                    quadrant,
-                    old_val,
-                    new_val
-                );
-            }
-        }
-    }
-}
-
-/// PBT-03: diagnostics field must be present when include_diagnostics=true
+/// PBT-02: diagnostics field must be present when include_diagnostics=true
 #[tokio::test]
 async fn test_pbt_diagnostics_present_when_requested() {
     let handlers = create_test_handlers();
@@ -191,7 +129,7 @@ async fn test_pbt_diagnostics_present_when_requested() {
 
             assert!(
                 data.get("diagnostics").is_some(),
-                "PBT-03: diagnostics MUST be present when include_diagnostics=true (old={}, new={})",
+                "PBT-02: diagnostics MUST be present when include_diagnostics=true (old={}, new={})",
                 old_val,
                 new_val
             );
@@ -200,21 +138,17 @@ async fn test_pbt_diagnostics_present_when_requested() {
             let diagnostics = &data["diagnostics"];
             assert!(
                 diagnostics.get("per_embedder").is_some(),
-                "PBT-03: diagnostics.per_embedder must exist"
-            );
-            assert!(
-                diagnostics.get("johari_threshold").is_some(),
-                "PBT-03: diagnostics.johari_threshold must exist"
+                "PBT-02: diagnostics.per_embedder must exist"
             );
             assert!(
                 diagnostics.get("delta_c_components").is_some(),
-                "PBT-03: diagnostics.delta_c_components must exist"
+                "PBT-02: diagnostics.delta_c_components must exist"
             );
         }
     }
 }
 
-/// PBT-04: Without include_diagnostics, diagnostics field should NOT be present
+/// PBT-03: Without include_diagnostics, diagnostics field should NOT be present
 #[tokio::test]
 async fn test_pbt_no_diagnostics_by_default() {
     let handlers = create_test_handlers();
@@ -245,6 +179,6 @@ async fn test_pbt_no_diagnostics_by_default() {
 
     assert!(
         data.get("diagnostics").is_none(),
-        "PBT-04: diagnostics should NOT be present when include_diagnostics=false"
+        "PBT-03: diagnostics should NOT be present when include_diagnostics=false"
     );
 }

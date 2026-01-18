@@ -72,7 +72,7 @@ impl TeleologicalSearchResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::fingerprint::{JohariFingerprint, PurposeVector, SemanticFingerprint};
+    use crate::types::fingerprint::{PurposeVector, SemanticFingerprint};
 
     #[test]
     fn test_search_result_dominant_embedder() {
@@ -83,7 +83,6 @@ mod tests {
             fingerprint: TeleologicalFingerprint::new(
                 SemanticFingerprint::zeroed(),
                 PurposeVector::default(),
-                JohariFingerprint::zeroed(),
                 [0u8; 32],
             ),
             similarity: 0.8,

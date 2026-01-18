@@ -15,6 +15,8 @@ use serde_json::json;
 use tracing::{debug, error, warn};
 
 use context_graph_core::steering::SteeringSystem;
+use context_graph_core::traits::TeleologicalSearchOptions;
+use context_graph_core::types::fingerprint::PurposeVector;
 
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
 
@@ -57,13 +59,16 @@ impl Handlers {
         // Since edge operations aren't exposed through TeleologicalMemoryStore trait,
         // we use approximations based on available fingerprint data:
         // - orphan_count: fingerprints with access_count == 0 (never accessed/connected)
-        // - connectivity: ratio of fingerprints with θ > 0.5 (aligned with North Star)
-        let johari_list = match self
+        // - connectivity: ratio of fingerprints with alignment_score > 0.5
+        let search_options = TeleologicalSearchOptions::quick(total_count.max(100));
+        let default_query = PurposeVector::default();
+
+        let search_results = match self
             .teleological_store
-            .list_all_johari(total_count.max(100))
+            .search_purpose(&default_query, search_options)
             .await
         {
-            Ok(list) => list,
+            Ok(results) => results,
             Err(e) => {
                 error!(error = %e, "get_steering_feedback: FAIL FAST - Failed to list fingerprints");
                 return self.tool_error_with_pulse(
@@ -77,24 +82,15 @@ impl Handlers {
         let mut aligned_count = 0_usize;
         let alignment_threshold = 0.5_f32;
 
-        for (uuid, _johari) in johari_list.iter() {
-            match self.teleological_store.retrieve(*uuid).await {
-                Ok(Some(fp)) => {
-                    // Orphan approximation: never accessed fingerprints
-                    if fp.access_count == 0 {
-                        orphan_count += 1;
-                    }
-                    // Connectivity approximation: aligned with North Star
-                    if fp.alignment_score >= alignment_threshold {
-                        aligned_count += 1;
-                    }
-                }
-                Ok(None) => {
-                    warn!(uuid = %uuid, "get_steering_feedback: Fingerprint not found");
-                }
-                Err(e) => {
-                    warn!(uuid = %uuid, error = %e, "get_steering_feedback: Failed to retrieve fingerprint");
-                }
+        for result in search_results.iter() {
+            let fp = &result.fingerprint;
+            // Orphan approximation: never accessed fingerprints
+            if fp.access_count == 0 {
+                orphan_count += 1;
+            }
+            // Connectivity approximation: fingerprints with good alignment
+            if fp.alignment_score >= alignment_threshold {
+                aligned_count += 1;
             }
         }
 

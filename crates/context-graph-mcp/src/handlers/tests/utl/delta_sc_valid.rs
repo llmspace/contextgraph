@@ -5,7 +5,7 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use context_graph_core::johari::NUM_EMBEDDERS;
+use context_graph_core::types::fingerprint::NUM_EMBEDDERS;
 
 use crate::handlers::tests::{create_test_handlers, extract_mcp_tool_data, make_request};
 use crate::protocol::JsonRpcId;
@@ -55,14 +55,6 @@ async fn test_gwt_compute_delta_sc_valid() {
     );
     assert!(data.get("delta_c").is_some(), "Should have delta_c");
     assert!(
-        data.get("johari_quadrants").is_some(),
-        "Should have johari_quadrants"
-    );
-    assert!(
-        data.get("johari_aggregate").is_some(),
-        "Should have johari_aggregate"
-    );
-    assert!(
         data.get("utl_learning_potential").is_some(),
         "Should have utl_learning_potential"
     );
@@ -100,16 +92,6 @@ async fn test_gwt_compute_delta_sc_per_embedder_count() {
         delta_s_per_embedder.len(),
         NUM_EMBEDDERS,
         "Should have exactly 13 per-embedder ΔS values"
-    );
-
-    // Verify 13 Johari quadrants
-    let johari_quadrants = data["johari_quadrants"]
-        .as_array()
-        .expect("johari_quadrants should be array");
-    assert_eq!(
-        johari_quadrants.len(),
-        NUM_EMBEDDERS,
-        "Should have exactly 13 Johari quadrants"
     );
 }
 
@@ -175,52 +157,6 @@ async fn test_gwt_compute_delta_sc_ap10_range_compliance() {
 }
 
 #[tokio::test]
-async fn test_gwt_compute_delta_sc_johari_quadrant_values() {
-    let handlers = create_test_handlers();
-
-    let old_fp = create_test_fingerprint_with_semantic(vec![0.5; 1024]);
-    let new_fp = create_test_fingerprint_with_semantic(vec![0.6; 1024]);
-
-    let request = make_request(
-        "tools/call",
-        Some(JsonRpcId::Number(1)),
-        Some(json!({
-            "name": "gwt/compute_delta_sc",
-            "arguments": {
-                "vertex_id": Uuid::new_v4().to_string(),
-                "old_fingerprint": serde_json::to_value(&old_fp).expect("serialize"),
-                "new_fingerprint": serde_json::to_value(&new_fp).expect("serialize"),
-            }
-        })),
-    );
-
-    let response = handlers.dispatch(request).await;
-    let result = response.result.expect("Should have result");
-    let data = extract_mcp_tool_data(&result);
-
-    // Verify Johari quadrants are valid enum values
-    let valid_quadrants = ["Open", "Blind", "Hidden", "Unknown"];
-    let johari_quadrants = data["johari_quadrants"].as_array().expect("array");
-
-    for (i, quadrant) in johari_quadrants.iter().enumerate() {
-        let q = quadrant.as_str().expect("string");
-        assert!(
-            valid_quadrants.contains(&q),
-            "johari_quadrants[{}] = '{}' is not a valid quadrant",
-            i,
-            q
-        );
-    }
-
-    let johari_agg = data["johari_aggregate"].as_str().expect("string");
-    assert!(
-        valid_quadrants.contains(&johari_agg),
-        "johari_aggregate = '{}' is not a valid quadrant",
-        johari_agg
-    );
-}
-
-#[tokio::test]
 async fn test_gwt_compute_delta_sc_with_diagnostics() {
     let handlers = create_test_handlers();
 
@@ -257,49 +193,7 @@ async fn test_gwt_compute_delta_sc_with_diagnostics() {
         "diagnostics should have per_embedder"
     );
     assert!(
-        diagnostics.get("johari_threshold").is_some(),
-        "diagnostics should have johari_threshold"
-    );
-    assert!(
         diagnostics.get("coherence_config").is_some(),
         "diagnostics should have coherence_config"
-    );
-}
-
-#[tokio::test]
-async fn test_gwt_compute_delta_sc_custom_johari_threshold() {
-    let handlers = create_test_handlers();
-
-    let old_fp = create_test_fingerprint_with_semantic(vec![0.5; 1024]);
-    let new_fp = create_test_fingerprint_with_semantic(vec![0.6; 1024]);
-
-    // Test with custom johari_threshold
-    let request = make_request(
-        "tools/call",
-        Some(JsonRpcId::Number(1)),
-        Some(json!({
-            "name": "gwt/compute_delta_sc",
-            "arguments": {
-                "vertex_id": Uuid::new_v4().to_string(),
-                "old_fingerprint": serde_json::to_value(&old_fp).expect("serialize"),
-                "new_fingerprint": serde_json::to_value(&new_fp).expect("serialize"),
-                "johari_threshold": 0.4,
-                "include_diagnostics": true,
-            }
-        })),
-    );
-
-    let response = handlers.dispatch(request).await;
-    let result = response.result.expect("Should have result");
-    let data = extract_mcp_tool_data(&result);
-
-    // Verify threshold was applied (clamped to [0.35, 0.65])
-    let threshold = data["diagnostics"]["johari_threshold"]
-        .as_f64()
-        .expect("threshold");
-    assert!(
-        (0.35..=0.65).contains(&threshold),
-        "johari_threshold {} should be clamped to [0.35, 0.65]",
-        threshold
     );
 }

@@ -43,7 +43,7 @@ fn test_cosine_similarity_mismatched_dims() {
 #[test]
 fn test_propagation_weights() {
     // TASK-P0-001: Updated for 3-level hierarchy
-    // Strategic is now top-level (was NorthStar before)
+    // Strategic is top-level
     assert_eq!(
         DefaultAlignmentCalculator::get_propagation_weight(GoalLevel::Strategic),
         1.0 // Top-level gets full weight

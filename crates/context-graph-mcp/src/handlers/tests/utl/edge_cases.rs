@@ -3,7 +3,7 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use context_graph_core::johari::NUM_EMBEDDERS;
+use context_graph_core::types::fingerprint::NUM_EMBEDDERS;
 
 use crate::handlers::tests::{create_test_handlers, extract_mcp_tool_data, make_request};
 use crate::protocol::JsonRpcId;
@@ -176,13 +176,13 @@ async fn test_ec03_zero_magnitude_embeddings() {
     );
 }
 
-/// EC-04: Threshold boundary test - ΔS/ΔC exactly at threshold (0.5)
+/// EC-04: Threshold boundary test - ΔS/ΔC values at various magnitudes
 #[tokio::test]
 async fn test_ec04_threshold_boundary() {
     let handlers = create_test_handlers();
 
     // We can't directly control the exact ΔS/ΔC values, but we can verify
-    // the classification logic handles boundary cases correctly
+    // the computation handles boundary cases correctly
     let old_fp = create_test_fingerprint_with_semantic(vec![0.5; 1024]);
     let new_fp = create_test_fingerprint_with_semantic(vec![0.55; 1024]);
 
@@ -195,7 +195,6 @@ async fn test_ec04_threshold_boundary() {
                 "vertex_id": Uuid::new_v4().to_string(),
                 "old_fingerprint": serde_json::to_value(&old_fp).expect("serialize"),
                 "new_fingerprint": serde_json::to_value(&new_fp).expect("serialize"),
-                "johari_threshold": 0.5,
                 "include_diagnostics": true,
             }
         })),
@@ -207,23 +206,19 @@ async fn test_ec04_threshold_boundary() {
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
 
-    let threshold = data["diagnostics"]["johari_threshold"]
-        .as_f64()
-        .expect("f64");
     let delta_s_agg = data["delta_s_aggregate"].as_f64().expect("f64");
     let delta_c = data["delta_c"].as_f64().expect("f64");
-    let johari_agg = data["johari_aggregate"].as_str().expect("string");
 
-    // The classification should be deterministic based on strict < and > comparison
-    // Verify the result is one of the valid quadrants
-    let valid_quadrants = ["Open", "Blind", "Hidden", "Unknown"];
+    // Verify values are within valid range
     assert!(
-        valid_quadrants.contains(&johari_agg),
-        "EC-04: Boundary case should still produce valid quadrant. ΔS={:.4}, ΔC={:.4}, threshold={:.4}, got '{}'",
-        delta_s_agg,
-        delta_c,
-        threshold,
-        johari_agg
+        (0.0..=1.0).contains(&delta_s_agg),
+        "EC-04: delta_s_aggregate should be in [0,1], got {}",
+        delta_s_agg
+    );
+    assert!(
+        (0.0..=1.0).contains(&delta_c),
+        "EC-04: delta_c should be in [0,1], got {}",
+        delta_c
     );
 }
 
@@ -272,79 +267,5 @@ async fn test_ec05_large_embedding_dimensions() {
         delta_s_per_embedder.len(),
         NUM_EMBEDDERS,
         "EC-05: Should still have 13 embedders"
-    );
-}
-
-/// EC-06: Verify behavior with custom johari_threshold at boundaries
-#[tokio::test]
-async fn test_ec06_johari_threshold_clamping() {
-    let handlers = create_test_handlers();
-
-    let old_fp = create_test_fingerprint_with_semantic(vec![0.5; 1024]);
-    let new_fp = create_test_fingerprint_with_semantic(vec![0.6; 1024]);
-
-    // Test threshold below minimum (0.35) - should be clamped
-    let request_low = make_request(
-        "tools/call",
-        Some(JsonRpcId::Number(1)),
-        Some(json!({
-            "name": "gwt/compute_delta_sc",
-            "arguments": {
-                "vertex_id": Uuid::new_v4().to_string(),
-                "old_fingerprint": serde_json::to_value(&old_fp).expect("serialize"),
-                "new_fingerprint": serde_json::to_value(&new_fp).expect("serialize"),
-                "johari_threshold": 0.1,  // Below minimum
-                "include_diagnostics": true,
-            }
-        })),
-    );
-
-    let response_low = handlers.dispatch(request_low).await;
-    assert!(response_low.error.is_none(), "Should handle low threshold");
-
-    let result_low = response_low.result.expect("result");
-    let data_low = extract_mcp_tool_data(&result_low);
-    let threshold_low = data_low["diagnostics"]["johari_threshold"]
-        .as_f64()
-        .expect("f64");
-    // Use tolerance for f32/f64 precision issues (0.35 stored as f32 may be 0.34999...)
-    assert!(
-        threshold_low >= 0.35 - 0.0001,
-        "EC-06: Threshold {} should be clamped to >= 0.35",
-        threshold_low
-    );
-
-    // Test threshold above maximum (0.65) - should be clamped
-    let request_high = make_request(
-        "tools/call",
-        Some(JsonRpcId::Number(1)),
-        Some(json!({
-            "name": "gwt/compute_delta_sc",
-            "arguments": {
-                "vertex_id": Uuid::new_v4().to_string(),
-                "old_fingerprint": serde_json::to_value(&old_fp).expect("serialize"),
-                "new_fingerprint": serde_json::to_value(&new_fp).expect("serialize"),
-                "johari_threshold": 0.9,  // Above maximum
-                "include_diagnostics": true,
-            }
-        })),
-    );
-
-    let response_high = handlers.dispatch(request_high).await;
-    assert!(
-        response_high.error.is_none(),
-        "Should handle high threshold"
-    );
-
-    let result_high = response_high.result.expect("result");
-    let data_high = extract_mcp_tool_data(&result_high);
-    let threshold_high = data_high["diagnostics"]["johari_threshold"]
-        .as_f64()
-        .expect("f64");
-    // Use tolerance for f32/f64 precision issues
-    assert!(
-        threshold_high <= 0.65 + 0.0001,
-        "EC-06: Threshold {} should be clamped to <= 0.65",
-        threshold_high
     );
 }

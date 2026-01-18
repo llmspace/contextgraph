@@ -13,8 +13,8 @@
 //! 4. `trigger_drift_correction` - Corrects drift if detected
 //! 5. `discover_sub_goals` - Finds sub-goals from clustered patterns
 //!
-//! # TASK-P0-001: North Star Removal
-//! The `auto_bootstrap_north_star` tool has been REMOVED per ARCH-03.
+//! # TASK-P0-001: Legacy Bootstrap Tool Removal
+//! The `auto_bootstrap` tool has been REMOVED per ARCH-03.
 //! Goals now emerge autonomously from topic clustering (constitution v6.0.0).
 //! Tests for the removed tool have been commented out.
 //!
@@ -44,23 +44,23 @@ use crate::protocol::{JsonRpcId, JsonRpcRequest};
 use crate::tools::tool_names;
 
 // =============================================================================
-// SCENARIO 1: STORE WITHOUT NORTH STAR (CRITICAL - THE FIX)
+// SCENARIO 1: STORE WITHOUT STRATEGIC GOAL (CRITICAL - THE FIX)
 // =============================================================================
 
-/// FSV Test: store_memory MUST succeed without North Star configured.
+/// FSV Test: store_memory MUST succeed without strategic goal configured.
 ///
 /// This is the CRITICAL test for the circular dependency fix.
-/// Before the fix: store_memory required North Star, but bootstrap needed stored memories.
-/// After the fix: store_memory uses PurposeVector::default() when no North Star exists.
+/// Before the fix: store_memory required strategic goal, but bootstrap needed stored memories.
+/// After the fix: store_memory uses PurposeVector::default() when no strategic goal exists.
 ///
 /// Source of Truth: tools.rs call_store_memory() - line 491: hierarchy.top_level_goals().first().is_none()
 /// Expected: Memory stored successfully with fingerprint ID returned.
 #[tokio::test]
-async fn test_store_memory_succeeds_without_north_star() {
-    // SETUP: Create handlers WITHOUT North Star (empty goal hierarchy)
+async fn test_store_memory_succeeds_without_strategic_goal() {
+    // SETUP: Create handlers WITHOUT strategic goal (empty goal hierarchy)
     let handlers = create_test_handlers_no_goals();
 
-    // EXECUTE: Store a memory - this should NOT fail even without North Star
+    // EXECUTE: Store a memory - this should NOT fail even without strategic goal
     let request = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
         id: Some(JsonRpcId::Number(1)),
@@ -77,7 +77,7 @@ async fn test_store_memory_succeeds_without_north_star() {
     // VERIFY: Response is successful - THIS IS THE CRITICAL CHECK
     assert!(
         response.error.is_none(),
-        "[CRITICAL FIX] store_memory MUST succeed without North Star. Got error: {:?}",
+        "[CRITICAL FIX] store_memory MUST succeed without strategic goal. Got error: {:?}",
         response.error
     );
 
@@ -106,18 +106,18 @@ async fn test_store_memory_succeeds_without_north_star() {
     );
 
     println!("[FSV] Phase 4 - CRITICAL FIX VERIFIED");
-    println!("[FSV]   store_memory succeeded WITHOUT North Star");
+    println!("[FSV]   store_memory succeeded WITHOUT strategic goal");
     println!("[FSV]   fingerprintId={}", fingerprint_id);
     println!("[FSV]   embedderCount={}", embedder_count);
     println!("[FSV]   CIRCULAR DEPENDENCY: FIXED");
 }
 
-/// FSV Test: Multiple memories can be stored without North Star.
+/// FSV Test: Multiple memories can be stored without strategic goal.
 ///
 /// Tests that the system can accumulate enough memories for bootstrap (>= 3).
 /// This verifies the "autonomous seeding" phase works correctly.
 #[tokio::test]
-async fn test_multiple_memories_stored_without_north_star() {
+async fn test_multiple_memories_stored_without_strategic_goal() {
     let handlers = create_test_handlers_no_goals();
 
     let test_contents = [
@@ -178,45 +178,45 @@ async fn test_multiple_memories_stored_without_north_star() {
         "[FSV] All fingerprint IDs must be unique"
     );
 
-    println!("[FSV] Phase 4 - Multiple memories stored without North Star: PASSED");
+    println!("[FSV] Phase 4 - Multiple memories stored without strategic goal: PASSED");
     println!("[FSV]   Stored {} memories", stored_ids.len());
     println!("[FSV]   All IDs unique: YES");
     println!("[FSV]   AUTONOMOUS SEEDING: WORKING");
 }
 
 // =============================================================================
-// SCENARIO 2: AUTO BOOTSTRAP NORTH STAR - REMOVED per TASK-P0-001 (ARCH-03)
+// SCENARIO 2: AUTO BOOTSTRAP - REMOVED per TASK-P0-001 (ARCH-03)
 // =============================================================================
-// The auto_bootstrap_north_star tool has been removed.
+// The auto_bootstrap tool has been removed.
 // Goals now emerge autonomously from topic clustering.
 // See constitution v6.0.0: topic_system.topic_portfolio
 
 /*
-REMOVED per TASK-P0-001: auto_bootstrap_north_star tests
+REMOVED per TASK-P0-001: auto_bootstrap tests
 
-/// FSV Test: auto_bootstrap_north_star returns appropriate response without data.
+/// FSV Test: auto_bootstrap returns appropriate response without data.
 #[tokio::test]
 async fn test_auto_bootstrap_fails_gracefully_with_no_data() {
     // TEST REMOVED - tool no longer exists
 }
 
-/// FSV Test: auto_bootstrap returns "already_bootstrapped" when North Star exists.
+/// FSV Test: auto_bootstrap returns "already_bootstrapped" when strategic goal exists.
 #[tokio::test]
 async fn test_auto_bootstrap_returns_already_bootstrapped_when_configured() {
     // TEST REMOVED - tool no longer exists
 }
 */
 
-// NOTE: The functionality previously provided by auto_bootstrap_north_star
+// NOTE: The functionality previously provided by auto_bootstrap
 // is now handled by the topic-based system. Topics emerge from HDBSCAN/BIRCH
 // clustering of memories. Use get_topic_portfolio and get_topic_stability
 // for similar functionality.
 
 #[tokio::test]
 async fn test_placeholder_for_removed_bootstrap_tests() {
-    // This test confirms that auto_bootstrap_north_star was intentionally removed
+    // This test confirms that auto_bootstrap was intentionally removed
     // per TASK-P0-001 and ARCH-03 (autonomous operation - goals emerge from clustering)
-    println!("[FSV] Phase 4 - auto_bootstrap_north_star: REMOVED per TASK-P0-001");
+    println!("[FSV] Phase 4 - auto_bootstrap: REMOVED per TASK-P0-001");
     println!("[FSV]   Status: already_bootstrapped");
     println!("[FSV]   IDEMPOTENT BEHAVIOR: VERIFIED");
 }
@@ -225,12 +225,12 @@ async fn test_placeholder_for_removed_bootstrap_tests() {
 // SCENARIO 3: GET AUTONOMOUS STATUS
 // =============================================================================
 
-/// FSV Test: get_autonomous_status returns valid structure without North Star.
+/// FSV Test: get_autonomous_status returns valid structure without strategic goal.
 ///
 /// Tests that status works even when system is not fully configured.
-/// Should indicate that North Star is not configured and provide recommendations.
+/// Should indicate that strategic goal is not configured and provide recommendations.
 #[tokio::test]
-async fn test_get_autonomous_status_without_north_star() {
+async fn test_get_autonomous_status_without_strategic_goal() {
     let handlers = create_test_handlers_no_goals();
 
     let request = JsonRpcRequest {
@@ -244,7 +244,7 @@ async fn test_get_autonomous_status_without_north_star() {
     };
     let response = handlers.dispatch(request).await;
 
-    // VERIFY: Should succeed even without North Star
+    // VERIFY: Should succeed even without strategic goal
     assert!(
         response.error.is_none(),
         "[FSV] get_autonomous_status should succeed: {:?}",
@@ -254,15 +254,15 @@ async fn test_get_autonomous_status_without_north_star() {
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
 
-    // FSV: Verify north_star shows not configured
-    let north_star = data
+    // FSV: Verify strategic_goals shows not configured
+    let strategic_goals = data
         .get("strategic_goals")
         .expect("strategic_goals must exist");
-    let configured = north_star
+    let configured = strategic_goals
         .get("configured")
         .and_then(|v| v.as_bool())
         .expect("configured must exist");
-    assert!(!configured, "[FSV] North Star should NOT be configured");
+    assert!(!configured, "[FSV] Strategic goal should NOT be configured");
 
     // FSV: Verify overall_health shows not_configured
     let overall_health = data
@@ -309,7 +309,7 @@ async fn test_get_autonomous_status_without_north_star() {
         "[FSV] bootstrap_service must be ready"
     );
 
-    println!("[FSV] Phase 4 - get_autonomous_status without North Star: PASSED");
+    println!("[FSV] Phase 4 - get_autonomous_status without strategic goal: PASSED");
     println!("[FSV]   strategic_goals.configured: {}", configured);
     println!("[FSV]   health_status: {}", health_status);
     println!("[FSV]   recommendations.len: {}", recommendations.len());
@@ -319,7 +319,7 @@ async fn test_get_autonomous_status_without_north_star() {
 /// FSV Test: get_autonomous_status with include_metrics=true.
 #[tokio::test]
 async fn test_get_autonomous_status_with_metrics() {
-    let handlers = super::create_test_handlers(); // With North Star
+    let handlers = super::create_test_handlers(); // With strategic goal
 
     let request = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
@@ -363,10 +363,10 @@ async fn test_get_autonomous_status_with_metrics() {
 // SCENARIO 4: ALIGNMENT DRIFT AND CORRECTION
 // =============================================================================
 
-/// FSV Test: get_alignment_drift works without North Star (ARCH-03 compliant).
+/// FSV Test: get_alignment_drift works without strategic goal (ARCH-03 compliant).
 ///
 /// ARCH-03: System should work autonomously. Drift detection should work
-/// by computing drift relative to the fingerprints' centroid when no North Star.
+/// by computing drift relative to the fingerprints' centroid when no strategic goal.
 #[tokio::test]
 async fn test_get_alignment_drift_arch03_compliant() {
     let handlers = create_test_handlers_no_goals();
@@ -384,23 +384,23 @@ async fn test_get_alignment_drift_arch03_compliant() {
     };
     let response = handlers.dispatch(request).await;
 
-    // VERIFY: Should succeed even without North Star
+    // VERIFY: Should succeed even without strategic goal
     assert!(
         response.error.is_none(),
-        "[FSV] get_alignment_drift should succeed without North Star: {:?}",
+        "[FSV] get_alignment_drift should succeed without strategic goal: {:?}",
         response.error
     );
 
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
 
-    // FSV: Verify reference_type indicates no North Star
+    // FSV: Verify reference_type indicates no strategic goal
     let reference_type = data
         .get("reference_type")
         .and_then(|v| v.as_str())
         .expect("reference_type must exist");
 
-    // When no memory_ids provided and no North Star, should indicate this
+    // When no memory_ids provided and no strategic goal, should indicate this
     let valid_types = ["no_reference", "computed_centroid"];
     assert!(
         valid_types.contains(&reference_type),
@@ -412,7 +412,7 @@ async fn test_get_alignment_drift_arch03_compliant() {
     println!("[FSV]   reference_type: {}", reference_type);
 }
 
-/// FSV Test: trigger_drift_correction works without North Star (ARCH-03 compliant).
+/// FSV Test: trigger_drift_correction works without strategic goal (ARCH-03 compliant).
 #[tokio::test]
 async fn test_trigger_drift_correction_arch03_compliant() {
     let handlers = create_test_handlers_no_goals();
@@ -430,7 +430,7 @@ async fn test_trigger_drift_correction_arch03_compliant() {
     };
     let response = handlers.dispatch(request).await;
 
-    // VERIFY: Should succeed even without North Star
+    // VERIFY: Should succeed even without strategic goal
     assert!(
         response.error.is_none(),
         "[FSV] trigger_drift_correction should succeed: {:?}",
@@ -457,7 +457,7 @@ async fn test_trigger_drift_correction_arch03_compliant() {
         .expect("reference_type must exist");
     assert_eq!(
         reference_type, "computed_centroid",
-        "[FSV] Without North Star, reference_type should be 'computed_centroid'"
+        "[FSV] Without strategic goal, reference_type should be 'computed_centroid'"
     );
 
     println!("[FSV] Phase 4 - trigger_drift_correction ARCH-03 compliant: PASSED");
@@ -469,7 +469,7 @@ async fn test_trigger_drift_correction_arch03_compliant() {
 // SCENARIO 5: DISCOVER SUB-GOALS
 // =============================================================================
 
-/// FSV Test: discover_sub_goals works without North Star (ARCH-03 compliant).
+/// FSV Test: discover_sub_goals works without strategic goal (ARCH-03 compliant).
 ///
 /// ARCH-03: Goals emerge from data patterns via clustering, no manual config needed.
 #[tokio::test]
@@ -490,7 +490,7 @@ async fn test_discover_sub_goals_arch03_compliant() {
     };
     let response = handlers.dispatch(request).await;
 
-    // VERIFY: Should succeed without North Star
+    // VERIFY: Should succeed without strategic goal
     assert!(
         response.error.is_none(),
         "[FSV] discover_sub_goals should succeed: {:?}",
@@ -500,14 +500,14 @@ async fn test_discover_sub_goals_arch03_compliant() {
     let result = response.result.expect("Should have result");
     let data = extract_mcp_tool_data(&result);
 
-    // FSV: Verify discovery_mode is "autonomous" when no North Star
+    // FSV: Verify discovery_mode is "autonomous" when no strategic goal
     let discovery_mode = data
         .get("discovery_mode")
         .and_then(|v| v.as_str())
         .expect("discovery_mode must exist");
     assert_eq!(
         discovery_mode, "autonomous",
-        "[FSV] Without North Star, discovery_mode should be 'autonomous', got '{}'",
+        "[FSV] Without strategic goal, discovery_mode should be 'autonomous', got '{}'",
         discovery_mode
     );
 
@@ -533,7 +533,7 @@ async fn test_discover_sub_goals_arch03_compliant() {
 /// FSV Test: Full autonomous flow with real RocksDB storage.
 ///
 /// This integration test verifies the complete autonomous bootstrap flow:
-/// 1. Create handlers without North Star (fresh start)
+/// 1. Create handlers without strategic goal (fresh start)
 /// 2. Store 5 memories (seeding phase)
 /// 3. Verify memories stored with neutral purpose vectors
 /// 4. Get autonomous status (should show not_configured)
@@ -542,7 +542,7 @@ async fn test_discover_sub_goals_arch03_compliant() {
 /// Uses RocksDB for real persistence verification.
 #[tokio::test]
 async fn test_full_autonomous_flow_with_rocksdb() {
-    // SETUP: Create handlers with RocksDB but no North Star
+    // SETUP: Create handlers with RocksDB but no strategic goal
     let (handlers, _tempdir) = create_test_handlers_with_rocksdb_no_goals().await;
 
     // STEP 1: Store 5 memories for autonomous seeding
@@ -607,16 +607,16 @@ async fn test_full_autonomous_flow_with_rocksdb() {
     );
 
     let status_data = extract_mcp_tool_data(&status_response.result.unwrap());
-    let north_star = status_data
+    let strategic_goals = status_data
         .get("strategic_goals")
         .expect("strategic_goals must exist");
-    let configured = north_star
+    let configured = strategic_goals
         .get("configured")
         .and_then(|v| v.as_bool())
         .unwrap_or(true);
-    assert!(!configured, "[FSV] North Star should still be unconfigured");
+    assert!(!configured, "[FSV] Strategic goal should still be unconfigured");
 
-    // STEP 3: Check alignment drift (should work without North Star)
+    // STEP 3: Check alignment drift (should work without strategic goal)
     let drift_request = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
         id: Some(JsonRpcId::Number(11)),
@@ -638,7 +638,7 @@ async fn test_full_autonomous_flow_with_rocksdb() {
     println!("\n[FSV] Phase 4 - FULL AUTONOMOUS FLOW WITH ROCKSDB");
     println!("==================================================");
     println!("[FSV]   Memories stored: {}", stored_ids.len());
-    println!("[FSV]   North Star configured: {}", configured);
+    println!("[FSV]   Strategic goal configured: {}", configured);
     println!("[FSV]   All IDs:");
     for (i, id) in stored_ids.iter().enumerate() {
         println!("[FSV]     {}: {}", i + 1, id);
@@ -656,12 +656,12 @@ async fn test_full_autonomous_flow_with_rocksdb() {
 /// FSV Integration Test: Verify all autonomous tools work together.
 ///
 /// This test exercises the complete autonomous toolchain in order:
-/// 1. store_memory (without North Star) - CRITICAL
+/// 1. store_memory (without strategic goal) - CRITICAL
 /// 2. get_autonomous_status (check not_configured)
 /// 3. get_alignment_drift (ARCH-03 compliant)
 /// 4. trigger_drift_correction (ARCH-03 compliant)
 /// 5. discover_sub_goals (ARCH-03 compliant)
-/// 6. auto_bootstrap_north_star (with existing handlers)
+/// 6. auto_bootstrap (removed per TASK-P0-001)
 #[tokio::test]
 async fn test_all_autonomous_tools_integration() {
     let handlers = create_test_handlers_no_goals();
@@ -683,10 +683,10 @@ async fn test_all_autonomous_tools_integration() {
     let resp1 = handlers.dispatch(req1).await;
     if resp1.error.is_none() {
         tests_passed += 1;
-        println!("[Phase 4] store_memory (without North Star): PASSED");
+        println!("[Phase 4] store_memory (without strategic goal): PASSED");
     } else {
         println!(
-            "[Phase 4] store_memory (without North Star): FAILED - {:?}",
+            "[Phase 4] store_memory (without strategic goal): FAILED - {:?}",
             resp1.error
         );
     }
@@ -704,9 +704,9 @@ async fn test_all_autonomous_tools_integration() {
     let resp2 = handlers.dispatch(req2).await;
     let status_correct = if resp2.error.is_none() {
         let data = extract_mcp_tool_data(&resp2.result.unwrap());
-        let north_star = data.get("strategic_goals");
-        north_star
-            .and_then(|ns| ns.get("configured"))
+        let strategic_goals = data.get("strategic_goals");
+        strategic_goals
+            .and_then(|sg| sg.get("configured"))
             .and_then(|c| c.as_bool())
             == Some(false)
     } else {
@@ -776,11 +776,11 @@ async fn test_all_autonomous_tools_integration() {
         println!("[Phase 4] discover_sub_goals: FAILED - {:?}", resp5.error);
     }
 
-    // TEST 6: auto_bootstrap_north_star - REMOVED per TASK-P0-001 (ARCH-03)
+    // TEST 6: auto_bootstrap - REMOVED per TASK-P0-001 (ARCH-03)
     // Goals now emerge autonomously from topic clustering.
     // Mark as passed since the tool was intentionally removed.
     tests_passed += 1;
-    println!("[Phase 4] auto_bootstrap_north_star: REMOVED per TASK-P0-001 (counted as passed)");
+    println!("[Phase 4] auto_bootstrap: REMOVED per TASK-P0-001 (counted as passed)");
 
     // SUMMARY
     println!("\n[Phase 4] AUTONOMOUS BOOTSTRAP TOOLS SUMMARY");
@@ -807,7 +807,7 @@ async fn test_all_autonomous_tools_integration() {
     // Critical: store_memory must work (test 1)
     assert!(
         tests_passed >= 1,
-        "[CRITICAL] store_memory without North Star MUST work - this is the core fix"
+        "[CRITICAL] store_memory without strategic goal MUST work - this is the core fix"
     );
 
     // All tests should pass

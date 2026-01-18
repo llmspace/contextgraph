@@ -152,7 +152,7 @@ async fn test_steering_feedback_all_orphans_low_connectivity() {
         dead_ends_removed
     );
 
-    // All orphans with theta < 0.5 means connectivity = 0 (none aligned to North Star)
+    // All orphans with theta < 0.5 means connectivity = 0 (none aligned to strategic goal)
     assert!(
         (0.0..0.1).contains(&connectivity),
         "All orphans should have low connectivity, got {}",

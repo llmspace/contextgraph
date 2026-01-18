@@ -6,7 +6,7 @@
 //!
 //! # Constitution References
 //! - IDENTITY-002: IC thresholds and timeout requirements
-//! - AP-25: Kuramoto N=13
+//! - AP-25: N=13 (13 embedder spaces)
 //! - AP-26: Exit codes (0=success, 1=error, 2=corruption)
 //! - AP-50: NO internal hooks (use Claude Code native)
 //! - AP-53: Hook logic in shell scripts calling CLI
@@ -23,17 +23,7 @@ pub mod session_start;
 mod types;
 pub mod user_prompt_submit;
 
-pub use args::{
-    GenerateConfigArgs, HookType, HooksCommands, OutputFormat, PostToolArgs, PreToolArgs,
-    PromptSubmitArgs, SessionEndArgs, SessionStartArgs, ShellType,
-};
-
-pub use error::{HookError, HookResult};
-
-pub use types::{
-    ConsciousnessState, ConversationMessage, HookEventType, HookInput, HookOutput, HookPayload,
-    ICClassification, ICLevel, JohariQuadrant, SessionEndStatus,
-};
+pub use args::HooksCommands;
 
 use tracing::error;
 

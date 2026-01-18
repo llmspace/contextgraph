@@ -1,7 +1,6 @@
 //! Error types for goal hierarchy operations.
 //!
-//! TASK-P0-001: Removed NoNorthStar and MultipleNorthStars errors per ARCH-03.
-//! Goals now emerge autonomously from data patterns.
+//! Goals emerge autonomously from data patterns.
 
 use crate::types::fingerprint::ValidationError;
 use thiserror::Error;
@@ -30,11 +29,6 @@ pub enum GoalNodeError {
 /// Errors for goal hierarchy operations.
 #[derive(Debug, Error)]
 pub enum GoalHierarchyError {
-    // REMOVED: NoNorthStar per TASK-P0-001 (ARCH-03)
-    // Empty hierarchies are now valid - goals emerge autonomously
-
-    // REMOVED: MultipleNorthStars per TASK-P0-001 (ARCH-03)
-    // Multiple Strategic goals are now allowed - they emerge autonomously
     /// Referenced parent goal does not exist.
     #[error("Parent goal not found: {0}")]
     ParentNotFound(Uuid),

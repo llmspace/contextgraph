@@ -5,7 +5,6 @@ use uuid::Uuid;
 use crate::index::config::PURPOSE_VECTOR_DIM;
 use crate::index::purpose::entry::{GoalId, PurposeIndexEntry, PurposeMetadata};
 use crate::types::fingerprint::PurposeVector;
-use crate::types::JohariQuadrant;
 
 /// Create a purpose vector with deterministic values based on base and variation.
 pub fn create_purpose_vector(base: f32, variation: f32) -> PurposeVector {
@@ -19,7 +18,7 @@ pub fn create_purpose_vector(base: f32, variation: f32) -> PurposeVector {
 /// Create a test entry with a specific base value and goal.
 pub fn create_entry(base: f32, goal: &str) -> PurposeIndexEntry {
     let pv = create_purpose_vector(base, 0.02);
-    let metadata = PurposeMetadata::new(GoalId::new(goal), 0.85, JohariQuadrant::Open).unwrap();
+    let metadata = PurposeMetadata::new(GoalId::new(goal), 0.85).unwrap();
     PurposeIndexEntry::new(Uuid::new_v4(), pv, metadata)
 }
 

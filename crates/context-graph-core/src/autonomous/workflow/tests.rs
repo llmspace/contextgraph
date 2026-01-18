@@ -340,7 +340,7 @@ mod tests {
         assert!(!event.is_urgent());
     }
 
-    // REMOVED: test_optimization_event_north_star_updated per TASK-P0-005 (ARCH-03)
+    // REMOVED: Legacy event test per TASK-P0-005 (ARCH-03)
 
     #[test]
     fn test_optimization_event_goal_added() {
@@ -354,10 +354,10 @@ mod tests {
     }
 
     #[test]
-    fn test_optimization_event_consciousness_dropped() {
-        let event = OptimizationEvent::ConsciousnessDropped { level: 0.3 };
+    fn test_optimization_event_coherence_dropped() {
+        let event = OptimizationEvent::CoherenceDropped { level: 0.3 };
 
-        assert_eq!(event.event_type_name(), "consciousness_dropped");
+        assert_eq!(event.event_type_name(), "coherence_dropped");
         assert!(event.is_urgent());
     }
 
@@ -373,7 +373,7 @@ mod tests {
 
     #[test]
     fn test_optimization_event_serialization() {
-        // TASK-P0-005: Removed NorthStarUpdated from events array per ARCH-03
+        // TASK-P0-005: Removed legacy event from events array per ARCH-03
         let events = [
             OptimizationEvent::MemoryStored {
                 memory_id: MemoryId::new(),
@@ -385,7 +385,7 @@ mod tests {
             OptimizationEvent::GoalAdded {
                 goal_id: GoalId::new(),
             },
-            OptimizationEvent::ConsciousnessDropped { level: 0.5 },
+            OptimizationEvent::CoherenceDropped { level: 0.5 },
             OptimizationEvent::ScheduledCheck {
                 check_type: ScheduledCheckType::DriftCheck,
             },
@@ -507,7 +507,7 @@ mod tests {
     }
 
     #[test]
-    // TASK-P0-005: Renamed from test_autonomous_status_initialized_without_north_star
+    // TASK-P0-005: Test initialization without strategic goal
     fn test_autonomous_status_initialized_without_strategic_goal() {
         let status = AutonomousStatus::initialized(false);
         assert!(status.enabled);

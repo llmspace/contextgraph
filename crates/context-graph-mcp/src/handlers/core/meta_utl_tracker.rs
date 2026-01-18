@@ -11,7 +11,9 @@ use tracing::debug;
 use uuid::Uuid;
 
 use context_graph_core::dream::ConsolidationMetrics;
-use context_graph_core::johari::NUM_EMBEDDERS;
+/// Number of embedders in the teleological system.
+/// Per CLAUDE.md: 13 embedders (E1-E13).
+const NUM_EMBEDDERS: usize = 13;
 
 use super::types::{
     AdjustmentReason, Domain, DomainAccuracyTracker, LambdaAdjustmentResult, LambdaError,

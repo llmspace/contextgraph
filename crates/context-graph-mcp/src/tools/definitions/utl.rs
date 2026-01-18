@@ -11,9 +11,9 @@ pub fn definitions() -> Vec<ToolDefinition> {
         ToolDefinition::new(
             "gwt/compute_delta_sc",
             "Compute per-embedder entropy (delta-S) and aggregate coherence (delta-C) for GWT workspace \
-             evaluation. Returns 13 delta-S values (one per embedder), aggregate delta-S, delta-C, Johari \
-             quadrant classifications, and UTL learning potential. Used by GWT workspace for \
-             winner-take-all selection and consciousness broadcasting. \
+             evaluation. Returns 13 delta-S values (one per embedder), aggregate delta-S, delta-C, embedder \
+             category classifications, and UTL learning potential. Used by GWT workspace for \
+             winner-take-all selection. \
              Constitution ref: delta_sc.delta-S_methods (lines 792-802).",
             json!({
                 "type": "object",
@@ -30,13 +30,6 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     "new_fingerprint": {
                         "type": "object",
                         "description": "Current TeleologicalFingerprint (serialized)"
-                    },
-                    "johari_threshold": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1,
-                        "default": 0.5,
-                        "description": "Threshold for Johari quadrant classification"
                     },
                     "include_diagnostics": {
                         "type": "boolean",

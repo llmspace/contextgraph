@@ -1,7 +1,7 @@
 //! Purpose Vector computation module.
 //!
 //! Provides goal hierarchy management and purpose vector computation
-//! for aligning memories to North Star goals across 13 embedding spaces.
+//! for aligning memories to Strategic goals across 13 embedding spaces.
 //!
 //! # Architecture
 //!
@@ -34,7 +34,6 @@
 //! use context_graph_core::types::fingerprint::SemanticFingerprint;
 //!
 //! // Create goal hierarchy with Strategic goal (discovered autonomously)
-//! // TASK-P0-005: Renamed from north_star per ARCH-03
 //! let mut hierarchy = GoalHierarchy::new();
 //! let discovery = GoalDiscoveryMetadata::bootstrap();
 //! let strategic_goal = GoalNode::autonomous_goal(

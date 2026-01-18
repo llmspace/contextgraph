@@ -62,22 +62,14 @@ mod tests {
         let id = Uuid::new_v4();
         let embeddings = create_test_embeddings();
         let purpose_vector = [0.5f32; 13];
-        let johari_quadrants = [0.25f32; 4];
         let content_hash = [0u8; 32];
 
-        let fp = StoredQuantizedFingerprint::new(
-            id,
-            embeddings,
-            purpose_vector,
-            johari_quadrants,
-            content_hash,
-        );
+        let fp = StoredQuantizedFingerprint::new(id, embeddings, purpose_vector, content_hash);
 
         assert_eq!(fp.id, id);
         assert_eq!(fp.version, STORAGE_VERSION);
         assert_eq!(fp.embeddings.len(), 13);
         assert_eq!(fp.purpose_vector.len(), 13);
-        // TASK-P0-001: alignment_score field removed per ARCH-03
     }
 
     #[test]
@@ -90,7 +82,6 @@ mod tests {
             Uuid::new_v4(),
             embeddings,
             [0.5f32; 13],
-            [0.25f32; 4],
             [0u8; 32],
         );
     }
@@ -190,7 +181,6 @@ mod tests {
             Uuid::new_v4(),
             create_test_embeddings(),
             [0.5f32; 13],
-            [0.25f32; 4],
             [0u8; 32],
         );
 
@@ -216,7 +206,6 @@ mod tests {
             Uuid::new_v4(),
             embeddings,
             [0.5f32; 13],
-            [0.25f32; 4],
             [0u8; 32],
         );
     }
@@ -303,7 +292,6 @@ mod tests {
             Uuid::new_v4(),
             embeddings,
             [0.5f32; 13],
-            [0.25f32; 4],
             [0u8; 32],
         );
     }
@@ -316,7 +304,6 @@ mod tests {
             Uuid::new_v4(),
             create_test_embeddings(),
             [0.5f32; 13],
-            [0.25f32; 4],
             [0u8; 32],
         );
 
@@ -352,7 +339,6 @@ mod tests {
             Uuid::new_v4(),
             create_test_embeddings(),
             [0.5f32; 13],
-            [0.25f32; 4],
             [0u8; 32],
         );
 
@@ -361,30 +347,5 @@ mod tests {
             fp.validate_quantization_methods(),
             "Test embeddings should use correct quantization methods"
         );
-    }
-
-    /// Test dominant quadrant calculation
-    #[test]
-    fn test_dominant_quadrant_calculation() {
-        // Open quadrant dominant
-        let fp1 = StoredQuantizedFingerprint::new(
-            Uuid::new_v4(),
-            create_test_embeddings(),
-            [0.5f32; 13],
-            [0.6, 0.2, 0.1, 0.1], // Open=0.6 is dominant
-            [0u8; 32],
-        );
-        assert_eq!(fp1.dominant_quadrant, 0); // Open
-        assert!((fp1.johari_confidence - 0.6).abs() < f32::EPSILON);
-
-        // Unknown quadrant dominant
-        let fp2 = StoredQuantizedFingerprint::new(
-            Uuid::new_v4(),
-            create_test_embeddings(),
-            [0.5f32; 13],
-            [0.1, 0.1, 0.2, 0.6], // Unknown=0.6 is dominant
-            [0u8; 32],
-        );
-        assert_eq!(fp2.dominant_quadrant, 3); // Unknown
     }
 }

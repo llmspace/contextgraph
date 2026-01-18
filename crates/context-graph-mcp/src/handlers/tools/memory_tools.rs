@@ -9,7 +9,7 @@ use context_graph_core::purpose::{
 };
 use context_graph_core::traits::TeleologicalSearchOptions;
 use context_graph_core::types::fingerprint::{
-    JohariFingerprint, PurposeVector, TeleologicalFingerprint, NUM_EMBEDDERS,
+    PurposeVector, TeleologicalFingerprint, NUM_EMBEDDERS,
 };
 use context_graph_core::types::UtlContext;
 
@@ -42,7 +42,7 @@ impl Handlers {
             .and_then(|v| v.as_f64())
             .unwrap_or(0.5);
 
-        // Get goal_vector from North Star for UTL alignment computation (Issue 3 fix)
+        // Get goal_vector from top-level strategic goal for UTL alignment computation
         // Per constitution.yaml: alignment = cos(content_embedding, goal_vector)
         // Without goal_vector, alignment always returns 1.0 (useless)
         // Per TASK-CORE-005: Use E1 semantic embedding from TeleologicalArray for UTL alignment
@@ -81,26 +81,26 @@ impl Handlers {
         hasher.update(content.as_bytes());
         let content_hash: [u8; 32] = hasher.finalize().into();
 
-        // AUTONOMOUS OPERATION: Compute purpose vector if North Star exists,
+        // AUTONOMOUS OPERATION: Compute purpose vector if top-level goal exists,
         // otherwise use default (neutral) alignment.
         //
         // From contextprd.md: "The array [of 13 embeddings] IS the teleological vector"
         // Purpose alignment is SECONDARY metadata - the 13-embedding fingerprint is primary.
-        // This allows autonomous operation without manual North Star configuration.
+        // This allows autonomous operation without manual goal configuration.
         //
-        // When North Star exists: PV = [A(E1,V), A(E2,V), ..., A(E13,V)]
-        // where A(Ei, V) = cos(theta) between embedder i and North Star goal V
+        // When top-level goal exists: PV = [A(E1,V), A(E2,V), ..., A(E13,V)]
+        // where A(Ei, V) = cos(theta) between embedder i and goal V
         //
-        // When no North Star: PV = [0.0; 13] (neutral alignment)
+        // When no top-level goal: PV = [0.0; 13] (neutral alignment)
         // Memories can be stored immediately; purpose can be recomputed later.
         let purpose_vector = {
             let hierarchy = self.goal_hierarchy.read().clone();
 
-            // If no North Star goal is defined, use default purpose vector
+            // If no top-level goal is defined, use default purpose vector
             // This enables AUTONOMOUS operation - no manual configuration required
             if hierarchy.top_level_goals().first().is_none() {
                 debug!(
-                    "inject_context: No North Star configured. Using default purpose vector. \
+                    "inject_context: No top-level goal configured. Using default purpose vector. \
                      Memory will be stored with neutral alignment (can be recomputed later)."
                 );
                 PurposeVector::default()
@@ -123,7 +123,7 @@ impl Handlers {
                         pv
                     }
                     Err(e) => {
-                        // If North Star exists but computation fails, THAT is an error
+                        // If top-level goal exists but computation fails, THAT is an error
                         error!(
                             error = %e,
                             "inject_context: Failed to compute purpose vector. \
@@ -139,12 +139,8 @@ impl Handlers {
         };
 
         // Create TeleologicalFingerprint with REAL computed purpose vector
-        let fingerprint = TeleologicalFingerprint::new(
-            embedding_output.fingerprint,
-            purpose_vector,
-            JohariFingerprint::zeroed(),
-            content_hash,
-        );
+        let fingerprint =
+            TeleologicalFingerprint::new(embedding_output.fingerprint, purpose_vector, content_hash);
         let fingerprint_id = fingerprint.id;
 
         // Store in TeleologicalMemoryStore
@@ -229,29 +225,29 @@ impl Handlers {
         hasher.update(content.as_bytes());
         let content_hash: [u8; 32] = hasher.finalize().into();
 
-        // ARCH-03: AUTONOMOUS OPERATION - Compute purpose vector if North Star exists,
+        // ARCH-03: AUTONOMOUS OPERATION - Compute purpose vector if strategic goal exists,
         // otherwise use default (neutral) alignment for autonomous seeding.
         //
         // From contextprd.md: "The array [of 13 embeddings] IS the teleological vector"
         // Purpose alignment is SECONDARY metadata - the 13-embedding fingerprint is primary.
-        // This allows autonomous operation without manual North Star configuration.
+        // This allows autonomous operation without manual strategic goal configuration.
         //
-        // When North Star exists: PV = [A(E1,V), A(E2,V), ..., A(E13,V)]
-        // where A(Ei, V) = cos(theta) between embedder i and North Star goal V
+        // When strategic goal exists: PV = [A(E1,V), A(E2,V), ..., A(E13,V)]
+        // where A(Ei, V) = cos(theta) between embedder i and strategic goal V
         //
-        // When no North Star: PV = [0.0; 13] (neutral alignment)
+        // When no strategic goal: PV = [0.0; 13] (neutral alignment)
         // Memories can be stored immediately; purpose can be recomputed later via
-        // auto_bootstrap_north_star once enough fingerprints exist.
+        // topic clustering once enough fingerprints exist.
         let purpose_vector = {
             let hierarchy = self.goal_hierarchy.read().clone();
 
-            // If no North Star goal is defined, use default purpose vector
+            // If no strategic goal is defined, use default purpose vector
             // This enables AUTONOMOUS operation per ARCH-03 - no manual configuration required
             if hierarchy.top_level_goals().first().is_none() {
                 debug!(
-                    "store_memory: No North Star configured. Using default purpose vector. \
+                    "store_memory: No strategic goal configured. Using default purpose vector. \
                      Memory will be stored with neutral alignment (can be recomputed later \
-                     via auto_bootstrap_north_star)."
+                     via topic clustering)."
                 );
                 PurposeVector::default()
             } else {
@@ -273,7 +269,7 @@ impl Handlers {
                         pv
                     }
                     Err(e) => {
-                        // If North Star exists but computation fails, THAT is an error
+                        // If strategic goal exists but computation fails, THAT is an error
                         error!(
                             error = %e,
                             "store_memory: Failed to compute purpose vector. \
@@ -289,12 +285,8 @@ impl Handlers {
         };
 
         // Create TeleologicalFingerprint with REAL computed purpose vector
-        let fingerprint = TeleologicalFingerprint::new(
-            embedding_output.fingerprint,
-            purpose_vector,
-            JohariFingerprint::zeroed(),
-            content_hash,
-        );
+        let fingerprint =
+            TeleologicalFingerprint::new(embedding_output.fingerprint, purpose_vector, content_hash);
         let fingerprint_id = fingerprint.id;
 
         match self.teleological_store.store(fingerprint).await {
@@ -409,7 +401,7 @@ impl Handlers {
                             "similarity": r.similarity,
                             "purposeAlignment": r.purpose_alignment,
                             "dominantEmbedder": r.dominant_embedder(),
-                            "thetaToNorthStar": r.fingerprint.alignment_score
+                            "alignmentScore": r.fingerprint.alignment_score
                         });
                         // Only include content field when includeContent=true
                         if include_content {

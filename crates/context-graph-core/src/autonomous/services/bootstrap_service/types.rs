@@ -1,7 +1,7 @@
 //! Type definitions for the BootstrapService
 //!
 //! Contains configuration, candidate, and result types used in the
-//! bootstrap process for North Star goal extraction.
+//! bootstrap process for Strategic goal extraction.
 
 use std::path::PathBuf;
 

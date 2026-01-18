@@ -8,15 +8,12 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 
 use context_graph_core::alignment::{DefaultAlignmentCalculator, GoalAlignmentCalculator};
-use context_graph_core::johari::{DynDefaultJohariManager, JohariTransitionManager};
 use context_graph_core::purpose::{GoalDiscoveryMetadata, GoalHierarchy, GoalLevel, GoalNode};
 use context_graph_core::stubs::{
     InMemoryTeleologicalStore, StubMultiArrayProvider, StubUtlProcessor,
 };
 use context_graph_core::traits::{MultiArrayEmbeddingProvider, UtlProcessor};
-use context_graph_core::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, TeleologicalFingerprint,
-};
+use context_graph_core::types::fingerprint::SemanticFingerprint;
 
 use crate::handlers::core::MetaUtlTracker;
 use crate::handlers::Handlers;
@@ -24,8 +21,7 @@ use crate::protocol::{JsonRpcId, JsonRpcRequest};
 
 // Re-export commonly used items for other test modules
 pub use crate::protocol::error_codes;
-pub use context_graph_core::johari::NUM_EMBEDDERS;
-pub use context_graph_core::types::JohariQuadrant;
+pub use context_graph_core::teleological::NUM_EMBEDDERS;
 pub use serde_json::json;
 pub use sha2::{Digest, Sha256};
 pub use uuid::Uuid;
@@ -35,14 +31,11 @@ pub use uuid::Uuid;
 /// This struct provides direct access to:
 /// - InMemoryTeleologicalStore (fingerprint storage)
 /// - GoalHierarchy (purpose/goal tree)
-/// - JohariTransitionManager (Johari window operations)
 /// - MetaUtlTracker (Meta-UTL predictions)
 pub struct TestContext {
     pub handlers: Handlers,
     pub store: Arc<InMemoryTeleologicalStore>,
     pub hierarchy: Arc<RwLock<GoalHierarchy>>,
-    #[allow(dead_code)]
-    pub johari_manager: Arc<dyn JohariTransitionManager>,
     pub meta_utl_tracker: Arc<RwLock<MetaUtlTracker>>,
 }
 
@@ -56,12 +49,8 @@ impl TestContext {
         let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
             Arc::new(DefaultAlignmentCalculator::new());
 
-        // Create goal hierarchy with North Star and sub-goals
+        // Create goal hierarchy with sub-goals
         let hierarchy = Arc::new(RwLock::new(create_test_hierarchy()));
-
-        // Create JohariTransitionManager with SHARED store reference
-        let johari_manager: Arc<dyn JohariTransitionManager> =
-            Arc::new(DynDefaultJohariManager::new(store.clone()));
 
         // Create MetaUtlTracker with SHARED access
         let meta_utl_tracker = Arc::new(RwLock::new(MetaUtlTracker::new()));
@@ -72,7 +61,6 @@ impl TestContext {
             multi_array_provider,
             alignment_calculator,
             hierarchy.clone(),
-            johari_manager.clone(),
             meta_utl_tracker.clone(),
         );
 
@@ -80,13 +68,12 @@ impl TestContext {
             handlers,
             store,
             hierarchy,
-            johari_manager,
             meta_utl_tracker,
         }
     }
 
-    /// Create a test context WITHOUT a North Star (for error testing).
-    pub fn new_without_north_star() -> Self {
+    /// Create a test context WITHOUT strategic goals (for error testing).
+    pub fn new_without_strategic_goal() -> Self {
         let store = Arc::new(InMemoryTeleologicalStore::new());
         let utl_processor: Arc<dyn UtlProcessor> = Arc::new(StubUtlProcessor::new());
         let multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider> =
@@ -94,11 +81,8 @@ impl TestContext {
         let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
             Arc::new(DefaultAlignmentCalculator::new());
 
-        // Empty hierarchy - no North Star
+        // Empty hierarchy - no strategic goals
         let hierarchy = Arc::new(RwLock::new(GoalHierarchy::new()));
-
-        let johari_manager: Arc<dyn JohariTransitionManager> =
-            Arc::new(DynDefaultJohariManager::new(store.clone()));
 
         let meta_utl_tracker = Arc::new(RwLock::new(MetaUtlTracker::new()));
 
@@ -108,7 +92,6 @@ impl TestContext {
             multi_array_provider,
             alignment_calculator,
             hierarchy.clone(),
-            johari_manager.clone(),
             meta_utl_tracker.clone(),
         );
 
@@ -116,7 +99,6 @@ impl TestContext {
             handlers,
             store,
             hierarchy,
-            johari_manager,
             meta_utl_tracker,
         }
     }
@@ -201,26 +183,4 @@ pub fn make_request_no_params(method: &str, id: i64) -> JsonRpcRequest {
         method: method.to_string(),
         params: None,
     }
-}
-
-/// Create a test fingerprint with specific Johari configuration.
-pub fn create_fingerprint_with_johari(
-    quadrants: [JohariQuadrant; NUM_EMBEDDERS],
-) -> TeleologicalFingerprint {
-    let mut johari = JohariFingerprint::zeroed();
-    for (idx, quadrant) in quadrants.iter().enumerate() {
-        match quadrant {
-            JohariQuadrant::Open => johari.set_quadrant(idx, 1.0, 0.0, 0.0, 0.0, 1.0),
-            JohariQuadrant::Hidden => johari.set_quadrant(idx, 0.0, 1.0, 0.0, 0.0, 1.0),
-            JohariQuadrant::Blind => johari.set_quadrant(idx, 0.0, 0.0, 1.0, 0.0, 1.0),
-            JohariQuadrant::Unknown => johari.set_quadrant(idx, 0.0, 0.0, 0.0, 1.0, 1.0),
-        }
-    }
-
-    TeleologicalFingerprint::new(
-        SemanticFingerprint::zeroed(),
-        PurposeVector::default(),
-        johari,
-        [0u8; 32],
-    )
 }

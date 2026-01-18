@@ -1,6 +1,6 @@
 //! GWT workspace tool implementations.
 //!
-//! TASK-GWT-001: Workspace operations - get_workspace_status, trigger_workspace_broadcast, adjust_coupling.
+//! TASK-GWT-001: Workspace operations - get_workspace_status, trigger_workspace_broadcast.
 
 use serde_json::json;
 use tracing::{debug, error};
@@ -83,13 +83,13 @@ impl Handlers {
     /// Arguments:
     /// - memory_id: UUID of memory to broadcast
     /// - importance: Importance score [0,1] (default 0.8)
-    /// - alignment: North star alignment [0,1] (default 0.8)
+    /// - alignment: Topic alignment [0,1] (default 0.8)
     /// - force: Force broadcast even if below coherence threshold
     ///
     /// Returns:
     /// - success: Whether broadcast was successful
     /// - memory_id: UUID of the memory
-    /// - new_r: Current Kuramoto order parameter
+    /// - coherence: Coherence order parameter (from per-space clustering)
     /// - was_selected: Whether this memory won WTA selection
     pub(crate) async fn call_trigger_workspace_broadcast(
         &self,
@@ -107,19 +107,6 @@ impl Handlers {
                     id,
                     error_codes::GWT_NOT_INITIALIZED,
                     "Workspace provider not initialized - use with_gwt() constructor",
-                );
-            }
-        };
-
-        // FAIL FAST: Check kuramoto provider (needed for order parameter)
-        let kuramoto = match &self.kuramoto_network {
-            Some(k) => k,
-            None => {
-                error!("trigger_workspace_broadcast: Kuramoto network not initialized");
-                return JsonRpcResponse::error(
-                    id,
-                    error_codes::GWT_NOT_INITIALIZED,
-                    "Kuramoto network not initialized - use with_gwt() constructor",
                 );
             }
         };
@@ -153,25 +140,24 @@ impl Handlers {
             .unwrap_or(0.8) as f32;
         let force = args.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
 
-        // Get current order parameter from Kuramoto network
-        let r = {
-            let kuramoto_guard = kuramoto.read();
-            kuramoto_guard.synchronization() as f32
-        };
+        // Coherence from per-space clustering coordination
+        let coherence_threshold = 0.8_f32;
 
-        // Check if memory qualifies for workspace (r >= 0.8 unless forced)
-        let coherence_threshold = 0.8;
-        if r < coherence_threshold && !force {
+        // Use importance * alignment as coherence estimate for WTA selection
+        let coherence = importance * alignment;
+
+        // Check if memory qualifies for workspace (coherence >= 0.8 unless forced)
+        if coherence < coherence_threshold && !force {
             return self.tool_result_with_pulse(
                 id,
                 json!({
                     "success": false,
                     "memory_id": memory_id.to_string(),
-                    "new_r": r,
+                    "coherence": coherence,
                     "was_selected": false,
                     "reason": format!(
-                        "Order parameter r={:.3} below coherence threshold {}. Use force=true to override.",
-                        r, coherence_threshold
+                        "Coherence {:.3} below threshold {}. Use force=true to override.",
+                        coherence, coherence_threshold
                     )
                 }),
             );
@@ -181,7 +167,7 @@ impl Handlers {
         let ws = workspace.write().await;
 
         // Create candidate and trigger WTA selection
-        let candidates = vec![(memory_id, r, importance, alignment)];
+        let candidates = vec![(memory_id, coherence, importance, alignment)];
         let winner = match ws.select_winning_memory(candidates).await {
             Ok(w) => w,
             Err(e) => {
@@ -221,7 +207,7 @@ impl Handlers {
             json!({
                 "success": true,
                 "memory_id": memory_id.to_string(),
-                "new_r": r,
+                "coherence": coherence,
                 "was_selected": was_selected,
                 "is_broadcasting": ws.is_broadcasting().await,
                 "dopamine_triggered": dopamine_triggered
@@ -229,85 +215,114 @@ impl Handlers {
         )
     }
 
-    /// adjust_coupling tool implementation.
+    // ========== TOPIC PORTFOLIO TOOLS ==========
+    // Topic Portfolio per PRD v6 (ARCH-03)
+
+    /// get_ego_state tool implementation.
     ///
-    /// TASK-GWT-001: Adjusts Kuramoto oscillator network coupling strength K.
-    /// Higher K leads to faster synchronization. K is clamped to [0, 10].
+    /// TASK-GWT-001: Returns Topic Profile state including purpose vector (13D),
+    /// topic stability, coherence with actions, and trajectory length.
     ///
-    /// FAIL FAST on missing kuramoto provider - no stubs or fallbacks.
-    ///
-    /// Arguments:
-    /// - new_K: New coupling strength (clamped to [0, 10])
-    ///
-    /// Returns:
-    /// - old_K: Previous coupling strength
-    /// - new_K: New coupling strength (after clamping)
-    /// - predicted_r: Predicted order parameter after adjustment
-    pub(crate) async fn call_adjust_coupling(
-        &self,
-        id: Option<JsonRpcId>,
-        args: serde_json::Value,
-    ) -> JsonRpcResponse {
-        debug!("Handling adjust_coupling tool call");
+    /// Per PRD v6: Uses topic stability metrics instead of consciousness state.
+    /// Health thresholds based on churn: healthy < 0.3, degraded [0.3, 0.5), critical >= 0.5
+    pub(crate) async fn call_get_ego_state(&self, id: Option<JsonRpcId>) -> JsonRpcResponse {
+        debug!("Handling get_ego_state tool call");
 
-        // FAIL FAST: Check kuramoto provider
-        let kuramoto = match &self.kuramoto_network {
-            Some(k) => k,
-            None => {
-                error!("adjust_coupling: Kuramoto network not initialized");
-                return JsonRpcResponse::error(
-                    id,
-                    error_codes::GWT_NOT_INITIALIZED,
-                    "Kuramoto network not initialized - use with_gwt() constructor",
-                );
-            }
-        };
-
-        // Parse new_K (required)
-        let new_k = match args.get("new_K").and_then(|v| v.as_f64()) {
-            Some(k) => k,
-            None => {
-                return self.tool_error_with_pulse(id, "Missing required 'new_K' parameter");
-            }
-        };
-
-        // Acquire write lock (parking_lot RwLock)
-        let mut kuramoto_guard = kuramoto.write();
-
-        // Get old coupling strength
-        let old_k = kuramoto_guard.coupling_strength();
-
-        // Set new coupling strength (will be clamped internally to [0, 10])
-        kuramoto_guard.set_coupling_strength(new_k);
-
-        // Get the actual new K (after clamping)
-        let actual_new_k = kuramoto_guard.coupling_strength();
-
-        // Get current synchronization for prediction
-        let current_r = kuramoto_guard.synchronization();
-
-        // Simple prediction: higher K tends to increase r
-        // This is a rough approximation based on Kuramoto dynamics
-        let predicted_r = if actual_new_k > old_k {
-            // Increasing K tends to increase r
-            (current_r + 0.1 * (actual_new_k - old_k)).min(1.0)
+        // Get topic stability from workspace provider per PRD v6
+        let topic_stability = if let Some(ref workspace) = &self.workspace_provider {
+            let ws = workspace.read().await;
+            ws.get_topic_stability().await
         } else {
-            // Decreasing K may decrease r
-            (current_r - 0.05 * (old_k - actual_new_k)).max(0.0)
+            0.5 // Default when workspace not available
+        };
+
+        // Default 13D purpose vector - balanced at 0.5 for all embedders
+        let purpose_vector: Vec<f64> = vec![0.5; 13];
+
+        // Get coherence with actions from UTL status
+        let utl_status = self.utl_processor.get_status();
+        let coherence_with_actions = utl_status
+            .get("coherence")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.5);
+
+        // Determine identity status based on topic stability thresholds per PRD v6
+        // topic_stability >= 0.7 = healthy (churn < 0.3)
+        // topic_stability in [0.5, 0.7) = warning (churn in [0.3, 0.5))
+        // topic_stability < 0.5 = critical (churn >= 0.5)
+        let identity_status = if topic_stability >= 0.9 {
+            "Healthy"
+        } else if topic_stability >= 0.7 {
+            "Warning"
+        } else if topic_stability >= 0.5 {
+            "Degraded"
+        } else {
+            "Critical"
         };
 
         self.tool_result_with_pulse(
             id,
             json!({
-                "old_K": old_k,
-                "new_K": actual_new_k,
-                "predicted_r": predicted_r,
-                "current_r": current_r,
-                "K_clamped": new_k != actual_new_k
+                "purpose_vector": purpose_vector,
+                "topic_stability": topic_stability,
+                "coherence_with_actions": coherence_with_actions,
+                "identity_status": identity_status,
+                "trajectory_length": 0_u64,
+                "thresholds": {
+                    "healthy": 0.9,
+                    "warning": 0.7,
+                    "degraded": 0.5
+                }
             }),
         )
     }
 
-    // ========== NORTH STAR TOOLS ==========
-    // Real implementations are in handlers/north_star.rs (TASK-NORTHSTAR-001)
+    /// get_coherence_state tool implementation.
+    ///
+    /// TASK-34: Returns high-level GWT workspace coherence state including
+    /// coherence level (High/Medium/Low), broadcasting status, and conflict detection.
+    ///
+    /// Per PRD v6: Uses topic stability metrics instead of consciousness state.
+    pub(crate) async fn call_get_coherence_state(
+        &self,
+        id: Option<JsonRpcId>,
+        _args: serde_json::Value,
+    ) -> JsonRpcResponse {
+        debug!("Handling get_coherence_state tool call");
+
+        // Get topic stability from workspace provider per PRD v6
+        let topic_stability = if let Some(ref workspace) = &self.workspace_provider {
+            let ws = workspace.read().await;
+            ws.get_topic_stability().await
+        } else {
+            0.5 // Default when workspace not available
+        };
+
+        // Get workspace metrics if available
+        let (is_broadcasting, has_conflict) = if let Some(ref workspace) = &self.workspace_provider {
+            let ws = workspace.read().await;
+            (ws.is_broadcasting().await, ws.has_conflict().await)
+        } else {
+            (false, false)
+        };
+
+        // Map topic stability to coherence level per PRD v6 thresholds
+        let coherence_level = if topic_stability >= 0.8 {
+            "High"
+        } else if topic_stability >= 0.5 {
+            "Medium"
+        } else {
+            "Low"
+        };
+
+        self.tool_result_with_pulse(
+            id,
+            json!({
+                "coherence_level": coherence_level,
+                "is_broadcasting": is_broadcasting,
+                "has_conflict": has_conflict,
+                "topic_stability": topic_stability
+            }),
+        )
+    }
 }

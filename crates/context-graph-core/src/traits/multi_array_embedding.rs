@@ -7,7 +7,7 @@
 //!
 //! **NO FUSION** - Each embedding space is preserved independently for:
 //! 1. Per-space HNSW search (13 independent indexes)
-//! 2. Per-space Johari quadrant classification
+//! 2. Per-space confidence classification
 //! 3. Full information preservation (~46KB vs ~6KB fused)
 //! 4. Auditability - trace which embedder contributed to ranking
 //!

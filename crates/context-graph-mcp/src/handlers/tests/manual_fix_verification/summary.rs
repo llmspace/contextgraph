@@ -31,7 +31,7 @@ async fn test_all_fixes_summary() {
     let res1 = handlers.dispatch(req1).await;
     let issue1_pass = res1.error.is_none();
 
-    // Issue 3a: get_autonomous_status without North Star
+    // Issue 3a: get_autonomous_status without strategic goal
     let req3a = make_request(
         "tools/call",
         Some(JsonRpcId::Number(2)),
@@ -48,8 +48,8 @@ async fn test_all_fixes_summary() {
             .map(|r| !r.get("isError").and_then(|v| v.as_bool()).unwrap_or(true))
             .unwrap_or(false);
 
-    // TASK-P0-001: Issue 3b (auto_bootstrap_north_star) test removed
-    // The auto_bootstrap_north_star tool was removed per ARCH-03 (goals emerge from topic clustering)
+    // TASK-P0-001: Issue 3b (auto_bootstrap) test removed
+    // The auto_bootstrap tool was removed per ARCH-03 (goals emerge from topic clustering)
     let issue3b_pass = true; // Removed - no longer testable
 
     // Edge case: empty query_content FAIL FAST
@@ -77,7 +77,7 @@ async fn test_all_fixes_summary() {
         if issue1_pass { "PASS" } else { "FAIL" }
     );
     println!(
-        "Issue 3a - get_autonomous_status without North Star: {}",
+        "Issue 3a - get_autonomous_status without strategic goal: {}",
         if issue3a_pass { "PASS" } else { "FAIL" }
     );
     println!(

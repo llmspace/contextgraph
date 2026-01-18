@@ -3,7 +3,6 @@
 use crate::index::config::PURPOSE_VECTOR_DIM;
 use crate::index::purpose::entry::{GoalId, PurposeMetadata};
 use crate::types::fingerprint::PurposeVector;
-use crate::types::JohariQuadrant;
 
 /// Create a purpose vector with deterministic values based on a base value.
 pub fn create_purpose_vector(base: f32) -> PurposeVector {
@@ -15,6 +14,6 @@ pub fn create_purpose_vector(base: f32) -> PurposeVector {
 }
 
 /// Create metadata for testing.
-pub fn create_metadata(goal: &str, quadrant: JohariQuadrant) -> PurposeMetadata {
-    PurposeMetadata::new(GoalId::new(goal), 0.85, quadrant).unwrap()
+pub fn create_metadata(goal: &str) -> PurposeMetadata {
+    PurposeMetadata::new(GoalId::new(goal), 0.85).unwrap()
 }

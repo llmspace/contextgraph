@@ -1,24 +1,21 @@
 //! Batch, statistics, and persistence operations.
 //!
-//! Contains batch store/retrieve, count/stats, flush/checkpoint/compact,
-//! and Johari listing operations.
+//! Contains batch store/retrieve, count/stats, and flush/checkpoint/compact operations.
 
 use std::path::PathBuf;
 
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use context_graph_core::error::{CoreError, CoreResult};
 use context_graph_core::traits::TeleologicalStorageBackend;
-use context_graph_core::types::fingerprint::{JohariFingerprint, TeleologicalFingerprint};
+use context_graph_core::types::fingerprint::TeleologicalFingerprint;
 
 use crate::teleological::column_families::{
     CF_FINGERPRINTS, QUANTIZED_EMBEDDER_CFS, TELEOLOGICAL_CFS,
 };
 use crate::teleological::schema::parse_fingerprint_key;
-use crate::teleological::serialization::deserialize_teleological_fingerprint;
 
-use super::helpers::get_aggregate_dominant_quadrant;
 use super::store::RocksDbTeleologicalStore;
 use super::types::TeleologicalStoreError;
 
@@ -100,31 +97,6 @@ impl RocksDbTeleologicalStore {
         }
 
         Ok(count)
-    }
-
-    /// Count fingerprints by Johari quadrant (internal async wrapper).
-    pub(crate) async fn count_by_quadrant_async(&self) -> CoreResult<[usize; 4]> {
-        let cf = self.get_cf(CF_FINGERPRINTS)?;
-        let iter = self.db.iterator_cf(cf, rocksdb::IteratorMode::Start);
-
-        let mut counts = [0usize; 4];
-
-        for item in iter {
-            let (key, value) = item.map_err(|e| {
-                TeleologicalStoreError::rocksdb_op("iterate", CF_FINGERPRINTS, None, e)
-            })?;
-            let id = parse_fingerprint_key(&key);
-
-            if self.is_soft_deleted(&id) {
-                continue;
-            }
-
-            let fp = deserialize_teleological_fingerprint(&value);
-            let quadrant_idx = get_aggregate_dominant_quadrant(&fp.johari);
-            counts[quadrant_idx] += 1;
-        }
-
-        Ok(counts)
     }
 
     /// Get storage size in bytes.
@@ -272,94 +244,5 @@ impl RocksDbTeleologicalStore {
 
         info!("Compaction complete");
         Ok(())
-    }
-}
-
-// ============================================================================
-// Johari Listing Operations
-// ============================================================================
-
-impl RocksDbTeleologicalStore {
-    /// List fingerprints by Johari quadrant (internal async wrapper).
-    pub(crate) async fn list_by_quadrant_async(
-        &self,
-        quadrant: usize,
-        limit: usize,
-    ) -> CoreResult<Vec<(Uuid, JohariFingerprint)>> {
-        debug!("list_by_quadrant: quadrant={}, limit={}", quadrant, limit);
-
-        if quadrant > 3 {
-            error!("Invalid quadrant index: {} (must be 0-3)", quadrant);
-            return Err(CoreError::ValidationError {
-                field: "quadrant".to_string(),
-                message: format!("Quadrant index must be 0-3, got {}", quadrant),
-            });
-        }
-
-        let cf = self.get_cf(CF_FINGERPRINTS)?;
-        let mut results = Vec::new();
-
-        let iter = self.db.iterator_cf(cf, rocksdb::IteratorMode::Start);
-
-        for item in iter {
-            if results.len() >= limit {
-                break;
-            }
-
-            let (key, value) = item.map_err(|e| {
-                TeleologicalStoreError::rocksdb_op("iterate", CF_FINGERPRINTS, None, e)
-            })?;
-
-            let id = parse_fingerprint_key(&key);
-
-            if self.is_soft_deleted(&id) {
-                continue;
-            }
-
-            let fp = deserialize_teleological_fingerprint(&value);
-            let dominant = get_aggregate_dominant_quadrant(&fp.johari);
-
-            if dominant == quadrant {
-                results.push((id, fp.johari.clone()));
-            }
-        }
-
-        debug!("list_by_quadrant returned {} results", results.len());
-        Ok(results)
-    }
-
-    /// List all Johari fingerprints (internal async wrapper).
-    pub(crate) async fn list_all_johari_async(
-        &self,
-        limit: usize,
-    ) -> CoreResult<Vec<(Uuid, JohariFingerprint)>> {
-        debug!("list_all_johari: limit={}", limit);
-
-        let cf = self.get_cf(CF_FINGERPRINTS)?;
-        let mut results = Vec::new();
-
-        let iter = self.db.iterator_cf(cf, rocksdb::IteratorMode::Start);
-
-        for item in iter {
-            if results.len() >= limit {
-                break;
-            }
-
-            let (key, value) = item.map_err(|e| {
-                TeleologicalStoreError::rocksdb_op("iterate", CF_FINGERPRINTS, None, e)
-            })?;
-
-            let id = parse_fingerprint_key(&key);
-
-            if self.is_soft_deleted(&id) {
-                continue;
-            }
-
-            let fp = deserialize_teleological_fingerprint(&value);
-            results.push((id, fp.johari.clone()));
-        }
-
-        debug!("list_all_johari returned {} results", results.len());
-        Ok(results)
     }
 }

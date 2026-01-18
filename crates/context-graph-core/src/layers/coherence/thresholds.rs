@@ -5,8 +5,8 @@
 //!
 //! # Constitution Reference
 //!
-//! From `docs2/constitution.yaml` lines 220-236:
-//! - gwt.kuramoto.thresholds: { coherent: "r≥0.8", fragmented: "r<0.5", hypersync: "r>0.95" }
+//! From `docs2/constitution.yaml`:
+//! - Phase coherence thresholds: { coherent: "r>=0.8", fragmented: "r<0.5", hypersync: "r>0.95" }
 //! - gwt.workspace.coherence_threshold: 0.8
 //!
 //! # Legacy Values (MUST preserve for backwards compatibility)
@@ -25,9 +25,9 @@
 use crate::atc::{AdaptiveThresholdCalibration, Domain};
 use crate::error::{CoreError, CoreResult};
 
-/// GWT thresholds for consciousness state determination.
+/// GWT thresholds for coherence state determination.
 ///
-/// These thresholds define the boundaries for consciousness states:
+/// These thresholds define the boundaries for coherence states:
 /// - `gate`: Order parameter threshold for GW broadcast (ignition)
 /// - `hypersync`: Order parameter above which is pathological hypersync
 /// - `fragmentation`: Order parameter below which is fragmented
@@ -177,7 +177,7 @@ impl GwtThresholds {
     ///
     /// # Arguments
     ///
-    /// * `order_param` - Kuramoto order parameter r ∈ [0, 1]
+    /// * `order_param` - Coherence order parameter r ∈ [0, 1]
     ///
     /// # Returns
     ///
@@ -194,7 +194,7 @@ impl GwtThresholds {
     ///
     /// # Arguments
     ///
-    /// * `order_param` - Kuramoto order parameter r ∈ [0, 1]
+    /// * `order_param` - Coherence order parameter r ∈ [0, 1]
     ///
     /// # Returns
     ///
@@ -210,7 +210,7 @@ impl GwtThresholds {
     ///
     /// # Arguments
     ///
-    /// * `order_param` - Kuramoto order parameter r ∈ [0, 1]
+    /// * `order_param` - Coherence order parameter r ∈ [0, 1]
     ///
     /// # Returns
     ///

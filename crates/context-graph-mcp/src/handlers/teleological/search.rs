@@ -84,7 +84,6 @@ impl Handlers {
             top_k: params.max_results,
             min_similarity: params.min_similarity,
             include_deleted: false,
-            johari_quadrant_filter: None,
             min_alignment: Some(params.min_similarity),
             embedder_indices: Vec::new(),
             semantic_query,

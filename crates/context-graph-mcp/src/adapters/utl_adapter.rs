@@ -112,12 +112,12 @@ impl UtlProcessorAdapter {
     /// Extract embedding from context.
     ///
     /// Returns the goal_vector if present, otherwise returns a default zero vector.
-    /// This allows UTL computation to proceed even without a configured North Star.
+    /// This allows UTL computation to proceed even without a configured strategic goal.
     /// The 13-embedder teleological arrays ARE the primary data; goal_vector alignment
     /// is supplementary metadata that can be computed later.
     fn get_embedding(context: &UtlContext) -> CoreResult<Vec<f32>> {
         // Use goal_vector if present, otherwise default to zero vector
-        // This enables autonomous operation without requiring North Star configuration
+        // This enables autonomous operation without requiring strategic goal configuration
         Ok(context
             .goal_vector
             .clone()
@@ -173,7 +173,6 @@ impl UtlProcessor for UtlProcessorAdapter {
                     signal.magnitude,
                     signal.delta_s,
                     signal.delta_c,
-                    signal.quadrant,
                     signal.latency_us as f64,
                 );
                 metrics.lifecycle_stage = processor.lifecycle_stage();
@@ -608,7 +607,7 @@ mod tests {
 
     /// TEST: Verify that missing goal_vector uses default zero vector.
     /// The 13-embedder teleological arrays are the primary data; goal_vector is optional.
-    /// This enables autonomous operation without requiring North Star configuration.
+    /// This enables autonomous operation without requiring strategic goal configuration.
     #[tokio::test]
     async fn test_missing_goal_vector_uses_default() {
         let adapter = UtlProcessorAdapter::with_defaults();

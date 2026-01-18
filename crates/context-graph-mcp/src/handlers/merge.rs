@@ -24,7 +24,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use context_graph_core::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
+    PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
 };
 
 use crate::protocol::{error_codes, JsonRpcId, JsonRpcResponse};
@@ -76,7 +76,7 @@ pub struct MergedNodeInfo {
     pub source_count: usize,
     pub strategy_used: MergeStrategy,
     pub created_at: String,
-    /// Average theta to north star of source nodes
+    /// Average theta alignment of source nodes
     pub alignment_score: f32,
     /// Total access count from all sources
     pub total_access_count: u64,
@@ -298,7 +298,6 @@ impl Handlers {
         };
 
         let merged_purpose = self.merge_purpose_vectors(&source_fingerprints);
-        let merged_johari = self.merge_johari_fingerprints(&source_fingerprints);
 
         // Step 4: Create merged fingerprint
         let now = Utc::now();
@@ -329,7 +328,6 @@ impl Handlers {
         let merged_fingerprint = TeleologicalFingerprint::new(
             merged_semantic,
             merged_purpose,
-            merged_johari,
             content_hash,
         );
         let merged_id = merged_fingerprint.id;
@@ -455,22 +453,6 @@ impl Handlers {
             warn!(
                 "Large theta spread in merge: min={:.2}, max={:.2} (consider force_merge)",
                 min_theta, max_theta
-            );
-        }
-
-        // Check Johari quadrant consistency
-        // All fingerprints should ideally have similar dominant quadrants
-        // We check the dominant quadrant for E1 (first embedder) as representative
-        let dominant_quadrants: Vec<_> = fingerprints
-            .iter()
-            .map(|f| f.johari.dominant_quadrant(0)) // E1 embedder
-            .collect();
-
-        let unique_quadrants: std::collections::HashSet<_> = dominant_quadrants.iter().collect();
-        if unique_quadrants.len() > 2 {
-            warn!(
-                "Merging fingerprints from {} different dominant quadrants (consider force_merge)",
-                unique_quadrants.len()
             );
         }
 
@@ -814,61 +796,6 @@ impl Handlers {
         }
 
         PurposeVector::new(alignments)
-    }
-
-    /// Merge Johari fingerprints by averaging soft quadrant weights.
-    fn merge_johari_fingerprints(
-        &self,
-        fingerprints: &[TeleologicalFingerprint],
-    ) -> JohariFingerprint {
-        if fingerprints.is_empty() {
-            return JohariFingerprint::default();
-        }
-
-        let n = fingerprints.len() as f32;
-
-        // Average the quadrant weights per embedder
-        let mut merged_quadrants = [[0.0f32; 4]; 13];
-        let mut merged_confidence = [0.0f32; 13];
-        let mut merged_transition_probs = [[[0.0f32; 4]; 4]; 13];
-
-        for embedder_idx in 0..13 {
-            // Average quadrant weights
-            for fp in fingerprints {
-                for (i, &val) in fp.johari.quadrants[embedder_idx].iter().enumerate() {
-                    merged_quadrants[embedder_idx][i] += val / n;
-                }
-                merged_confidence[embedder_idx] += fp.johari.confidence[embedder_idx] / n;
-                for from_q in 0..4 {
-                    for to_q in 0..4 {
-                        merged_transition_probs[embedder_idx][from_q][to_q] +=
-                            fp.johari.transition_probs[embedder_idx][from_q][to_q] / n;
-                    }
-                }
-            }
-            // Normalize quadrant weights to ensure sum = 1.0
-            let sum: f32 = merged_quadrants[embedder_idx].iter().sum();
-            if sum > 0.0 {
-                for val in &mut merged_quadrants[embedder_idx] {
-                    *val /= sum;
-                }
-            }
-            // Normalize transition probability rows
-            for from_q in 0..4 {
-                let row_sum: f32 = merged_transition_probs[embedder_idx][from_q].iter().sum();
-                if row_sum > 0.0 {
-                    for val in &mut merged_transition_probs[embedder_idx][from_q] {
-                        *val /= row_sum;
-                    }
-                }
-            }
-        }
-
-        JohariFingerprint {
-            quadrants: merged_quadrants,
-            confidence: merged_confidence,
-            transition_probs: merged_transition_probs,
-        }
     }
 
     /// Average multiple dense vectors element-wise and normalize.

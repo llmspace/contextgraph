@@ -59,7 +59,7 @@ async fn test_all_happy_paths_summary() {
         .unwrap_or("test-id")
         .to_string();
 
-    println!("\nRunning {} MCP method tests...\n", 17);
+    println!("\nRunning {} MCP method tests...\n", 15);
 
     // Test each method
     run_test(
@@ -205,52 +205,6 @@ async fn test_all_happy_paths_summary() {
     )
     .await;
 
-    run_test(
-        &handlers,
-        "Johari Distribution",
-        "johari/get_distribution",
-        Some(json!({
-            "memory_id": fingerprint_id
-        })),
-        &mut passed,
-        &mut total,
-    )
-    .await;
-
-    run_test(
-        &handlers,
-        "Johari Find by Quadrant",
-        "johari/find_by_quadrant",
-        Some(json!({
-            "quadrant": "Unknown",
-            "embedder_index": 0,
-            "limit": 5
-        })),
-        &mut passed,
-        &mut total,
-    )
-    .await;
-
-    // GWT/Consciousness tests may fail if not initialized
-    run_test(
-        &handlers,
-        "GWT Consciousness Level",
-        "gwt/consciousness_level",
-        None,
-        &mut passed,
-        &mut total,
-    )
-    .await;
-    run_test(
-        &handlers,
-        "Consciousness Get State",
-        "consciousness/get_state",
-        None,
-        &mut passed,
-        &mut total,
-    )
-    .await;
-
     // Final memory delete
     run_test(
         &handlers,
@@ -275,7 +229,7 @@ async fn test_all_happy_paths_summary() {
 
     // Core functionality should all pass
     assert!(
-        passed >= 14,
-        "At least 14 core tests should pass (GWT/consciousness may not be initialized)"
+        passed >= 12,
+        "At least 12 core tests should pass"
     );
 }

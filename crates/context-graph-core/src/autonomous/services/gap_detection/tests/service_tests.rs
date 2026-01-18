@@ -234,7 +234,7 @@ fn test_compute_coverage_score_single_goal() {
     )];
 
     let score = service.compute_coverage_score(&goals);
-    assert!(score > 0.8); // High score for active NorthStar
+    assert!(score > 0.8); // High score for active strategic goal
     println!("[PASS] test_compute_coverage_score_single_goal");
 }
 

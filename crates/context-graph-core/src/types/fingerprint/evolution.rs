@@ -1,13 +1,12 @@
 //! Purpose evolution tracking for teleological fingerprints.
 //!
-//! Tracks how a memory's alignment with North Star goals changes over time.
+//! Tracks how a memory's alignment with Strategic goals changes over time.
 //! From constitution.yaml: delta_A < -0.15 predicts failure 72 hours ahead.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::johari::JohariFingerprint;
 use super::purpose::PurposeVector;
 
 /// Events that trigger a purpose evolution snapshot.
@@ -24,7 +23,7 @@ pub enum EvolutionTrigger {
         query_context: String,
     },
 
-    /// The North Star goal itself changed
+    /// The Strategic goal itself changed
     GoalChanged {
         /// Previous goal UUID
         old_goal: Uuid,
@@ -83,24 +82,16 @@ pub struct PurposeSnapshot {
     /// The purpose vector at this point in time
     pub purpose: PurposeVector,
 
-    /// The Johari classification at this point in time
-    pub johari: JohariFingerprint,
-
     /// What triggered this snapshot
     pub trigger: EvolutionTrigger,
 }
 
 impl PurposeSnapshot {
     /// Create a new snapshot at the current time.
-    pub fn new(
-        purpose: PurposeVector,
-        johari: JohariFingerprint,
-        trigger: EvolutionTrigger,
-    ) -> Self {
+    pub fn new(purpose: PurposeVector, trigger: EvolutionTrigger) -> Self {
         Self {
             timestamp: Utc::now(),
             purpose,
-            johari,
             trigger,
         }
     }
@@ -109,13 +100,11 @@ impl PurposeSnapshot {
     pub fn with_timestamp(
         timestamp: DateTime<Utc>,
         purpose: PurposeVector,
-        johari: JohariFingerprint,
         trigger: EvolutionTrigger,
     ) -> Self {
         Self {
             timestamp,
             purpose,
-            johari,
             trigger,
         }
     }
@@ -134,10 +123,6 @@ mod tests {
 
     fn make_test_purpose() -> PurposeVector {
         PurposeVector::new([0.75; NUM_EMBEDDERS])
-    }
-
-    fn make_test_johari() -> JohariFingerprint {
-        JohariFingerprint::default()
     }
 
     #[test]
@@ -195,11 +180,9 @@ mod tests {
     #[test]
     fn test_purpose_snapshot_new() {
         let purpose = make_test_purpose();
-        let johari = make_test_johari();
 
         let before = Utc::now();
-        let snapshot =
-            PurposeSnapshot::new(purpose.clone(), johari.clone(), EvolutionTrigger::Created);
+        let snapshot = PurposeSnapshot::new(purpose.clone(), EvolutionTrigger::Created);
         let after = Utc::now();
 
         // Timestamp should be between before and after
@@ -217,13 +200,11 @@ mod tests {
     #[test]
     fn test_purpose_snapshot_with_timestamp() {
         let purpose = make_test_purpose();
-        let johari = make_test_johari();
         let custom_time = Utc::now() - Duration::hours(24);
 
         let snapshot = PurposeSnapshot::with_timestamp(
             custom_time,
             purpose,
-            johari,
             EvolutionTrigger::Recalibration,
         );
 
@@ -235,8 +216,7 @@ mod tests {
     #[test]
     fn test_purpose_snapshot_aggregate_alignment() {
         let purpose = PurposeVector::new([0.80; NUM_EMBEDDERS]);
-        let johari = make_test_johari();
-        let snapshot = PurposeSnapshot::new(purpose, johari, EvolutionTrigger::Created);
+        let snapshot = PurposeSnapshot::new(purpose, EvolutionTrigger::Created);
 
         assert!((snapshot.aggregate_alignment() - 0.80).abs() < 1e-6);
 

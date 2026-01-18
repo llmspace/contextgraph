@@ -412,14 +412,12 @@ fn create_valid_embeddings() -> HashMap<u8, QuantizedEmbedding> {
 fn test_valid_fingerprint_creation() {
     let embeddings = create_valid_embeddings();
     let purpose_vector = [0.5f32; 13];
-    let johari_quadrants = [0.25f32; 4];
     let content_hash: [u8; 32] = [0x42; 32]; // Non-zero
 
     let fp = StoredQuantizedFingerprint::new(
         Uuid::new_v4(),
         embeddings,
         purpose_vector,
-        johari_quadrants,
         content_hash,
     );
 
@@ -441,7 +439,6 @@ fn test_missing_embedder_panics() {
         Uuid::new_v4(),
         embeddings,
         [0.5f32; 13],
-        [0.25f32; 4],
         [0x42u8; 32],
     );
 }
@@ -470,7 +467,6 @@ fn test_invalid_embedder_index_panics() {
         Uuid::new_v4(),
         embeddings,
         [0.5f32; 13],
-        [0.25f32; 4],
         [0x42u8; 32],
     );
 }

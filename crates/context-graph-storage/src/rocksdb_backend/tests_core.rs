@@ -106,8 +106,8 @@ fn test_get_cf_unknown_returns_error() {
 }
 
 #[test]
-fn test_all_12_cfs_accessible() {
-    println!("=== TEST: All 12 column families accessible ===");
+fn test_all_core_cfs_accessible() {
+    println!("=== TEST: All core column families accessible ===");
     let (_tmp, db) = create_temp_db();
 
     let expected_cfs = [
@@ -115,10 +115,6 @@ fn test_all_12_cfs_accessible() {
         "edges",
         "embeddings",
         "metadata",
-        "johari_open",
-        "johari_hidden",
-        "johari_blind",
-        "johari_unknown",
         "temporal",
         "tags",
         "sources",

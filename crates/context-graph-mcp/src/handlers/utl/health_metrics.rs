@@ -5,14 +5,12 @@
 use serde_json::json;
 use tracing::{debug, error};
 
-use context_graph_core::johari::NUM_EMBEDDERS;
-
 use crate::protocol::{error_codes, JsonRpcId, JsonRpcResponse};
 
 use super::super::Handlers;
 use super::constants::{
     ATTACK_DETECTION_TARGET, COHERENCE_RECOVERY_TARGET_MS, FALSE_POSITIVE_TARGET,
-    LEARNING_SCORE_TARGET,
+    LEARNING_SCORE_TARGET, NUM_EMBEDDERS,
 };
 
 impl Handlers {

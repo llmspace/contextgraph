@@ -9,15 +9,13 @@ use crate::traits::{
     TeleologicalMemoryStore, TeleologicalSearchOptions, TeleologicalStorageBackend,
 };
 use crate::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
-    NUM_EMBEDDERS,
+    PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint, NUM_EMBEDDERS,
 };
 
 fn create_test_fingerprint() -> TeleologicalFingerprint {
     TeleologicalFingerprint::new(
         SemanticFingerprint::zeroed(),
         PurposeVector::new([0.75; NUM_EMBEDDERS]),
-        JohariFingerprint::zeroed(),
         [0u8; 32],
     )
 }
@@ -165,17 +163,6 @@ async fn test_min_similarity_filter() {
     let query = SemanticFingerprint::zeroed();
     let options = TeleologicalSearchOptions::quick(10).with_min_similarity(0.99);
     let _results = store.search_semantic(&query, options).await.unwrap();
-}
-
-#[tokio::test]
-async fn test_count_by_quadrant() {
-    let store = InMemoryTeleologicalStore::new();
-    for _ in 0..4 {
-        store.store(create_test_fingerprint()).await.unwrap();
-    }
-    let counts = store.count_by_quadrant().await.unwrap();
-    let total: usize = counts.iter().sum();
-    assert_eq!(total, 4);
 }
 
 #[tokio::test]

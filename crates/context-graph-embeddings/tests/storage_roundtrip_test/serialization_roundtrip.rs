@@ -12,16 +12,9 @@ fn test_json_roundtrip_fingerprint() {
     let id = Uuid::new_v4();
     let embeddings = create_test_embeddings_with_deterministic_data(99);
     let purpose_vector = create_purpose_vector(99);
-    let johari_quadrants = create_johari_quadrants(99);
     let content_hash = create_content_hash(99);
 
-    let original = StoredQuantizedFingerprint::new(
-        id,
-        embeddings.clone(),
-        purpose_vector,
-        johari_quadrants,
-        content_hash,
-    );
+    let original = StoredQuantizedFingerprint::new(id, embeddings.clone(), purpose_vector, content_hash);
 
     // Serialize to JSON
     let json = serde_json::to_string(&original).expect("JSON serialization failed");
@@ -62,16 +55,6 @@ fn test_json_roundtrip_fingerprint() {
         restored.purpose_vector, original.purpose_vector,
         "Purpose vector mismatch"
     );
-    // TASK-P0-001: alignment_score field removed per ARCH-03
-    assert_eq!(
-        restored.johari_quadrants, original.johari_quadrants,
-        "Johari quadrants mismatch"
-    );
-    assert_eq!(
-        restored.dominant_quadrant, original.dominant_quadrant,
-        "Dominant quadrant mismatch"
-    );
-    assert!((restored.johari_confidence - original.johari_confidence).abs() < f32::EPSILON);
     assert_eq!(
         restored.content_hash, original.content_hash,
         "Content hash mismatch"
@@ -87,7 +70,6 @@ fn test_bincode_roundtrip_fingerprint() {
         Uuid::new_v4(),
         create_test_embeddings_with_deterministic_data(77),
         create_purpose_vector(77),
-        create_johari_quadrants(77),
         create_content_hash(77),
     );
 

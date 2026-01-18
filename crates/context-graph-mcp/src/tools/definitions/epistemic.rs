@@ -1,7 +1,7 @@
 //! Epistemic action tool definitions (TASK-MCP-001).
 //!
 //! Implements epistemic_action tool for GWT workspace uncertainty/knowledge updates.
-//! Constitution: utl.johari.Unknown → EpistemicAction
+//! Constitution: Epistemic action for high uncertainty states.
 //! PRD: Section 1.8, Section 5.2 Line 527
 
 use crate::tools::types::ToolDefinition;
@@ -14,7 +14,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
         "Perform an epistemic action on the GWT workspace to update uncertainty \
              and knowledge states. Actions: assert (add belief), retract (remove belief), \
              query (check status), hypothesize (tentative belief), verify (confirm/deny). \
-             Used when Johari quadrant is Unknown (high entropy + high coherence).",
+             Used when high entropy + high coherence indicates uncertainty.",
         json!({
             "type": "object",
             "required": ["action_type", "target", "rationale"],
@@ -162,9 +162,9 @@ mod tests {
         // Synthetic test data from TASK-27 Section 7.1
         let synthetic_input = json!({
             "action_type": "hypothesize",
-            "target": "The system should consolidate memories when IC < 0.5",
+            "target": "The system should consolidate memories when entropy > 0.7",
             "confidence": 0.75,
-            "rationale": "Identity crisis threshold per constitution.yaml gwt.self_ego_node.thresholds.critical",
+            "rationale": "Dream trigger threshold per constitution.yaml dream.trigger.conditions",
             "context": {
                 "source_nodes": ["550e8400-e29b-41d4-a716-446655440000"],
                 "uncertainty_type": "epistemic"
@@ -343,7 +343,6 @@ mod tests {
         let values: Vec<&str> = enum_values.iter().map(|v| v.as_str().unwrap()).collect();
         assert_eq!(values.len(), 5);
 
-        // Constitution.yaml johari.Unknown -> EpistemicAction
         // These are the 5 epistemic operations:
         assert!(values.contains(&"assert"), "assert: add belief");
         assert!(values.contains(&"retract"), "retract: remove belief");

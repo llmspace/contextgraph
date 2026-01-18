@@ -9,9 +9,8 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::error::CoreResult;
-use crate::gwt::ego_node::SelfEgoNode;
 use crate::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
+    PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
 };
 
 use super::backend::TeleologicalStorageBackend;
@@ -131,7 +130,7 @@ pub trait TeleologicalMemoryStore: Send + Sync {
 
     /// Search by purpose vector alignment.
     ///
-    /// Finds fingerprints with similar purpose alignment to the North Star goal.
+    /// Finds fingerprints with similar purpose alignment to Strategic goals.
     /// Used in Stage 5 (Teleological) of the retrieval pipeline.
     ///
     /// # Arguments
@@ -238,21 +237,6 @@ pub trait TeleologicalMemoryStore: Send + Sync {
     /// - `CoreError::StorageError` - Storage backend failure
     async fn count(&self) -> CoreResult<usize>;
 
-    /// Get fingerprint counts by Johari quadrant.
-    ///
-    /// Returns counts for each of the 4 quadrants:
-    /// [Open, Hidden, Blind, Unknown]
-    ///
-    /// Classification uses the dominant quadrant of the aggregate
-    /// across all 13 embedders.
-    ///
-    /// # Returns
-    /// Array of 4 counts: [open_count, hidden_count, blind_count, unknown_count]
-    ///
-    /// # Errors
-    /// - `CoreError::StorageError` - Storage backend failure
-    async fn count_by_quadrant(&self) -> CoreResult<[usize; 4]>;
-
     /// Get total storage size in bytes.
     ///
     /// Returns the approximate heap memory used by the store.
@@ -309,51 +293,6 @@ pub trait TeleologicalMemoryStore: Send + Sync {
     /// - `CoreError::StorageError` - Compaction failure
     async fn compact(&self) -> CoreResult<()>;
 
-    // ==================== Scanning Operations ====================
-
-    /// List fingerprints by dominant Johari quadrant.
-    ///
-    /// This performs a full scan of the store, filtering by the dominant
-    /// Johari quadrant aggregated across all 13 embedders.
-    ///
-    /// # AP-007: PROPER SCANNING
-    ///
-    /// This method exists to support quadrant-based queries WITHOUT using
-    /// zero-magnitude semantic queries (which have undefined cosine similarity).
-    ///
-    /// # Arguments
-    /// * `quadrant` - Johari quadrant index (0=Open, 1=Hidden, 2=Blind, 3=Unknown)
-    /// * `limit` - Maximum results to return
-    ///
-    /// # Returns
-    /// Vector of (MemoryId, JohariFingerprint) pairs matching the quadrant.
-    ///
-    /// # Errors
-    /// - `CoreError::StorageError` - Storage backend failure
-    async fn list_by_quadrant(
-        &self,
-        quadrant: usize,
-        limit: usize,
-    ) -> CoreResult<Vec<(Uuid, JohariFingerprint)>>;
-
-    /// List all fingerprints with their Johari state.
-    ///
-    /// # AP-007: PROPER SCANNING
-    ///
-    /// This method exists to support pattern-based quadrant queries that need
-    /// to inspect per-embedder quadrant state. It replaces the broken pattern
-    /// of using zeroed semantic queries for "get all" operations.
-    ///
-    /// # Arguments
-    /// * `limit` - Maximum results to return
-    ///
-    /// # Returns
-    /// Vector of (MemoryId, JohariFingerprint) pairs.
-    ///
-    /// # Errors
-    /// - `CoreError::StorageError` - Storage backend failure
-    async fn list_all_johari(&self, limit: usize) -> CoreResult<Vec<(Uuid, JohariFingerprint)>>;
-
     // ==================== Content Storage (TASK-CONTENT-003) ====================
     // See `defaults.rs` for detailed documentation on default implementations.
 
@@ -372,15 +311,4 @@ pub trait TeleologicalMemoryStore: Send + Sync {
     /// Batch retrieve content for multiple fingerprints.
     /// Default: Returns vec of None. Override for batch-optimized retrieval.
     async fn get_content_batch(&self, ids: &[Uuid]) -> CoreResult<Vec<Option<String>>>;
-
-    // ==================== Ego Node Storage (TASK-GWT-P1-001) ====================
-    // See `defaults.rs` for detailed documentation on default implementations.
-
-    /// Save the singleton SELF_EGO_NODE to persistent storage.
-    /// Default: Returns unsupported error. Override for ego-capable backends.
-    async fn save_ego_node(&self, ego_node: &SelfEgoNode) -> CoreResult<()>;
-
-    /// Load the singleton SELF_EGO_NODE from persistent storage.
-    /// Default: Returns None. Override for ego-capable backends.
-    async fn load_ego_node(&self) -> CoreResult<Option<SelfEgoNode>>;
 }

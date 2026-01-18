@@ -6,7 +6,6 @@ use crate::index::config::HnswConfig;
 use crate::index::purpose::entry::GoalId;
 use crate::index::purpose::hnsw_purpose::{HnswPurposeIndex, PurposeIndexOps};
 use crate::index::purpose::query::{PurposeQuery, PurposeQueryTarget};
-use crate::types::JohariQuadrant;
 use std::collections::HashSet;
 
 #[test]
@@ -30,7 +29,7 @@ fn test_search_results_sorted_by_similarity_descending() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
 
     for i in 0..10 {
-        let entry = create_entry(0.1 * i as f32, "goal", JohariQuadrant::Open);
+        let entry = create_entry(0.1 * i as f32, "goal");
         index.insert(entry).unwrap();
     }
 
@@ -57,7 +56,7 @@ fn test_search_results_sorted_by_similarity_descending() {
 fn test_filter_returns_empty_when_no_matches() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
 
-    let entry = create_entry(0.5, "existing_goal", JohariQuadrant::Open);
+    let entry = create_entry(0.5, "existing_goal");
     index.insert(entry).unwrap();
 
     let query = PurposeQuery::new(
@@ -80,7 +79,7 @@ fn test_search_respects_limit() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
 
     for i in 0..20 {
-        let entry = create_entry(0.3 + i as f32 * 0.03, "goal", JohariQuadrant::Open);
+        let entry = create_entry(0.3 + i as f32 * 0.03, "goal");
         index.insert(entry).unwrap();
     }
 
@@ -105,15 +104,9 @@ fn test_search_respects_limit() {
 fn test_goals_list_returns_all_goals() {
     let mut index = HnswPurposeIndex::new(purpose_config()).unwrap();
 
-    index
-        .insert(create_entry(0.5, "alpha", JohariQuadrant::Open))
-        .unwrap();
-    index
-        .insert(create_entry(0.6, "beta", JohariQuadrant::Hidden))
-        .unwrap();
-    index
-        .insert(create_entry(0.7, "gamma", JohariQuadrant::Blind))
-        .unwrap();
+    index.insert(create_entry(0.5, "alpha")).unwrap();
+    index.insert(create_entry(0.6, "beta")).unwrap();
+    index.insert(create_entry(0.7, "gamma")).unwrap();
 
     let goals = index.goals();
 
@@ -133,7 +126,7 @@ fn test_multiple_inserts_and_removes() {
     // Insert 20 entries
     let mut ids: Vec<uuid::Uuid> = Vec::new();
     for i in 0..20 {
-        let entry = create_entry(0.3 + i as f32 * 0.03, "goal", JohariQuadrant::Open);
+        let entry = create_entry(0.3 + i as f32 * 0.03, "goal");
         ids.push(entry.memory_id);
         index.insert(entry).unwrap();
     }

@@ -8,11 +8,11 @@
 //!
 //! # Constitution Reference
 //!
-//! Johari quadrant to action mapping (constitution.yaml:159-163):
-//! - Open: delta_s < 0.5, delta_c > 0.5 -> DirectRecall
-//! - Blind: delta_s > 0.5, delta_c < 0.5 -> TriggerDream
-//! - Hidden: delta_s < 0.5, delta_c < 0.5 -> GetNeighborhood
-//! - Unknown: delta_s > 0.5, delta_c > 0.5 -> EpistemicAction
+//! Suggested action mapping based on entropy/coherence:
+//! - Low entropy, high coherence -> DirectRecall
+//! - High entropy, low coherence -> TriggerDream
+//! - Low entropy, low coherence -> GetNeighborhood
+//! - High entropy, high coherence -> EpistemicAction
 //!
 //! # Module Organization
 //!
@@ -20,11 +20,9 @@
 //! - `helpers` - MCP result helpers with CognitivePulse injection
 //! - `memory_tools` - Memory operations (inject_context, store_memory, search_graph)
 //! - `status_tools` - Status queries (get_memetic_status, get_graph_manifest, utl_status)
-//! - `gwt_consciousness` - GWT consciousness tools (get_consciousness_state, get_kuramoto_sync, get_ego_state)
 //! - `gwt_workspace` - GWT workspace tools (get_workspace_status, trigger_workspace_broadcast, adjust_coupling)
 
 mod dispatch;
-mod gwt_consciousness;
 mod gwt_workspace;
 mod helpers;
 mod memory_tools;

@@ -23,7 +23,7 @@ use super::score::LevelWeights;
 pub struct AlignmentConfig {
     /// Goal hierarchy to align against.
     ///
-    /// Must contain a North Star goal for computation to succeed.
+    /// Must contain a Strategic goal for computation to succeed.
     pub hierarchy: GoalHierarchy,
 
     /// Level-based weights for composite score.
@@ -136,7 +136,7 @@ impl AlignmentConfig {
     /// Returns error if:
     /// - Level weights don't sum to 1.0
     /// - Hierarchy validation is enabled and hierarchy is invalid
-    /// - Hierarchy has no North Star
+    /// - Hierarchy has no Strategic goals
     pub fn validate(&self) -> Result<(), String> {
         // Validate weights
         self.level_weights.validate().map_err(|e| e.to_string())?;
@@ -148,9 +148,9 @@ impl AlignmentConfig {
                 .map_err(|e| format!("Hierarchy validation failed: {}", e))?;
         }
 
-        // Check North Star exists
+        // Check Strategic goals exist
         if !self.hierarchy.has_top_level_goals() && !self.hierarchy.is_empty() {
-            return Err("Hierarchy has goals but no North Star".to_string());
+            return Err("Hierarchy has goals but no Strategic goals".to_string());
         }
 
         Ok(())

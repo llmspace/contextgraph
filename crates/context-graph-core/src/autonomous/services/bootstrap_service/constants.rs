@@ -12,7 +12,7 @@ pub const GOAL_KEYWORDS: &[&str] = &[
     "vision",
     "aim",
     "target",
-    "north star",
+    "strategic",
     "achieve",
     "accomplish",
     "deliver",

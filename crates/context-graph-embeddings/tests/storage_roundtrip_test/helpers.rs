@@ -111,19 +111,6 @@ pub fn create_purpose_vector(seed: u8) -> [f32; 13] {
     pv
 }
 
-/// Create deterministic johari quadrants based on seed.
-pub fn create_johari_quadrants(seed: u8) -> [f32; 4] {
-    let raw = [
-        0.1 + (seed as f32 % 0.3),
-        0.2 + ((seed as f32 * 1.3) % 0.3),
-        0.15 + ((seed as f32 * 0.7) % 0.25),
-        0.25 + ((seed as f32 * 1.1) % 0.35),
-    ];
-    // Normalize to sum to 1.0
-    let sum: f32 = raw.iter().sum();
-    [raw[0] / sum, raw[1] / sum, raw[2] / sum, raw[3] / sum]
-}
-
 /// Create deterministic content hash based on seed.
 pub fn create_content_hash(seed: u8) -> [u8; 32] {
     let mut hash = [0u8; 32];

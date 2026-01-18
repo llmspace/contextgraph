@@ -308,80 +308,6 @@ pub fn find_coactivated_pairs(
     pairs
 }
 
-/// Apply Kuramoto coupling for neural synchronization.
-///
-/// Formula: d(theta_i)/dt = omega_i + (K/N) * sum_j(sin(theta_j - theta_i))
-///
-/// Constitution: coupling_strength K = 0.9 during NREM (NOT 10.0)
-///
-/// # Arguments
-/// * `phases` - Current phase values (theta) for each node
-/// * `coupling_strength` - Kuramoto K parameter (0.9 per constitution)
-/// * `dt` - Time step
-///
-/// # Returns
-/// Updated phase values
-pub fn kuramoto_coupling(
-    phases: &HashMap<Uuid, f32>,
-    coupling_strength: f32,
-    dt: f32,
-) -> HashMap<Uuid, f32> {
-    let n = phases.len() as f32;
-    if n < 2.0 {
-        return phases.clone();
-    }
-
-    let mut new_phases = HashMap::new();
-
-    for (node_i, &theta_i) in phases {
-        let coupling_sum: f32 = phases
-            .values()
-            .map(|&theta_j| (theta_j - theta_i).sin())
-            .sum();
-
-        let d_theta = (coupling_strength / n) * coupling_sum;
-        let new_theta = theta_i + d_theta * dt;
-
-        // Wrap to [0, 2*PI]
-        let two_pi = 2.0 * std::f32::consts::PI;
-        let wrapped = new_theta % two_pi;
-        new_phases.insert(
-            *node_i,
-            if wrapped < 0.0 {
-                wrapped + two_pi
-            } else {
-                wrapped
-            },
-        );
-    }
-
-    new_phases
-}
-
-/// Compute Kuramoto order parameter (synchronization measure).
-///
-/// r = |1/N * sum_j(e^(i*theta_j))|
-///
-/// Returns value in [0, 1]:
-/// - 0 = completely desynchronized
-/// - 1 = perfectly synchronized
-pub fn kuramoto_order_parameter(phases: &HashMap<Uuid, f32>) -> f32 {
-    if phases.is_empty() {
-        return 0.0;
-    }
-
-    let n = phases.len() as f32;
-    let (sum_cos, sum_sin): (f32, f32) = phases
-        .values()
-        .map(|&theta| (theta.cos(), theta.sin()))
-        .fold((0.0, 0.0), |(sc, ss), (c, s)| (sc + c, ss + s));
-
-    let mean_cos = sum_cos / n;
-    let mean_sin = sum_sin / n;
-
-    (mean_cos * mean_cos + mean_sin * mean_sin).sqrt()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -397,7 +323,6 @@ mod tests {
         assert_eq!(engine.config().weight_decay, 0.001);
         assert_eq!(engine.config().weight_floor, 0.05);
         assert_eq!(engine.config().weight_cap, 1.0);
-        assert_eq!(engine.config().coupling_strength, 0.9);
     }
 
     #[test]
@@ -570,80 +495,8 @@ mod tests {
     }
 
     // ============================================================
-    // Kuramoto Tests
-    // ============================================================
-
-    #[test]
-    fn test_kuramoto_order_parameter_synchronized() {
-        let mut phases = HashMap::new();
-        phases.insert(Uuid::new_v4(), 0.0);
-        phases.insert(Uuid::new_v4(), 0.0);
-        phases.insert(Uuid::new_v4(), 0.0);
-
-        let r = kuramoto_order_parameter(&phases);
-        assert!((r - 1.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_kuramoto_order_parameter_desynchronized() {
-        let mut phases = HashMap::new();
-        let pi = std::f32::consts::PI;
-
-        phases.insert(Uuid::new_v4(), 0.0);
-        phases.insert(Uuid::new_v4(), 2.0 * pi / 3.0);
-        phases.insert(Uuid::new_v4(), 4.0 * pi / 3.0);
-
-        let r = kuramoto_order_parameter(&phases);
-        assert!(r < 0.1, "Evenly spaced phases should be desynchronized");
-    }
-
-    #[test]
-    fn test_kuramoto_coupling_convergence() {
-        let mut phases = HashMap::new();
-        let id1 = Uuid::new_v4();
-        let id2 = Uuid::new_v4();
-
-        phases.insert(id1, 0.0);
-        phases.insert(id2, 1.0);
-
-        let initial_r = kuramoto_order_parameter(&phases);
-
-        // Apply coupling iterations
-        let mut current = phases;
-        for _ in 0..100 {
-            current = kuramoto_coupling(&current, 0.9, 0.01); // Use constitution K=0.9
-        }
-
-        let final_r = kuramoto_order_parameter(&current);
-
-        assert!(
-            final_r > initial_r,
-            "Coupling should increase synchronization"
-        );
-    }
-
-    // ============================================================
     // Edge Case Tests
     // ============================================================
-
-    #[test]
-    fn test_kuramoto_single_node() {
-        let mut phases = HashMap::new();
-        let id = Uuid::new_v4();
-        phases.insert(id, 1.5);
-
-        let result = kuramoto_coupling(&phases, 0.9, 0.01);
-        assert_eq!(result.len(), 1);
-        // Single node should be unchanged (coupling sum is 0)
-        assert!((result[&id] - 1.5).abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_kuramoto_empty() {
-        let phases = HashMap::new();
-        let r = kuramoto_order_parameter(&phases);
-        assert_eq!(r, 0.0);
-    }
 
     #[test]
     fn test_select_replay_memories_limit_zero() {

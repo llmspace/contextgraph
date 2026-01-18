@@ -3,9 +3,6 @@
 //! Defines the data structures for computing and representing alignment scores
 //! across the goal hierarchy levels (Strategic, Tactical, Immediate).
 //!
-//! TASK-P0-001: Removed NorthStar level per ARCH-03 (autonomous operation).
-//! Strategic is now the top level.
-//!
 //! From constitution.yaml thresholds:
 //! - Optimal: θ ≥ 0.75
 //! - Acceptable: θ ∈ [0.70, 0.75)
@@ -20,8 +17,7 @@ use crate::types::fingerprint::AlignmentThreshold;
 
 /// Level-based weights for computing composite alignment score.
 ///
-/// TASK-P0-001: Removed north_star field. Weights redistributed:
-/// - strategic: 0.5 (highest influence, was NorthStar + Strategic)
+/// - strategic: 0.5 (highest influence, top-level)
 /// - tactical: 0.3
 /// - immediate: 0.2
 ///
@@ -146,8 +142,6 @@ impl GoalScore {
 /// - Per-level breakdown
 /// - Individual goal scores
 /// - Misalignment flags
-///
-/// TASK-P0-001: Removed north_star_alignment field per ARCH-03.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoalAlignmentScore {
     /// Weighted composite alignment score [0.0, 1.0]
@@ -184,7 +178,6 @@ impl GoalAlignmentScore {
     /// Create a new GoalAlignmentScore from individual goal scores.
     ///
     /// Computes composite score and aggregates per-level averages.
-    /// TASK-P0-001: Removed NorthStar level, now only 3 levels.
     pub fn compute(goal_scores: Vec<GoalScore>, weights: LevelWeights) -> Self {
         // Separate scores by level
         let mut strategic_scores: Vec<f32> = Vec::new();

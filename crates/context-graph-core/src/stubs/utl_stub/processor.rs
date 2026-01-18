@@ -165,7 +165,7 @@ impl UtlProcessor for StubUtlProcessor {
         // Check if we have vectors for real alignment computation
         if let (Some(input_emb), Some(goal_vec)) = (&context.input_embedding, &context.goal_vector)
         {
-            // Real alignment: cosine similarity to goal/North Star vector
+            // Real alignment: cosine similarity to goal/Strategic goal vector
             let alignment = cosine_similarity(input_emb, goal_vec);
             return Ok(alignment.clamp(-1.0, 1.0));
         }
@@ -207,7 +207,7 @@ impl UtlProcessor for StubUtlProcessor {
             "entropy": 0.0,
             "coherence": 0.0,
             "learning_score": 0.0,
-            "johari_quadrant": "Hidden",
+            "classification": "Hidden",
             "consolidation_phase": "Wake",
             "phase_angle": 0.0,
             "computation_mode": "real",  // Indicates real UTL, not stub

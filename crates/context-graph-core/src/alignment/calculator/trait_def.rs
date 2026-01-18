@@ -24,7 +24,7 @@ pub trait GoalAlignmentCalculator: Send + Sync {
     ///
     /// # Errors
     /// Returns error if:
-    /// - No North Star goal in hierarchy
+    /// - No top-level goals in hierarchy
     /// - Fingerprint is empty
     /// - Computation times out
     async fn compute_alignment(

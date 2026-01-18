@@ -13,7 +13,7 @@ use crate::autonomous::thresholds::AdaptiveThresholdConfig;
 pub struct AutonomousConfig {
     /// Enable autonomous mode
     pub enabled: bool,
-    /// Bootstrap configuration for initial North Star setup
+    /// Bootstrap configuration for initial setup
     pub bootstrap: BootstrapConfig,
     /// Adaptive threshold learning configuration
     pub thresholds: AdaptiveThresholdConfig,

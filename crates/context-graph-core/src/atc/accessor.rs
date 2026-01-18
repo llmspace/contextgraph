@@ -5,7 +5,7 @@
 
 use super::{AdaptiveThresholdCalibration, Domain};
 
-/// All threshold names supported by the system (20 thresholds).
+/// All threshold names supported by the system (19 thresholds).
 pub const THRESHOLD_NAMES: &[&str] = &[
     // Existing fields (5 behavioral thresholds, excluding confidence_bias)
     "theta_opt",
@@ -25,9 +25,8 @@ pub const THRESHOLD_NAMES: &[&str] = &[
     "theta_dream_activity",
     "theta_semantic_leap",
     "theta_shortcut_conf",
-    // Classification thresholds (2)
-    "theta_johari",
-    "theta_blind_spot",
+    // Classification thresholds (1)
+    "theta_classification",
     // Autonomous thresholds (4)
     "theta_obsolescence_low",
     "theta_obsolescence_high",
@@ -77,8 +76,7 @@ impl ThresholdAccessor for AdaptiveThresholdCalibration {
             "theta_semantic_leap" => thresholds.theta_semantic_leap,
             "theta_shortcut_conf" => thresholds.theta_shortcut_conf,
             // Classification thresholds
-            "theta_johari" => thresholds.theta_johari,
-            "theta_blind_spot" => thresholds.theta_blind_spot,
+            "theta_classification" => thresholds.theta_classification,
             // Autonomous thresholds
             "theta_obsolescence_low" => thresholds.theta_obsolescence_low,
             "theta_obsolescence_high" => thresholds.theta_obsolescence_high,
@@ -165,8 +163,8 @@ mod tests {
         let names = AdaptiveThresholdCalibration::list_threshold_names();
         assert_eq!(
             names.len(),
-            20,
-            "Expected 20 threshold names, got {}",
+            19,
+            "Expected 19 threshold names, got {}",
             names.len()
         );
         assert!(names.contains(&"theta_opt"));

@@ -54,7 +54,7 @@ fn create_verifiable_handlers() -> (
     let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
         Arc::new(DefaultAlignmentCalculator::new());
 
-    // Create goal hierarchy with North Star and sub-goals
+    // Create goal hierarchy with Strategic goals and sub-goals
     let hierarchy = create_full_test_hierarchy();
     let shared_hierarchy = Arc::new(RwLock::new(hierarchy));
 
@@ -70,8 +70,8 @@ fn create_verifiable_handlers() -> (
     (handlers, store, shared_hierarchy)
 }
 
-/// Create test handlers WITHOUT a North Star (for testing error cases).
-fn create_verifiable_handlers_no_north_star() -> (
+/// Create test handlers WITHOUT top-level goals (for testing error cases).
+fn create_verifiable_handlers_empty_hierarchy() -> (
     Handlers,
     Arc<InMemoryTeleologicalStore>,
     Arc<RwLock<GoalHierarchy>>,
@@ -83,7 +83,7 @@ fn create_verifiable_handlers_no_north_star() -> (
     let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
         Arc::new(DefaultAlignmentCalculator::new());
 
-    // Empty hierarchy - no North Star
+    // Empty hierarchy - no top-level goals
     let hierarchy = GoalHierarchy::new();
     let shared_hierarchy = Arc::new(RwLock::new(hierarchy));
 
@@ -168,7 +168,7 @@ fn create_full_test_hierarchy() -> GoalHierarchy {
 
 /// FULL STATE VERIFICATION: End-to-end purpose verification with direct inspection.
 ///
-/// TASK-CORE-001: Updated to remove deprecated north_star_alignment step per ARCH-03.
+/// TASK-CORE-001: Updated to remove deprecated alignment step per ARCH-03.
 /// TASK-P0-001: Updated for 3-level hierarchy (Strategic → Tactical → Immediate)
 ///
 /// This test:
@@ -179,7 +179,7 @@ fn create_full_test_hierarchy() -> GoalHierarchy {
 /// 5. AFTER STATE: Verify all data in Source of Truth
 /// 6. EVIDENCE: Print actual fingerprint data
 ///
-/// NOTE: purpose/north_star_alignment removed per ARCH-03 (autonomous-first).
+/// NOTE: Manual purpose alignment removed per ARCH-03 (autonomous-first).
 /// Manual alignment used single 1024D embeddings incompatible with 13-embedder arrays.
 #[tokio::test]
 async fn test_full_state_verification_store_alignment_drift_cycle() {
@@ -288,9 +288,9 @@ async fn test_full_state_verification_store_alignment_drift_cycle() {
     let fp_alignment = retrieved_fp.alignment_score;
     println!("   ✓ VERIFIED: Fingerprint exists in Source of Truth with correct data\n");
 
-    // NOTE: purpose/north_star_alignment REMOVED per TASK-CORE-001 (ARCH-03)
+    // NOTE: Manual purpose alignment REMOVED per TASK-CORE-001 (ARCH-03)
     // Manual alignment used single 1024D embeddings incompatible with 13-embedder arrays.
-    // Use auto_bootstrap_north_star tool for autonomous goal discovery instead.
+    // Use auto_bootstrap tool for autonomous goal discovery instead.
 
     // =========================================================================
     // STEP 4: DRIFT CHECK - Execute purpose/drift_check
@@ -392,7 +392,7 @@ async fn test_full_state_verification_store_alignment_drift_cycle() {
         drift_level.unwrap_or("?")
     );
     println!();
-    println!("NOTE: purpose/north_star_alignment removed per TASK-CORE-001 (ARCH-03)");
+    println!("NOTE: Manual purpose alignment removed per TASK-CORE-001 (ARCH-03)");
     println!();
     println!("Physical Evidence:");
     println!("  - Fingerprint UUID: {}", fingerprint_id);
@@ -480,7 +480,7 @@ async fn test_full_state_verification_goal_hierarchy_navigation() {
     // =========================================================================
     // STEP 3: Execute get_children and verify
     // =========================================================================
-    // TASK-P0-001: Extract a Strategic goal ID (top-level) instead of NorthStar
+    // TASK-P0-001: Extract a Strategic goal ID (top-level)
     let strategic_id = goals
         .iter()
         .find(|g| g.get("level").and_then(|v| v.as_str()) == Some("Strategic"))
@@ -566,7 +566,7 @@ async fn test_full_state_verification_goal_hierarchy_navigation() {
         .first()
         .expect("Must have immediate goal")
         .id;
-    // TASK-P0-001: Renamed from path_to_north_star to path_to_root
+    // TASK-P0-001: Uses path_to_root for ancestor traversal
     let direct_path = hierarchy_guard.path_to_root(&immediate_goal_id);
     println!("   Direct path length: {}", direct_path.len());
 
@@ -669,36 +669,36 @@ async fn test_edge_case_purpose_query_12_elements() {
 }
 
 // =============================================================================
-// EDGE CASE 2: Autonomous Operation Without North Star
+// EDGE CASE 2: Autonomous Operation Without Top-Level Goals
 // =============================================================================
 
-/// EDGE CASE: Store operation works autonomously without North Star.
+/// EDGE CASE: Store operation works autonomously without top-level goals.
 ///
 /// TASK-CORE-001: Updated to verify deprecated methods return METHOD_NOT_FOUND.
 ///
 /// AUTONOMOUS OPERATION: Per contextprd.md, the 13-embedding array IS the
 /// teleological vector. Memory storage uses default purpose vector [0.0; 13]
-/// when no North Star is configured, enabling autonomous operation.
+/// when no top-level goals are configured, enabling autonomous operation.
 #[tokio::test]
-async fn test_edge_case_autonomous_operation_no_north_star() {
+async fn test_edge_case_autonomous_operation_empty_hierarchy() {
     println!("\n======================================================================");
-    println!("EDGE CASE 2: Autonomous Operation Without North Star");
+    println!("EDGE CASE 2: Autonomous Operation Without Top-Level Goals");
     println!("======================================================================\n");
 
-    let (handlers, _store, hierarchy) = create_verifiable_handlers_no_north_star();
+    let (handlers, _store, hierarchy) = create_verifiable_handlers_empty_hierarchy();
 
     // BEFORE STATE
     println!("📊 BEFORE STATE:");
     println!(
-        "   Has North Star: {}",
+        "   Has top-level goals: {}",
         hierarchy.read().has_top_level_goals()
     );
     assert!(
         !hierarchy.read().has_top_level_goals(),
-        "Must NOT have North Star"
+        "Must NOT have top-level goals"
     );
 
-    // Store fingerprint - should SUCCEED without North Star (AUTONOMOUS OPERATION)
+    // Store fingerprint - should SUCCEED without top-level goals (AUTONOMOUS OPERATION)
     println!("\n📝 ATTEMPTING: memory/store (should succeed - autonomous operation)");
     let store_params = json!({
         "content": "Test content for autonomous alignment",
@@ -714,7 +714,7 @@ async fn test_edge_case_autonomous_operation_no_north_star() {
     // Verify store succeeds with default purpose vector
     assert!(
         store_response.error.is_none(),
-        "Store MUST succeed without North Star (AUTONOMOUS OPERATION). Error: {:?}",
+        "Store MUST succeed without top-level goals (AUTONOMOUS OPERATION). Error: {:?}",
         store_response.error
     );
     let result = store_response.result.expect("Should have result");
@@ -724,12 +724,12 @@ async fn test_edge_case_autonomous_operation_no_north_star() {
     println!("   SUCCESS: fingerprintId={}", fingerprint_id);
 
     // TASK-CORE-001: Verify deprecated method returns METHOD_NOT_FOUND
-    println!("\n📝 VERIFYING: purpose/north_star_alignment returns METHOD_NOT_FOUND");
+    println!("\n📝 VERIFYING: deprecated alignment method returns METHOD_NOT_FOUND");
     let align_params = json!({
         "fingerprint_id": "00000000-0000-0000-0000-000000000001"
     });
     let align_request = make_request(
-        "purpose/north_star_alignment",
+        "purpose/deprecated_alignment",
         Some(JsonRpcId::Number(2)),
         Some(align_params),
     );
@@ -808,43 +808,43 @@ async fn test_edge_case_goal_not_found() {
 }
 
 // =============================================================================
-// EDGE CASE 4: North Star Update Returns METHOD_NOT_FOUND (TASK-CORE-001)
+// EDGE CASE 4: Deprecated Update Method Returns METHOD_NOT_FOUND (TASK-CORE-001)
 // =============================================================================
 
-/// EDGE CASE: purpose/north_star_update is deprecated and returns METHOD_NOT_FOUND.
+/// EDGE CASE: Deprecated purpose update method returns METHOD_NOT_FOUND.
 ///
-/// TASK-CORE-001: Manual North Star update removed per ARCH-03 (autonomous-first).
-/// Goals emerge autonomously via auto_bootstrap_north_star tool.
+/// TASK-CORE-001: Manual goal update removed per ARCH-03 (autonomous-first).
+/// Goals emerge autonomously via auto_bootstrap tool.
 #[tokio::test]
-async fn test_edge_case_north_star_update_returns_method_not_found() {
+async fn test_edge_case_deprecated_update_returns_method_not_found() {
     println!("\n======================================================================");
-    println!("EDGE CASE 4: North Star Update Returns METHOD_NOT_FOUND (TASK-CORE-001)");
+    println!("EDGE CASE 4: Deprecated Update Returns METHOD_NOT_FOUND (TASK-CORE-001)");
     println!("======================================================================\n");
 
     let (handlers, _store, hierarchy) = create_verifiable_handlers();
 
     // BEFORE STATE
     println!("📊 BEFORE STATE:");
-    let has_ns = hierarchy.read().has_top_level_goals();
-    println!("   Has North Star: {}", has_ns);
-    assert!(has_ns, "Must already have North Star");
+    let has_top_level = hierarchy.read().has_top_level_goals();
+    println!("   Has top-level goals: {}", has_top_level);
+    assert!(has_top_level, "Must already have top-level goals");
 
-    let existing_ns_id = hierarchy
+    let existing_goal_id = hierarchy
         .read()
         .top_level_goals()
         .first()
         .map(|g| g.id.to_string())
-        .expect("Must have NS");
-    println!("   Existing North Star ID: {}", existing_ns_id);
+        .expect("Must have top-level goal");
+    println!("   Existing top-level goal ID: {}", existing_goal_id);
 
     // ACTION: Try to call deprecated method
-    println!("\n📝 ACTION: purpose/north_star_update (deprecated per TASK-CORE-001)");
+    println!("\n📝 ACTION: Calling deprecated update method (per TASK-CORE-001)");
     let update_params = json!({
-        "description": "New competing North Star",
+        "description": "New competing goal",
         "replace": false
     });
     let update_request = make_request(
-        "purpose/north_star_update",
+        "purpose/deprecated_update",
         Some(JsonRpcId::Number(1)),
         Some(update_params),
     );
@@ -863,16 +863,16 @@ async fn test_edge_case_north_star_update_returns_method_not_found() {
         "Must return METHOD_NOT_FOUND (-32601) for deprecated method"
     );
 
-    // AFTER STATE - original North Star unchanged
-    let after_ns_id = hierarchy
+    // AFTER STATE - original goal unchanged
+    let after_goal_id = hierarchy
         .read()
         .top_level_goals()
         .first()
         .map(|g| g.id.to_string())
-        .expect("Must still have NS");
+        .expect("Must still have top-level goal");
     assert_eq!(
-        after_ns_id, existing_ns_id,
-        "North Star must remain unchanged"
+        after_goal_id, existing_goal_id,
+        "Top-level goal must remain unchanged"
     );
 
     println!("\n✓ VERIFIED: Deprecated method returns METHOD_NOT_FOUND, hierarchy unchanged\n");

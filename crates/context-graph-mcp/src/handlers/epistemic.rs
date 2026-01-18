@@ -1,7 +1,7 @@
 //! Epistemic Action MCP Handler (TASK-MCP-002)
 //!
 //! Implements epistemic_action tool for GWT workspace belief management.
-//! Constitution: utl.johari.Unknown -> EpistemicAction
+//! Constitution: Triggered when high entropy + high coherence indicates uncertainty.
 //!
 //! ## Actions
 //! - assert: Add belief to workspace
@@ -629,9 +629,9 @@ mod tests {
     fn test_full_input_with_context() {
         let json = r#"{
             "action_type": "hypothesize",
-            "target": "IC < 0.5 triggers dream consolidation",
+            "target": "entropy > 0.7 triggers dream consolidation",
             "confidence": 0.85,
-            "rationale": "Constitution gwt.self_ego_node.thresholds.critical",
+            "rationale": "Constitution dream.trigger.conditions",
             "context": {
                 "source_nodes": ["550e8400-e29b-41d4-a716-446655440000"],
                 "uncertainty_type": "epistemic"

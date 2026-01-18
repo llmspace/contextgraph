@@ -4,13 +4,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::alignment::DefaultAlignmentCalculator;
-use crate::johari::DefaultJohariManager;
 use crate::purpose::{DiscoveryMethod, GoalDiscoveryMetadata, GoalHierarchy, GoalLevel, GoalNode};
 use crate::retrieval::teleological_result::AlignmentLevel;
 use crate::retrieval::InMemoryMultiEmbeddingExecutor;
 use crate::stubs::{InMemoryTeleologicalStore, StubMultiArrayProvider};
 use crate::types::fingerprint::SemanticFingerprint;
-use crate::types::JohariQuadrant;
 
 use super::super::teleological_query::TeleologicalQuery;
 use super::{DefaultTeleologicalPipeline, PipelineHealth, TeleologicalRetrievalPipeline};
@@ -76,13 +74,12 @@ fn create_test_hierarchy() -> GoalHierarchy {
 async fn create_test_pipeline() -> DefaultTeleologicalPipeline<
     InMemoryMultiEmbeddingExecutor,
     DefaultAlignmentCalculator,
-    DefaultJohariManager<InMemoryTeleologicalStore>,
     InMemoryTeleologicalStore,
 > {
     let store = InMemoryTeleologicalStore::new();
     let provider = StubMultiArrayProvider::new();
 
-    // Store needs to be Arc-wrapped for sharing between executor, johari_manager, and pipeline
+    // Store needs to be Arc-wrapped for sharing between executor and pipeline
     let store_arc = Arc::new(store);
 
     let executor = Arc::new(InMemoryMultiEmbeddingExecutor::with_arcs(
@@ -91,16 +88,9 @@ async fn create_test_pipeline() -> DefaultTeleologicalPipeline<
     ));
 
     let alignment_calc = Arc::new(DefaultAlignmentCalculator::new());
-    let johari_manager = Arc::new(DefaultJohariManager::new(store_arc.clone()));
     let hierarchy = create_test_hierarchy();
 
-    DefaultTeleologicalPipeline::new(
-        executor,
-        alignment_calc,
-        johari_manager,
-        store_arc,
-        hierarchy,
-    )
+    DefaultTeleologicalPipeline::new(executor, alignment_calc, store_arc, hierarchy)
 }
 
 #[tokio::test]
@@ -163,25 +153,6 @@ async fn test_execute_fails_empty_query() {
         }
         _ => panic!("Expected ValidationError"),
     }
-}
-
-#[tokio::test]
-async fn test_execute_with_johari_filter() {
-    let pipeline = create_test_pipeline().await;
-
-    let query = TeleologicalQuery::from_text("test")
-        .with_johari_filter(vec![JohariQuadrant::Open, JohariQuadrant::Blind]);
-
-    let result = pipeline.execute(&query).await.unwrap();
-
-    // All results should be in Open or Blind quadrant
-    for r in &result.results {
-        assert!(
-            r.johari_quadrant == JohariQuadrant::Open || r.johari_quadrant == JohariQuadrant::Blind
-        );
-    }
-
-    println!("[VERIFIED] Johari filter is applied");
 }
 
 #[tokio::test]

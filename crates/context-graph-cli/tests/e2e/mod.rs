@@ -4,7 +4,7 @@
 //! - **Integration tests**: Directly invoke CLI binary via std::process::Command
 //! - **E2E tests**: Execute ACTUAL SHELL SCRIPTS that then invoke CLI binary
 //!
-//! E2E tests verify the complete Claude Code → Shell Script → CLI → MCP → Database flow.
+//! E2E tests verify the complete Claude Code -> Shell Script -> CLI -> MCP -> Database flow.
 //!
 //! # NO MOCKS - Real Components Only
 //! - Real shell scripts (.claude/hooks/*.sh)
@@ -13,7 +13,6 @@
 //!
 //! # Test Categories
 //! - `full_session_test`: Complete session workflow via shell scripts
-//! - `identity_continuity_test`: Cross-session identity restoration via shell scripts
 //! - `error_recovery_test`: Error handling and exit codes from shell scripts
 //!
 //! # Running Tests
@@ -38,4 +37,3 @@
 pub mod error_recovery_test;
 pub mod full_session_test;
 pub mod helpers;
-pub mod identity_continuity_test;

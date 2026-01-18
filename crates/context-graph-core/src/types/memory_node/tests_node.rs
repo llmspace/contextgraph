@@ -165,7 +165,6 @@ fn test_memory_node_has_all_required_fields() {
     let _id: NodeId = node.id;
     let _content: &String = &node.content;
     let _embedding: &EmbeddingVector = &node.embedding;
-    let _quadrant: &crate::types::JohariQuadrant = &node.quadrant;
     let _importance: f32 = node.importance;
     let _valence: f32 = node.emotional_valence;
     let _created: chrono::DateTime<chrono::Utc> = node.created_at;
@@ -182,7 +181,6 @@ fn test_memory_node_new_defaults() {
     assert_eq!(node.importance, 0.5);
     assert_eq!(node.emotional_valence, 0.0);
     assert_eq!(node.access_count, 0);
-    assert_eq!(node.quadrant, crate::types::JohariQuadrant::default());
 }
 
 #[test]
@@ -201,15 +199,6 @@ fn test_memory_node_emotional_valence_range() {
     // Test neutral
     node.emotional_valence = 0.0;
     assert_eq!(node.emotional_valence, 0.0);
-}
-
-#[test]
-fn test_memory_node_quadrant_field() {
-    let embedding = vec![0.1; 1536];
-    let mut node = MemoryNode::new("test".to_string(), embedding);
-
-    node.quadrant = crate::types::JohariQuadrant::Blind;
-    assert_eq!(node.quadrant, crate::types::JohariQuadrant::Blind);
 }
 
 #[test]

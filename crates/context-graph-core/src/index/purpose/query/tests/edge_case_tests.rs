@@ -4,22 +4,6 @@ use uuid::Uuid;
 
 use super::helpers::create_purpose_vector;
 use crate::index::purpose::query::{PurposeQuery, PurposeQueryTarget};
-use crate::types::JohariQuadrant;
-
-#[test]
-fn test_all_quadrant_filters() {
-    let pv = create_purpose_vector(0.5);
-
-    for quadrant in JohariQuadrant::all() {
-        let query = PurposeQuery::new(PurposeQueryTarget::Vector(pv.clone()), 10, 0.5)
-            .unwrap()
-            .with_quadrant_filter(quadrant);
-
-        assert_eq!(query.quadrant_filter.unwrap(), quadrant);
-    }
-
-    println!("[VERIFIED] PurposeQuery works with all JohariQuadrant variants");
-}
 
 #[test]
 fn test_query_with_from_memory_target() {

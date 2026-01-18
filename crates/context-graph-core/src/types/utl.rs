@@ -89,7 +89,7 @@ pub struct UtlContext {
     /// Emotional state modifier
     pub emotional_state: EmotionalState,
 
-    /// Goal alignment vector (North Star)
+    /// Goal alignment vector (Strategic goals)
     pub goal_vector: Option<Vec<f32>>,
 
     /// Input embedding for real UTL computation

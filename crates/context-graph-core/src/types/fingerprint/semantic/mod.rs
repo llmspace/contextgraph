@@ -15,7 +15,6 @@
 //!
 //! **NO FUSION**: Each embedding space is preserved independently for:
 //! - Per-space HNSW search (13x independent indexes)
-//! - Per-space Johari quadrant classification
 //! - Per-space teleological alignment computation
 //! - 100% information preservation
 //!

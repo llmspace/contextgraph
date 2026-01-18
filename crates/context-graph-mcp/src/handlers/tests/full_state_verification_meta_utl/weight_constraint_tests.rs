@@ -6,7 +6,7 @@
 //! - Min weight >= 0.05 (soft constraint, may be violated in extreme distributions)
 //! - Bayesian escalation trigger after 10 consecutive low accuracy cycles
 
-use context_graph_core::johari::NUM_EMBEDDERS;
+use context_graph_core::teleological::NUM_EMBEDDERS;
 
 use crate::handlers::core::MetaUtlTracker;
 

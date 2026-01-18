@@ -8,8 +8,6 @@
 mod common;
 
 mod comprehensive_summary;
-mod gwt_consciousness_tests;
-mod johari_tests;
 mod memory_tests;
 mod purpose_utl_tests;
 mod search_tests;

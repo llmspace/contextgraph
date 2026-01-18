@@ -113,7 +113,6 @@ impl UtlStatus {
             entropy: self.metrics.avg_delta_s,
             coherence: self.metrics.avg_delta_c,
             learning_score: self.metrics.avg_learning_magnitude,
-            johari_quadrant: format!("{:?}", self.metrics.dominant_quadrant()),
             consolidation_phase: format!("{:?}", self.consolidation_phase),
             phase_angle: self.phase_angle,
             thresholds: ThresholdsResponse::from(&self.current_thresholds),
@@ -138,9 +137,6 @@ pub struct UtlStatusResponse {
 
     /// Average learning score
     pub learning_score: f32,
-
-    /// Dominant Johari quadrant name
-    pub johari_quadrant: String,
 
     /// Current consolidation phase name
     pub consolidation_phase: String,

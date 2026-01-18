@@ -10,8 +10,7 @@
 //! - Stored atomically with fingerprint in RocksDB
 //! - Indexed for O(log n) purpose-based search
 //!
-//! TASK-P0-004: Updated terminology from "North Star" to "Strategic" after v6.0.0 migration.
-//! GoalLevel::Strategic is now the top-level goal (replaces removed NorthStar level).
+//! TASK-P0-004: Updated terminology. GoalLevel::Strategic is now the top-level goal.
 
 use context_graph_core::purpose::{
     DefaultPurposeComputer, GoalDiscoveryMetadata, GoalHierarchy, GoalLevel, GoalNode,
@@ -52,14 +51,14 @@ async fn test_purpose_vector_structure() {
 }
 
 /// Test that purpose vectors are computed correctly from semantic fingerprints.
-/// TASK-P0-004: Updated test to use "strategic_goal" naming (replaces "north_star").
+/// TASK-P0-004: Uses "strategic_goal" naming for top-level goal.
 #[tokio::test]
 async fn test_purpose_computation_with_real_goal_hierarchy() {
     // Create a real goal hierarchy with strategic goal (top-level)
     let mut hierarchy = GoalHierarchy::new();
     let discovery = GoalDiscoveryMetadata::bootstrap();
 
-    // TASK-P0-004: Renamed from north_star to strategic_goal after v6.0.0 migration.
+    // TASK-P0-004: Uses strategic_goal as top-level goal type.
     // GoalLevel::Strategic is now the top-level goal type.
     let strategic_goal = GoalNode::autonomous_goal(
         "Master semantic understanding".into(),
@@ -153,7 +152,6 @@ fn test_multiple_purpose_vectors() {
         let fp = TeleologicalFingerprint::new(
             semantic,
             purpose_vector,
-            Default::default(),
             [i as u8; 32],
         );
 
@@ -182,7 +180,7 @@ fn test_multiple_purpose_vectors() {
 }
 
 /// Test that purpose vectors fail fast if strategic goal is missing.
-/// TASK-P0-004: Renamed test from "north_star" to "strategic_goal" after v6.0.0 migration.
+/// TASK-P0-004: Test verifies purpose computation fails without strategic goal.
 #[tokio::test]
 async fn test_purpose_computation_fails_without_strategic_goal() {
     let empty_hierarchy = GoalHierarchy::new(); // No strategic goal

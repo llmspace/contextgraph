@@ -3,7 +3,7 @@
 //! Delegates to existing methods while providing trait abstraction.
 
 use context_graph_core::marblestone::EdgeType;
-use context_graph_core::types::{EmbeddingVector, GraphEdge, JohariQuadrant, MemoryNode, NodeId};
+use context_graph_core::types::{EmbeddingVector, GraphEdge, MemoryNode, NodeId};
 
 use crate::column_families::cf_names;
 use crate::memex::{Memex, StorageHealth};
@@ -48,15 +48,6 @@ impl Memex for RocksDbMemex {
 
     fn get_edges_to(&self, target_id: &NodeId) -> Result<Vec<GraphEdge>, StorageError> {
         RocksDbMemex::get_edges_to(self, target_id)
-    }
-
-    fn query_by_quadrant(
-        &self,
-        quadrant: JohariQuadrant,
-        limit: Option<usize>,
-    ) -> Result<Vec<NodeId>, StorageError> {
-        // Delegate to index_ops with offset=0
-        self.get_nodes_by_quadrant(quadrant, limit, 0)
     }
 
     fn query_by_tag(&self, tag: &str, limit: Option<usize>) -> Result<Vec<NodeId>, StorageError> {
@@ -333,26 +324,6 @@ mod tests {
     // ========== QUERY OPERATIONS VIA TRAIT ==========
 
     #[test]
-    fn test_memex_query_by_quadrant() {
-        let (db, _tmp) = create_test_db();
-        let memex: &dyn Memex = &db;
-
-        let mut node = create_test_node();
-        node.quadrant = JohariQuadrant::Open;
-        memex.store_node(&node).expect("store");
-
-        println!("=== MEMEX QUERY_BY_QUADRANT TEST ===");
-
-        let open_nodes = memex
-            .query_by_quadrant(JohariQuadrant::Open, Some(10))
-            .expect("query via Memex");
-
-        println!("RESULT: Found {} nodes in Open quadrant", open_nodes.len());
-        assert!(open_nodes.contains(&node.id));
-        println!("RESULT: PASS - query_by_quadrant works via Memex trait");
-    }
-
-    #[test]
     fn test_memex_query_by_tag() {
         let (db, _tmp) = create_test_db();
         let memex: &dyn Memex = &db;
@@ -449,25 +420,6 @@ mod tests {
         println!("RESULT: nodes.len() = {}", nodes.len());
         assert!(nodes.is_empty());
         println!("RESULT: PASS - Empty results return Ok(Vec::new())");
-    }
-
-    #[test]
-    fn edge_case_limit_zero() {
-        let (db, _tmp) = create_test_db();
-        let memex: &dyn Memex = &db;
-
-        let node = create_test_node();
-        memex.store_node(&node).expect("store");
-
-        println!("=== EDGE CASE: limit = Some(0) ===");
-
-        let nodes = memex
-            .query_by_quadrant(JohariQuadrant::Unknown, Some(0))
-            .expect("query should succeed");
-
-        println!("RESULT: nodes.len() = {}", nodes.len());
-        assert!(nodes.is_empty());
-        println!("RESULT: PASS - limit=0 returns empty Vec");
     }
 
     // ========== THREAD SAFETY VERIFICATION ==========

@@ -35,8 +35,7 @@ pub struct PipelineHealth {
 /// Trait for teleological retrieval pipeline execution.
 ///
 /// Implementations must coordinate the 5-stage retrieval process and
-/// integrate teleological filtering (purpose alignment, goal hierarchy,
-/// Johari quadrants).
+/// integrate teleological filtering (purpose alignment, goal hierarchy).
 ///
 /// # Performance Requirements
 ///

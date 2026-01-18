@@ -14,7 +14,7 @@ use crate::types::fingerprint::PurposeVector;
 /// TeleologicalVector: Complete fused representation of a memory's teleological signature.
 ///
 /// Combines:
-/// - Purpose Vector (13D alignment to North Star)
+/// - Purpose Vector (13D alignment to Strategic goals)
 /// - Cross-correlations (78 unique embedding pair interactions)
 /// - Group alignments (6D hierarchical aggregation)
 /// - Optional Tucker core for compressed tensor representation
@@ -22,7 +22,7 @@ use crate::types::fingerprint::PurposeVector;
 /// From teleoplan.md: "TELEOLOGICAL VECTOR = 13 perspectives x 1024 dimensions"
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TeleologicalVector {
-    /// 13D purpose vector: alignment of each embedding to North Star
+    /// 13D purpose vector: alignment of each embedding to Strategic goals
     pub purpose_vector: PurposeVector,
 
     /// 78 cross-correlations: synergy-weighted interactions between embedding pairs

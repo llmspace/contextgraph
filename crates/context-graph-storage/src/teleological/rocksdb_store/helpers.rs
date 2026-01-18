@@ -1,30 +1,8 @@
 //! Helper functions for RocksDbTeleologicalStore.
 //!
-//! Contains utility functions for computing similarity, purpose alignment,
-//! and Johari quadrant analysis.
+//! Contains utility functions for computing similarity and purpose alignment.
 
-use context_graph_core::types::fingerprint::{JohariFingerprint, PurposeVector, NUM_EMBEDDERS};
-
-/// Get the aggregate dominant quadrant across all 13 embedders.
-///
-/// Aggregates quadrant weights across all embedders and returns the index
-/// of the dominant quadrant (0=Open, 1=Hidden, 2=Blind, 3=Unknown).
-pub fn get_aggregate_dominant_quadrant(johari: &JohariFingerprint) -> usize {
-    let mut totals = [0.0_f32; 4];
-    for quadrant in johari.quadrants.iter().take(NUM_EMBEDDERS) {
-        for (total, &q_val) in totals.iter_mut().zip(quadrant.iter()) {
-            *total += q_val;
-        }
-    }
-
-    // Find dominant quadrant
-    totals
-        .iter()
-        .enumerate()
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(i, _)| i)
-        .unwrap_or(3) // Default to Unknown
-}
+use context_graph_core::types::fingerprint::PurposeVector;
 
 /// Compute cosine similarity between two dense vectors.
 pub fn compute_cosine_similarity(a: &[f32], b: &[f32]) -> f32 {

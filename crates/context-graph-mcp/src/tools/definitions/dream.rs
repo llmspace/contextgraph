@@ -148,11 +148,13 @@ pub fn definitions() -> Vec<ToolDefinition> {
 
         // get_trigger_config - Get current trigger configuration
         // TASK-S02: Per SPEC-TRIGGER-MCP-001 REQ-CONFIG-01
+        // Constitution v6.0.0: ic_threshold replaced by churn_threshold
         ToolDefinition::new(
             "get_trigger_config",
             "Get current trigger configuration including thresholds, cooldowns, and trigger count. \
-             Returns entropy_threshold (default 0.7), ic_threshold (default 0.3), cooldown_ms, \
+             Returns entropy_threshold (default 0.7), churn_threshold (default 0.5), cooldown_ms, \
              last_trigger_timestamp, trigger_count, and enabled status. \
+             Per Constitution v6.0.0: dreams trigger when entropy > 0.7 AND churn > 0.5. \
              FAILS FAST if TriggerManager not initialized (AP-26).",
             json!({
                 "type": "object",

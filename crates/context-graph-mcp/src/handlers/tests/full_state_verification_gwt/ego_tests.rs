@@ -1,6 +1,8 @@
 //! Ego State FSV Tests
 //!
-//! Verifies purpose vector and identity continuity.
+//! Verifies purpose vector and topic profile state.
+//!
+//! Per PRD v6: Uses topic_stability instead of identity_coherence.
 
 use super::{create_handlers_with_gwt, extract_tool_content, make_tool_call_request};
 use crate::tools::tool_names;
@@ -47,14 +49,14 @@ async fn test_get_ego_state_returns_real_identity_data() {
         );
     }
 
-    // FSV-3: identity_coherence must be in [0, 1]
-    let identity_coherence = content["identity_coherence"]
+    // FSV-3: topic_stability must be in [0, 1] (replaces identity_coherence per PRD v6)
+    let topic_stability = content["topic_stability"]
         .as_f64()
-        .expect("identity_coherence must be f64");
+        .expect("topic_stability must be f64");
     assert!(
-        (0.0..=1.0).contains(&identity_coherence),
-        "Identity coherence={} must be in [0, 1]",
-        identity_coherence
+        (0.0..=1.0).contains(&topic_stability),
+        "Topic stability={} must be in [0, 1]",
+        topic_stability
     );
 
     // FSV-4: coherence_with_actions must be in [0, 1]
@@ -101,9 +103,9 @@ async fn test_get_ego_state_returns_real_identity_data() {
     );
 
     println!(
-        "FSV PASSED: Ego state returned REAL data: pv_len={}, coherence={:.4}, status={}",
+        "FSV PASSED: Ego state returned REAL data: pv_len={}, topic_stability={:.4}, status={}",
         purpose_vector.len(),
-        identity_coherence,
+        topic_stability,
         identity_status
     );
 }

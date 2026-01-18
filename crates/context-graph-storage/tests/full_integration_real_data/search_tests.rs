@@ -54,7 +54,6 @@ async fn test_search_returns_correct_results() {
         min_similarity: 0.0,
         min_alignment: None,
         include_deleted: false,
-        johari_quadrant_filter: None,
         embedder_indices: vec![],
         semantic_query: None,   // No semantic query for this test
         include_content: false, // TASK-CONTENT-005

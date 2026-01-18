@@ -204,79 +204,6 @@ async fn test_get_memetic_status_utl_values_in_valid_range() {
 }
 
 #[tokio::test]
-async fn test_get_memetic_status_johari_quadrant_valid() {
-    let handlers = create_test_handlers();
-    let request = make_request(
-        "tools/call",
-        Some(JsonRpcId::Number(1)),
-        Some(json!({
-            "name": "get_memetic_status",
-            "arguments": {}
-        })),
-    );
-
-    let response = handlers.dispatch(request).await;
-    let result = response.result.expect("Must have result");
-    let content = result.get("content").expect("Must have content");
-    let text = content[0].get("text").expect("Must have text");
-    let data: serde_json::Value = serde_json::from_str(text.as_str().unwrap()).unwrap();
-
-    let utl = data.get("utl").expect("Must have utl");
-    let johari = utl["johariQuadrant"]
-        .as_str()
-        .expect("johariQuadrant must be string");
-
-    // Per constitution.yaml:159-163
-    let valid_quadrants = ["Open", "Blind", "Hidden", "Unknown"];
-    assert!(
-        valid_quadrants.contains(&johari),
-        "Invalid Johari quadrant: '{}'. Must be one of {:?}",
-        johari,
-        valid_quadrants
-    );
-}
-
-#[tokio::test]
-async fn test_get_memetic_status_suggested_action_matches_johari() {
-    let handlers = create_test_handlers();
-    let request = make_request(
-        "tools/call",
-        Some(JsonRpcId::Number(1)),
-        Some(json!({
-            "name": "get_memetic_status",
-            "arguments": {}
-        })),
-    );
-
-    let response = handlers.dispatch(request).await;
-    let result = response.result.expect("Must have result");
-    let content = result.get("content").expect("Must have content");
-    let text = content[0].get("text").expect("Must have text");
-    let data: serde_json::Value = serde_json::from_str(text.as_str().unwrap()).unwrap();
-
-    let utl = data.get("utl").expect("Must have utl");
-    let johari = utl["johariQuadrant"].as_str().unwrap();
-    let action = utl["suggestedAction"]
-        .as_str()
-        .expect("suggestedAction must be string");
-
-    // Verify mapping per constitution.yaml:159-163
-    let expected_action = match johari {
-        "Open" => "direct_recall",
-        "Blind" => "trigger_dream",
-        "Hidden" => "get_neighborhood",
-        "Unknown" => "epistemic_action",
-        _ => "continue",
-    };
-
-    assert_eq!(
-        action, expected_action,
-        "Johari '{}' should map to '{}', got '{}'",
-        johari, expected_action, action
-    );
-}
-
-#[tokio::test]
 async fn test_get_memetic_status_not_hardcoded() {
     // The old stub returned: entropy=0.5, coherence=0.8, learningScore=0.65
     // StubUtlProcessor returns: entropy=0.0, coherence=0.0, learning_score=0.0
@@ -555,10 +482,6 @@ async fn test_tools_call_utl_status() {
     assert!(
         parsed.get("learning_score").is_some(),
         "Response must contain learning_score"
-    );
-    assert!(
-        parsed.get("johari_quadrant").is_some(),
-        "Response must contain johari_quadrant"
     );
     assert!(
         parsed.get("consolidation_phase").is_some(),

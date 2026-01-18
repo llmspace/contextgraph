@@ -114,20 +114,20 @@ The model `L = f(ΔS × ΔC)` uses multiplication because real learning requires
 *   High coherence (ΔC) with no novelty (ΔS ≈ 0) is just review.
 Learning is inherently **temporal**—it is the integration of these multiplicative moments over time.
 
-### The Johari Window and the ΔS × ΔC Plane
-The theory is elegantly mapped onto the **Johari Window**, a model for self-awareness. The ΔS x ΔC plane is presented as the mathematical Johari Window.
+### The ΔS × ΔC Plane and Topic Discovery
+The ΔS x ΔC plane can be mapped to topic emergence in the system.
 
-*   **Horizontal Axis (Entropy, ΔS):** Exposure to others, novelty, uncertainty.
-*   **Vertical Axis (Coherence, ΔC):** Awareness to self, structure, understanding.
+*   **Horizontal Axis (Entropy, ΔS):** Novelty, uncertainty, topic churn.
+*   **Vertical Axis (Coherence, ΔC):** Topic stability, understanding, weighted agreement.
 
-| Johari Quadrant | State | ΔS (Entropy) | ΔC (Coherence) |
+| State | ΔS (Entropy) | ΔC (Coherence) | Description |
 | :--- | :--- | :--- | :--- |
-| **Open** | Known to self & others | Low | High |
-| **Hidden** | Known to self, not others | Medium | High |
-| **Blind** | Unknown to self, known to others | High | Low |
-| **Unknown** | Unknown to self & others | High | Unknown |
+| **Stable Topic** | Low | High | Well-established topic with high weighted_agreement |
+| **Emerging Topic** | Medium | Medium | New topic forming from clustering |
+| **High Churn** | High | Low | Unstable topics, may trigger dream consolidation |
+| **Exploration** | High | Variable | Novel territory, topics still emerging |
 
-Learning is the process of moving information between these quadrants, primarily from Unknown/Blind toward Open. The `λ_dyn` term acts as a regulator to keep the learner in the optimal zone for this movement.
+Learning is the process of moving from high entropy (novel, disconnected) toward stable topics with high weighted agreement. The `λ_dyn` term acts as a regulator to keep the system in the optimal zone for topic discovery.
 
 ---
 

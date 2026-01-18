@@ -64,8 +64,7 @@ pub use amortized::{
 };
 pub use controller::{DreamController, DreamReport, DreamState, DreamStatus};
 pub use hebbian::{
-    find_coactivated_pairs, kuramoto_coupling, kuramoto_order_parameter, select_replay_memories,
-    EdgeUpdate, HebbianEngine, HebbianUpdateResult,
+    find_coactivated_pairs, select_replay_memories, EdgeUpdate, HebbianEngine, HebbianUpdateResult,
 };
 pub use hyperbolic_walk::{
     position_to_query, sample_starting_positions, DiscoveredBlindSpot, ExplorationResult,

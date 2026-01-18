@@ -210,10 +210,6 @@ async fn test_search_by_purpose_result_structure() {
                 first.get("purpose_vector").is_some(),
                 "Result should have purpose_vector"
             );
-            assert!(
-                first.get("johari_quadrant").is_some(),
-                "Result should have johari_quadrant"
-            );
         }
     }
 }

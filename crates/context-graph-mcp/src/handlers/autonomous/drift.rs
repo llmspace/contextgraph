@@ -24,7 +24,7 @@ impl Handlers {
     /// TASK-AUTONOMOUS-MCP + TASK-INTEG-002 + ARCH-03: Get current drift state with per-embedder analysis.
     /// Uses TeleologicalDriftDetector (TASK-LOGIC-010) for 5-level per-embedder drift detection.
     ///
-    /// ARCH-03 COMPLIANT: Works WITHOUT North Star by computing drift relative to
+    /// ARCH-03 COMPLIANT: Works without top-level goal by computing drift relative to
     /// the stored fingerprints' own centroid/average.
     ///
     /// Arguments:
@@ -147,7 +147,6 @@ impl Handlers {
             let severity = detector.detect_drift();
             let trend = detector.compute_trend();
 
-            // TASK-P0-001: Renamed from north_star to strategic
             let (goal_id_str, reference_type) = match &top_level_goal {
                 Some(goal) => (goal.id.to_string(), "strategic"),
                 None => ("none".to_string(), "no_reference"),
@@ -328,9 +327,9 @@ impl Handlers {
             "reference_id": reference_id.clone(),
             "arch03_compliant": true,
             "note": if reference_type == "computed_centroid" {
-                "ARCH-03 COMPLIANT: Drift computed relative to fingerprints' centroid (no North Star required)"
+                "ARCH-03 COMPLIANT: Drift computed relative to fingerprints' centroid"
             } else {
-                "Drift computed relative to North Star goal"
+                "Drift computed relative to strategic goal"
             }
         });
 
@@ -358,7 +357,7 @@ impl Handlers {
     /// TASK-AUTONOMOUS-MCP + ARCH-03: Manually trigger drift correction.
     /// Uses DriftCorrector to apply correction strategies.
     ///
-    /// ARCH-03 COMPLIANT: Works WITHOUT North Star by balancing fingerprints'
+    /// ARCH-03 COMPLIANT: Works without top-level goal by balancing fingerprints'
     /// alignment distribution towards the computed centroid.
     ///
     /// Arguments:
@@ -393,7 +392,6 @@ impl Handlers {
         );
 
         // ARCH-03 COMPLIANT: Check if top-level Strategic goal exists, but don't require it
-        // TASK-P0-001: Renamed from has_north_star to has_strategic_goal
         let (has_strategic_goal, reference_type) = {
             let hierarchy = self.goal_hierarchy.read();
             if hierarchy.top_level_goals().first().is_some() {
@@ -488,7 +486,7 @@ impl Handlers {
     /// FAIL FAST: Returns error if no history available (not silently empty array).
     ///
     /// Arguments:
-    /// - goal_id (optional): UUID of goal to get history for (defaults to North Star)
+    /// - goal_id (optional): UUID of goal to get history for (defaults to top-level strategic goal)
     /// - time_range (optional): "1h", "6h", "24h", "7d", "30d", "all" (default: "24h")
     /// - limit (optional): Max entries to return (default: 50)
     /// - include_per_embedder (optional): Include 13-embedder breakdown (default: false)

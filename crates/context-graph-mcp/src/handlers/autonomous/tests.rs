@@ -78,6 +78,5 @@ fn test_autonomous_error_codes_values() {
     assert_eq!(autonomous_error_codes::CONSOLIDATION_ERROR, -32114);
     assert_eq!(autonomous_error_codes::SUBGOAL_DISCOVERY_ERROR, -32115);
     assert_eq!(autonomous_error_codes::STATUS_AGGREGATION_ERROR, -32116);
-    assert_eq!(autonomous_error_codes::NO_NORTH_STAR_FOR_AUTONOMOUS, -32117);
     println!("[VERIFIED] Autonomous error codes are in correct range");
 }

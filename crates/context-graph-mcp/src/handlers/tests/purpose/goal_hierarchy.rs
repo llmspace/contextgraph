@@ -11,7 +11,7 @@ use super::super::{create_test_handlers, make_request};
 use super::helpers::get_goal_ids_from_hierarchy;
 
 /// Test goal/hierarchy_query get_all operation.
-/// TASK-P0-001: Updated field names (has_north_star -> has_top_level_goals)
+/// TASK-P0-001: Updated field names (has_top_level_goals)
 #[tokio::test]
 async fn test_goal_hierarchy_get_all() {
     let handlers = create_test_handlers();
@@ -46,7 +46,7 @@ async fn test_goal_hierarchy_get_all() {
         stats.get("total_goals").is_some(),
         "Should have total_goals"
     );
-    // TASK-P0-001: Renamed from has_north_star to has_top_level_goals
+    // TASK-P0-001: has_top_level_goals field
     assert!(
         stats.get("has_top_level_goals").is_some(),
         "Should have has_top_level_goals"
@@ -59,12 +59,12 @@ async fn test_goal_hierarchy_get_all() {
 
 /// Test goal/hierarchy_query get_goal operation.
 /// TASK-CORE-005: Updated to use UUID-based goal IDs instead of hardcoded strings.
-/// TASK-P0-001: Updated for 3-level hierarchy - uses Strategic instead of NorthStar.
+/// TASK-P0-001: Updated for 3-level hierarchy - uses Strategic level.
 #[tokio::test]
 async fn test_goal_hierarchy_get_goal() {
     let handlers = create_test_handlers();
 
-    // First, get the actual Strategic ID from the hierarchy (was NorthStar)
+    // First, get the actual Strategic ID from the hierarchy
     let (strategic_id, _, _, _) = get_goal_ids_from_hierarchy(&handlers).await;
     assert!(!strategic_id.is_empty(), "Should have Strategic goal");
 
@@ -91,13 +91,13 @@ async fn test_goal_hierarchy_get_goal() {
         Some(strategic_id.as_str()),
         "Should return correct goal"
     );
-    // TASK-P0-001: Now Strategic level, not NorthStar
+    // TASK-P0-001: Strategic level
     assert_eq!(
         goal.get("level").and_then(|v| v.as_str()),
         Some("Strategic"),
         "Should be Strategic level"
     );
-    // TASK-P0-001: Check is_top_level instead of is_north_star
+    // TASK-P0-001: Check is_top_level
     assert_eq!(
         goal.get("is_top_level").and_then(|v| v.as_bool()),
         Some(true),
@@ -217,7 +217,7 @@ async fn test_goal_hierarchy_get_ancestors() {
     let ancestors = result.get("ancestors").and_then(|v| v.as_array());
     assert!(ancestors.is_some(), "Should have ancestors array");
 
-    // Path should be: Immediate -> Tactical -> Strategic -> NorthStar
+    // Path should be: Immediate -> Tactical -> Strategic (3-level hierarchy)
     let ancestors = ancestors.unwrap();
     assert!(
         ancestors.len() >= 3,

@@ -123,7 +123,7 @@ impl MeaningPipeline {
     ///
     /// # Arguments
     /// * `embeddings` - 13 embedding vectors, each of dimension 1024
-    /// * `purpose_alignments` - 13D purpose vector alignments to North Star
+    /// * `purpose_alignments` - 13D purpose vector alignments
     ///
     /// # Panics
     ///

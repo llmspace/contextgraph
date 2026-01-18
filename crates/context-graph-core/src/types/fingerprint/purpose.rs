@@ -1,7 +1,7 @@
 //! Purpose Vector types for teleological alignment tracking.
 //!
 //! From constitution.yaml: Purpose Vector PV = [A(E1,V), ..., A(E13,V)]
-//! where A(Ei, V) = cos(θ) between embedder i and North Star goal V.
+//! where A(Ei, V) = cos(θ) between embedder i and Strategic goal V.
 
 use serde::{Deserialize, Serialize};
 
@@ -20,7 +20,7 @@ use crate::config::constants::alignment;
 /// - Critical: θ < 0.55
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AlignmentThreshold {
-    /// θ ≥ 0.75 - Strong alignment with North Star goal
+    /// θ ≥ 0.75 - Strong alignment with Strategic goals
     Optimal,
     /// θ ∈ [0.70, 0.75) - Acceptable alignment, monitor for drift
     Acceptable,
@@ -34,7 +34,7 @@ impl AlignmentThreshold {
     /// Classify an alignment value into a threshold category.
     ///
     /// # Arguments
-    /// * `theta` - Alignment value (cosine similarity to North Star), expected range [-1.0, 1.0]
+    /// * `theta` - Alignment value (cosine similarity to Strategic goal), expected range [-1.0, 1.0]
     ///
     /// # Returns
     /// The appropriate threshold category based on Royse 2026 thresholds.
@@ -103,13 +103,13 @@ impl std::fmt::Display for AlignmentThreshold {
     }
 }
 
-/// Purpose Vector: 13D alignment signature to North Star goal.
+/// Purpose Vector: 13D alignment signature to Strategic goals.
 ///
 /// From constitution.yaml: `PV = [A(E1,V), A(E2,V), ..., A(E13,V)]`
-/// where `A(Ei, V) = cos(θ)` between embedder i and North Star goal V.
+/// where `A(Ei, V) = cos(θ)` between embedder i and Strategic goal V.
 ///
 /// Each element is the cosine similarity between that embedder's representation
-/// and the North Star goal vector, measuring how well that semantic dimension
+/// and the Strategic goal vector, measuring how well that semantic dimension
 /// aligns with the system's ultimate purpose.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PurposeVector {

@@ -54,7 +54,6 @@ use super::splade::SpladeAlignment;
 ///
 /// // Goals are discovered autonomously with TeleologicalArray
 /// let discovery = GoalDiscoveryMetadata::bootstrap();
-/// // TASK-P0-005: Renamed from north_star per ARCH-03
 /// let strategic_goal = GoalNode::autonomous_goal(
 ///     "Emergent ML mastery goal".into(),
 ///     GoalLevel::Strategic,
@@ -291,11 +290,11 @@ impl DefaultPurposeComputer {
 
     /// Propagate alignment through goal hierarchy.
     ///
-    /// Combines North Star alignment with weighted child goal alignments.
+    /// Combines Strategic goal alignment with weighted child goal alignments.
     ///
     /// # Arguments
     ///
-    /// * `base_alignment` - Direct alignment with North Star
+    /// * `base_alignment` - Direct alignment with Strategic goal
     /// * `hierarchy` - Goal hierarchy for traversal
     /// * `fingerprint` - Memory fingerprint to compute child alignments
     /// * `config` - Configuration with propagation weights
@@ -314,7 +313,6 @@ impl DefaultPurposeComputer {
             return *base_alignments;
         }
 
-        // TASK-P0-001: Changed from north_star() to top_level_goals()
         let top_level = hierarchy.top_level_goals();
         let top_goal = match top_level.first() {
             Some(g) => *g,
@@ -447,7 +445,6 @@ impl PurposeVectorComputer for DefaultPurposeComputer {
         old_hierarchy: &GoalHierarchy,
         new_hierarchy: &GoalHierarchy,
     ) -> Result<PurposeVector, PurposeComputeError> {
-        // TASK-P0-001: Changed from north_star() to top_level_goals()
         debug!(
             old_top_goal = ?old_hierarchy.top_level_goals().first().map(|n| n.id.to_string()),
             new_top_goal = ?new_hierarchy.top_level_goals().first().map(|n| n.id.to_string()),
@@ -534,7 +531,6 @@ mod tests {
         println!("[VERIFIED] with_verbose_logging sets flag correctly");
     }
 
-    // TASK-P0-005: Renamed from test_compute_purpose_no_north_star per ARCH-03
     #[tokio::test]
     async fn test_compute_purpose_no_strategic_goal() {
         let computer = DefaultPurposeComputer::new();
@@ -546,7 +542,6 @@ mod tests {
         println!("[VERIFIED] compute_purpose fails without Strategic goal");
     }
 
-    // TASK-P0-005: Renamed from test_compute_purpose_with_north_star per ARCH-03
     #[tokio::test]
     async fn test_compute_purpose_with_strategic_goal() {
         let computer = DefaultPurposeComputer::new();

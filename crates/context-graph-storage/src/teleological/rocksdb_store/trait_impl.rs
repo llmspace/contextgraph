@@ -4,7 +4,7 @@
 //! the modular implementation files:
 //! - `crud.rs` - CRUD operations
 //! - `search.rs` - Search operations
-//! - `persistence.rs` - Batch, statistics, persistence, content, ego node
+//! - `persistence.rs` - Batch, statistics, persistence, content
 
 use std::path::PathBuf;
 
@@ -12,13 +12,12 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use context_graph_core::error::CoreResult;
-use context_graph_core::gwt::ego_node::SelfEgoNode;
 use context_graph_core::traits::{
     TeleologicalMemoryStore, TeleologicalSearchOptions, TeleologicalSearchResult,
     TeleologicalStorageBackend,
 };
 use context_graph_core::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
+    PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
 };
 
 use super::store::RocksDbTeleologicalStore;
@@ -103,10 +102,6 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
         self.count_async().await
     }
 
-    async fn count_by_quadrant(&self) -> CoreResult<[usize; 4]> {
-        self.count_by_quadrant_async().await
-    }
-
     fn storage_size_bytes(&self) -> usize {
         self.storage_size_bytes_internal()
     }
@@ -133,20 +128,6 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
         self.compact_async().await
     }
 
-    // ==================== Johari Listing ====================
-
-    async fn list_by_quadrant(
-        &self,
-        quadrant: usize,
-        limit: usize,
-    ) -> CoreResult<Vec<(Uuid, JohariFingerprint)>> {
-        self.list_by_quadrant_async(quadrant, limit).await
-    }
-
-    async fn list_all_johari(&self, limit: usize) -> CoreResult<Vec<(Uuid, JohariFingerprint)>> {
-        self.list_all_johari_async(limit).await
-    }
-
     // ==================== Content Storage ====================
 
     async fn store_content(&self, id: Uuid, content: &str) -> CoreResult<()> {
@@ -163,15 +144,5 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
 
     async fn delete_content(&self, id: Uuid) -> CoreResult<bool> {
         self.delete_content_async(id).await
-    }
-
-    // ==================== Ego Node Storage ====================
-
-    async fn save_ego_node(&self, ego_node: &SelfEgoNode) -> CoreResult<()> {
-        self.save_ego_node_async(ego_node).await
-    }
-
-    async fn load_ego_node(&self) -> CoreResult<Option<SelfEgoNode>> {
-        self.load_ego_node_async().await
     }
 }

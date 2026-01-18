@@ -4,7 +4,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{UtlError, UtlResult};
-use crate::johari::{JohariQuadrant, SuggestedAction};
 use crate::lifecycle::LifecycleLambdaWeights;
 
 use super::intensity::LearningIntensity;
@@ -14,27 +13,24 @@ use super::intensity::LearningIntensity;
 /// This struct captures the full result of a UTL computation including:
 /// - Raw component values (delta_s, delta_c, w_e, phi)
 /// - Computed learning magnitude
-/// - Johari classification and suggested action
 /// - Storage/consolidation recommendations
 /// - Performance metrics (latency)
 ///
 /// # Constitution Reference
 ///
-/// - ΔS: [0,1] entropy/novelty (constitution.yaml:154)
-/// - ΔC: [0,1] coherence/understanding (constitution.yaml:155)
-/// - wₑ: [0.5,1.5] emotional weight (constitution.yaml:156)
-/// - φ: [0,π] phase sync (constitution.yaml:157)
+/// - delta_S: [0,1] entropy/novelty (constitution.yaml:154)
+/// - delta_C: [0,1] coherence/understanding (constitution.yaml:155)
+/// - w_e: [0.5,1.5] emotional weight (constitution.yaml:156)
+/// - phi: [0,pi] phase sync (constitution.yaml:157)
 ///
 /// # Example
 ///
 /// ```
-/// use context_graph_utl::{LearningSignal, JohariQuadrant, SuggestedAction};
+/// use context_graph_utl::LearningSignal;
 ///
 /// let signal = LearningSignal::new(
 ///     0.7, 0.6, 0.8, 1.2, 0.5,
 ///     None,
-///     JohariQuadrant::Open,
-///     SuggestedAction::DirectRecall,
 ///     false, true, 1500,
 /// ).expect("Valid signal");
 ///
@@ -60,12 +56,6 @@ pub struct LearningSignal {
     /// Marblestone lambda weights if lifecycle-adjusted
     pub lambda_weights: Option<LifecycleLambdaWeights>,
 
-    /// Classified Johari quadrant
-    pub quadrant: JohariQuadrant,
-
-    /// Recommended retrieval action based on quadrant
-    pub suggested_action: SuggestedAction,
-
     /// Whether consolidation is recommended (magnitude > 0.6)
     pub should_consolidate: bool,
 
@@ -87,10 +77,8 @@ impl LearningSignal {
     /// * `delta_s` - Surprise component [0, 1]
     /// * `delta_c` - Coherence component [0, 1]
     /// * `w_e` - Emotional weight [0.5, 1.5]
-    /// * `phi` - Phase angle [0, π]
+    /// * `phi` - Phase angle [0, pi]
     /// * `lambda_weights` - Optional lifecycle weights
-    /// * `quadrant` - Johari classification
-    /// * `suggested_action` - Recommended action
     /// * `should_consolidate` - Consolidation flag
     /// * `should_store` - Storage flag
     /// * `latency_us` - Computation time in microseconds
@@ -108,8 +96,6 @@ impl LearningSignal {
         w_e: f32,
         phi: f32,
         lambda_weights: Option<LifecycleLambdaWeights>,
-        quadrant: JohariQuadrant,
-        suggested_action: SuggestedAction,
         should_consolidate: bool,
         should_store: bool,
         latency_us: u64,
@@ -121,8 +107,6 @@ impl LearningSignal {
             w_e,
             phi,
             lambda_weights,
-            quadrant,
-            suggested_action,
             should_consolidate,
             should_store,
             timestamp: Utc::now(),

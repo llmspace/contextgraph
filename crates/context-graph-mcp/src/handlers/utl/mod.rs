@@ -6,7 +6,7 @@
 //! # Module Organization
 //!
 //! - `constants`: Embedder names and constitution.yaml targets
-//! - `helpers`: Helper functions for embedding manipulation and Johari classification
+//! - `helpers`: Helper functions for embedding manipulation
 //! - `compute`: Basic UTL compute and metrics handlers
 //! - `learning_trajectory`: Meta-UTL learning trajectory handler
 //! - `health_metrics`: Meta-UTL health metrics handler

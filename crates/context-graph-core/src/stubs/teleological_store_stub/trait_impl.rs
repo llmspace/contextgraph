@@ -11,16 +11,14 @@ use async_trait::async_trait;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use super::similarity::get_dominant_quadrant;
 use super::InMemoryTeleologicalStore;
 use crate::error::{CoreError, CoreResult};
-use crate::gwt::ego_node::SelfEgoNode;
 use crate::traits::{
     TeleologicalMemoryStore, TeleologicalSearchOptions, TeleologicalSearchResult,
     TeleologicalStorageBackend,
 };
 use crate::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
+    PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
 };
 
 #[async_trait]
@@ -147,19 +145,6 @@ impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
         Ok(self.data.len() - self.deleted.len())
     }
 
-    async fn count_by_quadrant(&self) -> CoreResult<[usize; 4]> {
-        let mut counts = [0_usize; 4];
-        let deleted_ids: HashSet<Uuid> = self.deleted.iter().map(|r| *r.key()).collect();
-        for entry in self.data.iter() {
-            if deleted_ids.contains(entry.key()) {
-                continue;
-            }
-            let quadrant = get_dominant_quadrant(&entry.value().johari);
-            counts[quadrant] += 1;
-        }
-        Ok(counts)
-    }
-
     fn storage_size_bytes(&self) -> usize {
         self.size_bytes.load(Ordering::Relaxed)
     }
@@ -206,58 +191,6 @@ impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
         Ok(())
     }
 
-    async fn list_by_quadrant(
-        &self,
-        quadrant: usize,
-        limit: usize,
-    ) -> CoreResult<Vec<(Uuid, JohariFingerprint)>> {
-        debug!("list_by_quadrant: quadrant={}, limit={}", quadrant, limit);
-        if quadrant > 3 {
-            error!("Invalid quadrant index: {} (must be 0-3)", quadrant);
-            return Err(CoreError::ValidationError {
-                field: "quadrant".to_string(),
-                message: format!("Quadrant index must be 0-3, got {}", quadrant),
-            });
-        }
-        let mut results = Vec::new();
-        let deleted_ids: HashSet<Uuid> = self.deleted.iter().map(|r| *r.key()).collect();
-        for entry in self.data.iter() {
-            if results.len() >= limit {
-                break;
-            }
-            let id = *entry.key();
-            if deleted_ids.contains(&id) {
-                continue;
-            }
-            let fp = entry.value();
-            let dominant = get_dominant_quadrant(&fp.johari);
-            if dominant == quadrant {
-                results.push((id, fp.johari.clone()));
-            }
-        }
-        debug!("list_by_quadrant returned {} results", results.len());
-        Ok(results)
-    }
-
-    async fn list_all_johari(&self, limit: usize) -> CoreResult<Vec<(Uuid, JohariFingerprint)>> {
-        debug!("list_all_johari: limit={}", limit);
-        let mut results = Vec::new();
-        let deleted_ids: HashSet<Uuid> = self.deleted.iter().map(|r| *r.key()).collect();
-        for entry in self.data.iter() {
-            if results.len() >= limit {
-                break;
-            }
-            let id = *entry.key();
-            if deleted_ids.contains(&id) {
-                continue;
-            }
-            let fp = entry.value();
-            results.push((id, fp.johari.clone()));
-        }
-        debug!("list_all_johari returned {} results", results.len());
-        Ok(results)
-    }
-
     async fn store_content(&self, id: Uuid, content: &str) -> CoreResult<()> {
         self.store_content_impl(id, content).await
     }
@@ -272,13 +205,5 @@ impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
 
     async fn delete_content(&self, id: Uuid) -> CoreResult<bool> {
         self.delete_content_impl(id).await
-    }
-
-    async fn save_ego_node(&self, ego_node: &SelfEgoNode) -> CoreResult<()> {
-        self.save_ego_node_impl(ego_node).await
-    }
-
-    async fn load_ego_node(&self) -> CoreResult<Option<SelfEgoNode>> {
-        self.load_ego_node_impl().await
     }
 }

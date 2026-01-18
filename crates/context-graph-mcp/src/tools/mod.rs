@@ -18,7 +18,7 @@
 //!   - `steering`: Steering feedback tools
 //!   - `causal`: Causal inference tools
 //!   - `teleological`: 13-embedder fusion tools
-//!   - `autonomous`: Autonomous North Star tools
+//!   - `autonomous`: Autonomous system tools
 
 pub mod aliases;
 pub mod definitions;
@@ -45,16 +45,12 @@ mod tests {
         // + 3 Meta-UTL tools (TASK-METAUTL-P0-005) = 48 total
         // + 1 Epistemic tool (TASK-MCP-001) = 49 total
         // + 1 Merge tool (TASK-MCP-003) = 50 total
-        // + 1 Johari classification tool (TASK-MCP-005) = 51 total
         // + 4 Session tools (TASK-013/014) = 55 total (session_start, session_end, pre_tool_use, post_tool_use)
-        // NOTE: GWT now has 9 tools (TASK-33/34 added get_coherence_state, TASK-38 added get_identity_continuity, TASK-39 added get_kuramoto_state)
+        // NOTE: GWT now has 4 tools (get_workspace_status, get_ego_state, trigger_workspace_broadcast, get_coherence_state)
         // NOTE: Dream now has 8 tools (TASK-37 added get_gpu_status, TASK-S01/S02/S03 added trigger_mental_check, get_trigger_config, get_trigger_history)
         // NOTE: Autonomous now has 12 tools (7 original + 5 SPEC-AUTONOMOUS-001)
-        // NOTE: 6 manual North Star tools REMOVED (created single 1024D embeddings
-        // incompatible with 13-embedder teleological arrays)
-        // TASK-FIX-002: Added get_drift_history tool (58 + 1 = 59)
-        // TASK-P0-001: Removed auto_bootstrap_north_star per ARCH-03 (59 → 58)
-        assert_eq!(tools.len(), 58);
+        // TASK-FIX-002: Added get_drift_history tool
+        assert_eq!(tools.len(), 57);
 
         let tool_names: Vec<_> = tools.iter().map(|t| t.name.as_str()).collect();
 
@@ -66,15 +62,12 @@ mod tests {
         assert!(tool_names.contains(&"search_graph"));
         assert!(tool_names.contains(&"utl_status"));
 
-        // GWT tools (TASK-GWT-001, TASK-33/34, TASK-38)
-        assert!(tool_names.contains(&"get_consciousness_state"));
-        assert!(tool_names.contains(&"get_kuramoto_sync"));
+        // GWT tools (TASK-GWT-001, TASK-33/34)
+        // Note: Consciousness and IC tools removed per PRD v6
         assert!(tool_names.contains(&"get_workspace_status"));
         assert!(tool_names.contains(&"get_ego_state"));
         assert!(tool_names.contains(&"trigger_workspace_broadcast"));
-        assert!(tool_names.contains(&"adjust_coupling"));
         assert!(tool_names.contains(&"get_coherence_state")); // TASK-33/34
-        assert!(tool_names.contains(&"get_identity_continuity")); // TASK-38
 
         // UTL delta-S/C tool (TASK-UTL-P1-001)
         assert!(tool_names.contains(&"gwt/compute_delta_sc"));
@@ -101,8 +94,6 @@ mod tests {
         // Causal tools (TASK-CAUSAL-001)
         assert!(tool_names.contains(&"omni_infer"));
 
-        // NOTE: Manual North Star tools REMOVED - they created single 1024D embeddings
-        // incompatible with 13-embedder teleological arrays. Use autonomous system instead.
 
         // Teleological tools (TELEO-007 through TELEO-011)
         assert!(tool_names.contains(&"search_teleological"));
@@ -112,7 +103,6 @@ mod tests {
         assert!(tool_names.contains(&"manage_teleological_profile"));
 
         // Autonomous tools (TASK-AUTONOMOUS-MCP)
-        // REMOVED: auto_bootstrap_north_star per TASK-P0-001 (ARCH-03)
         assert!(tool_names.contains(&"get_alignment_drift"));
         assert!(tool_names.contains(&"trigger_drift_correction"));
         assert!(tool_names.contains(&"get_pruning_candidates"));
@@ -132,9 +122,6 @@ mod tests {
 
         // Merge tools (TASK-MCP-003)
         assert!(tool_names.contains(&"merge_concepts"));
-
-        // Johari classification tools (TASK-MCP-005)
-        assert!(tool_names.contains(&"get_johari_classification"));
 
         // Session tools (TASK-013/014)
         assert!(tool_names.contains(&"session_start"));

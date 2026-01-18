@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::types::Modality;
+use super::Modality;
 
 /// Helper function for serde default version value
 fn default_version() -> u32 {

@@ -13,11 +13,11 @@ use uuid::Uuid;
 pub struct WorkspaceCandidate {
     /// Memory unique identifier
     pub id: Uuid,
-    /// Kuramoto order parameter r (coherence measure)
+    /// Coherence order parameter r
     pub order_parameter: f32,
     /// Memory importance score [0,1]
     pub importance: f32,
-    /// North star alignment score [0,1]
+    /// Strategic goal alignment score [0,1]
     pub alignment: f32,
     /// Computed competition score
     pub score: f32,

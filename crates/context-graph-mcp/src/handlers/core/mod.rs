@@ -2,9 +2,9 @@
 //!
 //! TASK-S001: Updated to use TeleologicalMemoryStore and MultiArrayEmbeddingProvider.
 //! TASK-S003: Added GoalAlignmentCalculator for purpose/goal operations.
-//! TASK-S004: Added JohariTransitionManager for johari/* handlers.
+//! TASK-S004: Handler state management.
 //! TASK-S005: Added MetaUtlTracker for meta_utl/* handlers.
-//! TASK-GWT-001: Added GWT/Kuramoto provider traits for consciousness operations.
+//! TASK-GWT-001: Added GWT provider traits for state management operations.
 //! NO BACKWARDS COMPATIBILITY with legacy MemoryStore trait.
 //!
 //! # Module Organization

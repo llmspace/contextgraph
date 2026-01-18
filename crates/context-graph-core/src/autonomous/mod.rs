@@ -1,7 +1,7 @@
-//! Autonomous North Star system
+//! Autonomous goal alignment system
 //!
 //! This module provides types and services for autonomous operation of the
-//! North Star alignment system including bootstrap, drift detection,
+//! goal alignment system including bootstrap, drift detection,
 //! memory curation, and goal evolution.
 //!
 //! # Architecture
@@ -9,7 +9,7 @@
 //! The autonomous system is organized into two layers:
 //!
 //! ## Foundation Layer (Types)
-//! - `bootstrap` - North Star goal initialization types
+//! - `bootstrap` - Strategic goal initialization types
 //! - `thresholds` - Adaptive threshold calibration types
 //! - `drift` - Drift detection and monitoring types
 //! - `curation` - Memory pruning and consolidation types

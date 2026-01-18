@@ -1,8 +1,7 @@
 //! Goal hierarchy tree structure.
 //!
-//! TASK-P0-001: Removed North Star concept per ARCH-03 (autonomous operation).
-//! Goals now emerge autonomously from data patterns.
-//! Strategic level is now the top level.
+//! Goals emerge autonomously from data patterns.
+//! Strategic level is the top level.
 
 use super::error::GoalHierarchyError;
 use super::level::GoalLevel;
@@ -26,8 +25,6 @@ use uuid::Uuid;
 #[derive(Clone, Debug, Default)]
 pub struct GoalHierarchy {
     pub(crate) nodes: HashMap<Uuid, GoalNode>,
-    // REMOVED: north_star field per TASK-P0-001 (ARCH-03)
-    // Strategic goals are now the top level
 }
 
 impl GoalHierarchy {
@@ -69,9 +66,6 @@ impl GoalHierarchy {
             }
         }
 
-        // REMOVED: North Star uniqueness check per TASK-P0-001 (ARCH-03)
-        // Multiple Strategic goals are allowed (they emerge autonomously)
-
         // Update parent's child list
         if let Some(parent_id) = goal.parent_id {
             if let Some(parent) = self.nodes.get_mut(&parent_id) {
@@ -83,23 +77,14 @@ impl GoalHierarchy {
         Ok(())
     }
 
-    // REMOVED: north_star() method per TASK-P0-001 (ARCH-03)
-    // Use top_level_goals() instead
-
-    // REMOVED: has_north_star() method per TASK-P0-001 (ARCH-03)
-    // Use !top_level_goals().is_empty() instead
-
     /// Get all top-level (Strategic) goals.
     ///
-    /// Replaces the old `north_star()` method.
     /// Multiple Strategic goals can exist (they emerge autonomously).
     pub fn top_level_goals(&self) -> Vec<&GoalNode> {
         self.at_level(GoalLevel::Strategic)
     }
 
     /// Check if any top-level goals exist.
-    ///
-    /// Replaces the old `has_north_star()` method.
     #[inline]
     pub fn has_top_level_goals(&self) -> bool {
         !self.top_level_goals().is_empty()
@@ -147,8 +132,6 @@ impl GoalHierarchy {
     ///
     /// Returns the sequence of goal IDs from the given goal up to (and including)
     /// the top-level parent. Returns empty vec if goal not found.
-    ///
-    /// Renamed from `path_to_north_star` per TASK-P0-001 (ARCH-03).
     pub fn path_to_root(&self, goal_id: &Uuid) -> Vec<Uuid> {
         let mut path = Vec::new();
         let mut current = self.nodes.get(goal_id);
@@ -166,12 +149,8 @@ impl GoalHierarchy {
     /// Checks:
     /// - All parent references are valid
     ///
-    /// TASK-P0-001: Removed requirement for North Star to exist.
     /// Empty hierarchies are valid. Multiple Strategic goals are allowed.
     pub fn validate(&self) -> Result<(), GoalHierarchyError> {
-        // REMOVED: North Star requirement per TASK-P0-001 (ARCH-03)
-        // Empty hierarchies and hierarchies without top-level goals are valid
-
         // Check all parents exist
         for node in self.nodes.values() {
             if let Some(ref parent_id) = node.parent_id {

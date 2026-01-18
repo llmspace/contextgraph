@@ -2,7 +2,7 @@
 //!
 //! This module defines comprehensive configuration types for the UTL (Unified Theory of Learning)
 //! computation engine, including surprise, coherence, emotional weighting, phase oscillation,
-//! lifecycle stages, Johari classification, and KL divergence settings.
+//! lifecycle stages, and KL divergence settings.
 //!
 //! # Constitution Reference
 //!
@@ -16,7 +16,6 @@
 
 mod coherence;
 mod emotional;
-mod johari;
 mod kl;
 mod lifecycle;
 mod phase;
@@ -29,7 +28,6 @@ mod tests;
 // Re-export all public types for backwards compatibility
 pub use self::coherence::CoherenceConfig;
 pub use self::emotional::EmotionalConfig;
-pub use self::johari::JohariConfig;
 pub use self::kl::KlConfig;
 pub use self::lifecycle::{LifecycleConfig, StageConfig};
 pub use self::phase::PhaseConfig;
@@ -66,9 +64,6 @@ pub struct UtlConfig {
 
     /// Phase oscillation settings.
     pub phase: PhaseConfig,
-
-    /// Johari quadrant classification thresholds.
-    pub johari: JohariConfig,
 
     /// Lifecycle stage configurations.
     pub lifecycle: LifecycleConfig,
@@ -136,7 +131,6 @@ impl UtlConfig {
         self.coherence.validate()?;
         self.emotional.validate()?;
         self.phase.validate()?;
-        self.johari.validate()?;
         self.lifecycle.validate()?;
         self.kl.validate()?;
         self.thresholds.validate()?;

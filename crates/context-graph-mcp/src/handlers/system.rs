@@ -128,20 +128,13 @@ impl Handlers {
         }
 
         // ===== Graph/Index Health Check =====
-        // Probe: count_by_quadrant() - tests Johari quadrant indexing (graph structure)
-        match self.teleological_store.count_by_quadrant().await {
-            Ok(quadrant_counts) => {
-                let total: usize = quadrant_counts.iter().sum();
+        // Probe: count() - tests store accessibility (graph structure)
+        match self.teleological_store.count().await {
+            Ok(total) => {
                 components.insert(
                     "graph".to_string(),
                     json!({
                         "status": "healthy",
-                        "quadrantDistribution": {
-                            "open": quadrant_counts[0],
-                            "blind": quadrant_counts[1],
-                            "hidden": quadrant_counts[2],
-                            "unknown": quadrant_counts[3]
-                        },
                         "totalIndexed": total,
                         "indexIntegrity": true
                     }),
@@ -150,7 +143,7 @@ impl Handlers {
             Err(e) => {
                 all_healthy = false;
                 error!(
-                    "Health check FAILED - graph component: TeleologicalStore.count_by_quadrant() error: {}",
+                    "Health check FAILED - graph component: TeleologicalStore.count() error: {}",
                     e
                 );
                 components.insert(

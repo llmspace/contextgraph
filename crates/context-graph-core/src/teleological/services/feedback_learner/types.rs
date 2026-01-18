@@ -8,9 +8,9 @@ use crate::teleological::types::NUM_EMBEDDERS;
 /// Type of feedback received for a teleological vector.
 #[derive(Clone, Debug, PartialEq)]
 pub enum FeedbackType {
-    /// Positive feedback with magnitude (successful retrieval, high consciousness)
+    /// Positive feedback with magnitude (successful retrieval, high coherence)
     Positive { magnitude: f32 },
-    /// Negative feedback with magnitude (failed retrieval, low consciousness)
+    /// Negative feedback with magnitude (failed retrieval, low coherence)
     Negative { magnitude: f32 },
     /// Neutral feedback (neither reward nor penalty)
     Neutral,

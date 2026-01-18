@@ -304,8 +304,7 @@ fn test_find_parent_goal_empty_goals() {
     println!("[PASS] test_find_parent_goal_empty_goals");
 }
 
-// TASK-P0-001: Renamed from test_find_parent_goal_strategic - now tests Tactical
-// because Strategic goals are top-level and have no parent
+// TASK-P0-001: Tests Tactical level since Strategic goals are top-level and have no parent
 #[test]
 fn test_find_parent_goal_tactical() {
     let discovery = SubGoalDiscovery::new();
@@ -353,7 +352,7 @@ fn test_find_parent_goal_operational() {
     println!("[PASS] test_find_parent_goal_operational");
 }
 
-// TASK-P0-001: Renamed from test_find_parent_goal_northstar - Strategic is now top-level
+// TASK-P0-001: Strategic is now top-level
 #[test]
 fn test_find_parent_goal_strategic_top_level() {
     let discovery = SubGoalDiscovery::new();

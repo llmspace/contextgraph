@@ -6,7 +6,6 @@
 use uuid::Uuid;
 
 use crate::types::fingerprint::PurposeVector;
-use crate::types::JohariQuadrant;
 
 use super::super::entry::{GoalId, PurposeMetadata};
 
@@ -20,7 +19,7 @@ use super::super::entry::{GoalId, PurposeMetadata};
 /// - `memory_id`: UUID of the matching memory
 /// - `purpose_similarity`: Similarity score in purpose space [0.0, 1.0]
 /// - `purpose_vector`: The full 13D purpose vector
-/// - `metadata`: Associated metadata (goal, confidence, quadrant)
+/// - `metadata`: Associated metadata (goal, confidence)
 ///
 /// # Ordering
 ///
@@ -87,11 +86,5 @@ impl PurposeSearchResult {
     #[inline]
     pub fn matches_goal(&self, goal: &GoalId) -> bool {
         &self.metadata.primary_goal == goal
-    }
-
-    /// Check if this result passes a given quadrant filter.
-    #[inline]
-    pub fn matches_quadrant(&self, quadrant: JohariQuadrant) -> bool {
-        self.metadata.dominant_quadrant == quadrant
     }
 }

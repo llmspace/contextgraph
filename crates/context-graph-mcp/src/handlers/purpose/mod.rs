@@ -1,7 +1,6 @@
 //! Purpose and goal alignment handlers.
 //!
 //! TASK-S003: Implements MCP handlers for purpose/goal operations.
-//! TASK-CORE-001: Removed manual North Star methods per ARCH-03 (autonomous-first).
 //!
 //! # Purpose Methods
 //!
@@ -9,10 +8,6 @@
 //! - `goal/hierarchy_query`: Navigate goal hierarchy
 //! - `goal/aligned_memories`: Find memories aligned to a specific goal
 //! - `purpose/drift_check`: Detect alignment drift in memories
-//!
-//! NOTE: Manual North Star methods removed per ARCH-03:
-//! - `purpose/north_star_alignment` - REMOVED: Use auto_bootstrap_north_star
-//! - `purpose/north_star_update` - REMOVED: Use auto_bootstrap_north_star
 //!
 //! # Error Handling
 //!

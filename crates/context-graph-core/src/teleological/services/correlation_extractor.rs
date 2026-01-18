@@ -292,7 +292,7 @@ impl CorrelationExtractor {
     /// Cross-correlation between embedders i and j is computed as:
     /// corr(i,j) = sqrt(alignment[i] * alignment[j]) * synergy[i][j]
     ///
-    /// This captures: "when both embedders strongly align with North Star,
+    /// This captures: "when both embedders strongly align with the purpose vector,
     /// their interaction (weighted by synergy) is meaningful."
     ///
     /// # Arguments
@@ -312,7 +312,7 @@ impl CorrelationExtractor {
         for i in 0..SYNERGY_DIM {
             for j in (i + 1)..SYNERGY_DIM {
                 // Compute alignment-based correlation using geometric mean
-                // This is dimension-agnostic and captures "both embedders point to North Star"
+                // This is dimension-agnostic and captures "both embedders have strong purpose alignment"
                 let ai = alignments[i].max(0.0);
                 let aj = alignments[j].max(0.0);
                 let corr = (ai * aj).sqrt();

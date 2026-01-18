@@ -81,7 +81,6 @@ impl WorkspaceEventListener for MetaCognitiveEventListener {
             WorkspaceEvent::MemoryEnters { .. } => {}
             WorkspaceEvent::MemoryExits { .. } => {}
             WorkspaceEvent::WorkspaceConflict { .. } => {}
-            WorkspaceEvent::IdentityCritical { .. } => {}
         }
     }
 }

@@ -1,7 +1,7 @@
 //! Autonomous workflow orchestration types
 //!
 //! This module defines the complete configuration and status types for the
-//! autonomous North Star system, including scheduling, event handling, and
+//! autonomous system, including scheduling, event handling, and
 //! health monitoring.
 
 mod config;

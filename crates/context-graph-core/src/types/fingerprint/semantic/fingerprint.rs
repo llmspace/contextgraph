@@ -118,7 +118,6 @@ pub enum ValidationError {
 ///
 /// **NO FUSION.** Each embedding space preserved independently for:
 /// - Per-space HNSW search
-/// - Per-space Johari classification
 /// - Per-space teleological alignment
 /// - 100% information preservation
 ///

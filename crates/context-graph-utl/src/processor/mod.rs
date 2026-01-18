@@ -6,10 +6,9 @@
 //! - EmotionalWeightCalculator for w_e
 //! - PhaseOscillator for phi
 //! - LifecycleManager for lambda weights
-//! - JohariClassifier for quadrant classification
 //!
 //! # Constitution Reference
-//! - UTL formula: `L = f((ΔS × ΔC) · wₑ · cos φ)` (constitution.yaml:152)
+//! - UTL formula: `L = f((DeltaS x DeltaC) . w_e . cos phi)` (constitution.yaml:152)
 //! - Lifecycle stages: Infancy/Growth/Maturity (constitution.yaml:165-167)
 
 mod session;

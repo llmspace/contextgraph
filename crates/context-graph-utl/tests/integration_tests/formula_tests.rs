@@ -1,10 +1,9 @@
 //! UTL Formula Tests
 //!
-//! Tests for the core UTL formula: `L = f((ΔS × ΔC) · wₑ · cos φ)`
+//! Tests for the core UTL formula: `L = f((DeltaS x DeltaC) . w_e . cos phi)`
 
 use context_graph_utl::{
     compute_learning_magnitude,
-    johari::{JohariQuadrant, SuggestedAction},
     lifecycle::{LifecycleLambdaWeights, LifecycleStage},
     processor::UtlProcessor,
     LearningSignal,
@@ -51,7 +50,7 @@ fn test_full_utl_pipeline_with_real_data() {
     );
     assert!(
         result.phi >= 0.0 && result.phi <= std::f32::consts::PI,
-        "phi {} out of bounds [0,π]",
+        "phi {} out of bounds [0,pi]",
         result.phi
     );
 
@@ -60,15 +59,6 @@ fn test_full_utl_pipeline_with_real_data() {
         result.lambda_weights.is_some(),
         "Lambda weights must be present in LearningSignal"
     );
-
-    // Verify quadrant is valid
-    assert!(matches!(
-        result.quadrant,
-        JohariQuadrant::Open
-            | JohariQuadrant::Blind
-            | JohariQuadrant::Hidden
-            | JohariQuadrant::Unknown
-    ));
 }
 
 #[test]
@@ -81,11 +71,11 @@ fn test_formula_mathematical_properties() {
     let result = compute_learning_magnitude(0.5, 0.0, 1.0, 0.5);
     assert_eq!(result, 0.0, "zero coherence must yield zero learning");
 
-    // Property 3: phi=π/2 = zero learning (cos(π/2) ≈ 0)
+    // Property 3: phi=pi/2 = zero learning (cos(pi/2) ~= 0)
     let result = compute_learning_magnitude(1.0, 1.0, 1.0, std::f32::consts::FRAC_PI_2);
     assert!(
         result.abs() < 1e-6,
-        "phi=π/2 must yield near-zero learning, got {}",
+        "phi=pi/2 must yield near-zero learning, got {}",
         result
     );
 
@@ -101,7 +91,7 @@ fn test_formula_mathematical_properties() {
 
 #[test]
 fn test_formula_computation_accuracy() {
-    // Test exact formula: L = (ΔS × ΔC) · wₑ · cos(φ)
+    // Test exact formula: L = (DeltaS x DeltaC) . w_e . cos(phi)
     let delta_s = 0.8;
     let delta_c = 0.7;
     let w_e = 1.2;
@@ -123,11 +113,11 @@ fn test_formula_computation_accuracy() {
 
 #[test]
 fn test_anti_phase_suppresses_learning() {
-    // At phi = π, cos(π) = -1, so learning should be suppressed to 0
+    // At phi = pi, cos(pi) = -1, so learning should be suppressed to 0
     let result = compute_learning_magnitude(0.8, 0.7, 1.2, std::f32::consts::PI);
 
     // Raw: (0.8 * 0.7) * 1.2 * (-1) = -0.672, clamped to 0
-    assert_eq!(result, 0.0, "anti-phase (φ=π) must suppress learning to 0");
+    assert_eq!(result, 0.0, "anti-phase (phi=pi) must suppress learning to 0");
 }
 
 #[test]
@@ -150,12 +140,12 @@ fn test_min_values() {
 
 #[test]
 fn test_phi_orthogonal() {
-    // At phi = π/2, cos(π/2) ≈ 0, so learning should be ~0
+    // At phi = pi/2, cos(pi/2) ~= 0, so learning should be ~0
     let result = compute_learning_magnitude(1.0, 1.0, 1.5, std::f32::consts::FRAC_PI_2);
 
     assert!(
         result.abs() < 1e-6,
-        "phi=π/2 should yield L≈0, got {}",
+        "phi=pi/2 should yield L~=0, got {}",
         result
     );
 }
@@ -173,8 +163,6 @@ fn test_learning_signal_serialization() {
         1.2,
         0.5,
         Some(LifecycleLambdaWeights::for_stage(LifecycleStage::Growth)),
-        JohariQuadrant::Open,
-        SuggestedAction::DirectRecall,
         true,
         true,
         1500,
@@ -187,5 +175,4 @@ fn test_learning_signal_serialization() {
 
     assert_eq!(deserialized.magnitude, signal.magnitude);
     assert_eq!(deserialized.delta_s, signal.delta_s);
-    assert_eq!(deserialized.quadrant, signal.quadrant);
 }

@@ -10,7 +10,6 @@ pub(crate) mod core;
 pub(crate) mod dream;
 pub mod epistemic;
 pub(crate) mod gwt;
-pub mod johari;
 pub mod merge;
 pub(crate) mod meta_utl;
 pub(crate) mod neuromod;
@@ -25,17 +24,13 @@ use crate::tools::types::ToolDefinition;
 /// Get all tool definitions for the `tools/list` response.
 ///
 /// Returns the complete list of MCP tools exposed by the Context Graph server.
-/// Currently returns 55 tools across 15 categories.
-/// TASK-37: Added get_gpu_status tool (Dream tools now 5).
-/// TASK-38/39: Added get_identity_continuity, get_kuramoto_state (GWT tools now 9).
-/// TASK-013: Added session tools (4 tools).
 pub fn get_tool_definitions() -> Vec<ToolDefinition> {
-    let mut tools = Vec::with_capacity(55);
+    let mut tools = Vec::with_capacity(50);
 
     // Core tools (6)
     tools.extend(core::definitions());
 
-    // GWT tools (9) - includes get_coherence_state, get_identity_continuity, get_kuramoto_state
+    // GWT tools
     tools.extend(gwt::definitions());
 
     // UTL tools (1)
@@ -70,9 +65,6 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
 
     // Merge tools (1) - TASK-MCP-003
     tools.extend(merge::definitions());
-
-    // Johari classification tools (1) - TASK-MCP-005
-    tools.extend(johari::definitions());
 
     // Session tools (4) - TASK-013: Per ARCH-07 session lifecycle hooks
     tools.extend(session::definitions());

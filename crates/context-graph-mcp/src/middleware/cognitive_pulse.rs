@@ -4,15 +4,16 @@
 //! All fields are REQUIRED - no Option types.
 //! Computation MUST complete in < 1ms (warning logged if exceeded).
 //!
-//! # Constitution Reference
+//! # Suggested Action Mapping
 //!
-//! Johari quadrant to action mapping (constitution.yaml:159-163):
-//! - Open: delta_s < 0.5, delta_c > 0.5 -> DirectRecall
-//! - Blind: delta_s > 0.5, delta_c < 0.5 -> TriggerDream
-//! - Hidden: delta_s < 0.5, delta_c < 0.5 -> GetNeighborhood
-//! - Unknown: delta_s > 0.5, delta_c > 0.5 -> EpistemicAction
+//! Action is computed from entropy/coherence per PRD v6 embedder category weights:
+//! - Ready: entropy < 0.4, coherence > 0.6
+//! - Stabilize: entropy > 0.7, coherence < 0.4
+//! - Explore: entropy > 0.6, coherence > 0.5
+//! - Consolidate: coherence < 0.4
+//! - Review: entropy > 0.5, coherence < 0.5
+//! - Continue: default balanced state
 
-use std::str::FromStr;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -20,8 +21,7 @@ use thiserror::Error;
 use tracing::{debug, error, warn};
 
 use context_graph_core::traits::UtlProcessor;
-use context_graph_core::types::JohariQuadrant;
-use context_graph_utl::johari::{get_suggested_action, SuggestedAction};
+use context_graph_core::types::SuggestedAction;
 
 /// CognitivePulse provides real-time UTL state in every MCP response.
 ///
@@ -38,8 +38,7 @@ use context_graph_utl::johari::{get_suggested_action, SuggestedAction};
 ///     "entropy": 0.42,
 ///     "coherence": 0.78,
 ///     "learning_score": 0.55,
-///     "quadrant": "Open",
-///     "suggested_action": "DirectRecall"
+///     "suggested_action": "continue"
 ///   }
 /// }
 /// ```
@@ -54,10 +53,7 @@ pub struct CognitivePulse {
     /// Current learning magnitude in [0.0, 1.0]
     pub learning_score: f32,
 
-    /// Johari quadrant classification
-    pub quadrant: JohariQuadrant,
-
-    /// Suggested action per constitution.yaml:159-163
+    /// Suggested action computed from entropy/coherence
     pub suggested_action: SuggestedAction,
 }
 
@@ -82,6 +78,28 @@ pub enum CognitivePulseError {
 }
 
 impl CognitivePulse {
+    /// Compute suggested action from entropy and coherence values.
+    ///
+    /// Implements the entropy/coherence to action mapping per PRD v6.
+    fn compute_action(entropy: f32, coherence: f32) -> SuggestedAction {
+        match (entropy, coherence) {
+            // High entropy, low coherence - needs stabilization
+            (e, c) if e > 0.7 && c < 0.4 => SuggestedAction::Stabilize,
+            // High entropy, high coherence - exploration frontier
+            (e, c) if e > 0.6 && c > 0.5 => SuggestedAction::Explore,
+            // Low entropy, high coherence - well understood, ready
+            (e, c) if e < 0.4 && c > 0.6 => SuggestedAction::Ready,
+            // Low coherence - needs consolidation
+            (_, c) if c < 0.4 => SuggestedAction::Consolidate,
+            // High entropy - consider pruning
+            (e, _) if e > 0.8 => SuggestedAction::Prune,
+            // Review needed
+            (e, c) if e > 0.5 && c < 0.5 => SuggestedAction::Review,
+            // Default: continue
+            _ => SuggestedAction::Continue,
+        }
+    }
+
     /// Create pulse from UTL processor state.
     ///
     /// Extracts current UTL metrics from the processor and maps
@@ -143,38 +161,14 @@ impl CognitivePulse {
                 CognitivePulseError::ComputationFailed("missing learning_score in status".into())
             })?;
 
-        // Extract johari_quadrant - REQUIRED, no fallback
-        let quadrant_str = status
-            .get("johari_quadrant")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| {
-                error!("CognitivePulse: missing 'johari_quadrant' in UTL status");
-                CognitivePulseError::ComputationFailed("missing johari_quadrant in status".into())
-            })?;
-
-        // Parse quadrant string to enum
-        let quadrant = JohariQuadrant::from_str(quadrant_str).map_err(|e| {
-            error!(
-                quadrant = quadrant_str,
-                error = %e,
-                "CognitivePulse: invalid johari_quadrant value"
-            );
-            CognitivePulseError::InvalidInput {
-                field: "quadrant".into(),
-                reason: format!("invalid quadrant '{}': {}", quadrant_str, e),
-            }
-        })?;
-
-        // Get suggested action from quadrant using existing function
-        // This implements constitution.yaml:159-163 mapping
-        let suggested_action = get_suggested_action(quadrant);
+        // Compute suggested action from entropy/coherence
+        let suggested_action = Self::compute_action(entropy, coherence);
 
         // Construct pulse
         let pulse = Self {
             entropy,
             coherence,
             learning_score,
-            quadrant,
             suggested_action,
         };
 
@@ -188,7 +182,7 @@ impl CognitivePulse {
                 elapsed_us = elapsed.as_micros(),
                 entropy = pulse.entropy,
                 coherence = pulse.coherence,
-                quadrant = ?pulse.quadrant,
+                suggested_action = ?pulse.suggested_action,
                 "CognitivePulse computation exceeded 1ms target"
             );
         } else {
@@ -197,7 +191,6 @@ impl CognitivePulse {
                 entropy = pulse.entropy,
                 coherence = pulse.coherence,
                 learning_score = pulse.learning_score,
-                quadrant = ?pulse.quadrant,
                 suggested_action = ?pulse.suggested_action,
                 "CognitivePulse computed successfully"
             );
@@ -216,7 +209,6 @@ impl CognitivePulse {
     /// * `entropy` - Entropy value [0.0, 1.0]
     /// * `coherence` - Coherence value [0.0, 1.0]
     /// * `learning_score` - Learning score [0.0, 1.0]
-    /// * `quadrant` - Johari quadrant classification
     ///
     /// # Returns
     ///
@@ -227,15 +219,13 @@ impl CognitivePulse {
         entropy: f32,
         coherence: f32,
         learning_score: f32,
-        quadrant: JohariQuadrant,
     ) -> Result<Self, CognitivePulseError> {
-        let suggested_action = get_suggested_action(quadrant);
+        let suggested_action = Self::compute_action(entropy, coherence);
 
         let pulse = Self {
             entropy,
             coherence,
             learning_score,
-            quadrant,
             suggested_action,
         };
 
@@ -250,7 +240,6 @@ impl CognitivePulse {
     /// - entropy: [0.0, 1.0]
     /// - coherence: [0.0, 1.0]
     /// - learning_score: [0.0, 1.0]
-    /// - quadrant: must be valid JohariQuadrant (enforced by type)
     ///
     /// # Returns
     ///
@@ -312,38 +301,35 @@ mod tests {
 
     #[test]
     fn test_cognitive_pulse_from_values_valid() {
-        let pulse =
-            CognitivePulse::from_values(0.42, 0.78, 0.55, JohariQuadrant::Open).expect("valid");
+        let pulse = CognitivePulse::from_values(0.42, 0.78, 0.55).expect("valid");
 
         assert!((pulse.entropy - 0.42).abs() < 0.001);
         assert!((pulse.coherence - 0.78).abs() < 0.001);
         assert!((pulse.learning_score - 0.55).abs() < 0.001);
-        assert_eq!(pulse.quadrant, JohariQuadrant::Open);
-        assert_eq!(pulse.suggested_action, SuggestedAction::DirectRecall);
     }
 
     #[test]
-    fn test_cognitive_pulse_johari_action_mapping() {
-        // constitution.yaml:159-163 compliance
-        let open = CognitivePulse::from_values(0.3, 0.7, 0.5, JohariQuadrant::Open).expect("valid");
-        assert_eq!(open.suggested_action, SuggestedAction::DirectRecall);
+    fn test_cognitive_pulse_action_mapping() {
+        // Low entropy, high coherence -> Ready
+        let ready = CognitivePulse::from_values(0.3, 0.7, 0.5).expect("valid");
+        assert_eq!(ready.suggested_action, SuggestedAction::Ready);
 
-        let blind =
-            CognitivePulse::from_values(0.7, 0.3, 0.5, JohariQuadrant::Blind).expect("valid");
-        assert_eq!(blind.suggested_action, SuggestedAction::TriggerDream); // constitution: Blind → TriggerDream
+        // High entropy, low coherence -> Stabilize
+        let stabilize = CognitivePulse::from_values(0.75, 0.35, 0.5).expect("valid");
+        assert_eq!(stabilize.suggested_action, SuggestedAction::Stabilize);
 
-        let hidden =
-            CognitivePulse::from_values(0.3, 0.3, 0.5, JohariQuadrant::Hidden).expect("valid");
-        assert_eq!(hidden.suggested_action, SuggestedAction::GetNeighborhood);
+        // High entropy, high coherence -> Explore
+        let explore = CognitivePulse::from_values(0.65, 0.55, 0.5).expect("valid");
+        assert_eq!(explore.suggested_action, SuggestedAction::Explore);
 
-        let unknown =
-            CognitivePulse::from_values(0.7, 0.7, 0.5, JohariQuadrant::Unknown).expect("valid");
-        assert_eq!(unknown.suggested_action, SuggestedAction::EpistemicAction); // constitution: Unknown → EpistemicAction
+        // Low coherence -> Consolidate
+        let consolidate = CognitivePulse::from_values(0.5, 0.35, 0.5).expect("valid");
+        assert_eq!(consolidate.suggested_action, SuggestedAction::Consolidate);
     }
 
     #[test]
     fn test_cognitive_pulse_validation_entropy_out_of_range() {
-        let result = CognitivePulse::from_values(1.5, 0.5, 0.5, JohariQuadrant::Open);
+        let result = CognitivePulse::from_values(1.5, 0.5, 0.5);
         assert!(result.is_err());
 
         match result.unwrap_err() {
@@ -356,7 +342,7 @@ mod tests {
 
     #[test]
     fn test_cognitive_pulse_validation_coherence_out_of_range() {
-        let result = CognitivePulse::from_values(0.5, -0.1, 0.5, JohariQuadrant::Open);
+        let result = CognitivePulse::from_values(0.5, -0.1, 0.5);
         assert!(result.is_err());
 
         match result.unwrap_err() {
@@ -369,7 +355,7 @@ mod tests {
 
     #[test]
     fn test_cognitive_pulse_validation_learning_score_out_of_range() {
-        let result = CognitivePulse::from_values(0.5, 0.5, 2.0, JohariQuadrant::Open);
+        let result = CognitivePulse::from_values(0.5, 0.5, 2.0);
         assert!(result.is_err());
 
         match result.unwrap_err() {
@@ -382,14 +368,13 @@ mod tests {
 
     #[test]
     fn test_cognitive_pulse_validation_nan() {
-        let result = CognitivePulse::from_values(f32::NAN, 0.5, 0.5, JohariQuadrant::Open);
+        let result = CognitivePulse::from_values(f32::NAN, 0.5, 0.5);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_cognitive_pulse_serialization() {
-        let pulse =
-            CognitivePulse::from_values(0.42, 0.78, 0.55, JohariQuadrant::Open).expect("valid");
+        let pulse = CognitivePulse::from_values(0.42, 0.78, 0.55).expect("valid");
 
         let json = serde_json::to_string(&pulse).expect("serialize");
         assert!(json.contains("\"entropy\":0.42"));
@@ -403,14 +388,13 @@ mod tests {
     #[test]
     fn test_cognitive_pulse_boundary_values() {
         // Minimum values
-        let min =
-            CognitivePulse::from_values(0.0, 0.0, 0.0, JohariQuadrant::Hidden).expect("valid");
+        let min = CognitivePulse::from_values(0.0, 0.0, 0.0).expect("valid");
         assert_eq!(min.entropy, 0.0);
         assert_eq!(min.coherence, 0.0);
         assert_eq!(min.learning_score, 0.0);
 
         // Maximum values
-        let max = CognitivePulse::from_values(1.0, 1.0, 1.0, JohariQuadrant::Open).expect("valid");
+        let max = CognitivePulse::from_values(1.0, 1.0, 1.0).expect("valid");
         assert_eq!(max.entropy, 1.0);
         assert_eq!(max.coherence, 1.0);
         assert_eq!(max.learning_score, 1.0);

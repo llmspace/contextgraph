@@ -50,7 +50,6 @@ use dashmap::DashMap;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::gwt::ego_node::SelfEgoNode;
 use crate::traits::TeleologicalStorageBackend;
 use crate::types::fingerprint::TeleologicalFingerprint;
 
@@ -67,8 +66,6 @@ pub struct InMemoryTeleologicalStore {
     pub(crate) deleted: DashMap<Uuid, ()>,
     /// Content storage: UUID -> original content text
     pub(crate) content: DashMap<Uuid, String>,
-    /// Singleton SELF_EGO_NODE storage (TASK-GWT-P1-001).
-    pub(crate) ego_node: std::sync::RwLock<Option<SelfEgoNode>>,
     /// Running size estimate in bytes
     pub(crate) size_bytes: AtomicUsize,
 }
@@ -81,7 +78,6 @@ impl InMemoryTeleologicalStore {
             data: DashMap::new(),
             deleted: DashMap::new(),
             content: DashMap::new(),
-            ego_node: std::sync::RwLock::new(None),
             size_bytes: AtomicUsize::new(0),
         }
     }
@@ -96,7 +92,6 @@ impl InMemoryTeleologicalStore {
             data: DashMap::with_capacity(capacity),
             deleted: DashMap::new(),
             content: DashMap::with_capacity(capacity),
-            ego_node: std::sync::RwLock::new(None),
             size_bytes: AtomicUsize::new(0),
         }
     }

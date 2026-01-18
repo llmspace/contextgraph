@@ -7,6 +7,11 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// DTO for ExtendedTriggerReason for MCP serialization.
+///
+/// # Constitution Compliance (v6.0.0)
+///
+/// Per Constitution v6.0.0, dreams are triggered by entropy and churn conditions,
+/// NOT by identity coherence (IC). The IdentityCritical variant has been removed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TriggerReasonDto {
@@ -18,8 +23,6 @@ pub enum TriggerReasonDto {
     None,
     /// Manual trigger.
     Manual { phase: String },
-    /// Identity crisis.
-    IdentityCritical { ic_value: f32 },
     /// GPU overload.
     GpuOverload,
     /// Memory pressure.
@@ -43,7 +46,6 @@ impl std::fmt::Display for TriggerReasonDto {
             Self::ThresholdMet => write!(f, "threshold_met"),
             Self::None => write!(f, "none"),
             Self::Manual { phase } => write!(f, "manual:{}", phase),
-            Self::IdentityCritical { ic_value } => write!(f, "identity_critical:{:.2}", ic_value),
             Self::GpuOverload => write!(f, "gpu_overload"),
             Self::MemoryPressure => write!(f, "memory_pressure"),
             Self::Scheduled => write!(f, "scheduled"),
@@ -52,16 +54,18 @@ impl std::fmt::Display for TriggerReasonDto {
     }
 }
 
-/// TASK-S03: Convert core ExtendedTriggerReason to DTO for MCP serialization.
+/// Convert core ExtendedTriggerReason to DTO for MCP serialization.
+///
+/// # Constitution Compliance (v6.0.0)
+///
+/// Per Constitution v6.0.0, dreams are triggered by entropy and churn,
+/// NOT identity coherence. IdentityCritical conversion removed.
 impl From<ExtendedTriggerReason> for TriggerReasonDto {
     fn from(reason: ExtendedTriggerReason) -> Self {
         match reason {
             ExtendedTriggerReason::Manual { phase } => TriggerReasonDto::Manual {
                 phase: format!("{}", phase),
             },
-            ExtendedTriggerReason::IdentityCritical { ic_value } => {
-                TriggerReasonDto::IdentityCritical { ic_value }
-            }
             ExtendedTriggerReason::IdleTimeout => TriggerReasonDto::IdleTimeout,
             ExtendedTriggerReason::HighEntropy => TriggerReasonDto::HighEntropy,
             ExtendedTriggerReason::GpuOverload => TriggerReasonDto::GpuOverload,
@@ -118,13 +122,18 @@ impl TriggerHistoryEntry {
 }
 
 /// DTO for TriggerManager configuration (MCP response).
+///
+/// # Constitution Compliance (v6.0.0)
+///
+/// Per Constitution v6.0.0, dreams are triggered by entropy and churn,
+/// NOT identity coherence (IC). The ic_threshold field has been removed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TriggerConfigDto {
     /// Current entropy threshold.
     pub entropy_threshold: f32,
 
-    /// Current IC threshold.
-    pub ic_threshold: f32,
+    /// Current churn threshold (Constitution v6.0.0: churn > 0.5).
+    pub churn_threshold: f32,
 
     /// Cooldown duration in milliseconds.
     pub cooldown_ms: u64,
@@ -144,8 +153,8 @@ impl Default for TriggerConfigDto {
     fn default() -> Self {
         Self {
             entropy_threshold: 0.7,
-            ic_threshold: 0.3,
-            cooldown_ms: 60_000, // 1 minute
+            churn_threshold: 0.5, // Constitution v6.0.0: churn > 0.5
+            cooldown_ms: 60_000,  // 1 minute
             last_trigger_timestamp: None,
             trigger_count: 0,
             enabled: true,
@@ -444,11 +453,12 @@ mod tests {
     fn test_trigger_config_dto_default() {
         let config = TriggerConfigDto::default();
 
+        // Constitution v6.0.0: entropy > 0.7 AND churn > 0.5
         assert!((config.entropy_threshold - 0.7).abs() < f32::EPSILON);
-        assert!((config.ic_threshold - 0.3).abs() < f32::EPSILON);
+        assert!((config.churn_threshold - 0.5).abs() < f32::EPSILON);
         assert_eq!(config.cooldown_ms, 60_000);
         assert!(config.enabled);
-        println!("[PASS] TriggerConfigDto::default() has correct values");
+        println!("[PASS] TriggerConfigDto::default() has correct values (Constitution v6.0.0)");
     }
 
     #[test]

@@ -1,4 +1,4 @@
-//! Bincode serialization for TeleologicalFingerprint and SelfEgoNode.
+//! Bincode serialization for TeleologicalFingerprint.
 //!
 //! Uses bincode 1.3 for efficient binary serialization.
 //! Expected serialized size: ~30KB per fingerprint (based on SemanticFingerprint with 7,424 dense dims).
@@ -14,13 +14,8 @@
 //!
 //! Each serialized type is prefixed with a version byte.
 //! Version mismatches cause immediate panic (no migration support).
-//!
-//! # TASK-GWT-P1-001: SelfEgoNode Serialization
-//!
-//! Added serialize_ego_node and deserialize_ego_node for persistent ego storage.
 
 use bincode::{deserialize, serialize};
-use context_graph_core::gwt::ego_node::SelfEgoNode;
 use context_graph_core::types::fingerprint::TeleologicalFingerprint;
 use uuid::Uuid;
 
@@ -33,7 +28,7 @@ pub const TELEOLOGICAL_VERSION: u8 = 1;
 ///
 /// Based on actual SemanticFingerprint size:
 /// - TOTAL_DENSE_DIMS = 7,424 → 29,696 bytes for dense embeddings (f32)
-/// - Plus sparse vectors, JohariFingerprint, PurposeVector, metadata
+/// - Plus sparse vectors, PurposeVector, metadata
 /// - Bincode may compress zeros efficiently, so actual size varies
 /// - Using conservative minimum of 5KB to allow for heavy compression
 const MIN_FINGERPRINT_SIZE: usize = 5_000;
@@ -41,7 +36,7 @@ const MIN_FINGERPRINT_SIZE: usize = 5_000;
 /// Maximum expected size for a serialized TeleologicalFingerprint.
 ///
 /// With 100 evolution snapshots (MAX_EVOLUTION_SNAPSHOTS), size could grow significantly.
-/// Each snapshot contains PurposeVector (52B) + JohariFingerprint (~520B) + trigger + timestamp.
+/// Each snapshot contains PurposeVector (52B) + trigger + timestamp.
 /// Also, maximum-size fingerprints with many sparse entries and tokens can exceed 100KB:
 /// - 2000 E6 sparse entries: ~12KB (2000 * 6 bytes)
 /// - 1500 E13 SPLADE entries: ~9KB (1500 * 6 bytes)
@@ -344,158 +339,4 @@ pub fn deserialize_memory_id_list(data: &[u8]) -> Vec<Uuid> {
         result.push(uuid);
     }
     result
-}
-
-// =============================================================================
-// TASK-GWT-P1-001: SELF_EGO_NODE SERIALIZATION
-// =============================================================================
-
-/// Serialization version for SelfEgoNode.
-///
-/// Bump this when struct layout changes. Version mismatches will panic.
-pub const EGO_NODE_VERSION: u8 = 1;
-
-/// Minimum expected size for a serialized SelfEgoNode.
-///
-/// Minimal ego node contains:
-/// - Version byte: 1 byte
-/// - UUID (nil): 16 bytes
-/// - Optional<Fingerprint> = None: ~1 byte
-/// - purpose_vector (13 x f32): 52 bytes
-/// - coherence_with_actions (f32): 4 bytes
-/// - Empty trajectory vec: ~8 bytes
-/// - Timestamp: ~12 bytes
-///
-/// Minimum is conservatively 50 bytes to allow for bincode overhead.
-const MIN_EGO_NODE_SIZE: usize = 50;
-
-/// Maximum expected size for a serialized SelfEgoNode.
-///
-/// With maximum trajectory (1000 snapshots), size can be significant:
-/// - Each PurposeSnapshot: ~100 bytes (52 bytes vector + 12 bytes timestamp + context string)
-/// - 1000 snapshots: ~100KB
-/// - Optional fingerprint: up to ~150KB
-/// - Overhead: ~1KB
-///
-/// Total maximum: ~250KB, allowing up to 300KB for safety margin.
-const MAX_EGO_NODE_SIZE: usize = 300_000;
-
-/// Serialize SelfEgoNode to bytes.
-///
-/// # Arguments
-/// * `ego` - The SelfEgoNode to serialize
-///
-/// # Returns
-/// Byte vector containing:
-/// - 1 byte: version
-/// - N bytes: bincode-encoded SelfEgoNode
-///
-/// # Panics
-/// - Panics if bincode serialization fails (indicates struct incompatibility)
-/// - Panics if serialized size is outside [50B, 300KB] range
-///
-/// # Example
-/// ```ignore
-/// use context_graph_storage::teleological::serialize_ego_node;
-/// use context_graph_core::gwt::ego_node::SelfEgoNode;
-///
-/// let ego = SelfEgoNode::new();
-/// let bytes = serialize_ego_node(&ego);
-/// assert!(bytes.len() >= 50);
-/// ```
-pub fn serialize_ego_node(ego: &SelfEgoNode) -> Vec<u8> {
-    let mut result = Vec::with_capacity(10_000); // Pre-allocate ~10KB typical size
-    result.push(EGO_NODE_VERSION);
-
-    let encoded = serialize(ego).unwrap_or_else(|e| {
-        panic!(
-            "SERIALIZATION ERROR: Failed to serialize SelfEgoNode. \
-             Error: {}. EgoNode ID: {:?}. Trajectory length: {}. \
-             This indicates struct incompatibility with bincode 1.3. \
-             Check that all fields implement Serialize correctly.",
-            e,
-            ego.id,
-            ego.identity_trajectory.len()
-        );
-    });
-
-    result.extend(encoded);
-
-    // Verify size is in expected range
-    let size = result.len();
-    if !(MIN_EGO_NODE_SIZE..=MAX_EGO_NODE_SIZE).contains(&size) {
-        panic!(
-            "SERIALIZATION ERROR: SelfEgoNode size {} bytes outside expected range \
-             [{}, {}]. EgoNode ID: {:?}. Trajectory length: {}. \
-             This indicates missing or corrupted data, or unexpectedly large trajectory.",
-            size,
-            MIN_EGO_NODE_SIZE,
-            MAX_EGO_NODE_SIZE,
-            ego.id,
-            ego.identity_trajectory.len()
-        );
-    }
-
-    result
-}
-
-/// Deserialize SelfEgoNode from bytes.
-///
-/// # Arguments
-/// * `data` - Serialized bytes (from `serialize_ego_node`)
-///
-/// # Returns
-/// The deserialized SelfEgoNode
-///
-/// # Panics
-/// - Panics if data is empty
-/// - Panics if version mismatch (no migration support)
-/// - Panics if deserialization fails (indicates corruption)
-///
-/// # Example
-/// ```ignore
-/// use context_graph_storage::teleological::{
-///     serialize_ego_node,
-///     deserialize_ego_node,
-/// };
-/// use context_graph_core::gwt::ego_node::SelfEgoNode;
-///
-/// let original = SelfEgoNode::new();
-/// let bytes = serialize_ego_node(&original);
-/// let restored = deserialize_ego_node(&bytes);
-/// assert_eq!(original.id, restored.id);
-/// ```
-pub fn deserialize_ego_node(data: &[u8]) -> SelfEgoNode {
-    if data.is_empty() {
-        panic!(
-            "DESERIALIZATION ERROR: Empty data for SelfEgoNode. \
-             This indicates missing ego node or wrong CF lookup. \
-             Verify the key exists in the ego_node column family."
-        );
-    }
-
-    let version = data[0];
-    if version != EGO_NODE_VERSION {
-        panic!(
-            "DESERIALIZATION ERROR: SelfEgoNode version mismatch. Expected {}, got {}. \
-             Data length: {} bytes. \
-             This indicates stale data requiring migration. \
-             No automatic migration is supported - ego node must be reinitialized.",
-            EGO_NODE_VERSION,
-            version,
-            data.len()
-        );
-    }
-
-    deserialize(&data[1..]).unwrap_or_else(|e| {
-        panic!(
-            "DESERIALIZATION ERROR: Failed to deserialize SelfEgoNode. \
-             Error: {}. Data length: {} bytes, version: {}. \
-             This indicates corrupted storage or incompatible struct changes. \
-             Check that SelfEgoNode struct matches the stored version.",
-            e,
-            data.len(),
-            version
-        );
-    })
 }

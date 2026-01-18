@@ -1,6 +1,6 @@
-//! Workspace Status, Broadcast, and Coupling FSV Tests
+//! Workspace Status and Broadcast FSV Tests
 //!
-//! Verifies winner-take-all selection state and coupling adjustment.
+//! Verifies winner-take-all selection state.
 
 use serde_json::json;
 
@@ -130,110 +130,9 @@ async fn test_trigger_workspace_broadcast_performs_wta_selection() {
             "Response must include was_selected boolean"
         );
 
-        // FSV-3: Must have new_r (Kuramoto order parameter)
-        let new_r = content["new_r"].as_f64().expect("new_r must be f64");
-        assert!(
-            (0.0..=1.0).contains(&new_r),
-            "new_r must be in [0, 1], got {}",
-            new_r
-        );
-
         println!(
-            "FSV PASSED: trigger_workspace_broadcast WTA selection - selected={}, r={:.4}",
-            was_selected.unwrap_or(false),
-            new_r
+            "FSV PASSED: trigger_workspace_broadcast WTA selection - selected={}",
+            was_selected.unwrap_or(false)
         );
     }
-}
-
-#[tokio::test]
-async fn test_adjust_coupling_modifies_kuramoto_k() {
-    // SETUP: Create handlers with real GWT components
-    let handlers = create_handlers_with_gwt();
-
-    // STEP 1: Get initial coupling K
-    let initial_request = make_tool_call_request(tool_names::GET_KURAMOTO_SYNC, None);
-    let initial_response = handlers.dispatch(initial_request).await;
-    let initial_json = serde_json::to_value(&initial_response).expect("serialize");
-    let initial_content = extract_tool_content(&initial_json).expect("initial content");
-    let initial_k = initial_content["coupling"]
-        .as_f64()
-        .expect("initial coupling must be f64");
-
-    // STEP 2: Adjust coupling to a new value
-    let new_k_target = if initial_k < 5.0 {
-        initial_k + 1.0
-    } else {
-        initial_k - 1.0
-    };
-    let adjust_args = json!({ "new_K": new_k_target });
-    let adjust_request = make_tool_call_request(tool_names::ADJUST_COUPLING, Some(adjust_args));
-    let adjust_response = handlers.dispatch(adjust_request).await;
-
-    // Parse response
-    let adjust_json = serde_json::to_value(&adjust_response).expect("serialize");
-    assert!(
-        adjust_json.get("error").is_none(),
-        "adjust_coupling should succeed: {:?}",
-        adjust_json.get("error")
-    );
-
-    let adjust_content = extract_tool_content(&adjust_json).expect("adjust content");
-
-    // FSV-1: Must have old_K
-    let old_k = adjust_content["old_K"].as_f64().expect("old_K must be f64");
-    assert!(
-        (old_k - initial_k).abs() < 1e-6,
-        "old_K={} should match initial K={}",
-        old_k,
-        initial_k
-    );
-
-    // FSV-2: Must have new_K (clamped to [0, 10])
-    let new_k = adjust_content["new_K"].as_f64().expect("new_K must be f64");
-    assert!(
-        (0.0..=10.0).contains(&new_k),
-        "new_K must be in [0, 10], got {}",
-        new_k
-    );
-
-    // FSV-3: new_K should be close to target (unless clamped)
-    let expected_k = new_k_target.clamp(0.0, 10.0);
-    assert!(
-        (new_k - expected_k).abs() < 1e-6,
-        "new_K={} should be close to target {} (clamped)",
-        new_k,
-        expected_k
-    );
-
-    // FSV-4: Must have predicted_r
-    let predicted_r = adjust_content["predicted_r"]
-        .as_f64()
-        .expect("predicted_r must be f64");
-    assert!(
-        (0.0..=1.0).contains(&predicted_r),
-        "predicted_r must be in [0, 1], got {}",
-        predicted_r
-    );
-
-    // STEP 3: Verify change persisted by reading again
-    let verify_request = make_tool_call_request(tool_names::GET_KURAMOTO_SYNC, None);
-    let verify_response = handlers.dispatch(verify_request).await;
-    let verify_json = serde_json::to_value(&verify_response).expect("serialize");
-    let verify_content = extract_tool_content(&verify_json).expect("verify content");
-    let verify_k = verify_content["coupling"]
-        .as_f64()
-        .expect("verify coupling must be f64");
-
-    assert!(
-        (verify_k - new_k).abs() < 1e-6,
-        "K should persist after adjustment: expected {}, got {}",
-        new_k,
-        verify_k
-    );
-
-    println!(
-        "FSV PASSED: adjust_coupling modified K from {:.4} to {:.4}, predicted_r={:.4}",
-        initial_k, new_k, predicted_r
-    );
 }

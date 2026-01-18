@@ -1,22 +1,16 @@
 //! Autonomous system tool definitions.
 //! TASK-AUTONOMOUS-MCP: Drift detection, correction, pruning, consolidation, sub-goals, status.
-//! SPEC-AUTONOMOUS-001: Added 5 missing tools (get_learner_state, observe_outcome, execute_prune,
+//! SPEC-AUTONOMOUS-001: Added 5 tools (get_learner_state, observe_outcome, execute_prune,
 //!                      get_health_status, trigger_healing).
-//! TASK-P0-001: REMOVED auto_bootstrap_north_star per ARCH-03 (goals emerge from topic clustering)
 
 use crate::tools::types::ToolDefinition;
 use serde_json::json;
 
-/// Returns Autonomous tool definitions (12 tools after TASK-P0-001 removal).
-/// SPEC-AUTONOMOUS-001: Added 5 new tools per constitution NORTH-009, NORTH-012, NORTH-020.
+/// Returns Autonomous tool definitions (12 tools).
+/// SPEC-AUTONOMOUS-001: Added 5 tools per constitution NORTH-009, NORTH-012, NORTH-020.
 /// TASK-FIX-002/NORTH-010: Added get_drift_history tool.
-/// TASK-P0-001: Removed auto_bootstrap_north_star - goals emerge autonomously from clustering.
 pub fn definitions() -> Vec<ToolDefinition> {
     vec![
-        // REMOVED: auto_bootstrap_north_star per TASK-P0-001 (ARCH-03)
-        // Goals emerge autonomously from topic clustering, no manual bootstrap needed.
-        // Use get_topic_portfolio and get_topic_stability for topic-based goal discovery.
-
         // get_alignment_drift - Get drift state and history
         ToolDefinition::new(
             "get_alignment_drift",
@@ -303,8 +297,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
         ToolDefinition::new(
             "execute_prune",
             "Execute pruning on identified candidate nodes. Per NORTH-012: Completes the pruning workflow \
-             started by get_pruning_candidates. Uses soft delete with 30-day recovery per SEC-06. \
-             SELF_EGO_NODE is protected and cannot be pruned.",
+             started by get_pruning_candidates. Uses soft delete with 30-day recovery per SEC-06.",
             json!({
                 "type": "object",
                 "properties": {
@@ -354,7 +347,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             "trigger_healing",
             "Trigger self-healing protocol for a degraded subsystem. Per NORTH-020: Autonomous recovery \
              without manual intervention. Healing actions vary by subsystem and severity: \
-             UTL resets lambda weights, GWT resets Kuramoto phases, Dream aborts/resets scheduler, \
+             UTL resets lambda weights, GWT clears workspace, Dream aborts/resets scheduler, \
              Storage compacts RocksDB and clears caches.",
             json!({
                 "type": "object",

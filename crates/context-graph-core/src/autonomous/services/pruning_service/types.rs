@@ -52,7 +52,7 @@ pub struct MemoryMetadata {
     pub id: MemoryId,
     /// When the memory was created
     pub created_at: DateTime<Utc>,
-    /// North Star alignment score [0.0, 1.0]
+    /// Topic alignment score [0.0, 1.0]
     pub alignment: f32,
     /// Number of connections to other memories
     pub connection_count: u32,

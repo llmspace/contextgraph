@@ -3,8 +3,7 @@
 use std::collections::HashSet;
 
 use context_graph_core::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
-    NUM_EMBEDDERS,
+    PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint, NUM_EMBEDDERS,
 };
 use context_graph_storage::teleological::RocksDbTeleologicalStore;
 use rand::Rng;
@@ -80,27 +79,6 @@ pub fn generate_real_purpose_vector() -> PurposeVector {
     PurposeVector::new(alignments)
 }
 
-/// Generate a REAL JohariFingerprint with valid quadrant weights.
-pub fn generate_real_johari_fingerprint() -> JohariFingerprint {
-    let mut rng = rand::thread_rng();
-    let mut jf = JohariFingerprint::zeroed();
-
-    for i in 0..NUM_EMBEDDERS {
-        // Generate 4 random weights that sum to 1.0
-        let mut weights: [f32; 4] = std::array::from_fn(|_| rng.gen_range(0.0..1.0));
-        let sum: f32 = weights.iter().sum();
-        for w in &mut weights {
-            *w /= sum;
-        }
-        let confidence = rng.gen_range(0.5..1.0);
-        jf.set_quadrant(
-            i, weights[0], weights[1], weights[2], weights[3], confidence,
-        );
-    }
-
-    jf
-}
-
 /// Generate a REAL content hash (SHA-256 simulation).
 pub fn generate_real_content_hash() -> [u8; 32] {
     let mut rng = rand::thread_rng();
@@ -115,7 +93,6 @@ pub fn create_real_fingerprint() -> TeleologicalFingerprint {
     TeleologicalFingerprint::new(
         generate_real_semantic_fingerprint(),
         generate_real_purpose_vector(),
-        generate_real_johari_fingerprint(),
         generate_real_content_hash(),
     )
 }
@@ -126,7 +103,6 @@ pub fn create_real_fingerprint_with_id(id: Uuid) -> TeleologicalFingerprint {
         id,
         generate_real_semantic_fingerprint(),
         generate_real_purpose_vector(),
-        generate_real_johari_fingerprint(),
         generate_real_content_hash(),
     )
 }

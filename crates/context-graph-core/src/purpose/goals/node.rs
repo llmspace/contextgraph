@@ -62,7 +62,7 @@ pub struct GoalNode {
     ///   etc.
     pub teleological_array: TeleologicalArray,
 
-    /// Parent goal (None for NorthStar).
+    /// Parent goal (None for Strategic goals).
     pub parent_id: Option<Uuid>,
 
     /// Child goal IDs.
@@ -142,7 +142,6 @@ impl GoalNode {
         teleological_array: TeleologicalArray,
         discovery: GoalDiscoveryMetadata,
     ) -> Result<Self, GoalNodeError> {
-        // TASK-P0-001: Updated check from NorthStar to Strategic
         assert!(
             level != GoalLevel::Strategic,
             "Strategic goals cannot have a parent - they are top-level"
@@ -169,8 +168,6 @@ impl GoalNode {
     }
 
     /// Check if this is a top-level (Strategic) goal.
-    ///
-    /// Renamed from `is_north_star()` per TASK-P0-001 (ARCH-03).
     #[inline]
     pub fn is_top_level(&self) -> bool {
         self.level == GoalLevel::Strategic
@@ -179,7 +176,7 @@ impl GoalNode {
     /// Check if this goal has the given ancestor.
     ///
     /// Note: This only checks the immediate parent. For full ancestry check,
-    /// use `GoalHierarchy::path_to_north_star()`.
+    /// use `GoalHierarchy::path_to_root()`.
     #[inline]
     pub fn has_parent(&self, ancestor_id: Uuid) -> bool {
         self.parent_id == Some(ancestor_id)
@@ -197,7 +194,3 @@ impl GoalNode {
         self.child_ids.retain(|id| *id != child_id);
     }
 }
-
-// NOTE: The following constructors are REMOVED per ARCH-03 (autonomous-first):
-// - north_star() - Manual goal creation forbidden
-// - child() - Use autonomous_goal() or child_goal() instead

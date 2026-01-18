@@ -22,13 +22,13 @@ impl Handlers {
     /// TASK-AUTONOMOUS-MCP + TASK-INTEG-002 + ARCH-03: Discover potential sub-goals from memory clusters.
     /// Uses GoalDiscoveryPipeline (TASK-LOGIC-009) with K-means clustering for enhanced goal discovery.
     ///
-    /// ARCH-03 COMPLIANT: Works WITHOUT North Star by discovering ALL goals from clustering
+    /// ARCH-03 COMPLIANT: Works without top-level goal by discovering ALL goals from clustering
     /// of stored fingerprints. Goals emerge from data patterns via clustering.
     ///
     /// Arguments:
     /// - min_confidence (optional): Minimum confidence/coherence for sub-goal (default: 0.6)
     /// - max_goals (optional): Maximum sub-goals to discover (default: 5)
-    /// - parent_goal_id (optional): Parent goal (default: North Star if exists, otherwise discovers top-level goals)
+    /// - parent_goal_id (optional): Parent goal (default: top-level strategic goal if exists, otherwise discovers top-level goals)
     /// - memory_ids (optional): Specific memory IDs to analyze (default: all recent memories)
     /// - algorithm (optional): Clustering algorithm - "kmeans", "hdbscan", "spectral" (default: "kmeans")
     ///
@@ -63,7 +63,7 @@ impl Handlers {
             "discover_sub_goals: Parsed parameters"
         );
 
-        // ARCH-03 COMPLIANT: Check if North Star or parent goal exists, but don't require it
+        // ARCH-03 COMPLIANT: Check if top-level or parent goal exists, but don't require it
         let (parent_goal, discovery_mode): (Option<context_graph_core::purpose::GoalNode>, &str) = {
             let hierarchy = self.goal_hierarchy.read();
 
@@ -344,7 +344,7 @@ impl Handlers {
                 "discovery_count": discovered_goals.len(),
                 "arch03_compliant": true,
                 "note": if discovery_mode == "autonomous" {
-                    "ARCH-03 COMPLIANT: Goals discovered autonomously from clustering (no North Star required)"
+                    "ARCH-03 COMPLIANT: Goals discovered autonomously from clustering"
                 } else {
                     "Goals discovered as sub-goals under parent goal"
                 }

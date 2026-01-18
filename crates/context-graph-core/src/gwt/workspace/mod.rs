@@ -5,9 +5,9 @@
 //!
 //! ## Algorithm
 //!
-//! 1. Compute Kuramoto order parameter r for all candidate memories
+//! 1. Compute coherence order parameter r for all candidate memories
 //! 2. Filter: candidates where r >= coherence_threshold (0.8)
-//! 3. Rank: score = r * importance * north_star_alignment
+//! 3. Rank: score = r * importance * alignment
 //! 4. Select: top-1 becomes active_memory
 //! 5. Broadcast: active_memory visible to all subsystems (100ms window)
 //! 6. Inhibit: losing candidates receive dopamine reduction

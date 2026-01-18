@@ -3,7 +3,6 @@
 use super::helpers::create_purpose_vector;
 use crate::index::purpose::entry::GoalId;
 use crate::index::purpose::query::{PurposeQuery, PurposeQueryTarget};
-use crate::types::JohariQuadrant;
 use uuid::Uuid;
 
 #[test]
@@ -55,14 +54,6 @@ fn test_query_filter_combinations() {
     let query = query.with_goal_filter(GoalId::new("test_goal"));
     assert!(query.has_filters());
     assert_eq!(query.filter_count(), 1);
-
-    // Both filters
-    let query = PurposeQuery::new(PurposeQueryTarget::Vector(pv.clone()), 10, 0.0)
-        .unwrap()
-        .with_goal_filter(GoalId::new("goal_a"))
-        .with_quadrant_filter(JohariQuadrant::Hidden);
-    assert!(query.has_filters());
-    assert_eq!(query.filter_count(), 2);
 
     println!("[VERIFIED] Query filter combinations work correctly");
 }

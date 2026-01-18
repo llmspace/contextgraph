@@ -39,7 +39,7 @@
 //! ```
 
 use context_graph_core::marblestone::EdgeType;
-use context_graph_core::types::{EmbeddingVector, GraphEdge, JohariQuadrant, MemoryNode, NodeId};
+use context_graph_core::types::{EmbeddingVector, GraphEdge, MemoryNode, NodeId};
 
 use crate::rocksdb_backend::StorageError;
 
@@ -152,7 +152,7 @@ impl Default for StorageHealth {
 /// # Example: Using via Trait Object
 ///
 /// ```rust
-/// use context_graph_storage::{Memex, RocksDbMemex, MemoryNode, JohariQuadrant};
+/// use context_graph_storage::{Memex, RocksDbMemex, MemoryNode};
 /// use tempfile::TempDir;
 ///
 /// fn store_and_query(storage: &dyn Memex, content: &str) -> Result<Vec<uuid::Uuid>, context_graph_storage::StorageError> {
@@ -162,18 +162,17 @@ impl Default for StorageHealth {
 ///     let embedding = vec![val; dim];
 ///
 ///     // Store a node
-///     let mut node = MemoryNode::new(content.to_string(), embedding);
-///     node.quadrant = JohariQuadrant::Open;
+///     let node = MemoryNode::new(content.to_string(), embedding);
 ///     storage.store_node(&node)?;
 ///
-///     // Query by quadrant
-///     storage.query_by_quadrant(JohariQuadrant::Open, Some(10))
+///     // Query by tag
+///     storage.query_by_tag("test", Some(10))
 /// }
 ///
 /// let tmp = TempDir::new().unwrap();
 /// let memex = RocksDbMemex::open(tmp.path()).unwrap();
 /// let ids = store_and_query(&memex, "Test content").unwrap();
-/// assert_eq!(ids.len(), 1);
+/// // ids may be empty if no nodes have the "test" tag
 /// ```
 pub trait Memex: Send + Sync {
     // =========================================================================
@@ -183,8 +182,8 @@ pub trait Memex: Send + Sync {
     /// Stores a memory node to persistent storage.
     ///
     /// Validates the node before storage and writes atomically to all
-    /// relevant column families (nodes, embeddings, johari index,
-    /// temporal index, tags index, sources index).
+    /// relevant column families (nodes, embeddings, temporal index,
+    /// tags index, sources index).
     ///
     /// # Arguments
     ///
@@ -255,7 +254,7 @@ pub trait Memex: Send + Sync {
     ///
     /// # Index Maintenance
     ///
-    /// When quadrant or tags change, the implementation must:
+    /// When tags change, the implementation must:
     /// 1. Remove old index entries
     /// 2. Add new index entries
     ///
@@ -401,39 +400,6 @@ pub trait Memex: Send + Sync {
     // =========================================================================
     // Query Operations
     // =========================================================================
-
-    /// Queries nodes by Johari quadrant.
-    ///
-    /// Uses the secondary Johari index for efficient quadrant-based lookups.
-    ///
-    /// # Arguments
-    ///
-    /// * `quadrant` - The `JohariQuadrant` to query (Open, Blind, Hidden, Unknown)
-    /// * `limit` - Maximum results to return. `None` returns all matching nodes.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(Vec<NodeId>)` - Node IDs in the specified quadrant
-    /// * `Err(StorageError)` - Query failed
-    ///
-    /// # Errors
-    ///
-    /// * `StorageError::IndexCorrupted` - Invalid UUID in index
-    /// * `StorageError::ReadFailed` - RocksDB read operation failed
-    ///
-    /// # Johari Quadrants
-    ///
-    /// - `Open`: High coherence, low entropy (known knowns)
-    /// - `Blind`: Low coherence, high entropy (unknown knowns)
-    /// - `Hidden`: Low coherence, low entropy (known unknowns)
-    /// - `Unknown`: High coherence, high entropy (unknown unknowns)
-    ///
-    /// `Constraint: latency < 10ms for limit <= 100`
-    fn query_by_quadrant(
-        &self,
-        quadrant: JohariQuadrant,
-        limit: Option<usize>,
-    ) -> Result<Vec<NodeId>, StorageError>;
 
     /// Queries nodes by tag (exact match).
     ///

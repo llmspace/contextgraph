@@ -10,6 +10,8 @@ use context_graph_core::autonomous::{
     ConsolidationConfig, ConsolidationService, ExtendedPruningConfig, MemoryContent, MemoryId,
     MemoryMetadata, MemoryPair, PruningConfig, PruningService,
 };
+use context_graph_core::traits::TeleologicalSearchOptions;
+use context_graph_core::types::fingerprint::PurposeVector;
 
 use super::params::{ExecutePruneParams, GetPruningCandidatesParams, TriggerConsolidationParams};
 use crate::handlers::Handlers;
@@ -53,13 +55,16 @@ impl Handlers {
         );
 
         // SPEC-STUBFIX-002: FAIL FAST - Get all fingerprints from store
-        // Over-fetch to have room for filtering
-        let johari_list = match self
+        // Use search_purpose with default query to list fingerprints
+        let search_options = TeleologicalSearchOptions::quick(params.limit * 2);
+        let default_query = PurposeVector::default();
+
+        let fingerprint_results = match self
             .teleological_store
-            .list_all_johari(params.limit * 2)
+            .search_purpose(&default_query, search_options)
             .await
         {
-            Ok(list) => list,
+            Ok(results) => results,
             Err(e) => {
                 error!(
                     error = %e,
@@ -74,49 +79,36 @@ impl Handlers {
         };
 
         debug!(
-            fingerprint_count = johari_list.len(),
+            fingerprint_count = fingerprint_results.len(),
             "get_pruning_candidates: Retrieved fingerprints from store"
         );
 
         // Convert TeleologicalFingerprint to MemoryMetadata
-        let mut metadata_list: Vec<MemoryMetadata> = Vec::with_capacity(johari_list.len());
+        let mut metadata_list: Vec<MemoryMetadata> = Vec::with_capacity(fingerprint_results.len());
 
-        for (uuid, _johari) in johari_list.iter() {
-            // Retrieve full fingerprint for metadata conversion
-            match self.teleological_store.retrieve(*uuid).await {
-                Ok(Some(fp)) => {
-                    // Convert content_hash [u8; 32] to u64 for redundancy detection
-                    let hash_u64 =
-                        u64::from_le_bytes(fp.content_hash[0..8].try_into().unwrap_or([0u8; 8]));
+        for result in fingerprint_results.iter() {
+            // Use fingerprint directly from search result (no re-fetch needed)
+            let fp = &result.fingerprint;
 
-                    // Estimate fingerprint size: 13 embeddings * 1024 dims * 4 bytes + overhead
-                    let byte_size = (13 * 1024 * 4 + 1024) as u64;
+            // Convert content_hash [u8; 32] to u64 for redundancy detection
+            let hash_u64 =
+                u64::from_le_bytes(fp.content_hash[0..8].try_into().unwrap_or([0u8; 8]));
 
-                    let metadata = MemoryMetadata {
-                        id: MemoryId(fp.id),
-                        created_at: fp.created_at,
-                        alignment: fp.alignment_score,
-                        connection_count: 0, // No edge data available through trait
-                        byte_size,
-                        last_accessed: Some(fp.last_updated),
-                        quality_score: None, // Not available in fingerprint
-                        content_hash: Some(hash_u64),
-                    };
+            // Estimate fingerprint size: 13 embeddings * 1024 dims * 4 bytes + overhead
+            let byte_size = (13 * 1024 * 4 + 1024) as u64;
 
-                    metadata_list.push(metadata);
-                }
-                Ok(None) => {
-                    warn!(uuid = %uuid, "get_pruning_candidates: Fingerprint not found");
-                }
-                Err(e) => {
-                    error!(
-                        uuid = %uuid,
-                        error = %e,
-                        "get_pruning_candidates: Failed to retrieve fingerprint"
-                    );
-                    // Continue processing other fingerprints instead of failing completely
-                }
-            }
+            let metadata = MemoryMetadata {
+                id: MemoryId(fp.id),
+                created_at: fp.created_at,
+                alignment: fp.alignment_score,
+                connection_count: 0, // No edge data available through trait
+                byte_size,
+                last_accessed: Some(fp.last_updated),
+                quality_score: None, // Not available in fingerprint
+                content_hash: Some(hash_u64),
+            };
+
+            metadata_list.push(metadata);
         }
 
         // Create pruning service with user-provided config
@@ -245,12 +237,16 @@ impl Handlers {
         );
 
         // SPEC-STUBFIX-003: FAIL FAST - Get fingerprints from store
-        let johari_list = match self
+        // Use search_purpose with default query to retrieve all fingerprints up to limit
+        let search_options = TeleologicalSearchOptions::quick(params.max_memories);
+        let default_query = PurposeVector::default();
+
+        let search_results = match self
             .teleological_store
-            .list_all_johari(params.max_memories)
+            .search_purpose(&default_query, search_options)
             .await
         {
-            Ok(list) => list,
+            Ok(results) => results,
             Err(e) => {
                 error!(
                     error = %e,
@@ -265,43 +261,30 @@ impl Handlers {
         };
 
         debug!(
-            fingerprint_count = johari_list.len(),
+            fingerprint_count = search_results.len(),
             "trigger_consolidation: Retrieved fingerprints from store"
         );
 
         // Convert TeleologicalFingerprint to MemoryContent
-        let mut memory_contents: Vec<MemoryContent> = Vec::with_capacity(johari_list.len());
+        let mut memory_contents: Vec<MemoryContent> = Vec::with_capacity(search_results.len());
         let mut fingerprints: Vec<(uuid::Uuid, chrono::DateTime<chrono::Utc>)> = Vec::new();
 
-        for (uuid, _johari) in johari_list.iter() {
-            match self.teleological_store.retrieve(*uuid).await {
-                Ok(Some(fp)) => {
-                    // Use E1 (e5-large-v2 1024D) embedding for comparison
-                    // This is the primary semantic embedding
-                    let embedding = fp.semantic.e1_semantic.clone();
+        for result in search_results.iter() {
+            let fp = &result.fingerprint;
+            // Use E1 (e5-large-v2 1024D) embedding for comparison
+            // This is the primary semantic embedding
+            let embedding = fp.semantic.e1_semantic.clone();
 
-                    let content = MemoryContent::new(
-                        MemoryId(fp.id),
-                        embedding,
-                        String::new(), // No text content available in fingerprint
-                        fp.alignment_score,
-                    )
-                    .with_access_count(fp.access_count as u32);
+            let content = MemoryContent::new(
+                MemoryId(fp.id),
+                embedding,
+                String::new(), // No text content available in fingerprint
+                fp.alignment_score,
+            )
+            .with_access_count(fp.access_count as u32);
 
-                    memory_contents.push(content);
-                    fingerprints.push((fp.id, fp.created_at));
-                }
-                Ok(None) => {
-                    warn!(uuid = %uuid, "trigger_consolidation: Fingerprint not found");
-                }
-                Err(e) => {
-                    error!(
-                        uuid = %uuid,
-                        error = %e,
-                        "trigger_consolidation: Failed to retrieve fingerprint"
-                    );
-                }
-            }
+            memory_contents.push(content);
+            fingerprints.push((fp.id, fp.created_at));
         }
 
         // Build pairs based on strategy
@@ -510,23 +493,7 @@ impl Handlers {
         let mut cascade_pruned = 0;
         let mut errors: Vec<serde_json::Value> = Vec::new();
 
-        // Protected node check: SELF_EGO_NODE cannot be pruned (EC-AUTO-07)
-        const SELF_EGO_NODE_MARKER: &str = "self_ego_node";
-
         for node_id_str in &params.node_ids {
-            // Check for SELF_EGO_NODE protection
-            if node_id_str.to_lowercase().contains(SELF_EGO_NODE_MARKER) {
-                warn!(
-                    node_id = %node_id_str,
-                    "execute_prune: Cannot prune SELF_EGO_NODE - protected"
-                );
-                errors.push(json!({
-                    "node_id": node_id_str,
-                    "error": "Cannot prune SELF_EGO_NODE - protected system identity node"
-                }));
-                continue;
-            }
-
             // Parse UUID
             let uuid = match uuid::Uuid::parse_str(node_id_str) {
                 Ok(u) => u,

@@ -4,7 +4,7 @@
 
 use crate::purpose::{GoalDiscoveryMetadata, GoalHierarchy, GoalLevel, GoalNode};
 use crate::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, TeleologicalFingerprint, NUM_EMBEDDERS,
+    PurposeVector, SemanticFingerprint, TeleologicalFingerprint, NUM_EMBEDDERS,
 };
 
 use chrono::Utc;
@@ -25,14 +25,10 @@ pub fn create_real_fingerprint(alignment_factor: f32) -> TeleologicalFingerprint
     let alignments = [alignment_factor; NUM_EMBEDDERS];
     let purpose_vector = PurposeVector::new(alignments);
 
-    // Create REAL JohariFingerprint
-    let johari = JohariFingerprint::zeroed();
-
     TeleologicalFingerprint {
         id: Uuid::new_v4(),
         semantic,
         purpose_vector,
-        johari,
         purpose_evolution: Vec::new(),
         alignment_score: alignment_factor,
         content_hash: [0u8; 32],

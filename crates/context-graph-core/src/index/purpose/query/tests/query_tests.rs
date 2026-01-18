@@ -3,7 +3,6 @@
 use super::helpers::create_purpose_vector;
 use crate::index::purpose::entry::GoalId;
 use crate::index::purpose::query::{PurposeQuery, PurposeQueryTarget};
-use crate::types::JohariQuadrant;
 
 #[test]
 fn test_purpose_query_new_valid() {
@@ -13,7 +12,6 @@ fn test_purpose_query_new_valid() {
     assert_eq!(query.limit, 10);
     assert!((query.min_similarity - 0.7).abs() < f32::EPSILON);
     assert!(query.goal_filter.is_none());
-    assert!(query.quadrant_filter.is_none());
 
     println!("[VERIFIED] PurposeQuery::new creates valid query");
 }
@@ -112,19 +110,6 @@ fn test_purpose_query_with_goal_filter() {
 }
 
 #[test]
-fn test_purpose_query_with_quadrant_filter() {
-    let pv = create_purpose_vector(0.5);
-    let query = PurposeQuery::new(PurposeQueryTarget::Vector(pv), 10, 0.5)
-        .unwrap()
-        .with_quadrant_filter(JohariQuadrant::Hidden);
-
-    assert!(query.quadrant_filter.is_some());
-    assert_eq!(query.quadrant_filter.unwrap(), JohariQuadrant::Hidden);
-
-    println!("[VERIFIED] PurposeQuery::with_quadrant_filter sets quadrant filter correctly");
-}
-
-#[test]
 fn test_purpose_query_validate() {
     let pv = create_purpose_vector(0.5);
     let query = PurposeQuery::new(PurposeQueryTarget::Vector(pv), 10, 0.5).unwrap();
@@ -147,14 +132,6 @@ fn test_purpose_query_has_filters() {
     let query = query.with_goal_filter(GoalId::new("test"));
     assert!(query.has_filters());
     assert_eq!(query.filter_count(), 1);
-
-    // Both filters
-    let query = PurposeQuery::new(PurposeQueryTarget::Vector(pv), 10, 0.5)
-        .unwrap()
-        .with_goal_filter(GoalId::new("test"))
-        .with_quadrant_filter(JohariQuadrant::Open);
-    assert!(query.has_filters());
-    assert_eq!(query.filter_count(), 2);
 
     println!("[VERIFIED] has_filters and filter_count work correctly");
 }

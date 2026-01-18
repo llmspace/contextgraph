@@ -8,13 +8,12 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 
 use context_graph_core::alignment::{DefaultAlignmentCalculator, GoalAlignmentCalculator};
-use context_graph_core::johari::{DynDefaultJohariManager, JohariTransitionManager};
 use context_graph_core::purpose::GoalHierarchy;
 use context_graph_core::stubs::{
     InMemoryTeleologicalStore, StubMultiArrayProvider, StubUtlProcessor,
 };
 use context_graph_core::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, TeleologicalFingerprint,
+    PurposeVector, SemanticFingerprint, TeleologicalFingerprint,
 };
 
 use crate::handlers::core::MetaUtlTracker;
@@ -36,10 +35,6 @@ pub fn create_verifiable_handlers_with_tracker() -> (
         Arc::new(DefaultAlignmentCalculator::new());
     let goal_hierarchy = Arc::new(RwLock::new(GoalHierarchy::default()));
 
-    // Create JohariTransitionManager with SHARED store reference
-    let johari_manager: Arc<dyn JohariTransitionManager> =
-        Arc::new(DynDefaultJohariManager::new(store.clone()));
-
     // Create MetaUtlTracker with SHARED access
     let meta_utl_tracker = Arc::new(RwLock::new(MetaUtlTracker::new()));
 
@@ -49,7 +44,6 @@ pub fn create_verifiable_handlers_with_tracker() -> (
         multi_array,
         alignment_calc,
         goal_hierarchy,
-        johari_manager,
         meta_utl_tracker.clone(),
     );
 
@@ -61,7 +55,6 @@ pub fn create_test_fingerprint() -> TeleologicalFingerprint {
     TeleologicalFingerprint::new(
         SemanticFingerprint::zeroed(),
         PurposeVector::default(),
-        JohariFingerprint::zeroed(),
         [0u8; 32],
     )
 }

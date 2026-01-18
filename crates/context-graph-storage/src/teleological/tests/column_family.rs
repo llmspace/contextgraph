@@ -9,16 +9,16 @@ use crate::teleological::*;
 #[test]
 fn test_teleological_cf_names_count() {
     // TASK-TELEO-006: Updated from 4 to 7 CFs
-    // TASK-GWT-P1-001: Updated from 8 to 9 CFs (added CF_EGO_NODE)
-    // TASK-STORAGE-P2-001: Updated from 9 to 10 CFs (added CF_E12_LATE_INTERACTION)
-    // TASK-SESSION-04: Updated from 10 to 11 CFs (added CF_SESSION_IDENTITY)
+    // TASK-STORAGE-P2-001: Updated from 7 to 8 CFs (added CF_E12_LATE_INTERACTION)
+    // TASK-CONTENT-001: Updated from 8 to 9 CFs (added CF_CONTENT)
+    // PRD v6: Removed CF_SESSION_IDENTITY (Session Identity deprecated)
     assert_eq!(
         TELEOLOGICAL_CFS.len(),
         TELEOLOGICAL_CF_COUNT,
         "Must have exactly {} teleological column families",
         TELEOLOGICAL_CF_COUNT
     );
-    assert_eq!(TELEOLOGICAL_CF_COUNT, 11); // TASK-SESSION-04: +1 for CF_SESSION_IDENTITY
+    assert_eq!(TELEOLOGICAL_CF_COUNT, 9); // 9 CFs total
 }
 
 #[test]
@@ -166,85 +166,20 @@ fn test_descriptors_in_correct_order() {
 }
 
 #[test]
-fn test_get_all_teleological_cf_descriptors_returns_24() {
+fn test_get_all_teleological_cf_descriptors_returns_22() {
     use rocksdb::Cache;
     let cache = Cache::new_lru_cache(256 * 1024 * 1024);
     let descriptors = get_all_teleological_cf_descriptors(&cache);
 
-    // 11 teleological + 13 quantized embedder = 24
-    // TASK-GWT-P1-001: +1 for CF_EGO_NODE
+    // 9 teleological + 13 quantized embedder = 22
     // TASK-STORAGE-P2-001: +1 for CF_E12_LATE_INTERACTION
-    // TASK-SESSION-04: +1 for CF_SESSION_IDENTITY
+    // TASK-CONTENT-001: +1 for CF_CONTENT
+    // PRD v6: Removed CF_SESSION_IDENTITY (Session Identity deprecated)
     assert_eq!(
         descriptors.len(),
-        24,
-        "Must return 11 teleological + 13 quantized = 24 CFs"
+        22,
+        "Must return 9 teleological + 13 quantized = 22 CFs"
     );
-}
-
-// =========================================================================
-// TASK-GWT-P1-001: EGO_NODE CF Tests
-// =========================================================================
-
-#[test]
-fn test_ego_node_cf_options_valid() {
-    println!("=== TEST: ego_node_cf_options (TASK-GWT-P1-001) ===");
-
-    use rocksdb::Cache;
-    let cache = Cache::new_lru_cache(256 * 1024 * 1024);
-    let opts = ego_node_cf_options(&cache);
-    drop(opts); // Should not panic
-
-    println!("RESULT: PASS - ego_node_cf_options created successfully");
-}
-
-#[test]
-fn test_ego_node_in_cf_array() {
-    println!("=== TEST: CF_EGO_NODE in TELEOLOGICAL_CFS array ===");
-
-    assert!(
-        TELEOLOGICAL_CFS.contains(&CF_EGO_NODE),
-        "CF_EGO_NODE must be in TELEOLOGICAL_CFS"
-    );
-
-    println!("RESULT: PASS - CF_EGO_NODE is in TELEOLOGICAL_CFS");
-}
-
-// =========================================================================
-// TASK-SESSION-04: Session Identity CF Tests
-// =========================================================================
-
-#[test]
-fn test_session_identity_cf_options_valid() {
-    println!("=== TEST: session_identity_cf_options (TASK-SESSION-04) ===");
-
-    use rocksdb::Cache;
-    let cache = Cache::new_lru_cache(256 * 1024 * 1024);
-    let opts = session_identity_cf_options(&cache);
-    drop(opts); // Should not panic
-
-    println!("RESULT: PASS - session_identity_cf_options created successfully");
-}
-
-#[test]
-fn test_session_identity_in_cf_array() {
-    println!("=== TEST: CF_SESSION_IDENTITY in TELEOLOGICAL_CFS array ===");
-
-    assert!(
-        TELEOLOGICAL_CFS.contains(&CF_SESSION_IDENTITY),
-        "CF_SESSION_IDENTITY must be in TELEOLOGICAL_CFS"
-    );
-
-    println!("RESULT: PASS - CF_SESSION_IDENTITY is in TELEOLOGICAL_CFS");
-}
-
-#[test]
-fn test_session_identity_cf_name_value() {
-    println!("=== TEST: CF_SESSION_IDENTITY name value (TASK-SESSION-04) ===");
-
-    assert_eq!(CF_SESSION_IDENTITY, "session_identity");
-
-    println!("RESULT: PASS - CF_SESSION_IDENTITY = 'session_identity'");
 }
 
 // =========================================================================

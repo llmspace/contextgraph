@@ -88,10 +88,6 @@ async fn verify_store_creates_fingerprint_in_source_of_truth() {
         "  - purpose_vector.alignments: {:?}",
         &stored_fp.purpose_vector.alignments[..5]
     );
-    println!(
-        "  - johari.quadrants[0]: {:?}",
-        stored_fp.johari.quadrants[0]
-    );
 
     // Verify content hash matches expected
     let mut hasher = Sha256::new();

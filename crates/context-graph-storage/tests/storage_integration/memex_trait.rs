@@ -3,7 +3,6 @@
 //! Tests that RocksDbMemex implements the Memex trait correctly.
 
 use super::common::{create_node_with_content, create_test_node, setup_db};
-use context_graph_core::types::JohariQuadrant;
 use context_graph_storage::Memex;
 
 #[test]
@@ -32,15 +31,6 @@ fn test_memex_trait() {
     );
     assert!(health.is_healthy, "health check should pass");
     assert!(health.node_count >= 1, "should have at least 1 node");
-
-    // Query via trait
-    let by_quadrant = memex
-        .query_by_quadrant(JohariQuadrant::Open, Some(10))
-        .expect("query by quadrant");
-    println!(
-        "VERIFY: query_by_quadrant returned {} results",
-        by_quadrant.len()
-    );
 
     println!("RESULT: PASSED");
 }

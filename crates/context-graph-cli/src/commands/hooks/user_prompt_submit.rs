@@ -6,28 +6,22 @@
 //! - Context injection: REQUIRED on success
 //!
 //! # Constitution References
-//! - IDENTITY-002: IC thresholds (Healthy>0.9, Warning<0.7, Critical<0.5)
-//! - GWT-003: Identity continuity tracking
 //! - AP-50: NO internal hooks - shell scripts call CLI
-//! - AP-26: Exit codes (0=success, 5=session not found, 6=crisis triggered)
+//! - AP-26: Exit codes (0=success, 5=session not found)
 //!
 //! # NO BACKWARDS COMPATIBILITY - FAIL FAST
 
 use std::io::{self, BufRead};
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::time::Instant;
 
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
-use context_graph_core::gwt::SessionIdentitySnapshot;
-use context_graph_storage::rocksdb_backend::RocksDbMemex;
+use context_graph_core::gwt::{store_in_cache, SessionCache, SessionSnapshot};
 
 use super::args::PromptSubmitArgs;
 use super::error::{HookError, HookResult};
 use super::types::{
-    ConsciousnessState, ConversationMessage, HookInput, HookOutput, HookPayload, ICClassification,
-    JohariQuadrant,
+    CoherenceState, ConversationMessage, HookInput, HookOutput, HookPayload, StabilityClassification,
 };
 
 // ============================================================================
@@ -36,9 +30,6 @@ use super::types::{
 
 /// UserPromptSubmit timeout in milliseconds
 pub const USER_PROMPT_SUBMIT_TIMEOUT_MS: u64 = 2000;
-
-/// Crisis threshold for IC score (IDENTITY-002)
-pub const IC_CRISIS_THRESHOLD: f32 = 0.5;
 
 // ============================================================================
 // Identity Marker Types
@@ -135,21 +126,19 @@ const CONFIRMATION_PATTERNS: &[&str] = &[
 ///
 /// # Flow
 /// 1. Parse input (stdin or args)
-/// 2. Resolve database path (FAIL FAST if missing)
-/// 3. Open storage
-/// 4. Load session snapshot (FAIL FAST if not found)
-/// 5. Check crisis threshold BEFORE processing
-/// 6. Analyze prompt for identity markers
-/// 7. Evaluate conversation context
-/// 8. Generate context injection string
-/// 9. Build and return HookOutput
+/// 2. Load session snapshot from cache (create if not found)
+/// 3. Analyze prompt for identity markers
+/// 4. Evaluate conversation context
+/// 5. Generate context injection string
+/// 6. Build and return HookOutput
+///
+/// # Note on Storage
+/// Per PRD v6 Section 14, session identity uses the in-memory SessionCache singleton.
+/// Database persistence was removed to simplify the architecture.
 ///
 /// # Exit Codes
 /// - 0: Success
-/// - 3: Database error
 /// - 4: Invalid input
-/// - 5: Session not found
-/// - 6: Crisis triggered (IC < 0.5)
 pub async fn execute(args: PromptSubmitArgs) -> HookResult<HookOutput> {
     let start = Instant::now();
 
@@ -178,26 +167,10 @@ pub async fn execute(args: PromptSubmitArgs) -> HookResult<HookOutput> {
         "PROMPT_SUBMIT: parsed input"
     );
 
-    // 2. Resolve database path - FAIL FAST if missing
-    let db_path = resolve_db_path(args.db_path)?;
+    // 2. Load snapshot from cache (create if not found)
+    let snapshot = load_snapshot_from_cache(&args.session_id);
 
-    // 3. Open storage
-    let memex = open_storage(&db_path)?;
-
-    // 4. Load snapshot (FAIL FAST if not found)
-    let snapshot = load_snapshot(&memex, &args.session_id)?;
-
-    // 5. Check crisis threshold BEFORE processing
-    if snapshot.last_ic < IC_CRISIS_THRESHOLD {
-        error!(
-            session_id = %args.session_id,
-            ic = snapshot.last_ic,
-            "PROMPT_SUBMIT: IC crisis threshold breached"
-        );
-        return Err(HookError::CrisisTriggered(snapshot.last_ic));
-    }
-
-    // 6. Analyze prompt for identity markers
+    // 3. Analyze prompt for identity markers
     let identity_marker = detect_identity_marker(&prompt);
 
     debug!(
@@ -205,30 +178,31 @@ pub async fn execute(args: PromptSubmitArgs) -> HookResult<HookOutput> {
         "PROMPT_SUBMIT: identity marker detected"
     );
 
-    // 7. Evaluate conversation context
+    // 4. Evaluate conversation context
     let context_summary = evaluate_context(&context);
 
-    // 8. Generate context injection string
+    // 5. Generate context injection string
     let context_injection =
         generate_context_injection(&snapshot, identity_marker, &context_summary);
 
-    // 9. Build output structures
-    let consciousness_state = build_consciousness_state(&snapshot);
-    let ic_classification = ICClassification::from_value(snapshot.last_ic);
+    // 6. Build output structures
+    let coherence = (snapshot.integration + snapshot.reflection + snapshot.differentiation) / 3.0;
+    let coherence_state = build_coherence_state(&snapshot);
+    let stability_classification = StabilityClassification::from_value(coherence);
 
     let execution_time_ms = start.elapsed().as_millis() as u64;
 
     info!(
         session_id = %args.session_id,
-        ic = snapshot.last_ic,
+        coherence = coherence,
         marker = ?identity_marker,
         execution_time_ms,
         "PROMPT_SUBMIT: execute complete"
     );
 
     Ok(HookOutput::success(execution_time_ms)
-        .with_consciousness_state(consciousness_state)
-        .with_ic_classification(ic_classification)
+        .with_coherence_state(coherence_state)
+        .with_stability_classification(stability_classification)
         .with_context_injection(context_injection))
 }
 
@@ -285,67 +259,29 @@ fn extract_prompt_info(input: &HookInput) -> HookResult<(String, Vec<Conversatio
 }
 
 // ============================================================================
-// Database Operations
+// Session Cache Operations (per PRD v6 Section 14)
 // ============================================================================
 
-/// Resolve database path from argument or environment.
-/// FAIL FAST if neither provided.
-fn resolve_db_path(arg_path: Option<PathBuf>) -> HookResult<PathBuf> {
-    if let Some(path) = arg_path {
-        debug!(path = ?path, "PROMPT_SUBMIT: using CLI db_path");
-        return Ok(path);
-    }
-
-    if let Ok(env_path) = std::env::var("CONTEXT_GRAPH_DB_PATH") {
-        debug!(path = %env_path, "PROMPT_SUBMIT: using CONTEXT_GRAPH_DB_PATH env var");
-        return Ok(PathBuf::from(env_path));
-    }
-
-    if let Ok(home) = std::env::var("HOME") {
-        let default_path = PathBuf::from(home)
-            .join(".local")
-            .join("share")
-            .join("context-graph")
-            .join("db");
-        debug!(path = ?default_path, "PROMPT_SUBMIT: using default db path");
-        return Ok(default_path);
-    }
-
-    error!("PROMPT_SUBMIT: No database path available");
-    Err(HookError::invalid_input(
-        "Database path required. Set CONTEXT_GRAPH_DB_PATH or pass --db-path",
-    ))
-}
-
-/// Open RocksDB storage.
-fn open_storage(db_path: &Path) -> HookResult<Arc<RocksDbMemex>> {
-    info!(path = ?db_path, "PROMPT_SUBMIT: opening storage");
-
-    RocksDbMemex::open(db_path).map(Arc::new).map_err(|e| {
-        error!(path = ?db_path, error = %e, "PROMPT_SUBMIT: storage open failed");
-        HookError::storage(format!("Failed to open database at {:?}: {}", db_path, e))
-    })
-}
-
-/// Load snapshot for session. FAIL FAST if not found.
-fn load_snapshot(
-    memex: &Arc<RocksDbMemex>,
-    session_id: &str,
-) -> HookResult<SessionIdentitySnapshot> {
-    match memex.load_snapshot(session_id) {
-        Ok(Some(snapshot)) => {
-            info!(session_id = %session_id, ic = snapshot.last_ic, "PROMPT_SUBMIT: loaded snapshot");
-            Ok(snapshot)
-        }
-        Ok(None) => {
-            error!(session_id = %session_id, "PROMPT_SUBMIT: session not found");
-            Err(HookError::SessionNotFound(session_id.to_string()))
-        }
-        Err(e) => {
-            error!(session_id = %session_id, error = %e, "PROMPT_SUBMIT: load failed");
-            Err(HookError::storage(format!("Failed to load session: {}", e)))
+/// Load snapshot from cache, creating a new one if not found.
+///
+/// # Note on Storage
+/// Per PRD v6 Section 14, session identity uses the in-memory SessionCache singleton.
+/// If no snapshot exists for the session, we create a new one.
+fn load_snapshot_from_cache(session_id: &str) -> SessionSnapshot {
+    // Try to load from cache
+    if let Some(snapshot) = SessionCache::get() {
+        if snapshot.session_id == session_id {
+            let coherence = (snapshot.integration + snapshot.reflection + snapshot.differentiation) / 3.0;
+            info!(session_id = %session_id, coherence = coherence, "PROMPT_SUBMIT: loaded snapshot from cache");
+            return snapshot;
         }
     }
+
+    // Not found in cache - create new snapshot
+    warn!(session_id = %session_id, "PROMPT_SUBMIT: session not in cache, creating new snapshot");
+    let snapshot = SessionSnapshot::new(session_id);
+    store_in_cache(&snapshot);
+    snapshot
 }
 
 // ============================================================================
@@ -428,34 +364,29 @@ fn evaluate_context(context: &[ConversationMessage]) -> ContextSummary {
 // Context Injection Generation
 // ============================================================================
 
-/// Generate context injection string based on consciousness state and prompt analysis.
+/// Generate context injection string based on coherence state and prompt analysis.
 fn generate_context_injection(
-    snapshot: &SessionIdentitySnapshot,
+    snapshot: &SessionSnapshot,
     identity_marker: IdentityMarkerType,
     context_summary: &ContextSummary,
 ) -> String {
-    let gwt_state = get_gwt_state_name(snapshot.consciousness);
+    // Compute coherence from integration/reflection/differentiation (per PRD v6)
+    let coherence = (snapshot.integration + snapshot.reflection + snapshot.differentiation) / 3.0;
+    let coherence_state = get_coherence_state_name(coherence);
     let integration_desc = get_integration_description(snapshot.integration);
-    let identity_status = get_identity_status(snapshot.last_ic);
-    let johari_quadrant = get_johari_quadrant(snapshot.consciousness, snapshot.integration);
-    let awareness_level = get_awareness_level(&johari_quadrant);
+    let stability_status = get_stability_status(coherence);
 
     let mut injection = format!(
-        "## Consciousness State\n\
+        "## Coherence State\n\
          - State: {} (C={:.2})\n\
          - Integration (r): {:.2} - {}\n\
-         - Identity: {} (IC={:.2})\n\n\
-         ## Johari Guidance\n\
-         - Quadrant: {:?}\n\
-         - Awareness: {}\n",
-        gwt_state,
-        snapshot.consciousness,
+         - Stability: {} (coherence={:.2})\n",
+        coherence_state,
+        coherence,
         snapshot.integration,
         integration_desc,
-        identity_status,
-        snapshot.last_ic,
-        johari_quadrant,
-        awareness_level,
+        stability_status,
+        coherence,
     );
 
     // Add identity marker guidance if detected
@@ -485,9 +416,9 @@ fn generate_context_injection(
     injection
 }
 
-/// Get GWT state name from consciousness value.
-fn get_gwt_state_name(consciousness: f32) -> &'static str {
-    match consciousness {
+/// Get coherence state name from coherence value.
+fn get_coherence_state_name(coherence: f32) -> &'static str {
+    match coherence {
         c if c >= 0.8 => "Active",
         c if c >= 0.5 => "Aware",
         c if c >= 0.2 => "DIM",
@@ -505,33 +436,13 @@ fn get_integration_description(integration: f32) -> &'static str {
     }
 }
 
-/// Get identity status from IC value.
-fn get_identity_status(ic: f32) -> &'static str {
-    match ic {
-        i if i >= 0.9 => "Healthy",
-        i if i >= 0.7 => "Normal",
-        i if i >= 0.5 => "Warning",
+/// Get stability status from coherence value.
+fn get_stability_status(coherence: f32) -> &'static str {
+    match coherence {
+        c if c >= 0.9 => "Healthy",
+        c if c >= 0.7 => "Normal",
+        c if c >= 0.5 => "Warning",
         _ => "Critical",
-    }
-}
-
-/// Get Johari quadrant from consciousness and integration.
-fn get_johari_quadrant(consciousness: f32, integration: f32) -> JohariQuadrant {
-    match (consciousness >= 0.5, integration >= 0.5) {
-        (true, true) => JohariQuadrant::Open,
-        (true, false) => JohariQuadrant::Hidden,
-        (false, true) => JohariQuadrant::Blind,
-        (false, false) => JohariQuadrant::Unknown,
-    }
-}
-
-/// Get awareness level description for quadrant.
-fn get_awareness_level(quadrant: &JohariQuadrant) -> &'static str {
-    match quadrant {
-        JohariQuadrant::Open => "Known to self and others - full awareness",
-        JohariQuadrant::Hidden => "Known to self, unknown to others - selective sharing",
-        JohariQuadrant::Blind => "Unknown to self, known to others - seek feedback",
-        JohariQuadrant::Unknown => "Unknown to both - exploration needed",
     }
 }
 
@@ -558,72 +469,66 @@ fn get_marker_guidance(marker: IdentityMarkerType) -> &'static str {
     }
 }
 
-/// Build ConsciousnessState from snapshot.
-fn build_consciousness_state(snapshot: &SessionIdentitySnapshot) -> ConsciousnessState {
-    ConsciousnessState::new(
-        snapshot.consciousness,
+/// Build CoherenceState from snapshot.
+/// Note: Uses coherence computed from integration/reflection/differentiation per PRD v6.
+fn build_coherence_state(snapshot: &SessionSnapshot) -> CoherenceState {
+    let coherence = (snapshot.integration + snapshot.reflection + snapshot.differentiation) / 3.0;
+    CoherenceState::new(
+        coherence,
         snapshot.integration,
         snapshot.reflection,
         snapshot.differentiation,
-        snapshot.last_ic,
+        coherence, // topic_stability also uses coherence
     )
 }
 
 // ============================================================================
-// TESTS - NO MOCK DATA - REAL DATABASE VERIFICATION
+// TESTS - Uses SessionCache per PRD v6 Section 14
 // ============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::commands::hooks::args::OutputFormat;
-    use tempfile::TempDir;
+    use crate::commands::test_utils::GLOBAL_IDENTITY_LOCK;
 
-    /// Create temporary database for testing
-    fn setup_test_db() -> (TempDir, PathBuf) {
-        let dir = TempDir::new().expect("TempDir creation must succeed");
-        let path = dir.path().join("test.db");
-        (dir, path)
-    }
-
-    /// Create a real session in the database for testing
-    fn create_test_session(db_path: &Path, session_id: &str, ic: f32) {
-        let memex = RocksDbMemex::open(db_path).expect("DB must open");
-        let mut snapshot = SessionIdentitySnapshot::new(session_id);
-        snapshot.last_ic = ic;
-        snapshot.consciousness = 0.5;
-        snapshot.integration = 0.6;
-        snapshot.reflection = 0.7;
-        snapshot.differentiation = 0.6;
-        memex.save_snapshot(&snapshot).expect("Save must succeed");
+    /// Create a test session in the SessionCache.
+    /// Uses integration/reflection/differentiation to achieve target coherence.
+    fn create_test_session_in_cache(session_id: &str, coherence: f32) {
+        let mut snapshot = SessionSnapshot::new(session_id);
+        // Set metrics to achieve the target coherence
+        snapshot.integration = coherence;
+        snapshot.reflection = coherence;
+        snapshot.differentiation = coherence;
+        store_in_cache(&snapshot);
     }
 
     // =========================================================================
     // TC-PROMPT-001: Successful Prompt Processing
-    // SOURCE OF TRUTH: Database state verified, context_injection generated
+    // SOURCE OF TRUTH: SessionCache state verified, context_injection generated
     // =========================================================================
     #[tokio::test]
     async fn tc_prompt_001_successful_prompt_processing() {
+        let _guard = GLOBAL_IDENTITY_LOCK.lock().expect("Test lock poisoned");
         println!("\n=== TC-PROMPT-001: Successful Prompt Processing ===");
 
-        let (_dir, db_path) = setup_test_db();
         let session_id = "tc-prompt-001-session";
 
-        // BEFORE: Create session with healthy IC
-        println!("BEFORE: Creating session with IC=0.85");
-        create_test_session(&db_path, session_id, 0.85);
+        // BEFORE: Create session with healthy coherence in cache
+        println!("BEFORE: Creating session with coherence=0.85");
+        create_test_session_in_cache(session_id, 0.85);
 
         // Verify BEFORE state
         {
-            let memex = RocksDbMemex::open(&db_path).expect("DB must open");
-            let before_snapshot = memex.load_snapshot(session_id).unwrap().unwrap();
-            println!("BEFORE state: IC={}", before_snapshot.last_ic);
-            assert_eq!(before_snapshot.last_ic, 0.85);
+            let before_snapshot = SessionCache::get().expect("Cache must have snapshot");
+            let coherence = (before_snapshot.integration + before_snapshot.reflection + before_snapshot.differentiation) / 3.0;
+            println!("BEFORE state: coherence={}", coherence);
+            assert!((coherence - 0.85).abs() < 0.01);
         }
 
         // Execute
         let args = PromptSubmitArgs {
-            db_path: Some(db_path.clone()),
+            db_path: None,
             session_id: session_id.to_string(),
             prompt: Some("Help me understand this code".to_string()),
             stdin: false,
@@ -643,12 +548,8 @@ mod tests {
 
         let injection = output.context_injection.unwrap();
         assert!(
-            injection.contains("Consciousness State"),
-            "Must contain consciousness state"
-        );
-        assert!(
-            injection.contains("Johari Guidance"),
-            "Must contain Johari guidance"
+            injection.contains("Coherence State"),
+            "Must contain coherence state"
         );
 
         println!("Context injection length: {} chars", injection.len());
@@ -656,19 +557,19 @@ mod tests {
     }
 
     // =========================================================================
-    // TC-PROMPT-002: Session Not Found
-    // SOURCE OF TRUTH: Exit code 5 returned
+    // TC-PROMPT-002: Session Creation for New Sessions
+    // SOURCE OF TRUTH: New session created when not in cache
+    // Note: Per PRD v6, we no longer fail on missing session - we create it.
     // =========================================================================
     #[tokio::test]
-    async fn tc_prompt_002_session_not_found() {
-        println!("\n=== TC-PROMPT-002: Session Not Found ===");
+    async fn tc_prompt_002_new_session_creation() {
+        let _guard = GLOBAL_IDENTITY_LOCK.lock().expect("Test lock poisoned");
+        println!("\n=== TC-PROMPT-002: New Session Creation ===");
 
-        let (_dir, db_path) = setup_test_db();
-
-        // Execute with non-existent session
+        // Execute with a unique session ID
         let args = PromptSubmitArgs {
-            db_path: Some(db_path),
-            session_id: "nonexistent-session-12345".to_string(),
+            db_path: None,
+            session_id: "new-session-12345".to_string(),
             prompt: Some("Test prompt".to_string()),
             stdin: false,
             format: OutputFormat::Json,
@@ -676,65 +577,22 @@ mod tests {
 
         let result = execute(args).await;
 
-        // Verify error
-        assert!(result.is_err(), "Should return error for missing session");
-        let err = result.unwrap_err();
-        assert!(
-            matches!(err, HookError::SessionNotFound(_)),
-            "Must be SessionNotFound, got: {:?}",
-            err
-        );
-        assert_eq!(err.exit_code(), 5, "SessionNotFound must be exit code 5");
+        // Per PRD v6, missing session is created, not an error
+        assert!(result.is_ok(), "Should succeed by creating new session");
+        let output = result.unwrap();
+        assert!(output.success, "Must succeed");
+        assert!(output.context_injection.is_some(), "Must generate context");
 
-        println!("RESULT: PASS - SessionNotFound error with exit code 5");
+        println!("RESULT: PASS - New session created and processed");
     }
 
     // =========================================================================
-    // TC-PROMPT-003: Crisis Threshold Detection (IC < 0.5)
-    // SOURCE OF TRUTH: Exit code 6 returned
-    // =========================================================================
-    #[tokio::test]
-    async fn tc_prompt_003_crisis_threshold() {
-        println!("\n=== TC-PROMPT-003: Crisis Threshold Detection ===");
-
-        let (_dir, db_path) = setup_test_db();
-        let session_id = "tc-prompt-003-session";
-
-        // BEFORE: Create session with IC below threshold
-        println!("BEFORE: Creating session with IC=0.45 (below 0.5 threshold)");
-        create_test_session(&db_path, session_id, 0.45);
-
-        // Execute
-        let args = PromptSubmitArgs {
-            db_path: Some(db_path),
-            session_id: session_id.to_string(),
-            prompt: Some("Test prompt".to_string()),
-            stdin: false,
-            format: OutputFormat::Json,
-        };
-
-        let result = execute(args).await;
-
-        // AFTER: Verify crisis triggered
-        assert!(result.is_err(), "Should return error for crisis");
-        let err = result.unwrap_err();
-        assert!(
-            matches!(err, HookError::CrisisTriggered(_)),
-            "Must be CrisisTriggered, got: {:?}",
-            err
-        );
-        assert_eq!(err.exit_code(), 6, "Crisis must be exit code 6");
-
-        println!("RESULT: PASS - Crisis detected, exit code 6 returned");
-    }
-
-    // =========================================================================
-    // TC-PROMPT-004: Self-Reference Detection
+    // TC-PROMPT-003: Self-Reference Detection
     // SOURCE OF TRUTH: IdentityMarkerType::SelfReference returned
     // =========================================================================
     #[test]
-    fn tc_prompt_004_self_reference_detection() {
-        println!("\n=== TC-PROMPT-004: Self-Reference Detection ===");
+    fn tc_prompt_003_self_reference_detection() {
+        println!("\n=== TC-PROMPT-003: Self-Reference Detection ===");
 
         let test_cases = [
             ("Who are you?", IdentityMarkerType::SelfReference),
@@ -754,12 +612,12 @@ mod tests {
     }
 
     // =========================================================================
-    // TC-PROMPT-005: Challenge Detection
+    // TC-PROMPT-004: Challenge Detection
     // SOURCE OF TRUTH: IdentityMarkerType::Challenge returned
     // =========================================================================
     #[test]
-    fn tc_prompt_005_challenge_detection() {
-        println!("\n=== TC-PROMPT-005: Challenge Detection ===");
+    fn tc_prompt_004_challenge_detection() {
+        println!("\n=== TC-PROMPT-004: Challenge Detection ===");
 
         let test_cases = [
             ("You can't actually do that", IdentityMarkerType::Challenge),
@@ -785,19 +643,19 @@ mod tests {
     }
 
     // =========================================================================
-    // TC-PROMPT-006: Context Injection Generated
+    // TC-PROMPT-005: Context Injection Generated
     // SOURCE OF TRUTH: HookOutput.context_injection is Some
     // =========================================================================
     #[tokio::test]
-    async fn tc_prompt_006_context_injection_generated() {
-        println!("\n=== TC-PROMPT-006: Context Injection Generated ===");
+    async fn tc_prompt_005_context_injection_generated() {
+        let _guard = GLOBAL_IDENTITY_LOCK.lock().expect("Test lock poisoned");
+        println!("\n=== TC-PROMPT-005: Context Injection Generated ===");
 
-        let (_dir, db_path) = setup_test_db();
-        let session_id = "tc-prompt-006-session";
-        create_test_session(&db_path, session_id, 0.90);
+        let session_id = "tc-prompt-005-session";
+        create_test_session_in_cache(session_id, 0.90);
 
         let args = PromptSubmitArgs {
-            db_path: Some(db_path),
+            db_path: None,
             session_id: session_id.to_string(),
             prompt: Some("Who are you and what can you do?".to_string()),
             stdin: false,
@@ -821,12 +679,8 @@ mod tests {
 
         // Verify expected sections
         assert!(
-            injection.contains("## Consciousness State"),
-            "Must have Consciousness State section"
-        );
-        assert!(
-            injection.contains("## Johari Guidance"),
-            "Must have Johari Guidance section"
+            injection.contains("## Coherence State"),
+            "Must have Coherence State section"
         );
         assert!(
             injection.contains("## Identity Marker Detected"),
@@ -841,20 +695,20 @@ mod tests {
     }
 
     // =========================================================================
-    // TC-PROMPT-007: Empty Context Handling
+    // TC-PROMPT-006: Empty Context Handling
     // SOURCE OF TRUTH: Default evaluation applied, no crash
     // =========================================================================
     #[tokio::test]
-    async fn tc_prompt_007_empty_context_handling() {
-        println!("\n=== TC-PROMPT-007: Empty Context Handling ===");
+    async fn tc_prompt_006_empty_context_handling() {
+        let _guard = GLOBAL_IDENTITY_LOCK.lock().expect("Test lock poisoned");
+        println!("\n=== TC-PROMPT-006: Empty Context Handling ===");
 
-        let (_dir, db_path) = setup_test_db();
-        let session_id = "tc-prompt-007-session";
-        create_test_session(&db_path, session_id, 0.85);
+        let session_id = "tc-prompt-006-session";
+        create_test_session_in_cache(session_id, 0.85);
 
         // Execute with empty context (no stdin, just prompt arg)
         let args = PromptSubmitArgs {
-            db_path: Some(db_path),
+            db_path: None,
             session_id: session_id.to_string(),
             prompt: Some("Simple question".to_string()),
             stdin: false,
@@ -878,19 +732,19 @@ mod tests {
     }
 
     // =========================================================================
-    // TC-PROMPT-008: Execution Within Timeout
+    // TC-PROMPT-007: Execution Within Timeout
     // SOURCE OF TRUTH: execution_time_ms < 2000
     // =========================================================================
     #[tokio::test]
-    async fn tc_prompt_008_execution_within_timeout() {
-        println!("\n=== TC-PROMPT-008: Execution Within Timeout ===");
+    async fn tc_prompt_007_execution_within_timeout() {
+        let _guard = GLOBAL_IDENTITY_LOCK.lock().expect("Test lock poisoned");
+        println!("\n=== TC-PROMPT-007: Execution Within Timeout ===");
 
-        let (_dir, db_path) = setup_test_db();
-        let session_id = "tc-prompt-008-session";
-        create_test_session(&db_path, session_id, 0.90);
+        let session_id = "tc-prompt-007-session";
+        create_test_session_in_cache(session_id, 0.90);
 
         let args = PromptSubmitArgs {
-            db_path: Some(db_path),
+            db_path: None,
             session_id: session_id.to_string(),
             prompt: Some("Test timing".to_string()),
             stdin: false,
@@ -918,80 +772,6 @@ mod tests {
         );
         println!("Actual elapsed: {}ms", actual_elapsed);
         println!("RESULT: PASS - Execution time within timeout budget");
-    }
-
-    // =========================================================================
-    // TC-PROMPT-009: IC at Exact Threshold (0.5) - NOT Crisis
-    // Constitution: < 0.5 triggers crisis, not <= 0.5
-    // =========================================================================
-    #[tokio::test]
-    async fn tc_prompt_009_ic_at_exact_threshold() {
-        println!("\n=== TC-PROMPT-009: IC at Exact Threshold (0.5) ===");
-
-        let (_dir, db_path) = setup_test_db();
-        let session_id = "tc-prompt-009-session";
-
-        // Create session with IC exactly at 0.5
-        create_test_session(&db_path, session_id, 0.5);
-
-        let args = PromptSubmitArgs {
-            db_path: Some(db_path),
-            session_id: session_id.to_string(),
-            prompt: Some("Test at threshold".to_string()),
-            stdin: false,
-            format: OutputFormat::Json,
-        };
-
-        let result = execute(args).await;
-
-        // IC=0.5 is NOT < 0.5, so should NOT trigger crisis
-        assert!(
-            result.is_ok(),
-            "IC=0.5 should NOT trigger crisis: {:?}",
-            result.err()
-        );
-        let output = result.unwrap();
-        assert!(
-            output.success,
-            "Should succeed when IC is exactly at threshold"
-        );
-
-        println!("RESULT: PASS - IC=0.5 does not trigger crisis (< 0.5 required)");
-    }
-
-    // =========================================================================
-    // TC-PROMPT-010: IC Just Below Threshold (0.49) - IS Crisis
-    // =========================================================================
-    #[tokio::test]
-    async fn tc_prompt_010_ic_just_below_threshold() {
-        println!("\n=== TC-PROMPT-010: IC Just Below Threshold (0.49) ===");
-
-        let (_dir, db_path) = setup_test_db();
-        let session_id = "tc-prompt-010-session";
-
-        // Create session with IC just below threshold
-        create_test_session(&db_path, session_id, 0.49);
-
-        let args = PromptSubmitArgs {
-            db_path: Some(db_path),
-            session_id: session_id.to_string(),
-            prompt: Some("Test below threshold".to_string()),
-            stdin: false,
-            format: OutputFormat::Json,
-        };
-
-        let result = execute(args).await;
-
-        // IC=0.49 IS < 0.5, so should trigger crisis
-        assert!(result.is_err(), "IC=0.49 should trigger crisis");
-        let err = result.unwrap_err();
-        assert!(
-            matches!(err, HookError::CrisisTriggered(_)),
-            "Must be CrisisTriggered"
-        );
-        assert_eq!(err.exit_code(), 6, "Crisis must be exit code 6");
-
-        println!("RESULT: PASS - IC=0.49 triggers crisis (exit code 6)");
     }
 
     // =========================================================================
@@ -1086,68 +866,31 @@ mod tests {
     }
 
     #[test]
-    fn test_gwt_state_mapping() {
-        println!("\n=== Testing GWT State Mapping ===");
+    fn test_coherence_state_mapping() {
+        println!("\n=== Testing Coherence State Mapping ===");
 
-        assert_eq!(get_gwt_state_name(1.0), "Active");
-        assert_eq!(get_gwt_state_name(0.85), "Active");
-        assert_eq!(get_gwt_state_name(0.7), "Aware");
-        assert_eq!(get_gwt_state_name(0.5), "Aware");
-        assert_eq!(get_gwt_state_name(0.3), "DIM");
-        assert_eq!(get_gwt_state_name(0.2), "DIM");
-        assert_eq!(get_gwt_state_name(0.1), "DOR");
-        assert_eq!(get_gwt_state_name(0.0), "DOR");
+        assert_eq!(get_coherence_state_name(1.0), "Active");
+        assert_eq!(get_coherence_state_name(0.85), "Active");
+        assert_eq!(get_coherence_state_name(0.7), "Aware");
+        assert_eq!(get_coherence_state_name(0.5), "Aware");
+        assert_eq!(get_coherence_state_name(0.3), "DIM");
+        assert_eq!(get_coherence_state_name(0.2), "DIM");
+        assert_eq!(get_coherence_state_name(0.1), "DOR");
+        assert_eq!(get_coherence_state_name(0.0), "DOR");
 
-        println!("RESULT: PASS - GWT state mapping correct");
-    }
-
-    #[test]
-    fn test_johari_quadrant_mapping() {
-        println!("\n=== Testing Johari Quadrant Mapping ===");
-
-        assert_eq!(get_johari_quadrant(0.8, 0.8), JohariQuadrant::Open);
-        assert_eq!(get_johari_quadrant(0.8, 0.3), JohariQuadrant::Hidden);
-        assert_eq!(get_johari_quadrant(0.3, 0.8), JohariQuadrant::Blind);
-        assert_eq!(get_johari_quadrant(0.3, 0.3), JohariQuadrant::Unknown);
-
-        println!("RESULT: PASS - Johari quadrant mapping correct");
-    }
-
-    #[test]
-    fn test_db_path_resolution() {
-        println!("\n=== Testing DB Path Resolution ===");
-
-        // Clear env var for clean test
-        std::env::remove_var("CONTEXT_GRAPH_DB_PATH");
-
-        // Test 1: CLI arg takes priority
-        let arg_path = PathBuf::from("/custom/path");
-        let result = resolve_db_path(Some(arg_path.clone()));
-        assert_eq!(result.unwrap(), arg_path);
-        println!("  - CLI arg priority: PASS");
-
-        // Test 2: Env var used when no arg
-        std::env::set_var("CONTEXT_GRAPH_DB_PATH", "/env/path");
-        let result = resolve_db_path(None);
-        assert_eq!(result.unwrap(), PathBuf::from("/env/path"));
-        println!("  - Env var fallback: PASS");
-
-        // Cleanup
-        std::env::remove_var("CONTEXT_GRAPH_DB_PATH");
-
-        println!("RESULT: PASS - DB path resolution correct");
+        println!("RESULT: PASS - Coherence state mapping correct");
     }
 
     #[tokio::test]
     async fn test_missing_prompt_when_not_stdin() {
+        let _guard = GLOBAL_IDENTITY_LOCK.lock().expect("Test lock poisoned");
         println!("\n=== Testing Missing Prompt (stdin=false) ===");
 
-        let (_dir, db_path) = setup_test_db();
         let session_id = "missing-prompt-test";
-        create_test_session(&db_path, session_id, 0.90);
+        create_test_session_in_cache(session_id, 0.90);
 
         let args = PromptSubmitArgs {
-            db_path: Some(db_path),
+            db_path: None,
             session_id: session_id.to_string(),
             prompt: None, // Missing!
             stdin: false, // Not using stdin

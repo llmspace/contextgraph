@@ -9,7 +9,7 @@
 //!
 //! This module provides the main `HnswPurposeIndex` for Stage 4 retrieval:
 //! - HNSW-backed ANN search on 13D purpose vectors
-//! - Metadata storage for goal and quadrant filtering
+//! - Metadata storage for goal filtering
 //! - Secondary indexes for efficient filtered queries
 //!
 //! # Architecture
@@ -19,7 +19,6 @@
 //! ├── inner: RealHnswIndex (13D HNSW for ANN search - O(log n))
 //! ├── metadata: HashMap<Uuid, PurposeMetadata>
 //! ├── vectors: HashMap<Uuid, PurposeVector>
-//! ├── quadrant_index: HashMap<JohariQuadrant, HashSet<Uuid>>
 //! └── goal_index: HashMap<GoalId, HashSet<Uuid>>
 //! ```
 //!
@@ -52,7 +51,6 @@ use uuid::Uuid;
 
 use crate::index::hnsw_impl::RealHnswIndex;
 use crate::types::fingerprint::PurposeVector;
-use crate::types::JohariQuadrant;
 
 use super::entry::PurposeMetadata;
 use super::error::PurposeIndexResult;
@@ -63,14 +61,13 @@ use super::query::PurposeSearchResult;
 /// HNSW-backed purpose pattern index with metadata enrichment.
 ///
 /// Combines a REAL HNSW index (O(log n)) for fast ANN search on 13D purpose
-/// vectors with secondary indexes for efficient filtering by goal and Johari quadrant.
+/// vectors with secondary indexes for efficient filtering by goal.
 ///
 /// # Structure
 ///
 /// - `inner`: RealHnswIndex for approximate nearest neighbor search (O(log n))
 /// - `metadata`: Purpose metadata indexed by memory ID
 /// - `vectors`: Purpose vectors indexed by memory ID for reranking
-/// - `quadrant_index`: Inverted index from quadrant to memory IDs
 /// - `goal_index`: Inverted index from goal ID to memory IDs
 ///
 /// # Fail-Fast Semantics
@@ -87,8 +84,6 @@ pub struct HnswPurposeIndex {
     pub(crate) metadata: HashMap<Uuid, PurposeMetadata>,
     /// Purpose vectors for reranking.
     pub(crate) vectors: HashMap<Uuid, PurposeVector>,
-    /// Index by Johari quadrant for filtered queries.
-    pub(crate) quadrant_index: HashMap<JohariQuadrant, HashSet<Uuid>>,
     /// Index by primary goal for filtered queries.
     pub(crate) goal_index: HashMap<String, HashSet<Uuid>>,
 }

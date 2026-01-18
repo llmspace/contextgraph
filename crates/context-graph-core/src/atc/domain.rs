@@ -89,9 +89,9 @@ impl std::str::FromStr for Domain {
 /// # Constitution Reference
 /// See `docs2/constitution.yaml` sections:
 /// - `adaptive_thresholds.priors` for base ranges
-/// - `gwt.workspace`, `gwt.kuramoto` for GWT thresholds
+/// - `gwt.workspace` for GWT thresholds
 /// - `dream.trigger`, `dream.phases` for dream thresholds
-/// - `utl.johari` for classification thresholds
+/// - `utl.classification` for classification thresholds
 #[derive(Debug, Clone)]
 pub struct DomainThresholds {
     pub domain: Domain,
@@ -119,9 +119,8 @@ pub struct DomainThresholds {
     pub theta_semantic_leap: f32,  // [0.50, 0.90] REM exploration
     pub theta_shortcut_conf: f32,  // [0.50, 0.85] Shortcut confidence
 
-    // === NEW: Classification thresholds (2) ===
-    pub theta_johari: f32,     // [0.35, 0.65] Johari boundary
-    pub theta_blind_spot: f32, // [0.35, 0.65] Blind spot detection
+    // === NEW: Classification thresholds (1) ===
+    pub theta_classification: f32, // [0.35, 0.65] Classification boundary
 
     // === NEW: Autonomous thresholds (4) ===
     pub theta_obsolescence_low: f32,  // [0.20, 0.50] Low relevance
@@ -135,9 +134,9 @@ impl DomainThresholds {
     ///
     /// Threshold values are computed based on domain strictness (0.0 = loose, 1.0 = strict).
     /// Constitution references:
-    /// - GWT: gwt.workspace.coherence_threshold, gwt.kuramoto.thresholds
+    /// - GWT: gwt.workspace.coherence_threshold
     /// - Dream: dream.trigger.activity, dream.phases.rem.blind_spot
-    /// - Classification: utl.johari
+    /// - Classification: utl.classification
     pub fn new(domain: Domain) -> Self {
         let strictness = domain.strictness();
 
@@ -165,8 +164,7 @@ impl DomainThresholds {
 
         // === NEW: Classification thresholds ===
         // Fixed per constitution (may later be domain-tuned)
-        let theta_johari = 0.50;
-        let theta_blind_spot = 0.50;
+        let theta_classification = 0.50;
 
         // === NEW: Autonomous thresholds ===
         // Stricter domains require higher confidence for autonomous actions
@@ -198,8 +196,7 @@ impl DomainThresholds {
             theta_dream_activity,
             theta_semantic_leap,
             theta_shortcut_conf,
-            theta_johari,
-            theta_blind_spot,
+            theta_classification,
             theta_obsolescence_low,
             theta_obsolescence_high,
             theta_obsolescence_mid,
@@ -238,8 +235,7 @@ impl DomainThresholds {
         self.theta_shortcut_conf = blend(self.theta_shortcut_conf, similar.theta_shortcut_conf);
 
         // NEW: Classification thresholds
-        self.theta_johari = blend(self.theta_johari, similar.theta_johari);
-        self.theta_blind_spot = blend(self.theta_blind_spot, similar.theta_blind_spot);
+        self.theta_classification = blend(self.theta_classification, similar.theta_classification);
 
         // NEW: Autonomous thresholds
         self.theta_obsolescence_low =
@@ -314,10 +310,7 @@ impl DomainThresholds {
         }
 
         // === NEW: Classification thresholds ===
-        if !(0.35..=0.65).contains(&self.theta_johari) {
-            return false;
-        }
-        if !(0.35..=0.65).contains(&self.theta_blind_spot) {
+        if !(0.35..=0.65).contains(&self.theta_classification) {
             return false;
         }
 
@@ -379,8 +372,7 @@ impl DomainThresholds {
         self.theta_shortcut_conf = self.theta_shortcut_conf.clamp(0.50, 0.85);
 
         // NEW: Classification thresholds
-        self.theta_johari = self.theta_johari.clamp(0.35, 0.65);
-        self.theta_blind_spot = self.theta_blind_spot.clamp(0.35, 0.65);
+        self.theta_classification = self.theta_classification.clamp(0.35, 0.65);
 
         // NEW: Autonomous thresholds
         self.theta_obsolescence_low = self.theta_obsolescence_low.clamp(0.20, 0.50);
@@ -650,14 +642,9 @@ mod tests {
             thresholds.theta_shortcut_conf
         );
         assert!(
-            (0.35..=0.65).contains(&thresholds.theta_johari),
-            "theta_johari {} out of range [0.35, 0.65]",
-            thresholds.theta_johari
-        );
-        assert!(
-            (0.35..=0.65).contains(&thresholds.theta_blind_spot),
-            "theta_blind_spot {} out of range [0.35, 0.65]",
-            thresholds.theta_blind_spot
+            (0.35..=0.65).contains(&thresholds.theta_classification),
+            "theta_classification {} out of range [0.35, 0.65]",
+            thresholds.theta_classification
         );
         assert!(
             (0.20..=0.50).contains(&thresholds.theta_obsolescence_low),
@@ -762,8 +749,7 @@ mod tests {
         t.theta_dream_activity = 0.5;
         t.theta_semantic_leap = 0.0;
         t.theta_shortcut_conf = 0.0;
-        t.theta_johari = 0.0;
-        t.theta_blind_spot = 1.0;
+        t.theta_classification = 0.0;
         t.theta_obsolescence_low = 0.0;
         t.theta_obsolescence_high = 1.0;
 
@@ -779,8 +765,7 @@ mod tests {
         assert_eq!(t.theta_dream_activity, 0.30);
         assert_eq!(t.theta_semantic_leap, 0.50);
         assert_eq!(t.theta_shortcut_conf, 0.50);
-        assert_eq!(t.theta_johari, 0.35);
-        assert_eq!(t.theta_blind_spot, 0.65);
+        assert_eq!(t.theta_classification, 0.35);
         assert_eq!(t.theta_obsolescence_low, 0.20);
         assert_eq!(t.theta_obsolescence_high, 0.90);
     }
@@ -854,12 +839,12 @@ mod tests {
     }
 
     #[test]
-    fn test_field_count_is_21() {
-        // This test ensures we have exactly 21 fields by checking the struct size indirectly
-        // We verify by accessing all 21 fields
+    fn test_field_count_is_20() {
+        // This test ensures we have exactly 20 fields by checking the struct size indirectly
+        // We verify by accessing all 20 fields
         let t = DomainThresholds::new(Domain::General);
         let fields: Vec<f32> = vec![
-            // domain is not f32, so we count 21 f32 fields + 1 Domain
+            // domain is not f32, so we count 20 f32 fields + 1 Domain
             t.theta_opt,
             t.theta_acc,
             t.theta_warn,
@@ -875,15 +860,14 @@ mod tests {
             t.theta_dream_activity,
             t.theta_semantic_leap,
             t.theta_shortcut_conf,
-            t.theta_johari,
-            t.theta_blind_spot,
+            t.theta_classification,
             t.theta_obsolescence_low,
             t.theta_obsolescence_high,
             t.theta_obsolescence_mid,
             t.theta_drift_slope,
         ];
-        // 21 f32 fields + 1 Domain = 22 total fields in struct
-        assert_eq!(fields.len(), 21, "Should have 21 f32 threshold fields");
+        // 20 f32 fields + 1 Domain = 21 total fields in struct
+        assert_eq!(fields.len(), 20, "Should have 20 f32 threshold fields");
         // Verify domain field exists
         assert_eq!(t.domain, Domain::General);
     }
@@ -913,8 +897,7 @@ mod tests {
             println!("  theta_dream_activity: {:.3}", t.theta_dream_activity);
             println!("  theta_semantic_leap: {:.3}", t.theta_semantic_leap);
             println!("  theta_shortcut_conf: {:.3}", t.theta_shortcut_conf);
-            println!("  theta_johari: {:.3}", t.theta_johari);
-            println!("  theta_blind_spot: {:.3}", t.theta_blind_spot);
+            println!("  theta_classification: {:.3}", t.theta_classification);
             println!("  theta_obsolescence_low: {:.3}", t.theta_obsolescence_low);
             println!(
                 "  theta_obsolescence_high: {:.3}",

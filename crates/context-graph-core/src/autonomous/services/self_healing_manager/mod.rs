@@ -1,7 +1,7 @@
-//! Self-Healing Manager Service (NORTH-020)
+//! Self-Healing Manager Service
 //!
 //! This module implements the system health monitoring and automatic recovery
-//! service for the autonomous North Star system. It detects health issues,
+//! service for the autonomous system. It detects health issues,
 //! diagnoses problems, and applies healing actions.
 //!
 //! # Module Structure

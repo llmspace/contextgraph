@@ -11,7 +11,7 @@ use crate::alignment::misalignment::MisalignmentFlags;
 use crate::alignment::score::{GoalAlignmentScore, GoalScore, LevelWeights};
 use crate::purpose::{GoalDiscoveryMetadata, GoalHierarchy, GoalLevel, GoalNode};
 use crate::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, TeleologicalFingerprint, NUM_EMBEDDERS,
+    PurposeVector, SemanticFingerprint, TeleologicalFingerprint, NUM_EMBEDDERS,
 };
 
 pub(crate) fn test_discovery() -> GoalDiscoveryMetadata {
@@ -96,13 +96,11 @@ pub(crate) fn create_test_semantic_fingerprint(seed: f32) -> SemanticFingerprint
 pub(crate) fn create_test_fingerprint(alignment: f32) -> TeleologicalFingerprint {
     let semantic = create_test_semantic_fingerprint(alignment);
     let purpose_vector = PurposeVector::new([alignment; NUM_EMBEDDERS]);
-    let johari = JohariFingerprint::zeroed();
 
     TeleologicalFingerprint {
         id: uuid::Uuid::new_v4(),
         semantic,
         purpose_vector,
-        johari,
         purpose_evolution: Vec::new(),
         alignment_score: alignment,
         content_hash: [0u8; 32],

@@ -4,7 +4,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{UtlError, UtlResult};
-use crate::johari::JohariQuadrant;
 
 use super::signal::LearningSignal;
 
@@ -17,17 +16,15 @@ use super::signal::LearningSignal;
 /// # Example
 ///
 /// ```
-/// use context_graph_utl::{LearningSignal, UtlState, JohariQuadrant, SuggestedAction};
+/// use context_graph_utl::{LearningSignal, UtlState};
 ///
 /// let signal = LearningSignal::new(
 ///     0.7, 0.6, 0.8, 1.2, 0.5, None,
-///     JohariQuadrant::Blind, SuggestedAction::TriggerDream,
 ///     true, true, 2000,
 /// ).unwrap();
 ///
 /// let state = UtlState::from_signal(&signal);
 /// assert_eq!(state.learning_magnitude, 0.7);
-/// assert_eq!(state.quadrant, JohariQuadrant::Blind);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UtlState {
@@ -46,9 +43,6 @@ pub struct UtlState {
     /// Computed learning magnitude [0, 1]
     pub learning_magnitude: f32,
 
-    /// Classified Johari quadrant
-    pub quadrant: JohariQuadrant,
-
     /// When state was last updated (UTC)
     pub last_computed: DateTime<Utc>,
 }
@@ -64,7 +58,6 @@ impl UtlState {
             w_e: signal.w_e,
             phi: signal.phi,
             learning_magnitude: signal.magnitude,
-            quadrant: signal.quadrant,
             last_computed: signal.timestamp,
         }
     }
@@ -77,7 +70,6 @@ impl UtlState {
     /// - w_e = 1.0 (neutral emotional state)
     /// - phi = 0.0 (synchronized)
     /// - learning_magnitude = 0.5 (medium baseline)
-    /// - quadrant = Hidden (low surprise, low coherence)
     pub fn empty() -> Self {
         Self {
             delta_s: 0.0,
@@ -85,7 +77,6 @@ impl UtlState {
             w_e: 1.0,
             phi: 0.0,
             learning_magnitude: 0.5,
-            quadrant: JohariQuadrant::Hidden,
             last_computed: Utc::now(),
         }
     }
@@ -145,24 +136,10 @@ impl Default for UtlState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::johari::SuggestedAction;
 
     #[test]
     fn test_utl_state_from_signal() {
-        let signal = LearningSignal::new(
-            0.7,
-            0.6,
-            0.8,
-            1.2,
-            0.5,
-            None,
-            JohariQuadrant::Blind,
-            SuggestedAction::TriggerDream,
-            true,
-            true,
-            2000,
-        )
-        .unwrap();
+        let signal = LearningSignal::new(0.7, 0.6, 0.8, 1.2, 0.5, None, true, true, 2000).unwrap();
 
         let state = UtlState::from_signal(&signal);
 
@@ -171,7 +148,6 @@ mod tests {
         assert_eq!(state.w_e, 1.2);
         assert_eq!(state.phi, 0.5);
         assert_eq!(state.learning_magnitude, 0.7);
-        assert_eq!(state.quadrant, JohariQuadrant::Blind);
         assert_eq!(state.last_computed, signal.timestamp);
     }
 
@@ -184,7 +160,6 @@ mod tests {
         assert_eq!(state.w_e, 1.0);
         assert_eq!(state.phi, 0.0);
         assert_eq!(state.learning_magnitude, 0.5);
-        assert_eq!(state.quadrant, JohariQuadrant::Hidden);
     }
 
     #[test]
@@ -200,7 +175,6 @@ mod tests {
             default_state.learning_magnitude,
             empty_state.learning_magnitude
         );
-        assert_eq!(default_state.quadrant, empty_state.quadrant);
     }
 
     #[test]
@@ -228,7 +202,6 @@ mod tests {
             w_e: 1.0,
             phi: 0.0,
             learning_magnitude: 0.5,
-            quadrant: JohariQuadrant::Hidden,
             last_computed: Utc::now(),
         };
         assert!(state.validate().is_err());
@@ -242,7 +215,6 @@ mod tests {
             w_e: 1.0,
             phi: 0.0,
             learning_magnitude: 0.5,
-            quadrant: JohariQuadrant::Hidden,
             last_computed: Utc::now(),
         };
         assert!(state.validate().is_err());
@@ -256,7 +228,6 @@ mod tests {
             w_e: 1.2,
             phi: 0.5,
             learning_magnitude: 0.7,
-            quadrant: JohariQuadrant::Blind,
             last_computed: Utc::now(),
         };
 
@@ -268,6 +239,5 @@ mod tests {
         assert_eq!(deserialized.w_e, original.w_e);
         assert_eq!(deserialized.phi, original.phi);
         assert_eq!(deserialized.learning_magnitude, original.learning_magnitude);
-        assert_eq!(deserialized.quadrant, original.quadrant);
     }
 }

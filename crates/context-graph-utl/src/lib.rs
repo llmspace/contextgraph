@@ -6,27 +6,26 @@
 //! UTL (Unified Theory of Learning) computation engine for Context Graph.
 //!
 //! This crate provides the core UTL computation engine that implements the
-//! learning score formula: `L = f((ΔS × ΔC) · wₑ · cos φ)`
+//! learning score formula: `L = f((Delta_S x Delta_C) . w_e . cos phi)`
 //!
 //! # Modules
 //!
 //! - [`config`]: Configuration types for all UTL subsystems
 //! - [`error`]: Error types and result aliases
-//! - [`surprise`]: Surprise (ΔS) computation using KL divergence and embedding distance
-//! - [`coherence`]: Coherence (ΔC) computation with structural and graph-based metrics
-//! - [`emotional`]: Emotional weight (wₑ) computation with lexicon and arousal/valence
-//! - [`phase`]: Phase oscillation (φ) and consolidation detection (NREM/REM)
-//! - [`johari`]: Johari quadrant classification and retrieval weighting
+//! - [`surprise`]: Surprise (Delta_S) computation using KL divergence and embedding distance
+//! - [`coherence`]: Coherence (Delta_C) computation with structural and graph-based metrics
+//! - [`emotional`]: Emotional weight (w_e) computation with lexicon and arousal/valence
+//! - [`phase`]: Phase oscillation (phi) and consolidation detection (NREM/REM)
 //! - [`lifecycle`]: Lifecycle stage management with Marblestone lambda weights
 //! - [`learning`]: Learning magnitude computation and signal types
 //!
 //! # Constitution Reference
 //!
 //! The UTL formula is defined as:
-//! - `ΔS`: Entropy/novelty change in range `[0, 1]`
-//! - `ΔC`: Coherence/understanding change in range `[0, 1]`
-//! - `wₑ`: Emotional weight in range `[0.5, 1.5]`
-//! - `φ`: Phase synchronization angle in range `[0, π]`
+//! - `Delta_S`: Entropy/novelty change in range `[0, 1]`
+//! - `Delta_C`: Coherence/understanding change in range `[0, 1]`
+//! - `w_e`: Emotional weight in range `[0.5, 1.5]`
+//! - `phi`: Phase synchronization angle in range `[0, pi]`
 //!
 //! # Example
 //!
@@ -49,7 +48,6 @@ pub mod surprise;
 // Core UTL modules
 pub mod coherence;
 pub mod emotional;
-pub mod johari;
 pub mod learning;
 pub mod lifecycle;
 pub mod metrics;
@@ -66,18 +64,15 @@ pub use context_graph_core::types::{EmotionalState, UtlContext, UtlMetrics};
 // Re-export lifecycle types for convenience
 pub use lifecycle::{LifecycleLambdaWeights, LifecycleManager, LifecycleStage};
 
-// Re-export johari types for convenience
-pub use johari::{classify_quadrant, JohariClassifier, JohariQuadrant, SuggestedAction};
-
 // Re-export phase types for convenience
-pub use phase::{ConsolidationPhase, PhaseDetector, PhaseOscillator};
+pub use phase::{ConsolidationPhase, PhaseDetector};
 
 // Re-export processor types for convenience
 pub use processor::{SessionContext, UtlProcessor};
 
 // Re-export metrics types for convenience
 pub use metrics::{
-    QuadrantDistribution, StageThresholds, ThresholdsResponse, UtlComputationMetrics, UtlStatus,
+    StageThresholds, ThresholdsResponse, UtlComputationMetrics, UtlStatus,
     UtlStatusResponse,
 };
 
@@ -97,7 +92,6 @@ mod tests {
         let _metrics = UtlMetrics::default();
         let _context = UtlContext::default();
         let _state = EmotionalState::default();
-        let _quadrant = JohariQuadrant::default();
     }
 
     #[test]
@@ -107,12 +101,6 @@ mod tests {
 
         let weights = LifecycleLambdaWeights::for_stage(stage);
         assert!((weights.lambda_s() - 0.5).abs() < 0.001);
-    }
-
-    #[test]
-    fn test_johari_re_exports() {
-        let quadrant = classify_quadrant(0.3, 0.7);
-        assert_eq!(quadrant, JohariQuadrant::Open);
     }
 
     #[test]
@@ -146,26 +134,6 @@ mod tests {
 
         let result = compute_learning_magnitude_validated(0.5, 0.6, 1.0, 0.0);
         assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_learning_signal_api() {
-        // Verify LearningSignal is accessible
-        let signal = LearningSignal::new(
-            0.75,
-            0.6,
-            0.8,
-            1.2,
-            0.5,
-            None,
-            JohariQuadrant::Open,
-            SuggestedAction::DirectRecall,
-            true,
-            true,
-            1500,
-        )
-        .unwrap();
-        assert!(signal.is_high_learning()); // is_high_learning() uses > 0.7 threshold
     }
 
     #[test]

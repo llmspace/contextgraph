@@ -6,7 +6,7 @@
 //! # IMPORTANT: New GoalNode API
 //!
 //! Goals are now created with:
-//! - `GoalNode::autonomous_goal()` for any goal (including North Star)
+//! - `GoalNode::autonomous_goal()` for any goal (including Strategic goals)
 //! - `GoalNode::child_goal()` for goals with a parent
 //!
 //! Both require `TeleologicalArray` (SemanticFingerprint) and `GoalDiscoveryMetadata`.
@@ -236,7 +236,7 @@ fn test_goal_node_autonomous_goal_factory() {
     let discovery = create_test_discovery(DiscoveryMethod::Clustering, 0.85);
 
     let goal = GoalNode::autonomous_goal(
-        "Test North Star".to_string(),
+        "Test Strategic Goal".to_string(),
         GoalLevel::Strategic,
         fp,
         discovery,
@@ -244,7 +244,7 @@ fn test_goal_node_autonomous_goal_factory() {
     .unwrap();
 
     assert!(!goal.id.is_nil());
-    assert_eq!(goal.description, "Test North Star");
+    assert_eq!(goal.description, "Test Strategic Goal");
     assert_eq!(goal.level, GoalLevel::Strategic);
     assert!(goal.parent_id.is_none());
     assert_eq!(goal.discovery.method, DiscoveryMethod::Clustering);
@@ -621,7 +621,6 @@ fn test_purpose_vector_similarity() {
 // Error Handling Tests
 // ============================================================================
 
-// TASK-P0-001: Updated error message check (no longer mentions "North Star")
 #[test]
 fn test_purpose_compute_error_display() {
     let e1 = PurposeComputeError::NoTopLevelGoals;
@@ -643,7 +642,6 @@ fn test_purpose_compute_error_display() {
     println!("[VERIFIED] PurposeComputeError display messages are correct");
 }
 
-// TASK-P0-001: Updated to test remaining error variants after North Star removal
 #[test]
 fn test_goal_hierarchy_error_display() {
     // TASK-P0-001/ARCH-03: MultipleStrategicGoals and NoTopLevelGoals removed

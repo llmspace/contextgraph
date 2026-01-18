@@ -16,7 +16,6 @@
 //! - Error types and result aliases
 //! - Configuration structures
 //! - Goal alignment computation (`GoalAlignmentCalculator`, `GoalAlignmentScore`, etc.)
-//! - Johari transition management (`JohariTransitionManager`, `DefaultJohariManager`, etc.)
 //!
 //! # Example
 //!
@@ -41,7 +40,6 @@ pub mod error;
 pub mod injection;
 pub mod gwt;
 pub mod index;
-pub mod johari;
 pub mod layers;
 pub mod marblestone;
 pub mod memory;

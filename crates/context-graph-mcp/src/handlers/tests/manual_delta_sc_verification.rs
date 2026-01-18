@@ -27,9 +27,8 @@ use serde_json::json;
 use uuid::Uuid;
 
 use context_graph_core::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
-    E10_DIM, E11_DIM, E1_DIM, E2_DIM, E3_DIM, E4_DIM, E5_DIM, E7_DIM, E8_DIM, E9_DIM,
-    NUM_EMBEDDERS,
+    PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint, E10_DIM, E11_DIM,
+    E1_DIM, E2_DIM, E3_DIM, E4_DIM, E5_DIM, E7_DIM, E8_DIM, E9_DIM, NUM_EMBEDDERS,
 };
 
 use crate::protocol::JsonRpcId;
@@ -62,10 +61,9 @@ fn create_synthetic_fingerprint(base_value: f32) -> SemanticFingerprint {
 fn create_test_teleological_fingerprint(base_value: f32) -> TeleologicalFingerprint {
     let semantic = create_synthetic_fingerprint(base_value);
     let purpose_vector = PurposeVector::new([0.5; NUM_EMBEDDERS]); // Neutral alignment
-    let johari = JohariFingerprint::zeroed();
     let content_hash = [0u8; 32];
 
-    TeleologicalFingerprint::new(semantic, purpose_vector, johari, content_hash)
+    TeleologicalFingerprint::new(semantic, purpose_vector, content_hash)
 }
 
 /// Verify that delta_s_per_embedder has exactly 13 elements.
@@ -99,18 +97,6 @@ fn verify_delta_s_values(delta_s_per_embedder: &[f64]) -> Result<(), String> {
     Ok(())
 }
 
-/// Verify johari_quadrant is valid.
-fn verify_johari_quadrant(quadrant: &str) -> Result<(), String> {
-    const VALID_QUADRANTS: [&str; 4] = ["Open", "Blind", "Hidden", "Unknown"];
-    if !VALID_QUADRANTS.contains(&quadrant) {
-        return Err(format!(
-            "FAIL: johari_aggregate '{}' is not one of {:?}",
-            quadrant, VALID_QUADRANTS
-        ));
-    }
-    Ok(())
-}
-
 /// Verify UTL learning potential formula: utl_learning_potential = delta_s_aggregate * delta_c
 fn verify_utl_formula(
     delta_s_aggregate: f64,
@@ -133,7 +119,7 @@ fn verify_utl_formula(
 /// Extract delta_sc results from the response.
 fn extract_delta_sc_results(
     data: &serde_json::Value,
-) -> Result<(Vec<f64>, f64, f64, Vec<String>, String, f64), String> {
+) -> Result<(Vec<f64>, f64, f64, f64), String> {
     let delta_s_per_embedder = data
         .get("delta_s_per_embedder")
         .and_then(|v| v.as_array())
@@ -152,20 +138,6 @@ fn extract_delta_sc_results(
         .and_then(|v| v.as_f64())
         .ok_or("Missing delta_c")?;
 
-    let johari_quadrants = data
-        .get("johari_quadrants")
-        .and_then(|v| v.as_array())
-        .ok_or("Missing johari_quadrants")?
-        .iter()
-        .map(|v| v.as_str().unwrap_or("").to_string())
-        .collect::<Vec<_>>();
-
-    let johari_aggregate = data
-        .get("johari_aggregate")
-        .and_then(|v| v.as_str())
-        .ok_or("Missing johari_aggregate")?
-        .to_string();
-
     let utl_learning_potential = data
         .get("utl_learning_potential")
         .and_then(|v| v.as_f64())
@@ -175,8 +147,6 @@ fn extract_delta_sc_results(
         delta_s_per_embedder,
         delta_s_aggregate,
         delta_c,
-        johari_quadrants,
-        johari_aggregate,
         utl_learning_potential,
     ))
 }
@@ -221,8 +191,7 @@ async fn run_verification(
                 "vertex_id": vertex_id.to_string(),
                 "old_fingerprint": old_fp_json,
                 "new_fingerprint": new_fp_json,
-                "include_diagnostics": true,
-                "johari_threshold": 0.5
+                "include_diagnostics": true
             }
         })),
     );
@@ -244,21 +213,13 @@ async fn run_verification(
     let data = extract_mcp_tool_data(&result);
 
     // Extract results
-    let (
-        delta_s_per_embedder,
-        delta_s_aggregate,
-        delta_c,
-        johari_quadrants,
-        johari_aggregate,
-        utl_learning_potential,
-    ) = extract_delta_sc_results(&data)?;
+    let (delta_s_per_embedder, delta_s_aggregate, delta_c, utl_learning_potential) =
+        extract_delta_sc_results(&data)?;
 
     println!("\n[OUTPUT]");
     println!("  delta_s_per_embedder: {:?}", delta_s_per_embedder);
     println!("  delta_s_aggregate: {:.6}", delta_s_aggregate);
     println!("  delta_c: {:.6}", delta_c);
-    println!("  johari_quadrants: {:?}", johari_quadrants);
-    println!("  johari_aggregate: {}", johari_aggregate);
     println!("  utl_learning_potential: {:.6}", utl_learning_potential);
 
     // Run verifications
@@ -284,17 +245,7 @@ async fn run_verification(
     verify_range_01(utl_learning_potential, "utl_learning_potential")?;
     println!("  [PASS] utl_learning_potential in [0, 1]");
 
-    // 6. Verify johari_quadrant is valid
-    verify_johari_quadrant(&johari_aggregate)?;
-    println!("  [PASS] johari_aggregate is valid quadrant");
-
-    // 7. Verify all johari_quadrants are valid
-    for (i, q) in johari_quadrants.iter().enumerate() {
-        verify_johari_quadrant(q)?;
-        println!("  [PASS] johari_quadrants[{}] = {} is valid", i, q);
-    }
-
-    // 8. Verify UTL formula: utl_learning_potential = delta_s_aggregate * delta_c
+    // 6. Verify UTL formula: utl_learning_potential = delta_s_aggregate * delta_c
     verify_utl_formula(delta_s_aggregate, delta_c, utl_learning_potential)?;
     println!(
         "  [PASS] UTL formula verified: {:.6} = {:.6} * {:.6}",
@@ -309,7 +260,7 @@ async fn run_verification(
 ///
 /// old_fingerprint: e1_semantic = [0.5; 1024]
 /// new_fingerprint: e1_semantic = [0.52; 1024]
-/// Expected: Low Delta_S (< 0.3), High Delta_C (> 0.7), Johari = "Open" or "Hidden"
+/// Expected: Low Delta_S (< 0.3), High Delta_C (> 0.7)
 #[tokio::test]
 #[ignore = "Manual FSV test - run with --ignored"]
 async fn test_delta_sc_small_change() {
@@ -329,7 +280,7 @@ async fn test_delta_sc_small_change() {
 ///
 /// old_fingerprint: e1_semantic = [0.2; 1024]
 /// new_fingerprint: e1_semantic = [0.8; 1024]
-/// Expected: High Delta_S (> 0.5), valid Delta_C, Johari varies
+/// Expected: High Delta_S (> 0.5), valid Delta_C
 #[tokio::test]
 #[ignore = "Manual FSV test - run with --ignored"]
 async fn test_delta_sc_large_change() {
@@ -349,7 +300,7 @@ async fn test_delta_sc_large_change() {
 ///
 /// old_fingerprint: e1_semantic = [0.5; 1024]
 /// new_fingerprint: e1_semantic = [0.5; 1024]
-/// Expected: Delta_S ~= 0, Delta_C valid, Johari = "Open" or "Hidden"
+/// Expected: Delta_S ~= 0, Delta_C valid
 #[tokio::test]
 #[ignore = "Manual FSV test - run with --ignored"]
 async fn test_delta_sc_identical() {

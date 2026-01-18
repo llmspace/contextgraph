@@ -1,6 +1,6 @@
 //! Autonomous MCP tools tests (12 tools after TASK-P0-001):
 //!
-//! TASK-P0-001: REMOVED auto_bootstrap_north_star per ARCH-03.
+//! TASK-P0-001: REMOVED auto_bootstrap per ARCH-03.
 //! Goals now emerge autonomously from topic clustering (constitution v6.0.0).
 //!
 //! Current tools:
@@ -22,7 +22,7 @@ use serde_json::json;
 use super::helpers::{assert_success, make_tool_call};
 use crate::handlers::tests::create_test_handlers;
 
-// REMOVED: auto_bootstrap_north_star tests per TASK-P0-001 (ARCH-03)
+// REMOVED: auto_bootstrap tests per TASK-P0-001 (ARCH-03)
 // The tool has been removed. Goals now emerge from topic clustering.
 
 // -------------------------------------------------------------------------

@@ -2,21 +2,20 @@
 //!
 //! TASK-UTL-P1-001: Computes delta S (entropy change) and delta C (coherence change)
 //! for UTL learning.
+//!
+//! Note: Uses embedder category classifications per PRD v6.
 
 use serde_json::json;
 use tracing::{debug, error};
 use uuid::Uuid;
 
-use context_graph_core::johari::NUM_EMBEDDERS;
 use context_graph_core::types::fingerprint::TeleologicalFingerprint;
-use context_graph_core::types::JohariQuadrant;
 
 use crate::protocol::{error_codes, JsonRpcId, JsonRpcResponse};
 
 use super::super::Handlers;
-use super::constants::{ALPHA, BETA, GAMMA};
+use super::constants::{ALPHA, BETA, GAMMA, NUM_EMBEDDERS};
 use super::gwt_compute::{compute_delta_c, compute_delta_s};
-use super::helpers::classify_johari;
 
 impl Handlers {
     /// Handle gwt/compute_delta_sc request.
@@ -29,11 +28,12 @@ impl Handlers {
     /// - `old_fingerprint`: Previous TeleologicalFingerprint (13 embeddings)
     /// - `new_fingerprint`: New TeleologicalFingerprint (13 embeddings)
     /// - `include_diagnostics`: Optional, include detailed breakdown
-    /// - `johari_threshold`: Optional, override threshold (default 0.5)
     ///
     /// # Response
-    /// Returns delta_s_per_embedder, delta_s_aggregate, delta_c, johari_quadrants,
-    /// johari_aggregate, utl_learning_potential, and optional diagnostics.
+    /// Returns delta_s_per_embedder, delta_s_aggregate, delta_c,
+    /// utl_learning_potential, and optional diagnostics.
+    ///
+    /// Note: Uses embedder category classifications per PRD v6.
     pub(crate) async fn handle_gwt_compute_delta_sc(
         &self,
         id: Option<JsonRpcId>,
@@ -144,52 +144,36 @@ impl Handlers {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        let johari_threshold = params
-            .get("johari_threshold")
-            .and_then(|v| v.as_f64())
-            .map(|v| v as f32)
-            .unwrap_or(0.5)
-            .clamp(0.35, 0.65); // Per constitution.yaml adaptive_thresholds.priors.theta_joh
-
         // Compute delta S and delta C
         let delta_s_result = compute_delta_s(&old_fp, &new_fp, include_diagnostics);
         let delta_c_result = compute_delta_c(&old_fp, &new_fp);
-
-        // Classify Johari quadrants
-        let johari_quadrants: [JohariQuadrant; NUM_EMBEDDERS] = std::array::from_fn(|i| {
-            classify_johari(
-                delta_s_result.per_embedder[i],
-                delta_c_result.delta_c,
-                johari_threshold,
-            )
-        });
-
-        let johari_aggregate = classify_johari(
-            delta_s_result.aggregate,
-            delta_c_result.delta_c,
-            johari_threshold,
-        );
 
         // Build response
         let utl_learning_potential =
             (delta_s_result.aggregate * delta_c_result.delta_c).clamp(0.0, 1.0);
 
-        let johari_quadrant_strings: Vec<String> =
-            johari_quadrants.iter().map(|q| q.to_string()).collect();
+        // Classify embedders by category per CLAUDE.md embedder_categories
+        let embedder_categories: Vec<&str> = (0..NUM_EMBEDDERS)
+            .map(|i| match i {
+                0 | 4 | 5 | 6 | 9 | 11 | 12 => "SEMANTIC",  // E1, E5, E6, E7, E10, E12, E13
+                1 | 2 | 3 => "TEMPORAL",                     // E2, E3, E4
+                7 | 10 => "RELATIONAL",                      // E8, E11
+                8 => "STRUCTURAL",                           // E9
+                _ => "UNKNOWN",
+            })
+            .collect();
 
         let mut response = json!({
             "delta_s_per_embedder": delta_s_result.per_embedder.to_vec(),
             "delta_s_aggregate": delta_s_result.aggregate,
             "delta_c": delta_c_result.delta_c,
-            "johari_quadrants": johari_quadrant_strings,
-            "johari_aggregate": johari_aggregate.to_string(),
+            "embedder_categories": embedder_categories,
             "utl_learning_potential": utl_learning_potential,
         });
 
         if include_diagnostics {
             response["diagnostics"] = json!({
                 "per_embedder": delta_s_result.diagnostics,
-                "johari_threshold": johari_threshold,
                 "delta_c_components": {
                     "connectivity": delta_c_result.connectivity,
                     "cluster_fit": delta_c_result.cluster_fit,
@@ -213,8 +197,8 @@ impl Handlers {
         }
 
         debug!(
-            "gwt/compute_delta_sc: completed - delta_S_agg={:.4}, delta_C={:.4}, L_pot={:.4}, quadrant={}",
-            delta_s_result.aggregate, delta_c_result.delta_c, utl_learning_potential, johari_aggregate
+            "gwt/compute_delta_sc: completed - delta_S_agg={:.4}, delta_C={:.4}, L_pot={:.4}",
+            delta_s_result.aggregate, delta_c_result.delta_c, utl_learning_potential
         );
 
         JsonRpcResponse::success(id, response)

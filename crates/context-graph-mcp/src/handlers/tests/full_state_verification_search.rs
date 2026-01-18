@@ -46,7 +46,7 @@ fn create_verifiable_handlers() -> (Handlers, Arc<InMemoryTeleologicalStore>) {
         Arc::new(StubMultiArrayProvider::new());
     let alignment_calculator: Arc<dyn GoalAlignmentCalculator> =
         Arc::new(DefaultAlignmentCalculator::new());
-    // Must use test hierarchy with North Star - store handler requires it (AP-007)
+    // Must use test hierarchy with strategic goal - store handler requires it (AP-007)
     let goal_hierarchy = create_test_hierarchy();
 
     // Create handlers with our store (need to clone for both uses)
@@ -154,14 +154,10 @@ async fn test_full_state_verification_store_search_delete_cycle() {
 
     println!("   - Fingerprint ID in store: {}", retrieved_fp.id);
     println!(
-        "   - Theta to North Star: {:.4}",
+        "   - Alignment score: {:.4}",
         retrieved_fp.alignment_score
     );
     println!("   - Access count: {}", retrieved_fp.access_count);
-    println!(
-        "   - Johari dominant: {:?}",
-        retrieved_fp.johari.dominant_quadrant(0)
-    );
     println!(
         "   - Purpose vector (first 3): [{:.3}, {:.3}, {:.3}, ...]",
         retrieved_fp.purpose_vector.alignments[0],

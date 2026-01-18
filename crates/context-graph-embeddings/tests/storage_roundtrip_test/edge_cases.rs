@@ -12,7 +12,6 @@ fn test_get_embedding_invalid_index() {
         Uuid::new_v4(),
         create_test_embeddings_with_deterministic_data(42),
         create_purpose_vector(42),
-        create_johari_quadrants(42),
         create_content_hash(42),
     );
 
@@ -57,59 +56,13 @@ fn test_uniform_purpose_vector() {
         Uuid::new_v4(),
         create_test_embeddings_with_deterministic_data(42),
         [0.5f32; 13],
-        create_johari_quadrants(42),
         create_content_hash(42),
     );
 
-    // TASK-P0-001: alignment_score field removed per ARCH-03
-    // Verify purpose_vector is correctly stored instead
+    // Verify purpose_vector is correctly stored
     assert_eq!(fp.purpose_vector, [0.5f32; 13]);
 
     println!("[PASS] Uniform purpose vector handled correctly");
-}
-
-/// Test fingerprint with extreme johari quadrant (one dominant).
-#[test]
-fn test_extreme_johari_quadrants() {
-    let fp = StoredQuantizedFingerprint::new(
-        Uuid::new_v4(),
-        create_test_embeddings_with_deterministic_data(42),
-        create_purpose_vector(42),
-        [1.0, 0.0, 0.0, 0.0], // 100% Open
-        create_content_hash(42),
-    );
-
-    assert_eq!(fp.dominant_quadrant, 0, "Open should be dominant");
-    assert!(
-        (fp.johari_confidence - 1.0).abs() < f32::EPSILON,
-        "Confidence should be 1.0"
-    );
-
-    println!("[PASS] Extreme johari quadrants handled correctly");
-}
-
-/// Test fingerprint with all zero johari quadrants.
-#[test]
-fn test_zero_johari_quadrants() {
-    let fp = StoredQuantizedFingerprint::new(
-        Uuid::new_v4(),
-        create_test_embeddings_with_deterministic_data(42),
-        create_purpose_vector(42),
-        [0.0, 0.0, 0.0, 0.0],
-        create_content_hash(42),
-    );
-
-    // Should default to quadrant 0 with zero confidence
-    assert_eq!(
-        fp.dominant_quadrant, 0,
-        "Should default to Open with zero input"
-    );
-    assert!(
-        (fp.johari_confidence - 0.0).abs() < f32::EPSILON,
-        "Confidence should be 0.0"
-    );
-
-    println!("[PASS] Zero johari quadrants handled correctly");
 }
 
 /// Test multiple roundtrips don't accumulate errors.
@@ -119,7 +72,6 @@ fn test_multiple_roundtrips_no_drift() {
         Uuid::new_v4(),
         create_test_embeddings_with_deterministic_data(42),
         create_purpose_vector(42),
-        create_johari_quadrants(42),
         create_content_hash(42),
     );
 

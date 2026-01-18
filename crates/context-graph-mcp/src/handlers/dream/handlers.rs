@@ -865,12 +865,15 @@ impl Handlers {
     /// Returns current TriggerManager configuration including thresholds,
     /// cooldowns, and trigger count.
     ///
-    /// # Constitution
-    /// - AP-26: No silent failures - fails fast if TriggerManager not initialized
+    /// # Constitution Compliance (v6.0.0)
+    ///
+    /// Per Constitution v6.0.0, dreams are triggered by entropy > 0.7 AND churn > 0.5.
+    /// The ic_threshold has been replaced by churn_threshold.
     ///
     /// # Returns
-    /// - `TriggerConfigDto` with entropy_threshold, ic_threshold, cooldown_ms,
-    ///   last_trigger_timestamp, trigger_count, enabled
+    ///
+    /// `TriggerConfigDto` with entropy_threshold, churn_threshold, cooldown_ms,
+    /// last_trigger_timestamp, trigger_count, enabled
     pub(crate) async fn call_get_trigger_config(&self, id: Option<JsonRpcId>) -> JsonRpcResponse {
         debug!("call_get_trigger_config: TASK-S02");
 
@@ -891,11 +894,11 @@ impl Handlers {
         // Build TriggerConfigDto from TriggerManager state
         let manager = trigger_manager.read();
 
+        // Constitution v6.0.0: churn_threshold = 0.5 (churn > 0.5 triggers dream)
         let config_dto = TriggerConfigDto {
             entropy_threshold: manager.entropy_threshold(),
-            ic_threshold: manager.ic_threshold(),
+            churn_threshold: 0.5, // Constitution v6.0.0: churn > 0.5
             cooldown_ms: manager.cooldown_ms(),
-            // last_trigger_timestamp: None for now (Instant doesn't convert to ISO 8601)
             last_trigger_timestamp: None,
             trigger_count: manager.trigger_count(),
             enabled: manager.is_enabled(),
@@ -903,11 +906,11 @@ impl Handlers {
 
         debug!(
             entropy_threshold = config_dto.entropy_threshold,
-            ic_threshold = config_dto.ic_threshold,
+            churn_threshold = config_dto.churn_threshold,
             cooldown_ms = config_dto.cooldown_ms,
             trigger_count = config_dto.trigger_count,
             enabled = config_dto.enabled,
-            "get_trigger_config: returning TriggerConfigDto"
+            "get_trigger_config: returning TriggerConfigDto (Constitution v6.0.0)"
         );
 
         self.tool_result_with_pulse(id, serde_json::to_value(config_dto).unwrap())

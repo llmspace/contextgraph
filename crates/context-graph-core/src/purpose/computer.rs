@@ -17,7 +17,7 @@ use super::goals::GoalHierarchy;
 pub struct PurposeComputeConfig {
     /// Goal hierarchy to align against.
     ///
-    /// Must contain a North Star goal for computation to succeed.
+    /// Must contain a Strategic goal for computation to succeed.
     pub hierarchy: GoalHierarchy,
 
     /// Whether to propagate alignment up the hierarchy.
@@ -28,7 +28,7 @@ pub struct PurposeComputeConfig {
 
     /// Base/Strategic weighting for hierarchical propagation.
     ///
-    /// First value is weight for North Star alignment,
+    /// First value is weight for Strategic goal alignment,
     /// second is weight for child goal contributions.
     /// Default: (0.7, 0.3)
     pub propagation_weights: (f32, f32),
@@ -80,8 +80,6 @@ impl PurposeComputeConfig {
 }
 
 /// Errors during purpose computation.
-///
-/// TASK-P0-001: Renamed NoNorthStar to NoTopLevelGoals per ARCH-03.
 #[derive(Debug, thiserror::Error)]
 pub enum PurposeComputeError {
     /// No top-level (Strategic) goals defined in the hierarchy.

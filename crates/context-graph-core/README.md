@@ -8,16 +8,16 @@ This crate provides the foundational types for the Ultimate Context Graph - a 5-
 
 ## Features
 
-- **MemoryNode**: Core knowledge node with 1536D embeddings, Johari quadrant classification, and Ebbinghaus decay
+- **MemoryNode**: Core knowledge node with 1536D embeddings and Ebbinghaus decay
 - **GraphEdge**: Marblestone-inspired edges with 13 fields including neurotransmitter weights and steering rewards
 - **CognitivePulse**: Meta-cognitive state tracking with entropy/coherence metrics
-- **JohariQuadrant**: Four-quadrant classification (Open, Hidden, Blind, Unknown)
+- **TeleologicalFingerprint**: 13-embedding fingerprint for multi-space retrieval
 - **Marblestone Types**: Domain, EdgeType, and NeurotransmitterWeights for neural-inspired edge modulation
 
 ## Quick Start
 
 ```rust
-use context_graph_core::types::{MemoryNode, JohariQuadrant, CognitivePulse};
+use context_graph_core::types::{MemoryNode, CognitivePulse};
 use context_graph_core::marblestone::{Domain, EdgeType, NeurotransmitterWeights};
 
 // Create a memory node
@@ -31,7 +31,6 @@ let mut node = MemoryNode::new(
     "Rust async/await patterns".to_string(),
     create_valid_embedding(),
 );
-node.quadrant = JohariQuadrant::Open;
 node.importance = 0.8;
 node.validate().expect("Node should be valid");
 
@@ -48,7 +47,7 @@ context-graph-core/
 ├── types/              # Core domain types
 │   ├── memory_node/    # MemoryNode, NodeMetadata, ValidationError
 │   ├── graph_edge/     # GraphEdge, EdgeId
-│   ├── johari/         # JohariQuadrant, JohariTransition, Modality
+│   ├── fingerprint/    # TeleologicalFingerprint, SemanticFingerprint, PurposeVector
 │   ├── pulse.rs        # CognitivePulse, SuggestedAction
 │   ├── utl.rs          # UtlMetrics, EmotionalState
 │   └── nervous.rs      # LayerId, NervousSystemState
@@ -67,9 +66,8 @@ context-graph-core/
 ### MemoryNode
 
 The fundamental knowledge unit with:
-- **content**: Text content (≤1MB)
+- **content**: Text content (<=1MB)
 - **embedding**: 1536D normalized vector
-- **quadrant**: Johari classification
 - **importance**: [0.0, 1.0] relevance score
 - **metadata**: Tags, source, timestamps
 

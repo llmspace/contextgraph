@@ -11,8 +11,6 @@ fn test_learning_signal_creation_valid() {
         1.2,
         0.5,
         None,
-        JohariQuadrant::Open,
-        SuggestedAction::DirectRecall,
         true,
         true,
         1500,
@@ -25,8 +23,6 @@ fn test_learning_signal_creation_valid() {
     assert_eq!(signal.w_e, 1.2);
     assert_eq!(signal.phi, 0.5);
     assert!(signal.lambda_weights.is_none());
-    assert_eq!(signal.quadrant, JohariQuadrant::Open);
-    assert_eq!(signal.suggested_action, SuggestedAction::DirectRecall);
     assert!(signal.should_consolidate);
     assert!(signal.should_store);
     assert_eq!(signal.latency_us, 1500);
@@ -41,8 +37,6 @@ fn test_learning_signal_validation_nan_magnitude() {
         1.0,
         0.0,
         None,
-        JohariQuadrant::Hidden,
-        SuggestedAction::GetNeighborhood,
         false,
         true,
         100,
@@ -65,8 +59,6 @@ fn test_learning_signal_validation_infinity_magnitude() {
         1.0,
         0.0,
         None,
-        JohariQuadrant::Hidden,
-        SuggestedAction::GetNeighborhood,
         false,
         true,
         100,
@@ -89,8 +81,6 @@ fn test_learning_signal_validation_nan_component() {
         1.0,
         0.0,
         None,
-        JohariQuadrant::Hidden,
-        SuggestedAction::GetNeighborhood,
         false,
         true,
         100,
@@ -114,8 +104,6 @@ fn test_learning_intensity_boundary_values() {
         1.0,
         0.0,
         None,
-        JohariQuadrant::Hidden,
-        SuggestedAction::GetNeighborhood,
         false,
         false,
         100,
@@ -133,8 +121,6 @@ fn test_learning_intensity_boundary_values() {
         1.0,
         0.0,
         None,
-        JohariQuadrant::Hidden,
-        SuggestedAction::GetNeighborhood,
         false,
         true,
         100,
@@ -152,8 +138,6 @@ fn test_learning_intensity_boundary_values() {
         1.0,
         0.0,
         None,
-        JohariQuadrant::Open,
-        SuggestedAction::DirectRecall,
         true,
         true,
         100,
@@ -171,8 +155,6 @@ fn test_learning_intensity_boundary_values() {
         1.0,
         0.0,
         None,
-        JohariQuadrant::Hidden,
-        SuggestedAction::GetNeighborhood,
         false,
         true,
         100,
@@ -188,8 +170,6 @@ fn test_learning_intensity_boundary_values() {
         1.0,
         0.0,
         None,
-        JohariQuadrant::Open,
-        SuggestedAction::DirectRecall,
         true,
         true,
         100,
@@ -207,8 +187,6 @@ fn test_learning_signal_serialization_roundtrip() {
         1.2,
         0.5,
         None,
-        JohariQuadrant::Open,
-        SuggestedAction::DirectRecall,
         true,
         true,
         1500,
@@ -224,8 +202,6 @@ fn test_learning_signal_serialization_roundtrip() {
     assert_eq!(deserialized.w_e, original.w_e);
     assert_eq!(deserialized.phi, original.phi);
     assert!(deserialized.lambda_weights.is_none());
-    assert_eq!(deserialized.quadrant, original.quadrant);
-    assert_eq!(deserialized.suggested_action, original.suggested_action);
     assert_eq!(deserialized.should_consolidate, original.should_consolidate);
     assert_eq!(deserialized.should_store, original.should_store);
     assert_eq!(deserialized.latency_us, original.latency_us);
@@ -243,8 +219,6 @@ fn test_learning_signal_with_lambda_weights() {
         1.2,
         0.5,
         Some(weights),
-        JohariQuadrant::Open,
-        SuggestedAction::DirectRecall,
         true,
         true,
         1500,

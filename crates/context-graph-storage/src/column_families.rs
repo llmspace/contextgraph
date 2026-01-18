@@ -3,17 +3,13 @@
 //! Column families provide logical separation of data types and
 //! enable efficient range queries within each category.
 //!
-//! # Column Families (12 total per constitution.yaml)
+//! # Column Families (8 total per PRD v6)
 //! | Name | Purpose | Key Format | Optimization |
 //! |------|---------|------------|--------------|
 //! | nodes | Primary node storage | UUID (16 bytes) | Bloom filter, cache |
 //! | edges | Graph edge storage | UUID (16 bytes) | Prefix extractor |
 //! | embeddings | Embedding vectors (1536D×f32=6144 bytes) | UUID (16 bytes) | Large blocks |
 //! | metadata | Node metadata | UUID (16 bytes) | Cache |
-//! | johari_open | Open quadrant index | UUID | Prefix extractor |
-//! | johari_hidden | Hidden quadrant index | UUID | Prefix extractor |
-//! | johari_blind | Blind quadrant index | UUID | Prefix extractor |
-//! | johari_unknown | Unknown quadrant index | UUID | Prefix extractor |
 //! | temporal | Time-based index | timestamp_ms:UUID | Prefix extractor |
 //! | tags | Tag index | tag:UUID | Prefix extractor |
 //! | sources | Source index | source_uri:UUID | Prefix extractor |
@@ -22,12 +18,13 @@
 //! # Shared Block Cache
 //! All column families share a single 256MB block cache for efficient memory usage.
 //! Per constitution.yaml: "shared 256MB block cache with bloom filter"
+//!
+//! # PRD v6 Note
+//! Topic detection uses embedder category weights per PRD v6.
 
 use rocksdb::{BlockBasedOptions, Cache, ColumnFamilyDescriptor, Options, SliceTransform};
 
 /// Column family name constants.
-///
-/// These names MUST match `JohariQuadrant::column_family()` from context-graph-core.
 pub mod cf_names {
     /// Primary node storage column family.
     pub const NODES: &str = "nodes";
@@ -41,18 +38,6 @@ pub mod cf_names {
     /// Node metadata column family.
     pub const METADATA: &str = "metadata";
 
-    /// Open quadrant index - matches JohariQuadrant::Open.column_family().
-    pub const JOHARI_OPEN: &str = "johari_open";
-
-    /// Hidden quadrant index - matches JohariQuadrant::Hidden.column_family().
-    pub const JOHARI_HIDDEN: &str = "johari_hidden";
-
-    /// Blind quadrant index - matches JohariQuadrant::Blind.column_family().
-    pub const JOHARI_BLIND: &str = "johari_blind";
-
-    /// Unknown quadrant index - matches JohariQuadrant::Unknown.column_family().
-    pub const JOHARI_UNKNOWN: &str = "johari_unknown";
-
     /// Temporal index column family for time-based queries.
     pub const TEMPORAL: &str = "temporal";
 
@@ -65,7 +50,7 @@ pub mod cf_names {
     /// System metadata column family (rare access, no compression).
     pub const SYSTEM: &str = "system";
 
-    /// All column family names as a slice (12 total).
+    /// All column family names as a slice (8 total per PRD v6).
     ///
     /// This is the canonical list per constitution.yaml specification.
     pub const ALL: &[&str] = &[
@@ -73,10 +58,6 @@ pub mod cf_names {
         EDGES,
         EMBEDDINGS,
         METADATA,
-        JOHARI_OPEN,
-        JOHARI_HIDDEN,
-        JOHARI_BLIND,
-        JOHARI_UNKNOWN,
         TEMPORAL,
         TAGS,
         SOURCES,
@@ -168,7 +149,7 @@ pub fn embeddings_options(cache: &Cache) -> Options {
 
 /// Create options optimized for index column families.
 ///
-/// Used for: johari_*, temporal, tags, sources, metadata
+/// Used for: temporal, tags, sources, metadata
 ///
 /// # Configuration
 /// - Prefix extractor: 16 bytes (UUID)
@@ -216,11 +197,11 @@ pub fn system_options() -> Options {
 /// * `block_cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 12 `ColumnFamilyDescriptor`s with optimized options per CF type:
+/// Vector of 8 `ColumnFamilyDescriptor`s with optimized options per CF type:
 /// - `nodes`: Point lookup optimized with bloom filter
 /// - `edges`: Prefix-based range scans
 /// - `embeddings`: Large block size for sequential reads
-/// - `metadata`, `johari_*`, `temporal`, `tags`, `sources`: Index optimized
+/// - `metadata`, `temporal`, `tags`, `sources`: Index optimized
 /// - `system`: No compression for small metadata
 ///
 /// # Example
@@ -230,7 +211,7 @@ pub fn system_options() -> Options {
 ///
 /// let cache = Cache::new_lru_cache(256 * 1024 * 1024); // 256MB
 /// let descriptors = get_column_family_descriptors(&cache);
-/// assert_eq!(descriptors.len(), 12);
+/// assert_eq!(descriptors.len(), 8);
 /// ```
 pub fn get_column_family_descriptors(block_cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     vec![
@@ -238,10 +219,6 @@ pub fn get_column_family_descriptors(block_cache: &Cache) -> Vec<ColumnFamilyDes
         ColumnFamilyDescriptor::new(cf_names::EDGES, edges_options(block_cache)),
         ColumnFamilyDescriptor::new(cf_names::EMBEDDINGS, embeddings_options(block_cache)),
         ColumnFamilyDescriptor::new(cf_names::METADATA, index_options(block_cache)),
-        ColumnFamilyDescriptor::new(cf_names::JOHARI_OPEN, index_options(block_cache)),
-        ColumnFamilyDescriptor::new(cf_names::JOHARI_HIDDEN, index_options(block_cache)),
-        ColumnFamilyDescriptor::new(cf_names::JOHARI_BLIND, index_options(block_cache)),
-        ColumnFamilyDescriptor::new(cf_names::JOHARI_UNKNOWN, index_options(block_cache)),
         ColumnFamilyDescriptor::new(cf_names::TEMPORAL, index_options(block_cache)),
         ColumnFamilyDescriptor::new(cf_names::TAGS, index_options(block_cache)),
         ColumnFamilyDescriptor::new(cf_names::SOURCES, index_options(block_cache)),
@@ -249,19 +226,19 @@ pub fn get_column_family_descriptors(block_cache: &Cache) -> Vec<ColumnFamilyDes
     ]
 }
 
-/// Get ALL column family descriptors: base (12) + teleological (20) + autonomous (7).
+/// Get ALL column family descriptors: base (8) + teleological + autonomous.
 ///
-/// Returns 39 total column families for a fully configured Context Graph database.
+/// Returns total column families for a fully configured Context Graph database.
 ///
 /// # Arguments
 /// * `block_cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 39 `ColumnFamilyDescriptor`s:
-/// - 12 base CFs (nodes, edges, embeddings, etc.)
-/// - 7 teleological CFs (fingerprints, purpose_vectors, synergy_matrix, etc.)
+/// Vector of `ColumnFamilyDescriptor`s:
+/// - 8 base CFs (nodes, edges, embeddings, metadata, temporal, tags, sources, system)
+/// - Teleological CFs (fingerprints, purpose_vectors, synergy_matrix, etc.)
 /// - 13 quantized embedder CFs (emb_0 through emb_12)
-/// - 7 autonomous CFs (autonomous_config, drift_history, etc.)
+/// - Autonomous CFs (autonomous_config, etc.)
 ///
 /// # Example
 /// ```ignore
@@ -270,7 +247,7 @@ pub fn get_column_family_descriptors(block_cache: &Cache) -> Vec<ColumnFamilyDes
 ///
 /// let cache = Cache::new_lru_cache(256 * 1024 * 1024); // 256MB
 /// let descriptors = get_all_column_family_descriptors(&cache);
-/// assert_eq!(descriptors.len(), 39);
+/// assert_eq!(descriptors.len(), TOTAL_COLUMN_FAMILIES);
 /// ```
 pub fn get_all_column_family_descriptors(block_cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     use crate::autonomous::get_autonomous_cf_descriptors;
@@ -283,13 +260,12 @@ pub fn get_all_column_family_descriptors(block_cache: &Cache) -> Vec<ColumnFamil
 }
 
 /// Total number of column families in a fully configured Context Graph database.
-/// Base (12) + Teleological (11) + Quantized Embedder (13) + Autonomous (5) = 41
+/// Base (8) + Teleological (9) + Quantized Embedder (13) + Autonomous (5) = 35
 /// TASK-CONTENT-001: +1 for CF_CONTENT
-/// TASK-GWT-P1-001: +1 for CF_EGO_NODE
 /// TASK-STORAGE-P2-001: +1 for CF_E12_LATE_INTERACTION
-/// TASK-SESSION-04: +1 for CF_SESSION_IDENTITY
-/// TASK-P0-004: -2 (removed drift_history and goal_activity_metrics after North Star removal)
-pub const TOTAL_COLUMN_FAMILIES: usize = 41;
+/// TASK-P0-004: -2 (removed drift_history and goal_activity_metrics)
+/// PRD v6: Removed CF_SESSION_IDENTITY (Session Identity deprecated, replaced by Topic Stability)
+pub const TOTAL_COLUMN_FAMILIES: usize = 35;
 
 #[cfg(test)]
 mod tests {
@@ -303,8 +279,8 @@ mod tests {
     fn test_cf_names_count() {
         assert_eq!(
             cf_names::ALL.len(),
-            12,
-            "Must have exactly 12 column families"
+            8,
+            "Must have exactly 8 column families per PRD v6"
         );
     }
 
@@ -314,10 +290,6 @@ mod tests {
         assert!(cf_names::ALL.contains(&cf_names::EDGES));
         assert!(cf_names::ALL.contains(&cf_names::EMBEDDINGS));
         assert!(cf_names::ALL.contains(&cf_names::METADATA));
-        assert!(cf_names::ALL.contains(&cf_names::JOHARI_OPEN));
-        assert!(cf_names::ALL.contains(&cf_names::JOHARI_HIDDEN));
-        assert!(cf_names::ALL.contains(&cf_names::JOHARI_BLIND));
-        assert!(cf_names::ALL.contains(&cf_names::JOHARI_UNKNOWN));
         assert!(cf_names::ALL.contains(&cf_names::TEMPORAL));
         assert!(cf_names::ALL.contains(&cf_names::TAGS));
         assert!(cf_names::ALL.contains(&cf_names::SOURCES));
@@ -325,28 +297,10 @@ mod tests {
     }
 
     #[test]
-    fn test_cf_names_match_johari() {
-        use context_graph_core::types::JohariQuadrant;
-        assert_eq!(cf_names::JOHARI_OPEN, JohariQuadrant::Open.column_family());
-        assert_eq!(
-            cf_names::JOHARI_HIDDEN,
-            JohariQuadrant::Hidden.column_family()
-        );
-        assert_eq!(
-            cf_names::JOHARI_BLIND,
-            JohariQuadrant::Blind.column_family()
-        );
-        assert_eq!(
-            cf_names::JOHARI_UNKNOWN,
-            JohariQuadrant::Unknown.column_family()
-        );
-    }
-
-    #[test]
     fn test_cf_names_unique() {
         use std::collections::HashSet;
         let set: HashSet<_> = cf_names::ALL.iter().collect();
-        assert_eq!(set.len(), 12, "All CF names must be unique");
+        assert_eq!(set.len(), 8, "All CF names must be unique");
     }
 
     #[test]
@@ -411,10 +365,10 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_get_descriptors_returns_12() {
+    fn test_get_descriptors_returns_8() {
         let cache = Cache::new_lru_cache(256 * 1024 * 1024);
         let descriptors = get_column_family_descriptors(&cache);
-        assert_eq!(descriptors.len(), 12, "Must return exactly 12 descriptors");
+        assert_eq!(descriptors.len(), 8, "Must return exactly 8 descriptors (PRD v6)");
     }
 
     #[test]
@@ -481,7 +435,7 @@ mod tests {
         let descriptors = get_column_family_descriptors(&cache);
 
         println!("AFTER: {} descriptors created", descriptors.len());
-        assert_eq!(descriptors.len(), 12);
+        assert_eq!(descriptors.len(), 8);
         println!("RESULT: PASS - Works with minimum cache size");
     }
 
@@ -495,33 +449,13 @@ mod tests {
         let descriptors = get_column_family_descriptors(&cache);
 
         println!("AFTER: {} descriptors created", descriptors.len());
-        assert_eq!(descriptors.len(), 12);
+        assert_eq!(descriptors.len(), 8);
         println!("RESULT: PASS - Zero cache handled gracefully");
     }
 
     // =========================================================================
     // Additional Verification Tests
     // =========================================================================
-
-    #[test]
-    fn test_all_johari_quadrants_have_cf() {
-        use context_graph_core::types::JohariQuadrant;
-
-        // Verify all 4 Johari quadrants map to our CF names
-        let quadrants = JohariQuadrant::all();
-        assert_eq!(quadrants.len(), 4, "Should have 4 Johari quadrants");
-
-        for quadrant in quadrants {
-            let cf_name = quadrant.column_family();
-            assert!(
-                cf_names::ALL.contains(&cf_name),
-                "Johari quadrant {:?} maps to '{}' which is not in cf_names::ALL",
-                quadrant,
-                cf_name
-            );
-            println!("Johari {:?} -> CF '{}'", quadrant, cf_name);
-        }
-    }
 
     #[test]
     fn test_options_reusable_with_same_cache() {
@@ -536,22 +470,18 @@ mod tests {
         let desc2 = get_column_family_descriptors(&cache);
         println!("  Second batch: {} descriptors", desc2.len());
 
-        assert_eq!(desc1.len(), 12);
-        assert_eq!(desc2.len(), 12);
+        assert_eq!(desc1.len(), 8);
+        assert_eq!(desc2.len(), 8);
         println!("RESULT: PASS - Cache can be reused across multiple descriptor creations");
     }
 
     #[test]
     fn test_cf_name_values_match_spec() {
-        // Verify exact string values match constitution.yaml specification
+        // Verify exact string values match PRD v6 specification
         assert_eq!(cf_names::NODES, "nodes");
         assert_eq!(cf_names::EDGES, "edges");
         assert_eq!(cf_names::EMBEDDINGS, "embeddings");
         assert_eq!(cf_names::METADATA, "metadata");
-        assert_eq!(cf_names::JOHARI_OPEN, "johari_open");
-        assert_eq!(cf_names::JOHARI_HIDDEN, "johari_hidden");
-        assert_eq!(cf_names::JOHARI_BLIND, "johari_blind");
-        assert_eq!(cf_names::JOHARI_UNKNOWN, "johari_unknown");
         assert_eq!(cf_names::TEMPORAL, "temporal");
         assert_eq!(cf_names::TAGS, "tags");
         assert_eq!(cf_names::SOURCES, "sources");
@@ -567,7 +497,7 @@ mod tests {
         let names: HashSet<_> = descriptors.iter().map(|d| d.name()).collect();
         assert_eq!(
             names.len(),
-            12,
+            8,
             "All descriptor names must be unique, got {} unique names",
             names.len()
         );
@@ -598,20 +528,19 @@ mod tests {
     #[test]
     fn test_total_column_families_constant() {
         // Verify the constant is correct:
-        // 12 base + 11 teleological + 13 quantized + 5 autonomous = 41
+        // 8 base + 9 teleological + 13 quantized + 5 autonomous = 35
         // TASK-CONTENT-001: +1 for CF_CONTENT
-        // TASK-GWT-P1-001: +1 for CF_EGO_NODE
         // TASK-STORAGE-P2-001: +1 for CF_E12_LATE_INTERACTION
-        // TASK-SESSION-04: +1 for CF_SESSION_IDENTITY
-        // TASK-P0-004: -2 (removed drift_history and goal_activity_metrics after North Star removal)
+        // TASK-P0-004: -2 (removed drift_history and goal_activity_metrics)
+        // PRD v6: Removed CF_SESSION_IDENTITY (Session Identity deprecated)
         assert_eq!(
-            TOTAL_COLUMN_FAMILIES, 41,
-            "Total column families should be 41 (12 base + 11 teleological + 13 quantized + 5 autonomous)"
+            TOTAL_COLUMN_FAMILIES, 35,
+            "Total column families should be 35 (8 base + 9 teleological + 13 quantized + 5 autonomous)"
         );
     }
 
     #[test]
-    fn test_get_all_column_family_descriptors_returns_41() {
+    fn test_get_all_column_family_descriptors_returns_correct_count() {
         let cache = Cache::new_lru_cache(256 * 1024 * 1024);
         let descriptors = get_all_column_family_descriptors(&cache);
 
@@ -692,7 +621,7 @@ mod tests {
         );
     }
 
-    // TASK-P0-004: Updated test to verify 5 autonomous CFs after North Star removal.
+    // TASK-P0-004: Updated test to verify 5 autonomous CFs.
     // Removed drift_history and goal_activity_metrics (ARCH-10, ARCH-03).
     #[test]
     fn test_all_cf_descriptors_includes_autonomous_cfs() {

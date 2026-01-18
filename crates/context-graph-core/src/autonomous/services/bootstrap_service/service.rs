@@ -1,8 +1,8 @@
 //! Main BootstrapService implementation
 //!
-//! NORTH-008: Service for initializing North Star goal from documentation sources.
+//! NORTH-008: Service for initializing Strategic goals from documentation sources.
 //! Extracts goal candidates from project documents and selects the best
-//! goal to serve as the North Star for the context graph system.
+//! goal to serve as the Strategic goal for the context graph system.
 
 use std::collections::HashMap;
 use std::fs;
@@ -14,7 +14,7 @@ use super::extraction::extract_goal_candidates;
 use super::scoring::CandidateScoring;
 use super::types::{BootstrapResult, BootstrapServiceConfig, GoalCandidate};
 
-/// NORTH-008: Service for bootstrapping North Star goals from documents
+/// NORTH-008: Service for bootstrapping Strategic goals from documents
 #[derive(Debug)]
 pub struct BootstrapService {
     config: BootstrapServiceConfig,

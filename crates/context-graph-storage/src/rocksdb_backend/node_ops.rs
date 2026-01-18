@@ -18,7 +18,7 @@ use super::helpers::{format_source_key, format_tag_key, format_temporal_key};
 impl RocksDbMemex {
     /// Stores a MemoryNode atomically across all relevant column families.
     ///
-    /// Writes to: nodes, embeddings, johari_{quadrant}, temporal, tags (per tag), sources
+    /// Writes to: nodes, embeddings, temporal, tags (per tag), sources
     /// Uses WriteBatch for atomicity.
     ///
     /// # Validation
@@ -46,7 +46,6 @@ impl RocksDbMemex {
         let cf_temporal = self.get_cf(cf_names::TEMPORAL)?;
         let cf_tags = self.get_cf(cf_names::TAGS)?;
         let cf_sources = self.get_cf(cf_names::SOURCES)?;
-        let cf_johari = self.get_cf(node.quadrant.column_family())?;
 
         // 4. Serialize and write to nodes CF
         let node_key = serialize_uuid(&node.id);
@@ -57,26 +56,23 @@ impl RocksDbMemex {
         let embedding_value = serialize_embedding(&node.embedding);
         batch.put_cf(cf_embeddings, node_key.as_slice(), &embedding_value);
 
-        // 6. Add to Johari quadrant index (empty value, key is index)
-        batch.put_cf(cf_johari, node_key.as_slice(), []);
-
-        // 7. Add to temporal index: timestamp_millis:uuid format
+        // 6. Add to temporal index: timestamp_millis:uuid format
         let temporal_key = format_temporal_key(node.created_at, &node.id);
         batch.put_cf(cf_temporal, temporal_key.as_slice(), []);
 
-        // 8. Add to tag indexes (one entry per tag)
+        // 7. Add to tag indexes (one entry per tag)
         for tag in &node.metadata.tags {
             let tag_key = format_tag_key(tag, &node.id);
             batch.put_cf(cf_tags, tag_key.as_slice(), []);
         }
 
-        // 9. Add to sources index if source present
+        // 8. Add to sources index if source present
         if let Some(source) = &node.metadata.source {
             let source_key = format_source_key(source, &node.id);
             batch.put_cf(cf_sources, source_key.as_slice(), []);
         }
 
-        // 10. Execute atomic batch write
+        // 9. Execute atomic batch write
         self.db
             .write(batch)
             .map_err(|e| StorageError::WriteFailed(e.to_string()))?;
@@ -111,7 +107,7 @@ impl RocksDbMemex {
 
     /// Updates an existing MemoryNode, maintaining index consistency.
     ///
-    /// Handles index updates when quadrant or tags change.
+    /// Handles index updates when tags change.
     /// DOES NOT create if node doesn't exist - returns NotFound error.
     /// FAIL FAST: Non-existent nodes cause immediate error.
     ///
@@ -146,15 +142,7 @@ impl RocksDbMemex {
             serialize_embedding(&node.embedding),
         );
 
-        // 6. Handle Johari quadrant change
-        if old_node.quadrant != node.quadrant {
-            let old_cf = self.get_cf(old_node.quadrant.column_family())?;
-            let new_cf = self.get_cf(node.quadrant.column_family())?;
-            batch.delete_cf(old_cf, node_key.as_slice());
-            batch.put_cf(new_cf, node_key.as_slice(), []);
-        }
-
-        // 7. Handle tag changes
+        // 6. Handle tag changes
         let old_tags: HashSet<_> = old_node.metadata.tags.into_iter().collect();
         let new_tags: HashSet<_> = node.metadata.tags.iter().cloned().collect();
 
@@ -165,7 +153,7 @@ impl RocksDbMemex {
             batch.put_cf(cf_tags, format_tag_key(added_tag, &node.id), []);
         }
 
-        // 8. Handle source changes
+        // 7. Handle source changes
         let old_source = old_node.metadata.source.as_ref();
         let new_source = node.metadata.source.as_ref();
 
@@ -178,7 +166,7 @@ impl RocksDbMemex {
             }
         }
 
-        // 9. Write atomically
+        // 8. Write atomically
         self.db
             .write(batch)
             .map_err(|e| StorageError::WriteFailed(e.to_string()))?;
@@ -228,11 +216,9 @@ impl RocksDbMemex {
             let cf_temporal = self.get_cf(cf_names::TEMPORAL)?;
             let cf_tags = self.get_cf(cf_names::TAGS)?;
             let cf_sources = self.get_cf(cf_names::SOURCES)?;
-            let cf_johari = self.get_cf(node.quadrant.column_family())?;
 
             batch.delete_cf(cf_nodes, node_key.as_slice());
             batch.delete_cf(cf_embeddings, node_key.as_slice());
-            batch.delete_cf(cf_johari, node_key.as_slice());
             batch.delete_cf(cf_temporal, format_temporal_key(node.created_at, id));
 
             for tag in &node.metadata.tags {

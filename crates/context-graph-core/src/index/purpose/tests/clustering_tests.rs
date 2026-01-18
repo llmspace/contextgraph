@@ -2,7 +2,6 @@
 
 use super::helpers::{create_clustered_entries, create_entry};
 use crate::index::purpose::clustering::{KMeansConfig, KMeansPurposeClustering, StandardKMeans};
-use crate::types::JohariQuadrant;
 use std::collections::HashSet;
 use uuid::Uuid;
 
@@ -68,7 +67,7 @@ fn test_cluster_coherence_calculation() {
 
     // Create tightly grouped entries (high coherence expected)
     let entries: Vec<_> = (0..10)
-        .map(|i| create_entry(0.5 + i as f32 * 0.005, "tight", JohariQuadrant::Open))
+        .map(|i| create_entry(0.5 + i as f32 * 0.005, "tight"))
         .collect();
 
     let config = KMeansConfig::new(1, 100, 1e-6).unwrap();
@@ -86,7 +85,7 @@ fn test_cluster_coherence_calculation() {
 #[test]
 fn test_clustering_single_point_edge_case() {
     let clusterer = StandardKMeans::new();
-    let entries = vec![create_entry(0.5, "single", JohariQuadrant::Open)];
+    let entries = vec![create_entry(0.5, "single")];
     let config = KMeansConfig::new(1, 100, 1e-6).unwrap();
 
     let result = clusterer.cluster_purposes(&entries, &config).unwrap();
@@ -101,7 +100,7 @@ fn test_clustering_single_point_edge_case() {
 #[test]
 fn test_clustering_k_greater_than_n_rejected() {
     let clusterer = StandardKMeans::new();
-    let entries = vec![create_entry(0.5, "single", JohariQuadrant::Open)];
+    let entries = vec![create_entry(0.5, "single")];
     let config = KMeansConfig::new(5, 100, 1e-6).unwrap(); // k=5 but only 1 entry
 
     let result = clusterer.cluster_purposes(&entries, &config);

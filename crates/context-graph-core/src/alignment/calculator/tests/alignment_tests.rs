@@ -33,10 +33,6 @@ async fn test_compute_alignment_basic() {
         result.score.composite_score
     );
     println!(
-        "  - north_star_alignment: {:.3}",
-        result.score.strategic_alignment
-    );
-    println!(
         "  - strategic_alignment: {:.3}",
         result.score.strategic_alignment
     );
@@ -61,7 +57,7 @@ async fn test_compute_alignment_basic() {
 }
 
 #[tokio::test]
-async fn test_compute_alignment_no_north_star() {
+async fn test_compute_alignment_no_goals() {
     use crate::alignment::error::AlignmentError;
 
     let calculator = DefaultAlignmentCalculator::new();

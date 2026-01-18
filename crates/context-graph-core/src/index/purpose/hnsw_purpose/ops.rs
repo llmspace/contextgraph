@@ -128,7 +128,6 @@ impl PurposeIndexOps for HnswPurposeIndex {
         // Clear primary storage
         self.metadata.clear();
         self.vectors.clear();
-        self.quadrant_index.clear();
         self.goal_index.clear();
 
         // Remove all entries from HNSW index

@@ -7,8 +7,7 @@ use tempfile::TempDir;
 
 use context_graph_core::traits::TeleologicalMemoryStore;
 use context_graph_core::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
-    NUM_EMBEDDERS,
+    PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint, NUM_EMBEDDERS,
 };
 
 /// Create a test fingerprint with real (non-zero) embeddings.
@@ -74,19 +73,13 @@ fn create_test_fingerprint_with_seed(seed: u64) -> TeleologicalFingerprint {
     }
     let purpose = PurposeVector::new(alignments);
 
-    // Create JohariFingerprint using zeroed() then set values
-    let mut johari = JohariFingerprint::zeroed();
-    for i in 0..NUM_EMBEDDERS {
-        johari.set_quadrant(i, 0.8, 0.1, 0.05, 0.05, 0.9); // Open dominant with high confidence
-    }
-
     // Create unique hash
     let mut hash = [0u8; 32];
     for (i, byte) in hash.iter_mut().enumerate() {
         *byte = ((seed + i as u64) % 256) as u8;
     }
 
-    TeleologicalFingerprint::new(semantic, purpose, johari, hash)
+    TeleologicalFingerprint::new(semantic, purpose, hash)
 }
 
 fn create_test_fingerprint() -> TeleologicalFingerprint {

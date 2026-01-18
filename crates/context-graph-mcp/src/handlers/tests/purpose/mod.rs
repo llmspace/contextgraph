@@ -4,7 +4,7 @@
 //! goal/aligned_memories, and purpose/drift_check handlers.
 //!
 //! TASK-CORE-001: Removed tests for deprecated methods per ARCH-03.
-//! TASK-P0-002: Removed deprecated north_star_alignment and north_star_update test modules.
+//! TASK-P0-002: Removed deprecated test modules per ARCH-03.
 //!
 //! Uses STUBS (InMemoryTeleologicalStore, StubMultiArrayProvider) with real GoalHierarchy.
 //!

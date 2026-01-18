@@ -12,7 +12,6 @@ use uuid::Uuid;
 
 use crate::alignment::{AlignmentConfig, GoalAlignmentCalculator};
 use crate::error::{CoreError, CoreResult};
-use crate::johari::JohariTransitionManager;
 use crate::purpose::GoalHierarchy;
 use crate::traits::TeleologicalMemoryStore;
 use crate::types::fingerprint::{TeleologicalFingerprint, NUM_EMBEDDERS};
@@ -33,11 +32,10 @@ use super::traits::{PipelineHealth, TeleologicalRetrievalPipeline};
 ///
 /// All internal components are wrapped in `Arc` for shared access
 /// across async tasks.
-pub struct DefaultTeleologicalPipeline<E, A, J, S>
+pub struct DefaultTeleologicalPipeline<E, A, S>
 where
     E: MultiEmbeddingQueryExecutor,
     A: GoalAlignmentCalculator,
-    J: JohariTransitionManager,
     S: TeleologicalMemoryStore,
 {
     /// Multi-embedding executor (Stages 1-3, 5).
@@ -45,10 +43,6 @@ where
 
     /// Goal alignment calculator (Stage 4).
     pub(crate) alignment_calculator: Arc<A>,
-
-    /// Johari manager for quadrant classification (Stage 4).
-    #[allow(dead_code)]
-    pub(crate) johari_manager: Arc<J>,
 
     /// Teleological memory store for fetching fingerprints (Stage 4).
     pub(crate) store: Arc<S>,
@@ -63,11 +57,10 @@ where
     pub(crate) last_query_time: std::sync::RwLock<Option<Duration>>,
 }
 
-impl<E, A, J, S> DefaultTeleologicalPipeline<E, A, J, S>
+impl<E, A, S> DefaultTeleologicalPipeline<E, A, S>
 where
     E: MultiEmbeddingQueryExecutor,
     A: GoalAlignmentCalculator,
-    J: JohariTransitionManager,
     S: TeleologicalMemoryStore,
 {
     /// Create a new pipeline with all required components.
@@ -75,20 +68,17 @@ where
     /// # Arguments
     /// * `executor` - Multi-embedding query executor
     /// * `alignment_calculator` - Goal alignment calculator
-    /// * `johari_manager` - Johari transition manager
     /// * `store` - Teleological memory store for fingerprint retrieval (Stage 4)
     /// * `goal_hierarchy` - Goal hierarchy for alignment
     pub fn new(
         executor: Arc<E>,
         alignment_calculator: Arc<A>,
-        johari_manager: Arc<J>,
         store: Arc<S>,
         goal_hierarchy: GoalHierarchy,
     ) -> Self {
         Self {
             executor,
             alignment_calculator,
-            johari_manager,
             store,
             goal_hierarchy: Arc::new(goal_hierarchy),
             index_size: std::sync::atomic::AtomicUsize::new(0),
@@ -135,11 +125,10 @@ where
 }
 
 #[async_trait]
-impl<E, A, J, S> TeleologicalRetrievalPipeline for DefaultTeleologicalPipeline<E, A, J, S>
+impl<E, A, S> TeleologicalRetrievalPipeline for DefaultTeleologicalPipeline<E, A, S>
 where
     E: MultiEmbeddingQueryExecutor + Send + Sync,
     A: GoalAlignmentCalculator + Send + Sync,
-    J: JohariTransitionManager + Send + Sync,
     S: TeleologicalMemoryStore + Send + Sync,
 {
     #[instrument(skip(self, query), fields(query_text = %query.text))]
@@ -154,7 +143,6 @@ where
         debug!(
             text = %query.text,
             has_goals = query.has_goals(),
-            has_johari_filter = query.has_johari_filter(),
             include_breakdown = query.include_breakdown,
             "Starting teleological pipeline"
         );
@@ -311,21 +299,12 @@ where
                 continue;
             }
 
-            let johari_quadrant = self.compute_dominant_quadrant(fingerprint);
-
-            if let Some(ref allowed) = query.johari_filter {
-                if !allowed.contains(&johari_quadrant) {
-                    continue;
-                }
-            }
-
             let scored = ScoredMemory::new(
                 fingerprint.id,
                 goal_alignment, // Use alignment as score for direct filtering
                 fingerprint.alignment_score,
                 fingerprint.alignment_score,
                 goal_alignment,
-                johari_quadrant,
                 NUM_EMBEDDERS, // Assume all spaces
             )
             .with_misalignment(is_misaligned);
@@ -349,7 +328,6 @@ where
 
     async fn health_check(&self) -> CoreResult<PipelineHealth> {
         let spaces = self.executor.available_spaces();
-        // TASK-P0-005: Renamed from has_north_star per ARCH-03
         let has_strategic_goal = self.goal_hierarchy.has_top_level_goals();
         let last_time = self.last_query_time.read().ok().and_then(|g| *g);
         let index_size = self.index_size.load(std::sync::atomic::Ordering::Relaxed);

@@ -16,7 +16,7 @@ pub enum DiscoveryMethod {
     PatternRecognition,
     /// Created by decomposing a parent goal into sub-goals.
     Decomposition,
-    /// Bootstrapped from initial memory analysis (first North Star).
+    /// Bootstrapped from initial memory analysis (first Strategic goal).
     Bootstrap,
 }
 
@@ -68,7 +68,7 @@ impl GoalDiscoveryMetadata {
         })
     }
 
-    /// Create bootstrap metadata (for initial North Star).
+    /// Create bootstrap metadata (for initial Strategic goal).
     ///
     /// Bootstrap goals start with zero confidence and coherence,
     /// which will be computed after more data is available.

@@ -1,51 +1,16 @@
 //! GWT (Global Workspace Theory) tool definitions.
-//! TASK-GWT-001: Consciousness state, Kuramoto sync, workspace, ego, broadcast, coupling.
+//! TASK-GWT-001: Workspace, ego, broadcast tools.
 //! TASK-34: High-level coherence state tool.
-//! TASK-38: Identity continuity focused tool.
-//! TASK-39: Kuramoto state with stepper status tool.
+//!
+//! Note: Phase synchronization is handled by per-space clustering coordination.
+//! Topic stability metrics are used for session coherence tracking.
 
 use crate::tools::types::ToolDefinition;
 use serde_json::json;
 
-/// Returns GWT tool definitions (9 tools).
+/// Returns GWT tool definitions (4 tools).
 pub fn definitions() -> Vec<ToolDefinition> {
     vec![
-        // get_consciousness_state - GWT consciousness state (TASK-GWT-001)
-        ToolDefinition::new(
-            "get_consciousness_state",
-            "Get current consciousness state including Kuramoto sync (r), consciousness level (C), \
-             meta-cognitive score, differentiation, workspace status, and identity coherence. \
-             Requires GWT providers to be initialized via with_gwt() constructor.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "session_id": {
-                        "type": "string",
-                        "description": "Session ID for consciousness tracking (optional, uses default if not provided)"
-                    }
-                },
-                "required": []
-            }),
-        ),
-
-        // get_kuramoto_sync - Kuramoto oscillator network synchronization (TASK-GWT-001)
-        ToolDefinition::new(
-            "get_kuramoto_sync",
-            "Get Kuramoto oscillator network synchronization state including order parameter (r), \
-             mean phase (psi), all 13 oscillator phases, natural frequencies, and coupling strength. \
-             Requires GWT providers to be initialized via with_gwt() constructor.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "session_id": {
-                        "type": "string",
-                        "description": "Session ID (optional, uses default if not provided)"
-                    }
-                },
-                "required": []
-            }),
-        ),
-
         // get_workspace_status - Global Workspace status (TASK-GWT-001)
         ToolDefinition::new(
             "get_workspace_status",
@@ -64,13 +29,13 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         ),
 
-        // get_ego_state - Self-Ego Node state (TASK-GWT-001, TASK-IDENTITY-P0-007)
+        // get_ego_state - Topic Profile state (TASK-GWT-001, TASK-IDENTITY-P0-007)
         ToolDefinition::new(
             "get_ego_state",
-            "Get Self-Ego Node state including purpose vector (13D), identity continuity, \
+            "Get Topic Profile state including purpose vector (13D), topic stability, \
              coherence with actions, trajectory length, and crisis detection state. \
-             TASK-IDENTITY-P0-007: Response includes identity_continuity object with: \
-             ic (0.0-1.0), status (Healthy/Warning/Degraded/Critical), in_crisis (bool), \
+             TASK-IDENTITY-P0-007: Response includes topic_stability object with: \
+             ts (0.0-1.0), status (Healthy/Warning/Degraded/Critical), in_crisis (bool), \
              history_len (int), and last_detection (CrisisDetectionResult or null). \
              Requires GWT providers to be initialized via with_gwt() constructor.",
             json!({
@@ -111,7 +76,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "minimum": 0,
                         "maximum": 1,
                         "default": 0.8,
-                        "description": "North star alignment score [0.0, 1.0]"
+                        "description": "Goal alignment score [0.0, 1.0]"
                     },
                     "force": {
                         "type": "boolean",
@@ -123,75 +88,12 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         ),
 
-        // adjust_coupling - Adjust Kuramoto coupling strength (TASK-GWT-001)
-        ToolDefinition::new(
-            "adjust_coupling",
-            "Adjust Kuramoto oscillator network coupling strength K. \
-             Higher K leads to faster synchronization. K is clamped to [0, 10]. \
-             Returns old and new K values plus predicted order parameter r. \
-             Requires GWT providers to be initialized via with_gwt() constructor.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "new_K": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 10,
-                        "description": "New coupling strength K (clamped to [0, 10])"
-                    }
-                },
-                "required": ["new_K"]
-            }),
-        ),
-
         // get_coherence_state - High-level coherence summary (TASK-34)
         ToolDefinition::new(
             "get_coherence_state",
-            "Get high-level GWT workspace coherence state. Returns Kuramoto order parameter, \
-             coherence level classification (High/Medium/Low), workspace broadcasting status, \
-             and conflict detection status. Use get_kuramoto_sync for detailed oscillator data. \
-             Requires GWT providers to be initialized via with_gwt() constructor.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "include_phases": {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "Include all 13 oscillator phases in response (optional)"
-                    }
-                },
-                "required": []
-            }),
-        ),
-
-        // get_identity_continuity - Focused IC status (TASK-38)
-        ToolDefinition::new(
-            "get_identity_continuity",
-            "Get focused identity continuity (IC) status. Returns IC value (0.0-1.0), \
-             status classification (Healthy/Warning/Degraded/Critical), in_crisis flag, \
-             and thresholds. Unlike get_ego_state (full purpose vector, trajectory), this \
-             provides a minimal snapshot for monitoring identity health without bulk data. \
-             Requires GWT providers to be initialized via with_gwt() constructor.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "include_history": {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "Include recent IC history values (optional, up to 10 entries)"
-                    }
-                },
-                "required": []
-            }),
-        ),
-
-        // get_kuramoto_state - Kuramoto state with stepper status (TASK-39)
-        ToolDefinition::new(
-            "get_kuramoto_state",
-            "Get detailed Kuramoto oscillator network state including stepper running status. \
-             Returns is_running (stepper active), phases (13 oscillator phases), frequencies \
-             (13 natural frequencies), coupling (K), order_parameter (r), mean_phase (psi). \
-             Unlike get_kuramoto_sync, includes stepper lifecycle status for debugging/monitoring. \
+            "Get high-level GWT workspace coherence state. Returns coherence level \
+             classification (High/Medium/Low), workspace broadcasting status, \
+             and conflict detection status. \
              Requires GWT providers to be initialized via with_gwt() constructor.",
             json!({
                 "type": "object",

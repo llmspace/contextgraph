@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::types::fingerprint::evolution::PurposeSnapshot;
-use crate::types::fingerprint::johari::JohariFingerprint;
 use crate::types::fingerprint::purpose::PurposeVector;
 use crate::types::fingerprint::SemanticFingerprint;
 
@@ -28,11 +27,8 @@ pub struct TeleologicalFingerprint {
     /// The 13-embedding semantic fingerprint (from TASK-F001)
     pub semantic: SemanticFingerprint,
 
-    /// 13D alignment signature to North Star goal
+    /// 13D alignment signature to Strategic goals
     pub purpose_vector: PurposeVector,
-
-    /// Per-embedder Johari awareness classification
-    pub johari: JohariFingerprint,
 
     /// Time-series of purpose evolution snapshots
     pub purpose_evolution: Vec<PurposeSnapshot>,

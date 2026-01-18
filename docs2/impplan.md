@@ -8,37 +8,9 @@ Transform contextgraph into a multi-space emergent topic system:
 2. Discovers topics via 13 parallel HDBSCAN+BIRCH clustering spaces
 3. Captures Claude's descriptions + responses + MD file content as memories
 4. Uses frequency/recency importance (EWMA + BM25 + Wilson)
-5. Operates autonomously — NO North Star, NO IC, NO SELF_EGO_NODE
+5. Operates autonomously with emergent Topic Portfolio and Topic Stability
 6. Detects BOTH similarity clusters AND divergence from recent activity
 7. Integrates via Claude Code hooks for autonomous context injection
-
----
-
-## Part 0: North Star System Removal
-
-### Components to Remove
-
-**MCP Tools:** `auto_bootstrap_north_star`, `get_alignment_drift`, `get_drift_history`, `trigger_drift_correction`, `get_identity_continuity`, `get_ego_state`
-
-**Data Structures:** `NorthStar`, `GoalHierarchy`, `SelfEgoNode`, `IdentityContinuityMonitor`, `DriftDetector`, `DriftCorrector`, `north_star_alignment` field
-
-**Constitution Rules:** AP-01, AP-26, AP-37, AP-38, AP-40, `gwt.self_ego_node` section
-
-**Files to Delete:**
-- `crates/context-graph-core/src/autonomous/north_star.rs`
-- `crates/context-graph-core/src/autonomous/goal_hierarchy.rs`
-- `crates/context-graph-core/src/gwt/ego_node/` (entire directory)
-- `crates/context-graph-mcp/src/handlers/autonomous/bootstrap.rs`
-- `crates/context-graph-mcp/src/handlers/autonomous/drift.rs`
-
-### Replacements
-
-| Removed | Replacement |
-|---------|-------------|
-| North Star | Emergent Topic Portfolio |
-| SELF_EGO_NODE | Topic Profile (13D) |
-| Identity Continuity | Topic Stability (churn tracking) |
-| IC < 0.5 triggers dream | entropy > 0.7 + churn > 0.5 |
 
 ---
 
@@ -139,13 +111,11 @@ The 13 embedders (from PRD v5 Section 3) are divided into **4 categories** based
 - Clustering here indicates actual conceptual relationship
 - Count fully (1.0×) toward "agreeing spaces" threshold
 - Used for: similarity detection, divergence alerts, topic formation
-- Kuramoto frequencies: γ/β bands (high-frequency semantic processing)
 
 #### Temporal Embedders (E2, E3, E4) — 3 spaces
 - **Metadata only** — NEVER count for topic detection
 - NEVER trigger divergence alerts (working at different times is not divergence)
 - NEVER count toward "≥N spaces agreeing" topic threshold
-- Kuramoto frequencies: α band (8Hz) — rhythmic temporal processing
 - Used for:
   - **E2 Temporal-Recent (V_freshness):** How recently something occurred
   - **E3 Temporal-Periodic (V_periodicity):** Cyclical patterns (daily, weekly, etc.)
@@ -173,23 +143,23 @@ The 13 embedders (from PRD v5 Section 3) are divided into **4 categories** based
   - Format-aware retrieval
   - Noise-robust pattern matching
 
-### Per-Embedder Specifications (from PRD v5)
+### Per-Embedder Specifications (from PRD v6)
 
-| ID | Name | Dim | Purpose Vector | Category | Distance | Topic Weight | Kuramoto ω |
-|----|------|-----|----------------|----------|----------|--------------|------------|
-| E1 | Semantic (Matryoshka) | 1024D | V_meaning | Semantic | Cosine | 1.0 | 40Hz γ |
-| E2 | Temporal-Recent | 512D | V_freshness | Temporal | Cosine | 0.0 | 8Hz α |
-| E3 | Temporal-Periodic | 512D | V_periodicity | Temporal | Cosine | 0.0 | 8Hz α |
-| E4 | Temporal-Positional | 512D | V_ordering | Temporal | Cosine | 0.0 | 8Hz α |
-| E5 | Causal (asymmetric) | 768D | V_causality | Semantic | Asymmetric KNN | 1.0 | 25Hz β |
-| E6 | Sparse | ~30K (5% active) | V_selectivity | Semantic | Jaccard | 1.0 | 4Hz θ |
-| E7 | Code (AST) | 1536D | V_correctness | Semantic | Cosine | 1.0 | 25Hz β |
-| E8 | Graph/GNN | 384D | V_connectivity | Relational | TransE | 0.5 | 12Hz α-β |
-| E9 | HDC | 10K→1024D | V_robustness | Structural | Hamming | 0.5 | 80Hz γ+ |
-| E10 | Multimodal | 768D | V_multimodality | Semantic | Cosine | 1.0 | 40Hz γ |
-| E11 | Entity/TransE | 384D | V_factuality | Relational | TransE | 0.5 | 15Hz β |
-| E12 | Late-Interaction | 128D/token | V_precision | Semantic | MaxSim | 1.0 | 60Hz γ+ |
-| E13 | SPLADE | ~30K sparse | V_keyword | Semantic | Jaccard | 1.0 | 4Hz θ |
+| ID | Name | Dim | Purpose Vector | Category | Distance | Topic Weight |
+|----|------|-----|----------------|----------|----------|--------------|
+| E1 | Semantic (Matryoshka) | 1024D | V_meaning | Semantic | Cosine | 1.0 |
+| E2 | Temporal-Recent | 512D | V_freshness | Temporal | Cosine | 0.0 |
+| E3 | Temporal-Periodic | 512D | V_periodicity | Temporal | Cosine | 0.0 |
+| E4 | Temporal-Positional | 512D | V_ordering | Temporal | Cosine | 0.0 |
+| E5 | Causal (asymmetric) | 768D | V_causality | Semantic | Asymmetric KNN | 1.0 |
+| E6 | Sparse | ~30K (5% active) | V_selectivity | Semantic | Jaccard | 1.0 |
+| E7 | Code (AST) | 1536D | V_correctness | Semantic | Cosine | 1.0 |
+| E8 | Graph/GNN | 384D | V_connectivity | Relational | TransE | 0.5 |
+| E9 | HDC | 10K→1024D | V_robustness | Structural | Hamming | 0.5 |
+| E10 | Multimodal | 768D | V_multimodality | Semantic | Cosine | 1.0 |
+| E11 | Entity/TransE | 384D | V_factuality | Relational | TransE | 0.5 |
+| E12 | Late-Interaction | 128D/token | V_precision | Semantic | MaxSim | 1.0 |
+| E13 | SPLADE | ~30K sparse | V_keyword | Semantic | Jaccard | 1.0 |
 
 ### ΔS Computation Methods (from PRD Section 12)
 
@@ -501,10 +471,6 @@ churn_rate: f32 // 0.0=stable, 1.0=completely new
 
 ## Part 9: Implementation Roadmap
 
-### Phase 0: North Star Removal
-- Delete MCP tools, data structures, constitution rules
-- Files: See Part 0
-
 ### Phase 1: Memory Capture System
 - Hook description capture
 - Claude response capture
@@ -540,11 +506,6 @@ churn_rate: f32 // 0.0=stable, 1.0=completely new
 ---
 
 ## Part 10: Validation Checklist
-
-### North Star Removal
-- [ ] All North Star MCP tools removed
-- [ ] No `north_star_alignment`, `SELF_EGO_NODE`, IC references
-- [ ] System boots and stores memories
 
 ### Memory Capture
 - [ ] Hook descriptions captured and embedded

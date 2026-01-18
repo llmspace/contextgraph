@@ -3,10 +3,10 @@ name = "context-graph-cli"
 version = "0.1.0"
 edition = "2021"
 authors = ["Context Graph Team"]
-description = "CLI tools for Context Graph session identity and consciousness management"
+description = "CLI tools for Context Graph session and topic coherence management"
 license = "MIT"
 repository = "https://github.com/contextgraph/contextgraph"
-keywords = ["cli", "consciousness", "identity", "context-graph"]
+keywords = ["cli", "coherence", "topic", "context-graph"]
 
 [[bin]]
 name = "context-graph-cli"

@@ -13,16 +13,9 @@ fn test_create_fingerprint_with_all_13_embeddings() {
     let id = Uuid::new_v4();
     let embeddings = create_test_embeddings_with_deterministic_data(42);
     let purpose_vector = create_purpose_vector(42);
-    let johari_quadrants = create_johari_quadrants(42);
     let content_hash = create_content_hash(42);
 
-    let fp = StoredQuantizedFingerprint::new(
-        id,
-        embeddings,
-        purpose_vector,
-        johari_quadrants,
-        content_hash,
-    );
+    let fp = StoredQuantizedFingerprint::new(id, embeddings, purpose_vector, content_hash);
 
     // Verify all fields
     assert_eq!(fp.id, id, "ID must match");
@@ -35,11 +28,6 @@ fn test_create_fingerprint_with_all_13_embeddings() {
         fp.purpose_vector.len(),
         13,
         "Purpose vector must have 13 dimensions"
-    );
-    assert_eq!(
-        fp.johari_quadrants.len(),
-        4,
-        "Johari quadrants must have 4 values"
     );
     assert_eq!(fp.content_hash, content_hash, "Content hash must match");
     assert!(!fp.deleted, "New fingerprint should not be deleted");
@@ -62,7 +50,6 @@ fn test_panic_on_missing_embedder_0() {
         Uuid::new_v4(),
         embeddings,
         create_purpose_vector(42),
-        create_johari_quadrants(42),
         create_content_hash(42),
     );
 }
@@ -77,7 +64,6 @@ fn test_panic_on_missing_embedder_6() {
         Uuid::new_v4(),
         embeddings,
         create_purpose_vector(42),
-        create_johari_quadrants(42),
         create_content_hash(42),
     );
 }
@@ -92,7 +78,6 @@ fn test_panic_on_missing_embedder_12() {
         Uuid::new_v4(),
         embeddings,
         create_purpose_vector(42),
-        create_johari_quadrants(42),
         create_content_hash(42),
     );
 }
@@ -106,7 +91,6 @@ fn test_embeddings_have_correct_quantization_methods() {
         Uuid::new_v4(),
         embeddings,
         create_purpose_vector(42),
-        create_johari_quadrants(42),
         create_content_hash(42),
     );
 
@@ -129,63 +113,21 @@ fn test_embeddings_have_correct_quantization_methods() {
     println!("[PASS] All 13 embeddings have correct quantization methods");
 }
 
-/// Test alignment_score is computed correctly.
+/// Test purpose_vector is stored correctly.
 #[test]
-fn test_alignment_score_computation() {
+fn test_purpose_vector_storage() {
     let pv = [0.5f32; 13]; // Uniform purpose vector
 
     let fp = StoredQuantizedFingerprint::new(
         Uuid::new_v4(),
         create_test_embeddings_with_deterministic_data(42),
         pv,
-        create_johari_quadrants(42),
         create_content_hash(42),
     );
 
-    // TASK-P0-001: alignment_score field removed per ARCH-03
-    // Alignment is now computed dynamically from goal hierarchy, not stored.
+    assert_eq!(fp.purpose_vector, pv, "Purpose vector must be stored correctly");
 
-    println!("[PASS] purpose_vector computed correctly");
-}
-
-/// Test dominant quadrant computation.
-#[test]
-fn test_dominant_quadrant_computation() {
-    // Open dominant
-    let fp1 = StoredQuantizedFingerprint::new(
-        Uuid::new_v4(),
-        create_test_embeddings_with_deterministic_data(1),
-        create_purpose_vector(1),
-        [0.6, 0.2, 0.1, 0.1],
-        create_content_hash(1),
-    );
-    assert_eq!(fp1.dominant_quadrant, 0, "Open should be dominant");
-    assert!(
-        (fp1.johari_confidence - 0.6).abs() < f32::EPSILON,
-        "Confidence should be 0.6"
-    );
-
-    // Hidden dominant
-    let fp2 = StoredQuantizedFingerprint::new(
-        Uuid::new_v4(),
-        create_test_embeddings_with_deterministic_data(2),
-        create_purpose_vector(2),
-        [0.1, 0.7, 0.1, 0.1],
-        create_content_hash(2),
-    );
-    assert_eq!(fp2.dominant_quadrant, 1, "Hidden should be dominant");
-
-    // Unknown dominant
-    let fp3 = StoredQuantizedFingerprint::new(
-        Uuid::new_v4(),
-        create_test_embeddings_with_deterministic_data(3),
-        create_purpose_vector(3),
-        [0.1, 0.1, 0.2, 0.6],
-        create_content_hash(3),
-    );
-    assert_eq!(fp3.dominant_quadrant, 3, "Unknown should be dominant");
-
-    println!("[PASS] Dominant quadrant computed correctly for all cases");
+    println!("[PASS] purpose_vector stored correctly");
 }
 
 /// Test estimated size is within Constitution bounds.
@@ -195,7 +137,6 @@ fn test_estimated_size_within_bounds() {
         Uuid::new_v4(),
         create_test_embeddings_with_deterministic_data(42),
         create_purpose_vector(42),
-        create_johari_quadrants(42),
         create_content_hash(42),
     );
 

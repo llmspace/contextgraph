@@ -1,7 +1,7 @@
 //! RocksDB storage backend implementation.
 //!
 //! Provides persistent storage using RocksDB with column families
-//! for Johari quadrant separation and efficient indexing.
+//! for efficient indexing.
 //!
 //! # Performance Targets (constitution.yaml)
 //! - inject_context: p95 < 25ms, p99 < 50ms
@@ -10,15 +10,14 @@
 //! - get_node: < 500μs p95
 //!
 //! # Column Families
-//! Uses 12 CFs defined in `column_families.rs`:
+//! Uses CFs defined in `column_families.rs`:
 //! - nodes, edges, embeddings, metadata
-//! - johari_open, johari_hidden, johari_blind, johari_unknown
 //! - temporal, tags, sources, system
 //!
 //! # CRUD Operations (TASK-M02-017)
-//! - `store_node()`: Atomic write to nodes, embeddings, johari, temporal, tags, sources CFs
+//! - `store_node()`: Atomic write to nodes, embeddings, temporal, tags, sources CFs
 //! - `get_node()`: Retrieve and deserialize MemoryNode by ID
-//! - `update_node()`: Update with index maintenance when quadrant/tags change
+//! - `update_node()`: Update with index maintenance when tags change
 //! - `delete_node()`: Soft delete (SEC-06 compliance) or hard delete
 //!
 //! # Module Structure
@@ -30,7 +29,6 @@
 //! - `embedding_ops`: Embedding storage operations (TASK-M02-024)
 //! - `index_ops`: Secondary index query operations
 //! - `helpers`: Key formatting utilities
-//! - `session_identity`: Session identity persistence (TASK-SESSION-05)
 
 mod config;
 mod core;
@@ -42,8 +40,6 @@ mod index_ops;
 mod memex_impl;
 mod memory_provider;
 mod node_ops;
-mod session_identity;
-mod session_identity_manager;
 
 #[cfg(test)]
 mod tests_core;
@@ -71,6 +67,3 @@ pub use core::RocksDbMemex;
 
 // Re-export memory provider (TASK-007)
 pub use memory_provider::GraphMemoryProvider;
-
-// Re-export session identity manager (TASK-SESSION-06)
-pub use session_identity_manager::StandaloneSessionIdentityManager;

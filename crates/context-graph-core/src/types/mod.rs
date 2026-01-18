@@ -2,7 +2,6 @@
 
 pub mod fingerprint;
 mod graph_edge;
-mod johari;
 mod memory_node;
 mod nervous;
 mod pulse;
@@ -32,7 +31,6 @@ pub use fingerprint::{
     TOTAL_DENSE_DIMS,
 };
 pub use graph_edge::*;
-pub use johari::*;
 pub use memory_node::*;
 pub use nervous::*;
 pub use pulse::*;

@@ -1,7 +1,7 @@
 //! NORTH-013: Memory Consolidation Service
 //!
 //! This service merges similar memories to reduce redundancy while preserving
-//! alignment with the North Star goal. It uses cosine similarity for content
+//! alignment with strategic goals. It uses cosine similarity for content
 //! comparison and respects configurable thresholds for merging decisions.
 //!
 //! # Module Structure

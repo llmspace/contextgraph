@@ -65,9 +65,8 @@ impl Handlers {
             methods::SEARCH_WEIGHT_PROFILES => self.handle_get_weight_profiles(request.id).await,
 
             // Purpose/goal operations (TASK-S003)
-            // NOTE: PURPOSE_NORTH_STAR_ALIGNMENT and NORTH_STAR_UPDATE removed per TASK-CORE-001 (ARCH-03)
-            // These methods now fall through to the default case returning METHOD_NOT_FOUND (-32601)
-            // Use auto_bootstrap_north_star tool for autonomous goal discovery instead.
+            // NOTE: Legacy alignment methods removed per TASK-CORE-001 (ARCH-03)
+            // Goals now emerge autonomously from topic clustering.
             methods::PURPOSE_QUERY => self.handle_purpose_query(request.id, request.params).await,
             methods::GOAL_HIERARCHY_QUERY => {
                 self.handle_goal_hierarchy_query(request.id, request.params)
@@ -79,32 +78,6 @@ impl Handlers {
             }
             methods::PURPOSE_DRIFT_CHECK => {
                 self.handle_purpose_drift_check(request.id, request.params)
-                    .await
-            }
-
-            // Johari operations (TASK-S004)
-            methods::JOHARI_GET_DISTRIBUTION => {
-                self.handle_johari_get_distribution(request.id, request.params)
-                    .await
-            }
-            methods::JOHARI_FIND_BY_QUADRANT => {
-                self.handle_johari_find_by_quadrant(request.id, request.params)
-                    .await
-            }
-            methods::JOHARI_TRANSITION => {
-                self.handle_johari_transition(request.id, request.params)
-                    .await
-            }
-            methods::JOHARI_TRANSITION_BATCH => {
-                self.handle_johari_transition_batch(request.id, request.params)
-                    .await
-            }
-            methods::JOHARI_CROSS_SPACE_ANALYSIS => {
-                self.handle_johari_cross_space_analysis(request.id, request.params)
-                    .await
-            }
-            methods::JOHARI_TRANSITION_PROBABILITIES => {
-                self.handle_johari_transition_probabilities(request.id, request.params)
                     .await
             }
 
@@ -135,17 +108,6 @@ impl Handlers {
             methods::META_UTL_OPTIMIZED_WEIGHTS => {
                 self.handle_meta_utl_optimized_weights(request.id, request.params)
                     .await
-            }
-
-            // Consciousness JSON-RPC methods (TASK-INTEG-003)
-            // These delegate to existing tool implementations for hook integration.
-            methods::CONSCIOUSNESS_GET_STATE => {
-                // Delegate to existing get_consciousness_state tool implementation
-                self.call_get_consciousness_state(request.id).await
-            }
-            methods::CONSCIOUSNESS_SYNC_LEVEL => {
-                // Delegate to existing get_kuramoto_sync tool implementation
-                self.call_get_kuramoto_sync(request.id).await
             }
 
             methods::SYSTEM_STATUS => self.handle_system_status(request.id).await,

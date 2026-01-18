@@ -63,8 +63,8 @@ mod tests {
         );
         assert_eq!(resolve_alias("inject_context"), "inject_context");
         assert_eq!(
-            resolve_alias("get_consciousness_state"),
-            "get_consciousness_state"
+            resolve_alias("get_workspace_status"),
+            "get_workspace_status"
         );
     }
 

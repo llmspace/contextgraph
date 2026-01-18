@@ -3,7 +3,7 @@
 //! This module contains cosine similarity and semantic score computation functions
 //! used by the search operations.
 
-use crate::types::fingerprint::{JohariFingerprint, SemanticFingerprint, NUM_EMBEDDERS};
+use crate::types::fingerprint::{SemanticFingerprint, NUM_EMBEDDERS};
 
 /// Compute cosine similarity between two dense vectors.
 pub(crate) fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
@@ -104,23 +104,4 @@ pub(crate) fn compute_late_interaction_score(
     }
 
     total / query_tokens.len() as f32
-}
-
-/// Get dominant Johari quadrant for a fingerprint.
-pub(crate) fn get_dominant_quadrant(johari: &JohariFingerprint) -> usize {
-    // Aggregate quadrant weights across all embedders
-    let mut totals = [0.0_f32; 4];
-    for quadrants in &johari.quadrants {
-        for (total, quadrant) in totals.iter_mut().zip(quadrants.iter()) {
-            *total += quadrant;
-        }
-    }
-
-    // Find dominant
-    totals
-        .iter()
-        .enumerate()
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(i, _)| i)
-        .unwrap_or(3) // Default to Unknown
 }

@@ -1,6 +1,6 @@
 //! Tests for RocksDbAutonomousStore.
 //!
-//! TASK-P0-004: Removed drift_history and goal_activity_metrics tests after North Star removal.
+//! TASK-P0-004: Removed drift_history and goal_activity_metrics tests.
 
 #[cfg(test)]
 mod tests {

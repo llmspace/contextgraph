@@ -14,11 +14,9 @@
 //! - `panic`: Panic behavior tests (should_panic)
 //! - `stale_lock`: Stale lock detection tests
 //! - `content`: Content storage tests
-//! - `ego_node`: EGO_NODE persistence tests
 
 mod column_family;
 mod content;
-mod ego_node;
 mod helpers;
 mod key_format;
 mod panic;

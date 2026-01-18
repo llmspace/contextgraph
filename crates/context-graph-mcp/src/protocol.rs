@@ -112,8 +112,8 @@ pub mod error_codes {
     pub const EMBEDDER_NOT_READY: i32 = -32011;
     /// Purpose vector computation failed
     pub const PURPOSE_COMPUTATION_ERROR: i32 = -32012;
-    /// Johari quadrant classification failed
-    pub const JOHARI_CLASSIFICATION_ERROR: i32 = -32013;
+    /// Embedder category classification failed
+    pub const CATEGORY_CLASSIFICATION_ERROR: i32 = -32013;
     /// Sparse search (SPLADE E13) failed
     pub const SPARSE_SEARCH_ERROR: i32 = -32014;
     /// Semantic search (13-embedding) failed
@@ -130,27 +130,10 @@ pub mod error_codes {
     // Goal/alignment specific error codes (-32020 to -32029) - TASK-S003
     /// Goal not found in hierarchy
     pub const GOAL_NOT_FOUND: i32 = -32020;
-    /// DEPRECATED: North Star goal not configured in hierarchy.
-    /// The system now operates autonomously without requiring North Star configuration.
-    /// This error code is no longer used - handlers use default values instead.
-    #[deprecated(note = "System operates autonomously without North Star requirement")]
-    pub const NORTH_STAR_NOT_CONFIGURED: i32 = -32021;
     /// Alignment computation failed
     pub const ALIGNMENT_COMPUTATION_ERROR: i32 = -32022;
     /// Goal hierarchy operation failed
     pub const GOAL_HIERARCHY_ERROR: i32 = -32023;
-
-    // Johari-specific error codes (-32030 to -32039) - TASK-S004
-    /// Invalid embedder index (must be 0-12)
-    pub const JOHARI_INVALID_EMBEDDER_INDEX: i32 = -32030;
-    /// Invalid quadrant string (must be open/hidden/blind/unknown)
-    pub const JOHARI_INVALID_QUADRANT: i32 = -32031;
-    /// Soft classification weights don't sum to 1.0
-    pub const JOHARI_INVALID_SOFT_CLASSIFICATION: i32 = -32032;
-    /// Transition validation failed
-    pub const JOHARI_TRANSITION_ERROR: i32 = -32033;
-    /// Batch transition failed (all-or-nothing)
-    pub const JOHARI_BATCH_ERROR: i32 = -32034;
 
     // Meta-UTL error codes (-32040 to -32049) - TASK-S005
     /// Prediction not found for validation
@@ -174,23 +157,22 @@ pub mod error_codes {
     /// Pipeline breakdown metrics not yet implemented
     pub const PIPELINE_METRICS_UNAVAILABLE: i32 = -32052;
 
-    // GWT/Kuramoto error codes (-32060 to -32069) - TASK-GWT-001
+    // GWT error codes (-32060 to -32069) - TASK-GWT-001
+    // Note: Consciousness error codes removed in PRD v6 - use topic-based coherence instead
     /// GWT system not initialized or unavailable
     pub const GWT_NOT_INITIALIZED: i32 = -32060;
-    /// Kuramoto network error (step failed, invalid phase, etc.)
-    pub const KURAMOTO_ERROR: i32 = -32061;
-    /// Consciousness computation failed (invalid inputs, math error)
-    pub const CONSCIOUSNESS_COMPUTATION_FAILED: i32 = -32062;
+    /// Coherence network error (step failed, invalid phase, etc.)
+    pub const COHERENCE_ERROR: i32 = -32061;
     /// Workspace selection or broadcast error
     pub const WORKSPACE_ERROR: i32 = -32063;
     /// State machine transition error
     pub const STATE_TRANSITION_ERROR: i32 = -32064;
     /// Meta-cognitive evaluation failed
     pub const META_COGNITIVE_ERROR: i32 = -32065;
-    /// Self-ego node operation failed
-    pub const SELF_EGO_ERROR: i32 = -32066;
-    /// Identity continuity check failed
-    pub const IDENTITY_CONTINUITY_ERROR: i32 = -32067;
+    /// Topic profile operation failed
+    pub const TOPIC_PROFILE_ERROR: i32 = -32066;
+    /// Topic stability check failed
+    pub const TOPIC_STABILITY_ERROR: i32 = -32067;
 
     // Dream consolidation error codes (-32070 to -32079) - TASK-DREAM-MCP
     /// Dream controller/scheduler not initialized
@@ -233,9 +215,7 @@ pub mod error_codes {
 
     // Deprecated method error codes (JSON-RPC standard) - TASK-CORE-001
     /// Deprecated method - functionality removed per ARCH-03 (autonomous-first)
-    /// Use auto_bootstrap_north_star for autonomous goal discovery instead.
-    /// Same as METHOD_NOT_FOUND per JSON-RPC spec - clients calling deprecated
-    /// manual North Star methods will receive this error code.
+    /// Same as METHOD_NOT_FOUND per JSON-RPC spec.
     pub const DEPRECATED_METHOD: i32 = -32601;
 
     // Causal inference error codes (-32100 to -32109) - TASK-CAUSAL-001
@@ -330,9 +310,6 @@ pub mod methods {
     pub const SYSTEM_HEALTH: &str = "system/health";
 
     // Purpose/goal operations (TASK-S003)
-    // NOTE: PURPOSE_NORTH_STAR_ALIGNMENT removed per TASK-CORE-001 (ARCH-03)
-    // Manual North Star creates single 1024D embeddings incompatible with 13-embedder arrays.
-    // Use auto_bootstrap_north_star tool for autonomous goal discovery instead.
     /// Query memories by 13D purpose vector similarity
     pub const PURPOSE_QUERY: &str = "purpose/query";
     /// Navigate goal hierarchy (get_children, get_ancestors, get_subtree, get_aligned_memories)
@@ -341,23 +318,6 @@ pub mod methods {
     pub const GOAL_ALIGNED_MEMORIES: &str = "goal/aligned_memories";
     /// Detect alignment drift in memories (to be refactored in TASK-LOGIC-010 to use teleological arrays)
     pub const PURPOSE_DRIFT_CHECK: &str = "purpose/drift_check";
-    // NOTE: NORTH_STAR_UPDATE removed per TASK-CORE-001 (ARCH-03)
-    // Manual North Star update violates autonomous-first architecture.
-    // Goals emerge autonomously via auto_bootstrap_north_star tool.
-
-    // Johari operations (TASK-S004)
-    /// Get per-embedder Johari quadrant distribution
-    pub const JOHARI_GET_DISTRIBUTION: &str = "johari/get_distribution";
-    /// Find memories by quadrant for specific embedder
-    pub const JOHARI_FIND_BY_QUADRANT: &str = "johari/find_by_quadrant";
-    /// Execute single Johari transition
-    pub const JOHARI_TRANSITION: &str = "johari/transition";
-    /// Execute batch Johari transitions (atomic)
-    pub const JOHARI_TRANSITION_BATCH: &str = "johari/transition_batch";
-    /// Cross-space Johari analysis (blind spots, opportunities)
-    pub const JOHARI_CROSS_SPACE_ANALYSIS: &str = "johari/cross_space_analysis";
-    /// Get transition probability matrix
-    pub const JOHARI_TRANSITION_PROBABILITIES: &str = "johari/transition_probabilities";
 
     // Meta-UTL operations (TASK-S005)
     /// Get per-embedder learning trajectory and accuracy trends
@@ -373,28 +333,12 @@ pub mod methods {
     /// Get meta-learned optimized weights
     pub const META_UTL_OPTIMIZED_WEIGHTS: &str = "meta_utl/optimized_weights";
 
-    // GWT/Consciousness operations (TASK-GWT-001)
-    /// Get Kuramoto network synchronization status
-    pub const GWT_KURAMOTO_STATUS: &str = "gwt/kuramoto_status";
-    /// Get consciousness level and metrics
-    pub const GWT_CONSCIOUSNESS_LEVEL: &str = "gwt/consciousness_level";
+    // GWT operations (TASK-GWT-001)
+    // Note: Consciousness methods removed in PRD v6 - use topic-based coherence instead
     /// Get workspace status and active memory
     pub const GWT_WORKSPACE_STATUS: &str = "gwt/workspace_status";
-    /// Get consciousness state machine status
-    pub const GWT_STATE_STATUS: &str = "gwt/state_status";
     /// Get meta-cognitive loop status
     pub const GWT_META_COGNITIVE_STATUS: &str = "gwt/meta_cognitive_status";
-    /// Get self-ego node status
-    pub const GWT_SELF_EGO_STATUS: &str = "gwt/self_ego_status";
-
-    // Consciousness JSON-RPC methods (TASK-INTEG-003)
-    // These methods provide hook integration per MCP spec (docs2/refactor/08-MCP-TOOLS.md)
-    /// Get full consciousness state (GWT + Kuramoto + Workspace + Identity)
-    /// Triggered by SessionStart hooks for full system status.
-    pub const CONSCIOUSNESS_GET_STATE: &str = "consciousness/get_state";
-    /// Get lightweight sync level for health checks
-    /// Triggered by Notification hooks for periodic health monitoring.
-    pub const CONSCIOUSNESS_SYNC_LEVEL: &str = "consciousness/sync_level";
 }
 
 #[cfg(test)]

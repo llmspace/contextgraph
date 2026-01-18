@@ -2,10 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::johari::JohariQuadrant;
 use crate::lifecycle::{LifecycleLambdaWeights, LifecycleStage};
-
-use super::QuadrantDistribution;
 
 /// Accumulated statistics from UTL computations.
 ///
@@ -17,13 +14,12 @@ use super::QuadrantDistribution;
 ///
 /// ```
 /// use context_graph_utl::metrics::UtlComputationMetrics;
-/// use context_graph_utl::johari::JohariQuadrant;
 ///
 /// let mut metrics = UtlComputationMetrics::new();
 /// assert_eq!(metrics.computation_count, 0);
 /// assert!(metrics.is_healthy());
 ///
-/// metrics.record_computation(0.7, 0.5, 0.6, JohariQuadrant::Open, 1000.0);
+/// metrics.record_computation(0.7, 0.5, 0.6, 1000.0);
 /// assert_eq!(metrics.computation_count, 1);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -39,9 +35,6 @@ pub struct UtlComputationMetrics {
 
     /// Running average of coherence change (delta_c) [0.0, 1.0]
     pub avg_delta_c: f32,
-
-    /// Distribution of Johari quadrant classifications
-    pub quadrant_distribution: QuadrantDistribution,
 
     /// Current lifecycle stage (Infancy, Growth, Maturity)
     pub lifecycle_stage: LifecycleStage,
@@ -63,7 +56,6 @@ impl Default for UtlComputationMetrics {
             avg_learning_magnitude: 0.0,
             avg_delta_s: 0.0,
             avg_delta_c: 0.0,
-            quadrant_distribution: QuadrantDistribution::default(),
             lifecycle_stage: LifecycleStage::default(),
             lambda_weights: LifecycleLambdaWeights::default(),
             avg_latency_us: 0.0,
@@ -81,11 +73,6 @@ impl UtlComputationMetrics {
     /// Reset all metrics to initial state.
     pub fn reset(&mut self) {
         *self = Self::default();
-    }
-
-    /// Get the dominant quadrant (most frequent classification).
-    pub fn dominant_quadrant(&self) -> JohariQuadrant {
-        self.quadrant_distribution.dominant()
     }
 
     /// Calculate learning efficiency (magnitude per microsecond x 1000).
@@ -120,7 +107,6 @@ impl UtlComputationMetrics {
         learning_magnitude: f32,
         delta_s: f32,
         delta_c: f32,
-        quadrant: JohariQuadrant,
         latency_us: f64,
     ) {
         const ALPHA: f32 = 0.1;
@@ -141,8 +127,6 @@ impl UtlComputationMetrics {
             self.avg_delta_c = ALPHA * delta_c + (1.0 - ALPHA) * self.avg_delta_c;
             self.avg_latency_us = ALPHA_F64 * latency_us + (1.0 - ALPHA_F64) * self.avg_latency_us;
         }
-
-        self.quadrant_distribution.increment(quadrant);
 
         // Update p99 (simplified: track max as approximation)
         let latency_u64 = latency_us as u64;

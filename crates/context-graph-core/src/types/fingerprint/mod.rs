@@ -1,19 +1,17 @@
 //! Fingerprint types for the Context Graph system.
 //!
 //! This module provides the complete teleological fingerprint hierarchy:
-//! - SemanticFingerprint: 13-embedding array (TASK-F001) ✅
-//! - SparseVector: SPLADE sparse vector for E6 and E13 (TASK-F001) ✅
-//! - PurposeVector: 13D alignment to North Star (TASK-F002) ✅
-//! - JohariFingerprint: Per-embedder awareness classification (TASK-F003) ✅
-//! - TeleologicalFingerprint: Complete node representation (TASK-F002) ✅
+//! - SemanticFingerprint: 13-embedding array (TASK-F001)
+//! - SparseVector: SPLADE sparse vector for E6 and E13 (TASK-F001)
+//! - PurposeVector: 13D alignment (TASK-F002)
+//! - TeleologicalFingerprint: Complete node representation (TASK-F002)
 //!
 //! # Design Philosophy
 //!
 //! **NO FUSION**: Each embedding space is preserved independently for:
 //! 1. Per-space similarity search (13x HNSW indexes)
-//! 2. Per-space Johari quadrant classification
-//! 3. Per-space teleological alignment computation
-//! 4. Full semantic information preservation (~46KB vs 6KB fused = 67% info loss avoided)
+//! 2. Per-space teleological alignment computation
+//! 3. Full semantic information preservation (~46KB vs 6KB fused = 67% info loss avoided)
 //!
 //! # Example
 //!
@@ -33,7 +31,6 @@
 //! ```
 
 mod evolution;
-mod johari;
 mod purpose;
 mod semantic;
 mod sparse;
@@ -54,9 +51,6 @@ pub use purpose::{AlignmentThreshold, PurposeVector};
 
 // Re-export Evolution types (TASK-F002)
 pub use evolution::{EvolutionTrigger, PurposeSnapshot};
-
-// Re-export Johari types (TASK-F003) ✅
-pub use johari::{JohariFingerprint, JohariThresholds};
 
 // Re-export TeleologicalFingerprint (TASK-F002)
 pub use teleological::TeleologicalFingerprint;

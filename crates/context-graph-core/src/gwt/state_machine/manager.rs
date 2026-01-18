@@ -1,17 +1,26 @@
 //! State Machine Manager
 //!
-//! Manages consciousness state transitions and events.
+//! Manages coherence state transitions and events.
+//!
+//! # Constitution Compliance (v6.0.0)
+//!
+//! Per Constitution v6.0.0 Section 14, this manager handles topic-based coherence
+//! state transitions.
 
 use crate::error::CoreResult;
 use chrono::{DateTime, Duration, Utc};
 
-use super::types::{ConsciousnessState, StateTransition};
+use super::types::{CoherenceState, StateTransition};
 
-/// Manages consciousness state transitions and events
+/// Manages coherence state transitions and events.
+///
+/// # Constitution Compliance (v6.0.0)
+///
+/// Handles order parameter level transitions for coherence states.
 #[derive(Debug)]
 pub struct StateMachineManager {
-    /// Current state
-    current_state: ConsciousnessState,
+    /// Current coherence state
+    current_state: CoherenceState,
     /// Last state transition
     last_transition: Option<StateTransition>,
     /// Time entered current state
@@ -26,7 +35,7 @@ impl StateMachineManager {
     /// Create a new state machine manager
     pub fn new() -> Self {
         Self {
-            current_state: ConsciousnessState::Dormant,
+            current_state: CoherenceState::Dormant,
             last_transition: None,
             entered_state_at: Utc::now(),
             inactivity_timeout_secs: 600, // 10 minutes
@@ -34,8 +43,8 @@ impl StateMachineManager {
         }
     }
 
-    /// Get current state
-    pub fn current_state(&self) -> ConsciousnessState {
+    /// Get current coherence state
+    pub fn current_state(&self) -> CoherenceState {
         self.current_state
     }
 
@@ -44,41 +53,41 @@ impl StateMachineManager {
         Utc::now() - self.entered_state_at
     }
 
-    /// Update state based on consciousness level
-    pub async fn update(&mut self, consciousness_level: f32) -> CoreResult<ConsciousnessState> {
+    /// Update state based on order parameter level.
+    ///
+    /// # Arguments
+    ///
+    /// * `level` - Order parameter level (0.0-1.0)
+    pub async fn update(&mut self, level: f32) -> CoreResult<CoherenceState> {
         // Update activity timestamp
         self.last_activity = Utc::now();
 
         // Determine new state
-        let new_state = ConsciousnessState::from_level(consciousness_level);
+        let new_state = CoherenceState::from_level(level);
 
         // Check for inactivity-driven transition to dormant
         if self.time_in_state().num_seconds() > self.inactivity_timeout_secs as i64
-            && self.current_state != ConsciousnessState::Dormant
+            && self.current_state != CoherenceState::Dormant
         {
-            self.transition_to(
-                ConsciousnessState::Dormant,
-                consciousness_level,
-                "inactivity_timeout",
-            )
-            .await?;
+            self.transition_to(CoherenceState::Dormant, level, "inactivity_timeout")
+                .await?;
             return Ok(self.current_state);
         }
 
         // Check if state changed
         if new_state != self.current_state {
-            self.transition_to(new_state, consciousness_level, "consciousness_level_change")
+            self.transition_to(new_state, level, "level_change")
                 .await?;
         }
 
         Ok(self.current_state)
     }
 
-    /// Execute transition with logging
+    /// Execute transition with logging.
     async fn transition_to(
         &mut self,
-        new_state: ConsciousnessState,
-        consciousness_level: f32,
+        new_state: CoherenceState,
+        level: f32,
         reason: &str,
     ) -> CoreResult<()> {
         let old_state = self.current_state;
@@ -89,17 +98,17 @@ impl StateMachineManager {
             from: old_state,
             to: new_state,
             timestamp: Utc::now(),
-            consciousness_level,
+            level,
         };
 
         self.last_transition = Some(transition.clone());
 
         // Log transition
         tracing::info!(
-            "State transition: {} → {} (level={:.3}, reason={})",
+            "State transition: {} -> {} (level={:.3}, reason={})",
             old_state.name(),
             new_state.name(),
-            consciousness_level,
+            level,
             reason
         );
 
@@ -111,37 +120,42 @@ impl StateMachineManager {
         self.last_transition.as_ref()
     }
 
-    /// Check if system just became conscious
-    pub fn just_became_conscious(&self) -> bool {
+    /// Check if system just became stable (coherent).
+    ///
+    /// Returns true if the system transitioned to Stable state within the last 1000ms.
+    pub fn just_became_stable(&self) -> bool {
         if let Some(trans) = &self.last_transition {
-            trans.to == ConsciousnessState::Conscious
+            trans.to == CoherenceState::Stable
                 && (Utc::now() - trans.timestamp).num_milliseconds() < 1000
         } else {
             false
         }
     }
 
-    /// Check if system is in a conscious state
-    pub fn is_conscious(&self) -> bool {
+    /// Check if system is in a stable (coherent) state.
+    ///
+    /// Returns true for Stable or Hypersync states.
+    /// Hypersync is considered a form of stability (albeit pathological).
+    pub fn is_stable(&self) -> bool {
         matches!(
             self.current_state,
-            ConsciousnessState::Conscious | ConsciousnessState::Hypersync
+            CoherenceState::Stable | CoherenceState::Hypersync
         )
     }
 
     /// Check if system is hypersynchronized (warning state)
     pub fn is_hypersync(&self) -> bool {
-        self.current_state == ConsciousnessState::Hypersync
+        self.current_state == CoherenceState::Hypersync
     }
 
     /// Check if coherence is fragmented
     pub fn is_fragmented(&self) -> bool {
-        self.current_state == ConsciousnessState::Fragmented
+        self.current_state == CoherenceState::Fragmented
     }
 
     /// Check if system is dormant
     pub fn is_dormant(&self) -> bool {
-        self.current_state == ConsciousnessState::Dormant
+        self.current_state == CoherenceState::Dormant
     }
 
     /// Set inactivity timeout

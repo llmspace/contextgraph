@@ -106,62 +106,72 @@ impl Handlers {
             );
         }
 
-        // GWT Health
+        // GWT Health - uses topic stability metrics per PRD v6
+        // Health thresholds based on churn: healthy < 0.3, degraded [0.3, 0.5), critical >= 0.5
         if params.subsystem == "gwt" || params.subsystem == "all" {
-            // Get GWT state from providers if available
-            // ConsciousnessState is an enum - use async trait methods for metrics
-            let (gwt_status, kuramoto_r, identity_continuity) = if let (
-                Some(ref gwt_system),
-                Some(ref kuramoto),
-            ) =
-                (&self.gwt_system, &self.kuramoto_network)
-            {
-                // Get Kuramoto order parameter (r)
-                let r = kuramoto.read().synchronization();
+            // Get topic stability from workspace provider if available
+            let gwt_status = if let Some(ref workspace) = &self.workspace_provider {
+                let ws = workspace.read().await;
+                let topic_stability = ws.get_topic_stability().await;
+                let time_in_state = if let Some(ref gwt_system) = &self.gwt_system {
+                    gwt_system.time_in_state()
+                } else {
+                    std::time::Duration::from_secs(0)
+                };
 
-                // Get identity continuity from GwtSystemProvider async method
-                let ic = gwt_system.identity_coherence().await;
-
-                // Health based on identity continuity and Kuramoto r
-                let health_score = (ic + r as f32) / 2.0;
-                let status = get_status(health_score as f64);
+                // Health based on topic stability (inverse of churn)
+                // churn < 0.3 = healthy, churn in [0.3, 0.5) = degraded, churn >= 0.5 = critical
+                // topic_stability = 1.0 - churn conceptually
+                let status = if topic_stability >= 0.7 {
+                    "healthy"
+                } else if topic_stability >= 0.5 {
+                    "degraded"
+                } else {
+                    "critical"
+                };
 
                 if status != "healthy" {
                     overall_healthy = false;
                     if status == "critical" {
                         any_critical = true;
-                    }
-                    if ic < 0.5 {
                         recommendations.push(json!({
-                                "subsystem": "gwt",
-                                "action": "trigger_dream",
-                                "description": format!("Identity continuity ({:.2}) below 0.5 - dream consolidation required", ic)
-                            }));
+                            "subsystem": "gwt",
+                            "action": "trigger_dream",
+                            "description": format!("Topic stability is {:.2} - dream consolidation may help", topic_stability)
+                        }));
                     }
                 }
 
-                (status, r, ic)
+                subsystems.insert(
+                    "gwt_health".to_string(),
+                    json!({
+                        "status": status,
+                        "topic_stability": topic_stability,
+                        "time_in_state_ms": time_in_state.as_millis()
+                    }),
+                );
+
+                status
             } else {
-                // No GWT provider - report as unknown (EC-AUTO-09)
-                ("unknown", 0.0, 0.0)
+                // No workspace provider - report as unknown (EC-AUTO-09)
+                subsystems.insert(
+                    "gwt_health".to_string(),
+                    json!({
+                        "status": "unknown",
+                        "topic_stability": null,
+                        "time_in_state_ms": 0
+                    }),
+                );
+                "unknown"
             };
 
             if gwt_status == "unknown" {
                 recommendations.push(json!({
                     "subsystem": "gwt",
                     "action": "initialize_gwt",
-                    "description": "GWT providers not initialized"
+                    "description": "Workspace provider not initialized"
                 }));
             }
-
-            subsystems.insert(
-                "gwt_health".to_string(),
-                json!({
-                    "status": gwt_status,
-                    "kuramoto_r": kuramoto_r,
-                    "identity_continuity": identity_continuity
-                }),
-            );
         }
 
         // Dream Health
@@ -225,29 +235,20 @@ impl Handlers {
             // Query storage metrics
             // NOTE: TeleologicalMemoryStore trait doesn't expose health metrics.
             // We check basic functionality by attempting to count nodes.
-            let (storage_status, node_count) =
-                match self.teleological_store.list_all_johari(1).await {
-                    Ok(_) => {
-                        // Storage is accessible
-                        // Try to get total count (limit high)
-                        let count = match self.teleological_store.list_all_johari(100000).await {
-                            Ok(list) => list.len(),
-                            Err(_) => 0,
-                        };
-                        ("healthy", count)
-                    }
-                    Err(e) => {
-                        error!(error = %e, "get_health_status: Storage health check failed");
-                        overall_healthy = false;
-                        any_critical = true;
-                        recommendations.push(json!({
-                            "subsystem": "storage",
-                            "action": "check_rocksdb",
-                            "description": format!("Storage access failed: {}", e)
-                        }));
-                        ("critical", 0)
-                    }
-                };
+            let (storage_status, node_count) = match self.teleological_store.count().await {
+                Ok(count) => ("healthy", count),
+                Err(e) => {
+                    error!(error = %e, "get_health_status: Storage health check failed");
+                    overall_healthy = false;
+                    any_critical = true;
+                    recommendations.push(json!({
+                        "subsystem": "storage",
+                        "action": "check_rocksdb",
+                        "description": format!("Storage access failed: {}", e)
+                    }));
+                    ("critical", 0)
+                }
+            };
 
             subsystems.insert(
                 "storage_health".to_string(),
@@ -417,8 +418,7 @@ impl Handlers {
                 new_status = if success { "healthy" } else { "degraded" };
             }
             "gwt" => {
-                // GWT healing: Reset Kuramoto phases, clear workspace
-                // TASK-011: Wire to actual KuramotoProvider reset methods
+                // GWT healing: Clear workspace and reset state
                 info!(
                     severity = %params.severity,
                     "trigger_healing: Initiating GWT healing"
@@ -433,18 +433,6 @@ impl Handlers {
                         actions_taken.push("Reset attention focus".to_string());
                     }
                     "high" | "critical" => {
-                        // Reset Kuramoto oscillator phases to uniform distribution
-                        if let Some(ref kuramoto) = self.kuramoto_network {
-                            kuramoto.write().reset();
-                            actions_taken
-                                .push("Reset Kuramoto oscillator phases to uniform".to_string());
-                        } else {
-                            warn!("trigger_healing: Kuramoto network not available for GWT reset");
-                            actions_taken.push(
-                                "Kuramoto network not available - skipped phase reset".to_string(),
-                            );
-                        }
-
                         actions_taken.push("Cleared workspace queue".to_string());
 
                         // Trigger dream consolidation for identity healing

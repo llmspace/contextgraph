@@ -17,8 +17,7 @@ use super::*;
 use crate::stubs::{InMemoryTeleologicalStore, StubMultiArrayProvider};
 use crate::traits::TeleologicalMemoryStore;
 use crate::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint,
-    NUM_EMBEDDERS,
+    PurposeVector, SemanticFingerprint, SparseVector, TeleologicalFingerprint, NUM_EMBEDDERS,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -28,7 +27,6 @@ fn create_test_fingerprint() -> TeleologicalFingerprint {
     TeleologicalFingerprint::new(
         SemanticFingerprint::zeroed(),
         PurposeVector::new([0.75; NUM_EMBEDDERS]),
-        JohariFingerprint::zeroed(),
         [0u8; 32],
     )
 }
@@ -58,7 +56,6 @@ fn create_searchable_fingerprint(seed: u8) -> TeleologicalFingerprint {
     TeleologicalFingerprint::new(
         semantic,
         PurposeVector::new([0.75 + (seed as f32 * 0.01); NUM_EMBEDDERS]),
-        JohariFingerprint::zeroed(),
         [seed; 32],
     )
 }

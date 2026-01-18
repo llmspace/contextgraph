@@ -51,7 +51,7 @@ fn test_detect_patterns_optimal() {
     println!("[VERIFIED] detect_patterns identifies positive patterns");
 }
 
-// TASK-P0-001: Renamed from test_detect_patterns_north_star_drift
+// TASK-P0-001: Tests strategic level drift detection
 #[test]
 fn test_detect_patterns_strategic_drift() {
     let calculator = DefaultAlignmentCalculator::new();

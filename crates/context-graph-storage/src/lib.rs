@@ -11,21 +11,19 @@
 //! # Architecture
 //! - `memex`: Storage trait abstraction (Memex = "memory index")
 //! - `rocksdb_backend`: RocksDB implementation
-//! - `column_families`: Column family definitions per Johari quadrant (12 CFs)
-//! - `teleological`: TeleologicalFingerprint storage extensions (20 CFs)
+//! - `column_families`: Column family definitions (8 base CFs per PRD v6)
+//! - `teleological`: TeleologicalFingerprint storage extensions
 //! - `serialization`: Bincode serialization utilities
 //! - `indexes`: Secondary index operations (tags, temporal, sources)
 //!
-//! # Column Families (41 total)
+//! # Column Families (35 total per PRD v6)
 //!
-//! Base (12): nodes, edges, embeddings, metadata, johari_*, temporal, tags, sources, system
+//! Base (8): nodes, edges, embeddings, metadata, temporal, tags, sources, system
 //! Teleological (11): fingerprints, purpose_vectors, e13_splade_inverted, e1_matryoshka_128,
-//!                    synergy_matrix, teleological_profiles, teleological_vectors, ego_node
+//!                    synergy_matrix, teleological_profiles, teleological_vectors
 //! Quantized Embedder (13): emb_0..emb_12
 //! Autonomous (5): autonomous_config, adaptive_threshold_state, autonomous_lineage,
 //!                 consolidation_history, memory_curation
-//!
-//! TASK-P0-004: Removed drift_history and goal_activity_metrics (ARCH-10, ARCH-03)
 //!
 //! # Constitution Reference
 //! - db.dev: sqlite (ghost phase), db.prod: postgres16+
@@ -56,16 +54,13 @@ pub use rocksdb_backend::{
 // Re-export GraphMemoryProvider for NREM dream phase (TASK-007)
 pub use rocksdb_backend::GraphMemoryProvider;
 
-// Re-export StandaloneSessionIdentityManager (TASK-SESSION-06)
-pub use rocksdb_backend::StandaloneSessionIdentityManager;
-
 // Re-export Memex trait and StorageHealth (TASK-M02-026)
 pub use memex::{Memex, StorageHealth};
 
 // Re-export core types for storage consumers
 pub use context_graph_core::marblestone::{Domain, EdgeType, NeurotransmitterWeights};
 pub use context_graph_core::types::{
-    EdgeId, EmbeddingVector, GraphEdge, JohariQuadrant, MemoryNode, Modality, NodeId, NodeMetadata,
+    EdgeId, EmbeddingVector, GraphEdge, MemoryNode, Modality, NodeId, NodeMetadata,
     ValidationError,
 };
 
@@ -99,8 +94,6 @@ pub use teleological::{
     parse_e1_matryoshka_key,
     parse_fingerprint_key,
     parse_purpose_vector_key,
-    parse_session_identity_key,
-    parse_session_temporal_key,
     parse_teleological_profile_key,
     parse_teleological_vector_key,
     purpose_vector_cf_options,
@@ -112,9 +105,6 @@ pub use teleological::{
     serialize_purpose_vector,
     // Serialization functions
     serialize_teleological_fingerprint,
-    session_identity_cf_options,
-    session_identity_key,
-    session_temporal_key,
     synergy_matrix_cf_options,
     teleological_profile_key,
     teleological_profiles_cf_options,
@@ -151,8 +141,6 @@ pub use teleological::{
     CF_EMB_9,
     CF_FINGERPRINTS,
     CF_PURPOSE_VECTORS,
-    // TASK-SESSION-04: Session identity column family and key helpers
-    CF_SESSION_IDENTITY,
     // TASK-TELEO-006: New teleological vector column families
     CF_SYNERGY_MATRIX,
     CF_TELEOLOGICAL_PROFILES,
@@ -175,7 +163,6 @@ pub use teleological::{
     PURPOSE_VECTOR_DIM,
     QUANTIZED_EMBEDDER_CFS,
     QUANTIZED_EMBEDDER_CF_COUNT,
-    SESSION_LATEST_KEY,
     // TASK-TELEO-006: New key format functions
     SYNERGY_MATRIX_KEY,
     TELEOLOGICAL_CFS,
@@ -184,7 +171,7 @@ pub use teleological::{
 };
 
 // Re-export autonomous storage types (TASK-NORTH-007)
-// TASK-P0-004: Removed drift_history and goal_activity_metrics exports after North Star removal
+// TASK-P0-004: Removed drift_history and goal_activity_metrics exports
 pub use autonomous::{
     // CF option builders (5 after TASK-P0-004)
     adaptive_threshold_state_cf_options,

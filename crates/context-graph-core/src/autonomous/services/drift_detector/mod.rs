@@ -1,6 +1,6 @@
-//! NORTH-010: DriftDetector Service
+//! DriftDetector Service
 //!
-//! Detects alignment drift from North Star goal using rolling statistical analysis.
+//! Detects alignment drift using rolling statistical analysis.
 //! Monitors alignment observations over a configurable window and calculates
 //! drift severity, trend direction, and provides actionable recommendations.
 //!

@@ -1,7 +1,7 @@
 //! Helper functions for UTL tests
 
 use context_graph_core::types::fingerprint::{
-    JohariFingerprint, PurposeVector, SemanticFingerprint, TeleologicalFingerprint,
+    PurposeVector, SemanticFingerprint, TeleologicalFingerprint,
 };
 
 /// Create a test TeleologicalFingerprint with specified semantic values.
@@ -10,10 +10,5 @@ use context_graph_core::types::fingerprint::{
 pub fn create_test_fingerprint_with_semantic(semantic_values: Vec<f32>) -> TeleologicalFingerprint {
     let mut semantic = SemanticFingerprint::zeroed();
     semantic.e1_semantic = semantic_values;
-    TeleologicalFingerprint::new(
-        semantic,
-        PurposeVector::default(),
-        JohariFingerprint::zeroed(),
-        [0u8; 32],
-    )
+    TeleologicalFingerprint::new(semantic, PurposeVector::default(), [0u8; 32])
 }

@@ -35,7 +35,6 @@ pub enum PatternType {
     /// High variance across embedding spaces
     InconsistentAlignment,
     /// Strategic goal misalignment (most severe)
-    /// TASK-P0-001: Renamed from NorthStarDrift
     StrategicDrift,
     /// All goals optimally aligned (positive pattern)
     OptimalAlignment,
@@ -356,7 +355,6 @@ mod tests {
 
     #[test]
     fn test_pattern_type_display() {
-        // TASK-P0-001: Renamed from NorthStarDrift
         assert_eq!(
             format!("{}", PatternType::StrategicDrift),
             "Strategic Drift"

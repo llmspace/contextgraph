@@ -135,7 +135,7 @@ async fn test_pre_tool_use_completes_under_100ms() {
 /// Test that SessionEnd completes within its 30s budget
 ///
 /// SessionEnd has the largest budget (30s) because it:
-/// - Persists SessionIdentitySnapshot
+/// - Persists SessionSnapshot
 /// - May trigger dream consolidation
 /// - Updates indexes
 #[tokio::test]

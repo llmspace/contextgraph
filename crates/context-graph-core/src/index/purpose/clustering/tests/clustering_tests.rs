@@ -5,7 +5,6 @@ use uuid::Uuid;
 use crate::index::purpose::clustering::clusterer::{KMeansPurposeClustering, StandardKMeans};
 use crate::index::purpose::clustering::config::KMeansConfig;
 use crate::index::purpose::entry::{GoalId, PurposeIndexEntry, PurposeMetadata};
-use crate::types::JohariQuadrant;
 
 use super::helpers::{create_clustered_entries, create_entry, create_purpose_vector};
 
@@ -78,8 +77,7 @@ fn test_cluster_all_same_points() {
     let base_pv = create_purpose_vector(0.5, 0.0);
     let entries: Vec<PurposeIndexEntry> = (0..5)
         .map(|_| {
-            let metadata =
-                PurposeMetadata::new(GoalId::new("same"), 0.9, JohariQuadrant::Open).unwrap();
+            let metadata = PurposeMetadata::new(GoalId::new("same"), 0.9).unwrap();
             PurposeIndexEntry::new(Uuid::new_v4(), base_pv.clone(), metadata)
         })
         .collect();
