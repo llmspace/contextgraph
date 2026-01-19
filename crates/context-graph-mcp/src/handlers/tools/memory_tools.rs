@@ -139,6 +139,10 @@ impl Handlers {
             }
         };
 
+        // TASK-FIX-CLUSTERING: Compute cluster array BEFORE fingerprint is consumed
+        // This must be done before TeleologicalFingerprint::new() moves the semantic fingerprint.
+        let cluster_array = embedding_output.fingerprint.to_cluster_array();
+
         // Create TeleologicalFingerprint with REAL computed purpose vector
         let fingerprint =
             TeleologicalFingerprint::new(embedding_output.fingerprint, purpose_vector, content_hash);
@@ -148,6 +152,27 @@ impl Handlers {
         if let Err(e) = self.teleological_store.store(fingerprint).await {
             error!(error = %e, "inject_context: Storage FAILED");
             return self.tool_error_with_pulse(id, &format!("Storage failed: {}", e));
+        }
+
+        // TASK-FIX-CLUSTERING: Insert into cluster_manager for topic detection
+        // This enables MultiSpaceClusterManager to track this memory for HDBSCAN/BIRCH clustering.
+        // Per PRD Section 5: Topics emerge from multi-space clustering with weighted_agreement >= 2.5.
+        {
+            let mut cluster_mgr = self.cluster_manager.write();
+            if let Err(e) = cluster_mgr.insert(fingerprint_id, &cluster_array) {
+                // Non-fatal: fingerprint is stored, clustering can be retried via detect_topics
+                warn!(
+                    fingerprint_id = %fingerprint_id,
+                    error = %e,
+                    "inject_context: Failed to insert into cluster_manager. \
+                     Topic detection may not include this memory until next recluster."
+                );
+            } else {
+                debug!(
+                    fingerprint_id = %fingerprint_id,
+                    "inject_context: Inserted into cluster_manager for topic detection"
+                );
+            }
         }
 
         // TASK-CONTENT-001: Store content text alongside fingerprint
@@ -285,6 +310,10 @@ impl Handlers {
             }
         };
 
+        // TASK-FIX-CLUSTERING: Compute cluster array BEFORE fingerprint is consumed
+        // This must be done before TeleologicalFingerprint::new() moves the semantic fingerprint.
+        let cluster_array = embedding_output.fingerprint.to_cluster_array();
+
         // Create TeleologicalFingerprint with REAL computed purpose vector
         let fingerprint =
             TeleologicalFingerprint::new(embedding_output.fingerprint, purpose_vector, content_hash);
@@ -292,6 +321,27 @@ impl Handlers {
 
         match self.teleological_store.store(fingerprint).await {
             Ok(_) => {
+                // TASK-FIX-CLUSTERING: Insert into cluster_manager for topic detection
+                // This enables MultiSpaceClusterManager to track this memory for HDBSCAN/BIRCH clustering.
+                // Per PRD Section 5: Topics emerge from multi-space clustering with weighted_agreement >= 2.5.
+                {
+                    let mut cluster_mgr = self.cluster_manager.write();
+                    if let Err(e) = cluster_mgr.insert(fingerprint_id, &cluster_array) {
+                        // Non-fatal: fingerprint is stored, clustering can be retried via detect_topics
+                        warn!(
+                            fingerprint_id = %fingerprint_id,
+                            error = %e,
+                            "store_memory: Failed to insert into cluster_manager. \
+                             Topic detection may not include this memory until next recluster."
+                        );
+                    } else {
+                        debug!(
+                            fingerprint_id = %fingerprint_id,
+                            "store_memory: Inserted into cluster_manager for topic detection"
+                        );
+                    }
+                }
+
                 // TASK-CONTENT-010: Store content text alongside fingerprint
                 // Content storage failure is non-fatal - fingerprint is primary data
                 if let Err(e) = self

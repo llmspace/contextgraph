@@ -303,6 +303,48 @@ impl SparseVector {
         }
         1.0 - (self.nnz() as f32 / SPARSE_VOCAB_SIZE as f32)
     }
+
+    /// Convert sparse vector to dense representation.
+    ///
+    /// Creates a dense vector of the specified dimension, placing values
+    /// at their corresponding indices. All other positions are set to 0.0.
+    ///
+    /// # Arguments
+    ///
+    /// * `dim` - The dimension of the output dense vector
+    ///
+    /// # Returns
+    ///
+    /// A dense `Vec<f32>` of size `dim` with values placed at sparse indices.
+    /// Indices >= dim are silently ignored.
+    ///
+    /// # Performance
+    ///
+    /// This allocates a full-size dense vector. For SPLADE with vocab_size 30522,
+    /// this is ~120KB per vector. Use sparingly for clustering/indexing operations.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use context_graph_core::types::fingerprint::SparseVector;
+    ///
+    /// let sv = SparseVector::new(vec![1, 5, 10], vec![0.1, 0.5, 1.0]).unwrap();
+    /// let dense = sv.to_dense(20);
+    /// assert_eq!(dense[0], 0.0);
+    /// assert_eq!(dense[1], 0.1);
+    /// assert_eq!(dense[5], 0.5);
+    /// assert_eq!(dense[10], 1.0);
+    /// ```
+    pub fn to_dense(&self, dim: usize) -> Vec<f32> {
+        let mut dense = vec![0.0; dim];
+        for (&idx, &val) in self.indices.iter().zip(self.values.iter()) {
+            let idx_usize = idx as usize;
+            if idx_usize < dim {
+                dense[idx_usize] = val;
+            }
+        }
+        dense
+    }
 }
 
 impl Default for SparseVector {

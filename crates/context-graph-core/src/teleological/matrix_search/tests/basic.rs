@@ -204,8 +204,19 @@ fn test_adaptive_strategy() {
 
 #[test]
 fn test_embedder_names() {
+    // Test canonical names matching Embedder::name()
     assert_eq!(embedder_names::name(0), "E1_Semantic");
-    assert_eq!(embedder_names::name(5), "E6_Code");
-    assert_eq!(embedder_names::name(12), "E13_Sparse");
+    assert_eq!(embedder_names::name(1), "E2_Temporal_Recent");
+    assert_eq!(embedder_names::name(2), "E3_Temporal_Periodic");
+    assert_eq!(embedder_names::name(3), "E4_Temporal_Positional");
+    assert_eq!(embedder_names::name(4), "E5_Causal");
+    assert_eq!(embedder_names::name(5), "E6_Sparse_Lexical");
+    assert_eq!(embedder_names::name(6), "E7_Code");
+    assert_eq!(embedder_names::name(7), "E8_Emotional");
+    assert_eq!(embedder_names::name(8), "E9_HDC");
+    assert_eq!(embedder_names::name(9), "E10_Multimodal");
+    assert_eq!(embedder_names::name(10), "E11_Entity");
+    assert_eq!(embedder_names::name(11), "E12_Late_Interaction");
+    assert_eq!(embedder_names::name(12), "E13_SPLADE");
     assert_eq!(embedder_names::name(99), "Unknown");
 }

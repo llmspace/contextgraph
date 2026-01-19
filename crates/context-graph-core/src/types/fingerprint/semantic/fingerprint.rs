@@ -390,6 +390,67 @@ impl SemanticFingerprint {
     pub fn validate_strict(&self) -> Result<(), ValidationError> {
         self.validate()
     }
+
+    /// Convert fingerprint to dense array for cluster_manager insertion.
+    ///
+    /// TASK-FIX-CLUSTERING: Required for topic detection via MultiSpaceClusterManager.
+    ///
+    /// This method converts all 13 embeddings to dense Vec<f32> format:
+    /// - Dense embeddings (E1-E5, E7-E11): Cloned directly
+    /// - Sparse embeddings (E6, E13): Converted via SparseVector::to_dense()
+    /// - Token-level (E12): Mean-pooled across tokens to single 128D vector
+    ///
+    /// # Performance
+    ///
+    /// This is an expensive operation due to sparse->dense expansion.
+    /// E6 and E13 expand from ~1500 active values to 30522 dimensions each (~240KB).
+    /// Use only for clustering operations, not for routine storage/retrieval.
+    ///
+    /// # Returns
+    ///
+    /// Array of 13 dense vectors with expected dimensions:
+    /// - E1: 1024D, E2-E4: 512D each, E5: 768D
+    /// - E6: 30522D (sparse converted), E7: 1536D
+    /// - E8, E11: 384D each, E9: 1024D, E10: 768D
+    /// - E12: 128D (mean-pooled), E13: 30522D (sparse converted)
+    pub fn to_cluster_array(&self) -> [Vec<f32>; 13] {
+        // E12: Mean-pool tokens to single 128D vector
+        // If no tokens, return zero vector
+        let e12_pooled = if self.e12_late_interaction.is_empty() {
+            vec![0.0; E12_TOKEN_DIM]
+        } else {
+            let num_tokens = self.e12_late_interaction.len() as f32;
+            let mut pooled = vec![0.0; E12_TOKEN_DIM];
+            for token in &self.e12_late_interaction {
+                for (i, &val) in token.iter().enumerate() {
+                    if i < E12_TOKEN_DIM {
+                        pooled[i] += val;
+                    }
+                }
+            }
+            // Mean by dividing by token count
+            for val in &mut pooled {
+                *val /= num_tokens;
+            }
+            pooled
+        };
+
+        [
+            self.e1_semantic.clone(),
+            self.e2_temporal_recent.clone(),
+            self.e3_temporal_periodic.clone(),
+            self.e4_temporal_positional.clone(),
+            self.e5_causal.clone(),
+            self.e6_sparse.to_dense(E6_SPARSE_VOCAB),
+            self.e7_code.clone(),
+            self.e8_graph.clone(),
+            self.e9_hdc.clone(),
+            self.e10_multimodal.clone(),
+            self.e11_entity.clone(),
+            e12_pooled,
+            self.e13_splade.to_dense(E13_SPLADE_VOCAB),
+        ]
+    }
 }
 
 // NOTE: Default is intentionally NOT implemented for SemanticFingerprint.

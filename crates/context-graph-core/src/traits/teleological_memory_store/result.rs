@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::embeddings::category::category_for;
+use crate::teleological::Embedder;
 use crate::types::fingerprint::TeleologicalFingerprint;
 
 /// Search result from teleological memory queries.
@@ -58,14 +60,31 @@ impl TeleologicalSearchResult {
         }
     }
 
-    /// Get the dominant embedder (highest score).
+    /// Get the dominant embedder (highest weighted score).
+    ///
+    /// FIX: Now applies category weights from constitution:
+    /// - SEMANTIC (E1, E5, E6, E7, E10, E12, E13): weight 1.0
+    /// - TEMPORAL (E2, E3, E4): weight 0.0 (NEVER dominant per AP-60)
+    /// - RELATIONAL (E8, E11): weight 0.5
+    /// - STRUCTURAL (E9): weight 0.5
+    ///
+    /// This ensures temporal embedders cannot be reported as dominant,
+    /// as their scores are multiplied by 0.0.
     pub fn dominant_embedder(&self) -> usize {
         self.embedder_scores
             .iter()
             .enumerate()
+            .map(|(idx, &score)| {
+                // Get category weight for this embedder (default to 1.0 for safety)
+                let weight = Embedder::from_index(idx)
+                    .map(|e| category_for(e).topic_weight())
+                    .unwrap_or(1.0);
+                // Temporal embedders (E2-E4) get score * 0.0 = 0.0
+                (idx, score * weight)
+            })
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
-            .unwrap_or(0)
+            .unwrap_or(0) // Default to E1_Semantic if all scores are 0
     }
 }
 
@@ -77,7 +96,7 @@ mod tests {
     #[test]
     fn test_search_result_dominant_embedder() {
         let mut scores = [0.1; 13];
-        scores[5] = 0.9; // E6 is dominant
+        scores[5] = 0.9; // E6 (Sparse/Semantic) is dominant
 
         let result = TeleologicalSearchResult {
             fingerprint: TeleologicalFingerprint::new(
@@ -92,6 +111,34 @@ mod tests {
             content: None,
         };
 
-        assert_eq!(result.dominant_embedder(), 5);
+        assert_eq!(result.dominant_embedder(), 5); // E6 is semantic, should be dominant
+    }
+
+    #[test]
+    fn test_dominant_embedder_excludes_temporal() {
+        // E2 (temporal) has highest raw score but should NOT be dominant
+        // because temporal embedders have weight 0.0 per AP-60
+        let mut scores = [0.1; 13];
+        scores[1] = 0.95; // E2_TemporalRecent has highest raw score
+        scores[0] = 0.5;  // E1_Semantic has lower raw score but weight 1.0
+
+        let result = TeleologicalSearchResult {
+            fingerprint: TeleologicalFingerprint::new(
+                SemanticFingerprint::zeroed(),
+                PurposeVector::default(),
+                [0u8; 32],
+            ),
+            similarity: 0.8,
+            embedder_scores: scores,
+            purpose_alignment: 0.7,
+            stage_scores: [0.0; 5],
+            content: None,
+        };
+
+        // E1 (index 0) should be dominant, NOT E2 (index 1)
+        // E2 weighted score: 0.95 * 0.0 = 0.0
+        // E1 weighted score: 0.5 * 1.0 = 0.5
+        assert_eq!(result.dominant_embedder(), 0,
+            "Temporal embedder E2 should never be dominant (weight 0.0 per AP-60)");
     }
 }

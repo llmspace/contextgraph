@@ -309,6 +309,7 @@ impl UtlProcessor for UtlProcessorAdapter {
     /// Returns `CoreError::MissingField` if goal_vector is missing from context.
     async fn compute_metrics(&self, input: &str, context: &UtlContext) -> CoreResult<UtlMetrics> {
         let inner = self.inner_clone();
+        let metrics_ref = self.metrics_clone();
         let input = input.to_string();
         let embedding = Self::get_embedding(context)?;
         let context_embeddings = Self::get_context_embeddings(context);
@@ -320,6 +321,22 @@ impl UtlProcessor for UtlProcessorAdapter {
             let signal = processor
                 .compute_learning(&input, &embedding, &context_embeddings)
                 .map_err(|e| CoreError::UtlError(e.to_string()))?;
+
+            // FIX: Update accumulated metrics so get_status() returns live values
+            // Previously this was missing, causing get_memetic_status to return all zeros
+            {
+                let mut metrics = metrics_ref
+                    .write()
+                    .map_err(|e| CoreError::Internal(format!("Lock poisoned: {}", e)))?;
+                metrics.record_computation(
+                    signal.magnitude,
+                    signal.delta_s,
+                    signal.delta_c,
+                    signal.latency_us as f64,
+                );
+                metrics.lifecycle_stage = processor.lifecycle_stage();
+                metrics.lambda_weights = processor.lambda_weights();
+            }
 
             Ok(UtlMetrics {
                 entropy: signal.delta_s,

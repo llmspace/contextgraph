@@ -14,15 +14,20 @@
 //!
 //! TASK-INTEG-TOPIC: Integrated with MultiSpaceClusterManager and TopicStabilityTracker.
 
+use chrono::Utc;
 use tracing::{debug, error, info, warn};
 
 use context_graph_core::clustering::Topic;
+use context_graph_core::retrieval::config::low_thresholds;
+use context_graph_core::retrieval::divergence::DIVERGENCE_SPACES;
+use context_graph_core::teleological::Embedder;
+use context_graph_core::traits::TeleologicalSearchOptions;
 
 use crate::protocol::{error_codes, JsonRpcId, JsonRpcResponse};
 
 use super::super::Handlers;
 use super::topic_dtos::{
-    DetectTopicsRequest, DetectTopicsResponse, DivergenceAlertsResponse,
+    DetectTopicsRequest, DetectTopicsResponse, DivergenceAlert, DivergenceAlertsResponse,
     GetDivergenceAlertsRequest, GetTopicPortfolioRequest, GetTopicStabilityRequest,
     PhaseBreakdown, StabilityMetricsSummary, TopicPortfolioResponse, TopicStabilityResponse,
     TopicSummary,
@@ -30,6 +35,45 @@ use super::topic_dtos::{
 
 /// Minimum memories required for clustering (per constitution min_cluster_size).
 const MIN_MEMORIES_FOR_CLUSTERING: usize = 3;
+
+/// Minimum memories required for divergence detection.
+const MIN_MEMORIES_FOR_DIVERGENCE: usize = 2;
+
+/// Maximum words in memory summary for divergence alerts.
+const MAX_SUMMARY_WORDS: usize = 50;
+
+/// Convert Embedder to DTO semantic space string.
+///
+/// Maps embedder variants to the format used in DivergenceAlert DTO.
+/// Per AP-62, only SEMANTIC embedders should be passed here.
+fn embedder_to_dto_space(embedder: Embedder) -> &'static str {
+    match embedder {
+        Embedder::Semantic => "E1_Semantic",
+        Embedder::Causal => "E5_Causal",
+        Embedder::Sparse => "E6_Sparse",
+        Embedder::Code => "E7_Code",
+        Embedder::Multimodal => "E10_Multimodal",
+        Embedder::LateInteraction => "E12_LateInteraction",
+        Embedder::KeywordSplade => "E13_SPLADE",
+        // Temporal, Relational, Structural embedders should never reach here per AP-62
+        _ => {
+            warn!(
+                embedder = ?embedder,
+                "Non-semantic embedder passed to divergence detection (AP-62 violation)"
+            );
+            "Unknown"
+        }
+    }
+}
+
+/// Truncate content to max_words for divergence alert summaries.
+fn truncate_summary(content: &str, max_words: usize) -> String {
+    content
+        .split_whitespace()
+        .take(max_words)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
 
 /// Convert core Topic to TopicSummary DTO.
 ///
@@ -480,24 +524,143 @@ impl Handlers {
             );
         }
 
+        let lookback_hours = request.lookback_hours as i64;
         debug!(
-            lookback_hours = request.lookback_hours,
+            lookback_hours = lookback_hours,
             "get_divergence_alerts: Processing request"
         );
 
         // Per AP-62: Only E1, E5, E6, E7, E10, E12, E13 trigger divergence alerts
         // Temporal embedders (E2-E4) are explicitly excluded per AP-63
-        // Divergence detection will compare current context against recent memories
+        // Divergence detection compares current context against recent memories
         // using only SEMANTIC embedders
 
-        // Return no alerts for now; alerts will be computed when
-        // divergence detection is fully integrated with clustering module
-        let response = DivergenceAlertsResponse::no_alerts();
+        // Step 1: Generate a broad query embedding to find recent memories
+        // Using a neutral/common phrase that should have reasonable matches
+        let broad_query = match self.multi_array_provider.embed_all("context memory").await {
+            Ok(output) => output.fingerprint,
+            Err(e) => {
+                error!(error = %e, "get_divergence_alerts: Failed to generate query embedding");
+                return self.tool_error_with_pulse(id, &format!("Embedding error: {}", e));
+            }
+        };
+
+        let search_options = TeleologicalSearchOptions::quick(100)
+            .with_min_similarity(0.0)
+            .with_include_content(true);
+
+        let all_results = match self
+            .teleological_store
+            .search_semantic(&broad_query, search_options)
+            .await
+        {
+            Ok(results) => results,
+            Err(e) => {
+                error!(error = %e, "get_divergence_alerts: Failed to search memories");
+                return self.tool_error_with_pulse(id, &format!("Search error: {}", e));
+            }
+        };
+
+        // Step 2: Filter to memories within lookback window
+        let cutoff = Utc::now() - chrono::Duration::hours(lookback_hours);
+        let mut recent: Vec<_> = all_results
+            .into_iter()
+            .filter(|r| r.fingerprint.created_at >= cutoff)
+            .collect();
+
+        // Need at least 2 memories for divergence detection
+        if recent.len() < MIN_MEMORIES_FOR_DIVERGENCE {
+            debug!(
+                memory_count = recent.len(),
+                min_required = MIN_MEMORIES_FOR_DIVERGENCE,
+                "get_divergence_alerts: Insufficient memories for divergence detection"
+            );
+            let response = DivergenceAlertsResponse::no_alerts();
+            return self.tool_result_with_pulse(
+                id,
+                serde_json::to_value(response).expect("DivergenceAlertsResponse should serialize"),
+            );
+        }
+
+        // Step 3: Sort by created_at descending (most recent first)
+        recent.sort_by(|a, b| b.fingerprint.created_at.cmp(&a.fingerprint.created_at));
+
+        // Step 4: Use the most recent memory as the "current" query
+        let current = recent.remove(0);
+        let current_semantic = &current.fingerprint.semantic;
+        let current_id = current.fingerprint.id;
 
         debug!(
+            current_id = %current_id,
+            comparison_count = recent.len(),
+            "get_divergence_alerts: Comparing most recent memory against {} others",
+            recent.len()
+        );
+
+        // Step 5: Search again using the most recent memory as the query
+        // This gives us similarity scores against the "current" context
+        let comparison_options = TeleologicalSearchOptions::quick(50)
+            .with_min_similarity(0.0)
+            .with_include_content(true);
+
+        let comparison_results = match self
+            .teleological_store
+            .search_semantic(current_semantic, comparison_options)
+            .await
+        {
+            Ok(results) => results,
+            Err(e) => {
+                error!(error = %e, "get_divergence_alerts: Failed to search for comparisons");
+                return self.tool_error_with_pulse(id, &format!("Search error: {}", e));
+            }
+        };
+
+        // Step 6: Filter comparison results to lookback window (excluding the current memory)
+        let comparisons: Vec<_> = comparison_results
+            .into_iter()
+            .filter(|r| r.fingerprint.id != current_id && r.fingerprint.created_at >= cutoff)
+            .collect();
+
+        // Step 7: Check each SEMANTIC embedding space for divergence
+        let low = low_thresholds();
+        let mut alerts: Vec<DivergenceAlert> = Vec::new();
+
+        for result in comparisons {
+            // Check each SEMANTIC embedder (per AP-62)
+            for &embedder in &DIVERGENCE_SPACES {
+                let idx = embedder.index();
+                let score = result.embedder_scores[idx];
+                let threshold = low.get_threshold(embedder);
+
+                // Alert if score is BELOW low threshold (divergent)
+                if score < threshold {
+                    let summary = result
+                        .content
+                        .as_ref()
+                        .map(|c| truncate_summary(c, MAX_SUMMARY_WORDS))
+                        .unwrap_or_else(|| format!("Memory {}", result.fingerprint.id));
+
+                    alerts.push(DivergenceAlert {
+                        semantic_space: embedder_to_dto_space(embedder).to_string(),
+                        similarity_score: score,
+                        recent_memory_summary: summary,
+                        threshold,
+                    });
+                }
+            }
+        }
+
+        // Step 8: Compute severity and build response
+        let severity = DivergenceAlertsResponse::compute_severity(&alerts);
+        let response = DivergenceAlertsResponse { alerts, severity };
+
+        info!(
             alert_count = response.alerts.len(),
             severity = %response.severity,
-            "get_divergence_alerts: Returning alerts response"
+            lookback_hours = lookback_hours,
+            "get_divergence_alerts: Detected {} divergence alerts with severity '{}'",
+            response.alerts.len(),
+            response.severity
         );
 
         self.tool_result_with_pulse(
@@ -561,5 +724,110 @@ mod tests {
             error_codes::INSUFFICIENT_MEMORIES, -32021,
             "INSUFFICIENT_MEMORIES error code must be -32021"
         );
+    }
+
+    // =========================================================================
+    // Divergence Detection Helper Tests
+    // =========================================================================
+
+    #[test]
+    fn test_embedder_to_dto_space() {
+        // Verify all SEMANTIC embedders map correctly
+        assert_eq!(embedder_to_dto_space(Embedder::Semantic), "E1_Semantic");
+        assert_eq!(embedder_to_dto_space(Embedder::Causal), "E5_Causal");
+        assert_eq!(embedder_to_dto_space(Embedder::Sparse), "E6_Sparse");
+        assert_eq!(embedder_to_dto_space(Embedder::Code), "E7_Code");
+        assert_eq!(embedder_to_dto_space(Embedder::Multimodal), "E10_Multimodal");
+        assert_eq!(embedder_to_dto_space(Embedder::LateInteraction), "E12_LateInteraction");
+        assert_eq!(embedder_to_dto_space(Embedder::KeywordSplade), "E13_SPLADE");
+    }
+
+    #[test]
+    fn test_embedder_to_dto_space_non_semantic() {
+        // Non-semantic embedders should return "Unknown" (with warning)
+        // These should never be used in divergence detection per AP-62
+        assert_eq!(embedder_to_dto_space(Embedder::TemporalRecent), "Unknown");
+        assert_eq!(embedder_to_dto_space(Embedder::TemporalPeriodic), "Unknown");
+        assert_eq!(embedder_to_dto_space(Embedder::TemporalPositional), "Unknown");
+    }
+
+    #[test]
+    fn test_truncate_summary_short() {
+        let content = "Hello world";
+        assert_eq!(truncate_summary(content, 50), "Hello world");
+    }
+
+    #[test]
+    fn test_truncate_summary_long() {
+        let content = "This is a very long piece of text that should be truncated to only a few words";
+        let truncated = truncate_summary(content, 5);
+        assert_eq!(truncated, "This is a very long");
+        assert!(!truncated.contains("truncated"));
+    }
+
+    #[test]
+    fn test_truncate_summary_empty() {
+        let content = "";
+        assert_eq!(truncate_summary(content, 50), "");
+    }
+
+    #[test]
+    fn test_min_memories_for_divergence() {
+        // Need at least 2 memories to detect divergence (1 current, 1 to compare)
+        assert_eq!(
+            MIN_MEMORIES_FOR_DIVERGENCE, 2,
+            "MIN_MEMORIES_FOR_DIVERGENCE must be 2"
+        );
+    }
+
+    #[test]
+    fn test_max_summary_words() {
+        // Verify summary truncation limit
+        assert_eq!(
+            MAX_SUMMARY_WORDS, 50,
+            "MAX_SUMMARY_WORDS should be 50"
+        );
+    }
+
+    #[test]
+    fn test_divergence_spaces_match_ap62() {
+        // AP-62: Only SEMANTIC embedders (E1, E5, E6, E7, E10, E12, E13) trigger alerts
+        assert_eq!(DIVERGENCE_SPACES.len(), 7, "Should have 7 DIVERGENCE_SPACES");
+
+        // Verify each expected embedder is present
+        assert!(DIVERGENCE_SPACES.contains(&Embedder::Semantic), "Must include E1");
+        assert!(DIVERGENCE_SPACES.contains(&Embedder::Causal), "Must include E5");
+        assert!(DIVERGENCE_SPACES.contains(&Embedder::Sparse), "Must include E6");
+        assert!(DIVERGENCE_SPACES.contains(&Embedder::Code), "Must include E7");
+        assert!(DIVERGENCE_SPACES.contains(&Embedder::Multimodal), "Must include E10");
+        assert!(DIVERGENCE_SPACES.contains(&Embedder::LateInteraction), "Must include E12");
+        assert!(DIVERGENCE_SPACES.contains(&Embedder::KeywordSplade), "Must include E13");
+
+        // AP-63: Temporal embedders must NOT be included
+        assert!(!DIVERGENCE_SPACES.contains(&Embedder::TemporalRecent), "Must NOT include E2");
+        assert!(!DIVERGENCE_SPACES.contains(&Embedder::TemporalPeriodic), "Must NOT include E3");
+        assert!(!DIVERGENCE_SPACES.contains(&Embedder::TemporalPositional), "Must NOT include E4");
+    }
+
+    #[test]
+    fn test_low_thresholds_for_divergence() {
+        // Verify low thresholds are configured for divergence detection
+        let low = low_thresholds();
+
+        // All thresholds should be in valid range [0.0, 1.0]
+        for embedder in Embedder::all() {
+            let threshold = low.get_threshold(embedder);
+            assert!(
+                threshold >= 0.0 && threshold <= 1.0,
+                "{:?} threshold {} out of range",
+                embedder,
+                threshold
+            );
+        }
+
+        // Verify specific thresholds from TECH-PHASE3-SIMILARITY-DIVERGENCE.md
+        assert!((low.get_threshold(Embedder::Semantic) - 0.30).abs() < 0.01);
+        assert!((low.get_threshold(Embedder::Causal) - 0.25).abs() < 0.01);
+        assert!((low.get_threshold(Embedder::Code) - 0.35).abs() < 0.01);
     }
 }
