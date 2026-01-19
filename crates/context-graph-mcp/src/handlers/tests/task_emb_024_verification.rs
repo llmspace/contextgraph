@@ -15,11 +15,9 @@
 
 use std::sync::Arc;
 
-use parking_lot::RwLock;
 use serde_json::json;
 
 use context_graph_core::monitoring::{LayerStatusProvider, StubLayerStatusProvider};
-use context_graph_core::purpose::GoalHierarchy;
 use context_graph_core::stubs::{
     InMemoryTeleologicalStore, StubMultiArrayProvider, StubUtlProcessor,
 };
@@ -30,22 +28,21 @@ use context_graph_core::traits::{
 use crate::handlers::Handlers;
 use crate::protocol::{error_codes, JsonRpcId, JsonRpcRequest};
 
-/// Create test handlers using Handlers::with_all (which uses StubLayerStatusProvider).
+/// Create test handlers using Handlers::with_defaults (which uses StubLayerStatusProvider).
 ///
 /// TASK-GAP-001: Updated to use Handlers::with_defaults() after PRD v6 refactor.
 /// This is the configuration that TASK-EMB-024 requires to fail-fast.
+/// NOTE: GoalHierarchy was removed - Handlers::with_defaults now takes 4 args.
 fn create_handlers_with_stub_monitors() -> Handlers {
     let store: Arc<dyn TeleologicalMemoryStore> = Arc::new(InMemoryTeleologicalStore::new());
     let utl_processor: Arc<dyn UtlProcessor> = Arc::new(StubUtlProcessor::new());
     let multi_array: Arc<dyn MultiArrayEmbeddingProvider> = Arc::new(StubMultiArrayProvider::new());
-    let goal_hierarchy = GoalHierarchy::default();
     let layer_status: Arc<dyn LayerStatusProvider> = Arc::new(StubLayerStatusProvider);
 
     Handlers::with_defaults(
         store,
         utl_processor,
         multi_array,
-        Arc::new(RwLock::new(goal_hierarchy)),
         layer_status,
     )
 }

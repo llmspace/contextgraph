@@ -51,7 +51,7 @@
 //! };
 //! use uuid::Uuid;
 //!
-//! // Create registry with all 12 HNSW indexes
+//! // Create registry with all 11 HNSW indexes
 //! let registry = EmbedderIndexRegistry::new();
 //!
 //! // Get index for E8 Graph (384D)

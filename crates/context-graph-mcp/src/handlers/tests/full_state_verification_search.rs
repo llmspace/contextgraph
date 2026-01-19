@@ -155,18 +155,10 @@ async fn test_full_state_verification_store_search_delete_cycle() {
         .expect("Fingerprint must exist in store");
 
     println!("   - Fingerprint ID in store: {}", retrieved_fp.id);
-    println!(
-        "   - Aggregate alignment: {:.4}",
-        retrieved_fp.purpose_vector.aggregate_alignment()
-    );
     println!("   - Access count: {}", retrieved_fp.access_count);
-    println!(
-        "   - Purpose vector (first 3): [{:.3}, {:.3}, {:.3}, ...]",
-        retrieved_fp.purpose_vector.alignments[0],
-        retrieved_fp.purpose_vector.alignments[1],
-        retrieved_fp.purpose_vector.alignments[2]
-    );
+    println!("   - Last updated: {}", retrieved_fp.last_updated);
     println!("   - Semantic fingerprint: 13 embedders with varying dimensions");
+    // NOTE: purpose_vector was removed from TeleologicalFingerprint
 
     // Verify it's the same ID
     assert_eq!(
@@ -360,10 +352,8 @@ async fn test_full_state_verification_store_search_delete_cycle() {
         retrieved_fp.content_hash.len()
     );
     println!("  - Embedding spaces: 13 (E1-E13)");
-    println!(
-        "  - Aggregate alignment: {:.4}",
-        retrieved_fp.purpose_vector.aggregate_alignment()
-    );
+    println!("  - Access count: {}", retrieved_fp.access_count);
+    // NOTE: purpose_vector was removed from TeleologicalFingerprint
     println!("======================================================================\n");
 }
 
