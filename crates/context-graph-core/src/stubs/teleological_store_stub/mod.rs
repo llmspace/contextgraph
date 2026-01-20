@@ -52,6 +52,7 @@ use uuid::Uuid;
 
 use crate::traits::TeleologicalStorageBackend;
 use crate::types::fingerprint::TeleologicalFingerprint;
+use crate::types::SourceMetadata;
 
 /// In-memory implementation of TeleologicalMemoryStore.
 ///
@@ -66,6 +67,8 @@ pub struct InMemoryTeleologicalStore {
     pub(crate) deleted: DashMap<Uuid, ()>,
     /// Content storage: UUID -> original content text
     pub(crate) content: DashMap<Uuid, String>,
+    /// Source metadata storage: UUID -> SourceMetadata
+    pub(crate) source_metadata: DashMap<Uuid, SourceMetadata>,
     /// Running size estimate in bytes
     pub(crate) size_bytes: AtomicUsize,
 }
@@ -78,6 +81,7 @@ impl InMemoryTeleologicalStore {
             data: DashMap::new(),
             deleted: DashMap::new(),
             content: DashMap::new(),
+            source_metadata: DashMap::new(),
             size_bytes: AtomicUsize::new(0),
         }
     }
@@ -92,6 +96,7 @@ impl InMemoryTeleologicalStore {
             data: DashMap::with_capacity(capacity),
             deleted: DashMap::new(),
             content: DashMap::with_capacity(capacity),
+            source_metadata: DashMap::with_capacity(capacity),
             size_bytes: AtomicUsize::new(0),
         }
     }

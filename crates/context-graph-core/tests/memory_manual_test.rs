@@ -205,6 +205,8 @@ fn manual_test_source_type_discrimination() {
             word_offset: 0,
             char_offset: 0,
             original_file_hash: "abc123def456".to_string(),
+            start_line: 1,
+            end_line: 3,
         }),
     );
 

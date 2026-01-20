@@ -46,6 +46,9 @@ pub enum TransportMode {
 }
 
 use context_graph_core::config::Config;
+use context_graph_core::memory::watcher::MDFileWatcher;
+use context_graph_core::memory::{MemoryCaptureService, MultiArrayEmbeddingAdapter};
+use context_graph_core::memory::store::MemoryStore;
 use context_graph_core::traits::{
     MultiArrayEmbeddingProvider, TeleologicalMemoryStore, UtlProcessor,
 };
@@ -457,6 +460,157 @@ impl McpServer {
     pub async fn shutdown(&self) {
         info!("Initiating graceful shutdown...");
         info!("Graceful shutdown complete");
+    }
+
+    /// Start the file watcher if enabled in configuration.
+    ///
+    /// The file watcher monitors ./docs/ directory (and subdirectories) for .md
+    /// file changes and automatically indexes them as memories with MDFileChunk
+    /// source metadata.
+    ///
+    /// # Configuration
+    ///
+    /// Set in config.toml:
+    /// ```toml
+    /// [watcher]
+    /// enabled = true
+    /// watch_paths = ["./docs"]
+    /// session_id = "docs-watcher"
+    /// ```
+    ///
+    /// # Returns
+    ///
+    /// `Ok(true)` if watcher started successfully, `Ok(false)` if disabled,
+    /// `Err` if startup failed.
+    pub async fn start_file_watcher(&self) -> Result<bool> {
+        if !self.config.watcher.enabled {
+            debug!("File watcher disabled in configuration");
+            return Ok(false);
+        }
+
+        // Wait for embedding models to be ready
+        if self.models_loading.load(Ordering::SeqCst) {
+            info!("Waiting for embedding models to load before starting file watcher...");
+            // Wait up to 60 seconds for models to load
+            for _ in 0..120 {
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                if !self.models_loading.load(Ordering::SeqCst) {
+                    break;
+                }
+            }
+            if self.models_loading.load(Ordering::SeqCst) {
+                error!("Embedding models still loading after 60s - skipping file watcher");
+                return Ok(false);
+            }
+        }
+
+        // Check if model loading failed
+        {
+            let failed = self.models_failed.read().await;
+            if let Some(ref err) = *failed {
+                error!("Cannot start file watcher - embedding models failed: {}", err);
+                return Ok(false);
+            }
+        }
+
+        // Get embedding provider
+        let provider = {
+            let slot = self.multi_array_provider.read().await;
+            match slot.as_ref() {
+                Some(p) => Arc::clone(p),
+                None => {
+                    error!("Cannot start file watcher - no embedding provider available");
+                    return Ok(false);
+                }
+            }
+        };
+
+        // Create storage path for file watcher (same as MCP server)
+        let db_path = Self::resolve_storage_path(&self.config);
+
+        // Create memory store
+        let memory_store = Arc::new(MemoryStore::new(&db_path).map_err(|e| {
+            anyhow::anyhow!("Failed to create memory store for file watcher: {}", e)
+        })?);
+
+        // Create embedding adapter
+        let embedder = Arc::new(MultiArrayEmbeddingAdapter::new(provider));
+
+        // Create capture service
+        let capture_service = Arc::new(MemoryCaptureService::new(memory_store.clone(), embedder));
+
+        // Convert watch paths to PathBufs
+        let watch_paths: Vec<PathBuf> = self
+            .config
+            .watcher
+            .watch_paths
+            .iter()
+            .map(PathBuf::from)
+            .collect();
+
+        let session_id = self.config.watcher.session_id.clone();
+
+        // Spawn file watcher in a dedicated thread to handle the non-Send Receiver
+        // We use spawn_blocking + nested tokio runtime for this
+        std::thread::spawn(move || {
+            // Create a new runtime for this thread
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("Failed to create file watcher runtime");
+
+            rt.block_on(async move {
+                info!(
+                    paths = ?watch_paths,
+                    session_id = %session_id,
+                    "Starting file watcher..."
+                );
+
+                // Create file watcher
+                let mut watcher = match MDFileWatcher::new(watch_paths.clone(), capture_service, session_id.clone()) {
+                    Ok(w) => w,
+                    Err(e) => {
+                        error!(error = %e, "Failed to create file watcher");
+                        return;
+                    }
+                };
+
+                // Start watcher
+                if let Err(e) = watcher.start().await {
+                    error!(error = %e, "Failed to start file watcher");
+                    return;
+                }
+
+                info!(
+                    paths = ?watch_paths,
+                    "File watcher started - monitoring for .md file changes (recursive)"
+                );
+
+                // Process events in a loop
+                let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
+                loop {
+                    interval.tick().await;
+                    match watcher.process_events().await {
+                        Ok(count) => {
+                            if count > 0 {
+                                info!(files_processed = count, "File watcher processed changes");
+                            }
+                        }
+                        Err(e) => {
+                            error!(error = %e, "File watcher error processing events");
+                        }
+                    }
+                }
+            });
+        });
+
+        info!(
+            paths = ?self.config.watcher.watch_paths,
+            session_id = %self.config.watcher.session_id,
+            "File watcher started as background task"
+        );
+
+        Ok(true)
     }
 
     /// Handle a single JSON-RPC request.

@@ -356,6 +356,54 @@ pub fn parse_content_key(key: &[u8]) -> Uuid {
 }
 
 // =============================================================================
+// SOURCE METADATA KEYS (UUID = 16 bytes)
+// =============================================================================
+
+/// Key for source_metadata CF: fingerprint_id UUID as 16 bytes.
+///
+/// Used to store provenance information (source type, file path, etc.)
+/// associated with a fingerprint.
+///
+/// # Arguments
+/// * `id` - The fingerprint's UUID
+///
+/// # Returns
+/// Exactly 16 bytes (UUID in big-endian format)
+#[inline]
+pub fn source_metadata_key(id: &Uuid) -> [u8; 16] {
+    *id.as_bytes()
+}
+
+/// Parse source_metadata key back to fingerprint UUID.
+///
+/// # Arguments
+/// * `key` - Exactly 16 bytes
+///
+/// # Returns
+/// The parsed UUID
+///
+/// # Panics
+/// Panics if key is not exactly 16 bytes (FAIL FAST).
+#[inline]
+pub fn parse_source_metadata_key(key: &[u8]) -> Uuid {
+    if key.len() != 16 {
+        panic!(
+            "STORAGE ERROR: source_metadata key must be 16 bytes, got {} bytes. \
+             Key data: {:02x?}. This indicates corrupted storage or wrong CF access.",
+            key.len(),
+            key
+        );
+    }
+    Uuid::from_slice(key).unwrap_or_else(|e| {
+        panic!(
+            "STORAGE ERROR: Invalid UUID bytes in source_metadata key. \
+             Error: {}. Key data: {:02x?}.",
+            e, key
+        );
+    })
+}
+
+// =============================================================================
 // TASK-STORAGE-P2-001: E12 LATE INTERACTION TOKEN KEYS (UUID = 16 bytes)
 // =============================================================================
 

@@ -19,6 +19,7 @@ use context_graph_core::traits::{
 use context_graph_core::types::fingerprint::{
     SemanticFingerprint, SparseVector, TeleologicalFingerprint,
 };
+use context_graph_core::types::SourceMetadata;
 
 use super::store::RocksDbTeleologicalStore;
 
@@ -136,5 +137,23 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
 
     async fn delete_content(&self, id: Uuid) -> CoreResult<bool> {
         self.delete_content_async(id).await
+    }
+
+    // ==================== Source Metadata Storage ====================
+
+    async fn store_source_metadata(&self, id: Uuid, metadata: &SourceMetadata) -> CoreResult<()> {
+        self.store_source_metadata_async(id, metadata).await
+    }
+
+    async fn get_source_metadata(&self, id: Uuid) -> CoreResult<Option<SourceMetadata>> {
+        self.get_source_metadata_async(id).await
+    }
+
+    async fn delete_source_metadata(&self, id: Uuid) -> CoreResult<bool> {
+        self.delete_source_metadata_async(id).await
+    }
+
+    async fn get_source_metadata_batch(&self, ids: &[Uuid]) -> CoreResult<Vec<Option<SourceMetadata>>> {
+        self.get_source_metadata_batch_async(ids).await
     }
 }

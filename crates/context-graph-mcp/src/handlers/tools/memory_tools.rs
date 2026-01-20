@@ -400,10 +400,12 @@ impl Handlers {
             .await
         {
             Ok(results) => {
+                // Collect IDs for batch operations
+                let ids: Vec<uuid::Uuid> = results.iter().map(|r| r.fingerprint.id).collect();
+
                 // TASK-CONTENT-003: Hydrate content if requested
                 // Batch retrieve content for all results to minimize I/O
                 let contents: Vec<Option<String>> = if include_content && !results.is_empty() {
-                    let ids: Vec<uuid::Uuid> = results.iter().map(|r| r.fingerprint.id).collect();
                     match self.teleological_store.get_content_batch(&ids).await {
                         Ok(c) => c,
                         Err(e) => {
@@ -418,6 +420,25 @@ impl Handlers {
                     }
                 } else {
                     // Not requested or no results - empty vec
+                    vec![]
+                };
+
+                // Batch retrieve source metadata for all results
+                // Source metadata enables context injection to show file paths for MDFileChunk memories
+                let source_metadata: Vec<Option<context_graph_core::types::SourceMetadata>> = if !results.is_empty() {
+                    match self.teleological_store.get_source_metadata_batch(&ids).await {
+                        Ok(m) => m,
+                        Err(e) => {
+                            warn!(
+                                error = %e,
+                                result_count = results.len(),
+                                "search_graph: Source metadata retrieval failed. Results will not include source info."
+                            );
+                            // Return None for all - graceful degradation
+                            vec![None; ids.len()]
+                        }
+                    }
+                } else {
                     vec![]
                 };
 
@@ -440,6 +461,17 @@ impl Handlers {
                                 Some(c) => json!(c),
                                 None => serde_json::Value::Null,
                             };
+                        }
+                        // Always include source metadata if available (enables context injection to show file paths)
+                        if let Some(Some(ref metadata)) = source_metadata.get(i) {
+                            entry["source"] = json!({
+                                "type": format!("{}", metadata.source_type),
+                                "file_path": metadata.file_path,
+                                "chunk_index": metadata.chunk_index,
+                                "total_chunks": metadata.total_chunks,
+                                "hook_type": metadata.hook_type,
+                                "tool_name": metadata.tool_name
+                            });
                         }
                         entry
                     })

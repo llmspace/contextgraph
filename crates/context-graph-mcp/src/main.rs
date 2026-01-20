@@ -54,7 +54,7 @@ use std::io;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use tracing::{error, info};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::{fmt, EnvFilter};
 
 use context_graph_core::config::Config;
@@ -717,6 +717,13 @@ async fn main() -> Result<()> {
 
         // Create server with warmup configuration
         let server = server::McpServer::new(config, warm_first).await?;
+
+        // Start file watcher if enabled in configuration
+        match server.start_file_watcher().await {
+            Ok(true) => info!("File watcher started successfully"),
+            Ok(false) => debug!("File watcher not started (disabled or models not ready)"),
+            Err(e) => warn!("File watcher failed to start: {}", e),
+        }
 
         // Run with selected transport
         match transport_mode {

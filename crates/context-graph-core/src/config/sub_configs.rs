@@ -342,3 +342,51 @@ impl Default for CudaConfig {
         }
     }
 }
+
+/// File watcher configuration for monitoring markdown documentation.
+///
+/// When enabled, the MCP server will monitor the specified directories
+/// for .md file changes and automatically index them as memories with
+/// MDFileChunk source metadata.
+///
+/// # Example Configuration
+///
+/// ```toml
+/// [watcher]
+/// enabled = true
+/// watch_paths = ["./docs"]
+/// session_id = "docs-watcher"
+/// ```
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct WatcherConfig {
+    /// Enable the file watcher (default: false).
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Directories to watch for .md files (default: ["./docs"]).
+    /// Subdirectories are watched recursively.
+    #[serde(default = "default_watch_paths")]
+    pub watch_paths: Vec<String>,
+
+    /// Session ID for captured memories (default: "docs-watcher").
+    #[serde(default = "default_watcher_session_id")]
+    pub session_id: String,
+}
+
+fn default_watch_paths() -> Vec<String> {
+    vec!["./docs".to_string()]
+}
+
+fn default_watcher_session_id() -> String {
+    "docs-watcher".to_string()
+}
+
+impl Default for WatcherConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            watch_paths: default_watch_paths(),
+            session_id: default_watcher_session_id(),
+        }
+    }
+}

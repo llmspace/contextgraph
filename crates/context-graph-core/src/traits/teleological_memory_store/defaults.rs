@@ -1,19 +1,26 @@
 //! Default implementations for optional TeleologicalMemoryStore methods.
 //!
-//! This module provides default implementations for content storage methods.
-//! These are separated from the core trait to keep the main trait file under
-//! the 500-line limit while maintaining clear organization.
+//! This module provides default implementations for content storage and
+//! source metadata methods. These are separated from the core trait to keep
+//! the main trait file under the 500-line limit while maintaining clear organization.
 //!
 //! # Content Storage (TASK-CONTENT-003)
 //!
 //! Content storage allows associating original text content with fingerprints.
 //! The default implementations return errors or empty results for backends
 //! that don't support content storage.
+//!
+//! # Source Metadata Storage
+//!
+//! Source metadata allows tracking memory provenance (e.g., file path for
+//! MDFileChunk memories). This enables context injection to display where
+//! memories originated from.
 
 use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::error::{CoreError, CoreResult};
+use crate::types::SourceMetadata;
 
 use super::backend::TeleologicalStorageBackend;
 
@@ -95,6 +102,74 @@ pub trait TeleologicalMemoryStoreDefaults: Send + Sync {
     /// Vector of `None` values (backend does not support content storage).
     async fn get_content_batch_default(&self, ids: &[Uuid]) -> CoreResult<Vec<Option<String>>> {
         // Default returns None for all IDs since content storage is not supported
+        Ok(vec![None; ids.len()])
+    }
+
+    // ==================== Source Metadata Defaults ====================
+
+    /// Default: Store source metadata - returns unsupported error.
+    ///
+    /// Source metadata tracks memory provenance (e.g., file path for MDFileChunk).
+    ///
+    /// # Arguments
+    /// * `id` - Fingerprint UUID
+    /// * `metadata` - Source metadata to store
+    ///
+    /// # Errors
+    /// - `CoreError::Internal` - Source metadata storage not supported by backend
+    async fn store_source_metadata_default(
+        &self,
+        id: Uuid,
+        metadata: &SourceMetadata,
+    ) -> CoreResult<()> {
+        let _ = (id, metadata); // Suppress unused warnings
+        Err(CoreError::Internal(format!(
+            "Source metadata storage not supported by {} backend",
+            self.backend_type()
+        )))
+    }
+
+    /// Default: Get source metadata - returns None (graceful degradation).
+    ///
+    /// Returns the source metadata that was stored with the fingerprint.
+    /// Returns None if metadata was never stored or backend doesn't support it.
+    ///
+    /// # Arguments
+    /// * `id` - Fingerprint UUID
+    ///
+    /// # Returns
+    /// `None` - Backend does not support source metadata storage.
+    async fn get_source_metadata_default(&self, id: Uuid) -> CoreResult<Option<SourceMetadata>> {
+        let _ = id; // Suppress unused warnings
+        Ok(None)
+    }
+
+    /// Default: Delete source metadata - returns false (nothing to delete).
+    ///
+    /// Called automatically when fingerprint is deleted (cascade delete).
+    ///
+    /// # Arguments
+    /// * `id` - Fingerprint UUID
+    ///
+    /// # Returns
+    /// `false` - No metadata existed to delete.
+    async fn delete_source_metadata_default(&self, id: Uuid) -> CoreResult<bool> {
+        let _ = id; // Suppress unused warnings
+        Ok(false)
+    }
+
+    /// Default: Batch get source metadata - returns vec of None.
+    ///
+    /// # Arguments
+    /// * `ids` - Slice of fingerprint UUIDs
+    ///
+    /// # Returns
+    /// Vector of `None` values (backend does not support source metadata storage).
+    async fn get_source_metadata_batch_default(
+        &self,
+        ids: &[Uuid],
+    ) -> CoreResult<Vec<Option<SourceMetadata>>> {
+        // Default returns None for all IDs since source metadata storage is not supported
         Ok(vec![None; ids.len()])
     }
 }

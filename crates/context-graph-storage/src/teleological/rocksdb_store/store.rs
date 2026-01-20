@@ -20,7 +20,7 @@ use context_graph_core::types::fingerprint::TeleologicalFingerprint;
 
 use crate::teleological::column_families::{
     get_all_teleological_cf_descriptors, CF_CONTENT, CF_E12_LATE_INTERACTION, CF_E1_MATRYOSHKA_128,
-    CF_FINGERPRINTS, QUANTIZED_EMBEDDER_CFS, TELEOLOGICAL_CFS,
+    CF_FINGERPRINTS, CF_SOURCE_METADATA, QUANTIZED_EMBEDDER_CFS, TELEOLOGICAL_CFS,
 };
 use crate::teleological::indexes::EmbedderIndexRegistry;
 use crate::teleological::schema::{
@@ -629,6 +629,14 @@ impl RocksDbTeleologicalStore {
         self.db
             .cf_handle(CF_E12_LATE_INTERACTION)
             .expect("CF_E12_LATE_INTERACTION must exist - database initialization failed")
+    }
+
+    /// Get the source_metadata column family handle (FAIL FAST on missing).
+    #[inline]
+    pub(crate) fn cf_source_metadata(&self) -> &ColumnFamily {
+        self.db
+            .cf_handle(CF_SOURCE_METADATA)
+            .expect("CF_SOURCE_METADATA must exist - database initialization failed")
     }
 }
 

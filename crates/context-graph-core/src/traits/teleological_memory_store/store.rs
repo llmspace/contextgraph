@@ -12,6 +12,7 @@ use crate::error::CoreResult;
 use crate::types::fingerprint::{
     SemanticFingerprint, SparseVector, TeleologicalFingerprint,
 };
+use crate::types::SourceMetadata;
 
 use super::backend::TeleologicalStorageBackend;
 use super::options::TeleologicalSearchOptions;
@@ -290,4 +291,60 @@ pub trait TeleologicalMemoryStore: Send + Sync {
     /// Batch retrieve content for multiple fingerprints.
     /// Default: Returns vec of None. Override for batch-optimized retrieval.
     async fn get_content_batch(&self, ids: &[Uuid]) -> CoreResult<Vec<Option<String>>>;
+
+    // ==================== Source Metadata Storage ====================
+    // Enables tracking memory provenance (e.g., file path for MDFileChunk)
+    // See `defaults.rs` for default implementations.
+
+    /// Store source metadata associated with a fingerprint.
+    ///
+    /// Source metadata provides provenance tracking, enabling context injection
+    /// to display where memories originated from (e.g., file paths for chunked
+    /// markdown files).
+    ///
+    /// # Arguments
+    /// * `id` - The fingerprint UUID
+    /// * `metadata` - Source metadata to store
+    ///
+    /// # Errors
+    /// - `CoreError::StorageError` - Storage backend failure
+    /// - `CoreError::SerializationError` - Serialization failure
+    async fn store_source_metadata(&self, id: Uuid, metadata: &SourceMetadata) -> CoreResult<()>;
+
+    /// Retrieve source metadata for a fingerprint.
+    ///
+    /// # Arguments
+    /// * `id` - The fingerprint UUID
+    ///
+    /// # Returns
+    /// `Some(metadata)` if found, `None` if no metadata stored.
+    ///
+    /// # Errors
+    /// - `CoreError::StorageError` - Storage backend failure
+    /// - `CoreError::SerializationError` - Deserialization failure
+    async fn get_source_metadata(&self, id: Uuid) -> CoreResult<Option<SourceMetadata>>;
+
+    /// Delete source metadata for a fingerprint.
+    ///
+    /// # Arguments
+    /// * `id` - The fingerprint UUID
+    ///
+    /// # Returns
+    /// `true` if metadata was deleted, `false` if not found.
+    ///
+    /// # Errors
+    /// - `CoreError::StorageError` - Storage backend failure
+    async fn delete_source_metadata(&self, id: Uuid) -> CoreResult<bool>;
+
+    /// Batch retrieve source metadata for multiple fingerprints.
+    ///
+    /// # Arguments
+    /// * `ids` - Slice of fingerprint UUIDs
+    ///
+    /// # Returns
+    /// Vector of `Option<SourceMetadata>` (same order as input).
+    ///
+    /// # Errors
+    /// - `CoreError::StorageError` - Storage backend failure
+    async fn get_source_metadata_batch(&self, ids: &[Uuid]) -> CoreResult<Vec<Option<SourceMetadata>>>;
 }

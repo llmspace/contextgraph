@@ -17,6 +17,7 @@ use crate::traits::{
     TeleologicalStorageBackend,
 };
 use crate::types::fingerprint::{SemanticFingerprint, SparseVector, TeleologicalFingerprint};
+use crate::types::SourceMetadata;
 
 #[async_trait]
 impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
@@ -194,5 +195,28 @@ impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
 
     async fn delete_content(&self, id: Uuid) -> CoreResult<bool> {
         self.delete_content_impl(id).await
+    }
+
+    // ==================== Source Metadata Storage ====================
+
+    async fn store_source_metadata(&self, id: Uuid, metadata: &SourceMetadata) -> CoreResult<()> {
+        debug!("Storing source metadata for {}", id);
+        self.source_metadata.insert(id, metadata.clone());
+        Ok(())
+    }
+
+    async fn get_source_metadata(&self, id: Uuid) -> CoreResult<Option<SourceMetadata>> {
+        Ok(self.source_metadata.get(&id).map(|r| r.clone()))
+    }
+
+    async fn delete_source_metadata(&self, id: Uuid) -> CoreResult<bool> {
+        Ok(self.source_metadata.remove(&id).is_some())
+    }
+
+    async fn get_source_metadata_batch(&self, ids: &[Uuid]) -> CoreResult<Vec<Option<SourceMetadata>>> {
+        Ok(ids
+            .iter()
+            .map(|id| self.source_metadata.get(id).map(|r| r.clone()))
+            .collect())
     }
 }

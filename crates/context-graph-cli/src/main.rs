@@ -77,6 +77,14 @@ enum Commands {
     ///
     /// Takes approximately 20-30 seconds on RTX 5090 (32GB VRAM).
     Warmup(commands::warmup::WarmupArgs),
+    /// Watch a directory for markdown file changes
+    ///
+    /// Monitors the specified directory for .md file changes and automatically
+    /// chunks and stores them as memories with source metadata.
+    ///
+    /// Example:
+    ///   context-graph-cli watch --path ./docs --session-id my-session
+    Watch(commands::watch::WatchArgs),
 }
 
 #[tokio::main]
@@ -105,6 +113,7 @@ async fn main() {
         Commands::Memory { action } => commands::memory::handle_memory_command(action).await,
         Commands::Setup(args) => commands::setup::handle_setup(args).await,
         Commands::Warmup(args) => commands::warmup::handle_warmup(args).await,
+        Commands::Watch(args) => commands::watch::handle_watch(args).await,
     };
 
     std::process::exit(exit_code);

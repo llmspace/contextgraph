@@ -467,6 +467,55 @@ pub struct RetrievedMemory {
     pub similarity: f32,
     /// Dominant embedder that matched (e.g., "E1_Semantic")
     pub dominant_embedder: String,
+    /// Source metadata - where this memory originated
+    pub source: Option<SourceInfo>,
+}
+
+/// Source metadata for a retrieved memory.
+#[derive(Debug, Clone)]
+pub struct SourceInfo {
+    /// Source type: "MDFileChunk", "HookDescription", "ClaudeResponse", etc.
+    pub source_type: String,
+    /// File path (for MDFileChunk sources)
+    pub file_path: Option<String>,
+    /// Chunk index (for MDFileChunk sources)
+    pub chunk_index: Option<u32>,
+    /// Total chunks in file (for MDFileChunk sources)
+    pub total_chunks: Option<u32>,
+    /// Hook type (for HookDescription sources)
+    pub hook_type: Option<String>,
+    /// Tool name (for HookDescription sources)
+    pub tool_name: Option<String>,
+}
+
+impl SourceInfo {
+    /// Format source info as a readable string.
+    pub fn display_string(&self) -> String {
+        match self.source_type.as_str() {
+            "MDFileChunk" => {
+                if let Some(ref path) = self.file_path {
+                    match (self.chunk_index, self.total_chunks) {
+                        (Some(idx), Some(total)) => {
+                            format!("Source: `{}` (chunk {}/{})", path, idx + 1, total)
+                        }
+                        _ => format!("Source: `{}`", path),
+                    }
+                } else {
+                    "Source: MDFileChunk".to_string()
+                }
+            }
+            "HookDescription" => {
+                match (&self.hook_type, &self.tool_name) {
+                    (Some(hook), Some(tool)) => format!("Source: {} hook ({})", hook, tool),
+                    (Some(hook), None) => format!("Source: {} hook", hook),
+                    _ => "Source: HookDescription".to_string(),
+                }
+            }
+            "ClaudeResponse" => "Source: Claude response".to_string(),
+            "Manual" => "Source: Manual entry".to_string(),
+            other => format!("Source: {}", other),
+        }
+    }
 }
 
 /// A divergence alert from the knowledge graph.
@@ -577,6 +626,19 @@ fn parse_search_results(result: &serde_json::Value) -> Vec<RetrievedMemory> {
             total_chars += c.len();
         }
 
+        // Parse source metadata if available
+        let source = item.get("source").and_then(|s| {
+            let source_type = s.get("type").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
+            Some(SourceInfo {
+                source_type,
+                file_path: s.get("file_path").and_then(|v| v.as_str()).map(String::from),
+                chunk_index: s.get("chunk_index").and_then(|v| v.as_u64()).map(|n| n as u32),
+                total_chunks: s.get("total_chunks").and_then(|v| v.as_u64()).map(|n| n as u32),
+                hook_type: s.get("hook_type").and_then(|v| v.as_str()).map(String::from),
+                tool_name: s.get("tool_name").and_then(|v| v.as_str()).map(String::from),
+            })
+        });
+
         memories.push(RetrievedMemory {
             id: item
                 .get("fingerprintId")
@@ -593,6 +655,7 @@ fn parse_search_results(result: &serde_json::Value) -> Vec<RetrievedMemory> {
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown")
                 .to_string(),
+            source,
         });
     }
 
@@ -824,6 +887,11 @@ fn generate_context_injection(
                 memory.similarity,
                 memory.dominant_embedder
             ));
+
+            // Add source metadata if available (file path, chunk info, etc.)
+            if let Some(ref source) = memory.source {
+                injection.push_str(&format!("**{}**\n", source.display_string()));
+            }
 
             // Add content if available
             if let Some(ref content) = memory.content {

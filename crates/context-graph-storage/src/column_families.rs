@@ -257,9 +257,9 @@ pub fn get_all_column_family_descriptors(block_cache: &Cache) -> Vec<ColumnFamil
 }
 
 /// Total number of column families in a fully configured Context Graph database.
-/// Base (8) + Teleological (11) + Quantized Embedder (13) = 32
+/// Base (8) + Teleological (12) + Quantized Embedder (13) = 33
 /// PRD v6: Autonomous module removed - topics emerge from clustering, not goal hierarchies
-pub const TOTAL_COLUMN_FAMILIES: usize = 32;
+pub const TOTAL_COLUMN_FAMILIES: usize = 33;
 
 #[cfg(test)]
 mod tests {
@@ -522,11 +522,12 @@ mod tests {
     #[test]
     fn test_total_column_families_constant() {
         // Verify the constant is correct:
-        // 8 base + 11 teleological + 13 quantized = 32
+        // 8 base + 12 teleological + 13 quantized = 33
         // PRD v6: Autonomous module removed - topics emerge from clustering, not goal hierarchies
+        // Teleological: 11 original + 1 source_metadata = 12
         assert_eq!(
-            TOTAL_COLUMN_FAMILIES, 32,
-            "Total column families should be 32 (8 base + 11 teleological + 13 quantized)"
+            TOTAL_COLUMN_FAMILIES, 33,
+            "Total column families should be 33 (8 base + 12 teleological + 13 quantized)"
         );
     }
 

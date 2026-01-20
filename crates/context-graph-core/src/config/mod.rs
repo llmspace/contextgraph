@@ -15,7 +15,7 @@ use crate::error::{CoreError, CoreResult};
 // Re-export all sub-config types for backwards compatibility
 pub use sub_configs::{
     CudaConfig, EmbeddingConfig, FeatureFlags, IndexConfig, LoggingConfig, McpConfig, ServerConfig,
-    StorageConfig, UtlConfig,
+    StorageConfig, UtlConfig, WatcherConfig,
 };
 
 // Re-export embedder configuration types (TASK-L04)
@@ -52,6 +52,9 @@ pub struct Config {
     pub utl: UtlConfig,
     pub features: FeatureFlags,
     pub cuda: CudaConfig,
+    /// File watcher configuration for ./docs/ monitoring
+    #[serde(default)]
+    pub watcher: WatcherConfig,
 }
 
 impl Config {
@@ -87,6 +90,7 @@ impl Config {
             utl: UtlConfig::default(),
             features: FeatureFlags::default(),
             cuda: CudaConfig::default(),
+            watcher: WatcherConfig::default(),
         }
     }
 

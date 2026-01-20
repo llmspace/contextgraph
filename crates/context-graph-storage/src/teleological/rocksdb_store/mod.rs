@@ -38,6 +38,7 @@
 //! - `search`: Search operation implementations
 //! - `persistence`: Batch, statistics, persistence operations
 //! - `content`: Content storage operations
+//! - `source_metadata`: Source metadata storage operations
 //! - `trait_impl`: TeleologicalMemoryStore trait implementation (thin wrapper)
 //! - `tests`: Comprehensive test suite
 
@@ -48,6 +49,7 @@ mod index_ops;
 mod inverted_index;
 mod persistence;
 mod search;
+mod source_metadata;
 mod store;
 mod trait_impl;
 mod types;

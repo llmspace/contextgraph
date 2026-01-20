@@ -18,7 +18,7 @@ fn test_teleological_cf_names_count() {
         "Must have exactly {} teleological column families",
         TELEOLOGICAL_CF_COUNT
     );
-    assert_eq!(TELEOLOGICAL_CF_COUNT, 11); // 9 active + 2 legacy CFs total
+    assert_eq!(TELEOLOGICAL_CF_COUNT, 12); // 10 active + 2 legacy CFs total (includes source_metadata)
 }
 
 #[test]
@@ -166,19 +166,20 @@ fn test_descriptors_in_correct_order() {
 }
 
 #[test]
-fn test_get_all_teleological_cf_descriptors_returns_24() {
+fn test_get_all_teleological_cf_descriptors_returns_25() {
     use rocksdb::Cache;
     let cache = Cache::new_lru_cache(256 * 1024 * 1024);
     let descriptors = get_all_teleological_cf_descriptors(&cache);
 
-    // 11 teleological + 13 quantized embedder = 24
+    // 12 teleological + 13 quantized embedder = 25
     // TASK-STORAGE-P2-001: +1 for CF_E12_LATE_INTERACTION
     // TASK-CONTENT-001: +1 for CF_CONTENT
     // LEGACY-COMPAT: +2 for legacy CFs (session_identity, ego_node)
+    // FILE-WATCHER: +1 for CF_SOURCE_METADATA
     assert_eq!(
         descriptors.len(),
-        24,
-        "Must return 11 teleological + 13 quantized = 24 CFs"
+        25,
+        "Must return 12 teleological + 13 quantized = 25 CFs"
     );
 }
 

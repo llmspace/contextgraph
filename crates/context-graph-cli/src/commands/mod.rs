@@ -12,6 +12,7 @@ pub mod memory;
 pub mod session;
 pub mod setup;
 pub mod warmup;
+pub mod watch;
 
 /// Test utilities for CLI tests
 #[cfg(test)]
