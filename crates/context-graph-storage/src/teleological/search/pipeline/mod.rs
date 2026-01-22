@@ -80,7 +80,12 @@ mod tests;
 // Re-export all public types for backwards compatibility
 pub use builder::PipelineBuilder;
 pub use execution::RetrievalPipeline;
-pub use traits::{InMemorySpladeIndex, InMemoryTokenStorage, SpladeIndex, TokenStorage};
+pub use traits::{
+    // E6 sparse index types (per e6upgrade.md)
+    apply_e6_tiebreaker, compute_e6_boost, E6SparseIndex, InMemoryE6SparseIndex,
+    // Original types
+    InMemorySpladeIndex, InMemoryTokenStorage, SpladeIndex, TokenStorage,
+};
 pub use types::{
     PipelineCandidate, PipelineConfig, PipelineError, PipelineResult, PipelineStage, StageConfig,
     StageResult,

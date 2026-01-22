@@ -1,15 +1,18 @@
-//! Inverted index operations for SPLADE sparse vectors.
+//! Inverted index operations for sparse vectors (E6 and E13).
 //!
-//! Contains methods for updating and removing fingerprints from the
-//! E13 SPLADE inverted index.
+//! Contains methods for updating and removing fingerprints from:
+//! - E13 SPLADE inverted index (learned expansion)
+//! - E6 Sparse inverted index (exact keywords) - per e6upgrade.md
+//!
+//! Both indexes use the same posting list format (term_id → Vec<Uuid>).
 
 use rocksdb::WriteBatch;
 use uuid::Uuid;
 
 use context_graph_core::types::fingerprint::SparseVector;
 
-use crate::teleological::column_families::CF_E13_SPLADE_INVERTED;
-use crate::teleological::schema::e13_splade_inverted_key;
+use crate::teleological::column_families::{CF_E13_SPLADE_INVERTED, CF_E6_SPARSE_INVERTED};
+use crate::teleological::schema::{e13_splade_inverted_key, e6_sparse_inverted_key};
 use crate::teleological::serialization::{deserialize_memory_id_list, serialize_memory_id_list};
 
 use super::store::RocksDbTeleologicalStore;
@@ -86,5 +89,166 @@ impl RocksDbTeleologicalStore {
         }
 
         Ok(())
+    }
+
+    // =========================================================================
+    // E6 SPARSE INVERTED INDEX OPERATIONS (per e6upgrade.md)
+    // =========================================================================
+
+    /// Update the E6 Sparse inverted index for a fingerprint.
+    ///
+    /// For each active term in the sparse vector, adds this fingerprint's ID
+    /// to the posting list if not already present.
+    ///
+    /// # Usage
+    /// - Stage 1: Dual sparse recall with E13 (union of candidates)
+    /// - Stage 3.5: E6 tie-breaker for close E1 scores
+    pub(crate) fn update_e6_sparse_inverted_index(
+        &self,
+        batch: &mut WriteBatch,
+        id: &Uuid,
+        sparse: &SparseVector,
+    ) -> TeleologicalStoreResult<()> {
+        let cf_inverted = self.get_cf(CF_E6_SPARSE_INVERTED)?;
+
+        // For each active term, update the posting list
+        for &term_id in &sparse.indices {
+            let term_key = e6_sparse_inverted_key(term_id);
+
+            // Read existing posting list
+            let existing = self.db.get_cf(cf_inverted, term_key).map_err(|e| {
+                TeleologicalStoreError::rocksdb_op("get", CF_E6_SPARSE_INVERTED, None, e)
+            })?;
+
+            let mut ids: Vec<Uuid> = match existing {
+                Some(data) => deserialize_memory_id_list(&data),
+                None => Vec::new(),
+            };
+
+            // Add this ID if not already present
+            if !ids.contains(id) {
+                ids.push(*id);
+                let serialized = serialize_memory_id_list(&ids);
+                batch.put_cf(cf_inverted, term_key, &serialized);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Remove a fingerprint's terms from the E6 sparse inverted index.
+    ///
+    /// For each active term in the sparse vector, removes this fingerprint's ID
+    /// from the posting list. Deletes the term key if the posting list becomes empty.
+    pub(crate) fn remove_from_e6_sparse_inverted_index(
+        &self,
+        batch: &mut WriteBatch,
+        id: &Uuid,
+        sparse: &SparseVector,
+    ) -> TeleologicalStoreResult<()> {
+        let cf_inverted = self.get_cf(CF_E6_SPARSE_INVERTED)?;
+
+        for &term_id in &sparse.indices {
+            let term_key = e6_sparse_inverted_key(term_id);
+
+            let existing = self.db.get_cf(cf_inverted, term_key).map_err(|e| {
+                TeleologicalStoreError::rocksdb_op("get", CF_E6_SPARSE_INVERTED, None, e)
+            })?;
+
+            if let Some(data) = existing {
+                let mut ids: Vec<Uuid> = deserialize_memory_id_list(&data);
+                ids.retain(|&i| i != *id);
+
+                if ids.is_empty() {
+                    batch.delete_cf(cf_inverted, term_key);
+                } else {
+                    let serialized = serialize_memory_id_list(&ids);
+                    batch.put_cf(cf_inverted, term_key, &serialized);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Recall candidates from E6 sparse inverted index.
+    ///
+    /// Returns memory IDs that share at least one term with the query sparse vector.
+    /// Results are unsorted - use for Stage 1 candidate generation, not final ranking.
+    ///
+    /// # Arguments
+    /// * `query_sparse` - The query's E6 sparse vector
+    /// * `max_candidates` - Maximum number of candidates to return
+    ///
+    /// # Returns
+    /// Vector of (memory_id, term_overlap_count) tuples for scoring
+    pub fn e6_sparse_recall(
+        &self,
+        query_sparse: &SparseVector,
+        max_candidates: usize,
+    ) -> TeleologicalStoreResult<Vec<(Uuid, usize)>> {
+        use std::collections::HashMap;
+
+        let cf_inverted = self.get_cf(CF_E6_SPARSE_INVERTED)?;
+        let mut candidate_counts: HashMap<Uuid, usize> = HashMap::new();
+
+        // For each query term, fetch the posting list and count matches
+        for &term_id in &query_sparse.indices {
+            let term_key = e6_sparse_inverted_key(term_id);
+
+            let existing = self.db.get_cf(cf_inverted, term_key).map_err(|e| {
+                TeleologicalStoreError::rocksdb_op("get", CF_E6_SPARSE_INVERTED, None, e)
+            })?;
+
+            if let Some(data) = existing {
+                let ids = deserialize_memory_id_list(&data);
+                for id in ids {
+                    *candidate_counts.entry(id).or_insert(0) += 1;
+                }
+            }
+        }
+
+        // Sort by term overlap count (descending) and take top candidates
+        let mut candidates: Vec<(Uuid, usize)> = candidate_counts.into_iter().collect();
+        candidates.sort_by(|a, b| b.1.cmp(&a.1));
+        candidates.truncate(max_candidates);
+
+        Ok(candidates)
+    }
+
+    /// Get E6 term overlap score between a query and stored fingerprint.
+    ///
+    /// Returns the fraction of query terms that appear in the document.
+    /// Used for E6 tie-breaking when E1 scores are close (Stage 3.5).
+    ///
+    /// # Arguments
+    /// * `query_sparse` - The query's E6 sparse vector
+    /// * `doc_sparse` - The document's E6 sparse vector
+    ///
+    /// # Returns
+    /// Score in [0.0, 1.0] representing query term coverage
+    pub fn e6_term_overlap_score(query_sparse: &SparseVector, doc_sparse: &SparseVector) -> f32 {
+        if query_sparse.indices.is_empty() {
+            return 0.0;
+        }
+
+        // Count shared terms using merge-join (both vectors are sorted by term_id)
+        let mut shared = 0usize;
+        let mut i = 0;
+        let mut j = 0;
+
+        while i < query_sparse.indices.len() && j < doc_sparse.indices.len() {
+            match query_sparse.indices[i].cmp(&doc_sparse.indices[j]) {
+                std::cmp::Ordering::Less => i += 1,
+                std::cmp::Ordering::Greater => j += 1,
+                std::cmp::Ordering::Equal => {
+                    shared += 1;
+                    i += 1;
+                    j += 1;
+                }
+            }
+        }
+
+        shared as f32 / query_sparse.indices.len() as f32
     }
 }

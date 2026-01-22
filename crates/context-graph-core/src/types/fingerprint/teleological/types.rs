@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::types::fingerprint::SemanticFingerprint;
+use crate::types::fingerprint::{SemanticFingerprint, SparseVector};
 
 /// Complete teleological fingerprint for a memory node.
 ///
@@ -14,7 +14,17 @@ use crate::types::fingerprint::SemanticFingerprint;
 /// and retrieval.
 ///
 /// From constitution.yaml:
-/// - Expected size: ~46KB per node
+/// - Expected size: ~46KB per node (+ ~2KB if e6_sparse is present)
+///
+/// # E6 Sparse Vector
+///
+/// The optional `e6_sparse` field stores the original sparse vector from E6
+/// (V_selectivity) embedder before projection to dense. This enables:
+/// - Stage 1 sparse recall via inverted index
+/// - Exact keyword matching for technical queries
+/// - E6 tie-breaking when E1 scores are close
+///
+/// See docs/e6upgrade.md for the full E6 enhancement proposal.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TeleologicalFingerprint {
     /// Unique identifier for this fingerprint (UUID v4)
@@ -39,4 +49,15 @@ pub struct TeleologicalFingerprint {
     /// Used by consolidation, boost_importance, and dream phases.
     /// Default: 0.5
     pub importance: f32,
+
+    /// Original E6 sparse vector for Stage 1 recall and keyword matching.
+    ///
+    /// This field is optional for backward compatibility with existing fingerprints.
+    /// New fingerprints should populate this during embedding generation.
+    ///
+    /// - Typical size: ~235 active terms (~1.4KB)
+    /// - Used for: inverted index recall, exact term matching, tie-breaking
+    /// - NOT used for: semantic similarity (use projected dense in `semantic`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub e6_sparse: Option<SparseVector>,
 }

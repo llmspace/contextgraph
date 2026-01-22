@@ -73,6 +73,9 @@ pub use column_families::{
     // TASK-STORAGE-P2-001: E12 Late Interaction column family constant
     CF_E12_LATE_INTERACTION,
     CF_E13_SPLADE_INVERTED,
+    // E6 sparse inverted index for dual Stage 1 recall (e6upgrade.md)
+    CF_E6_SPARSE_INVERTED,
+    e6_sparse_inverted_cf_options,
     CF_E1_MATRYOSHKA_128,
     CF_EMB_0,
     CF_EMB_1,
@@ -105,6 +108,9 @@ pub use quantized::{QuantizedFingerprintStorage, QuantizedStorageError, Quantize
 // Re-export schema types
 pub use schema::{
     e13_splade_inverted_key,
+    // E6 sparse inverted index key functions (e6upgrade.md)
+    e6_sparse_inverted_key,
+    parse_e6_sparse_key,
     e1_matryoshka_128_key,
     fingerprint_key,
     parse_e13_splade_key,

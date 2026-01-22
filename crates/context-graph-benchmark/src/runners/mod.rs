@@ -8,6 +8,7 @@ pub mod comparative;
 pub mod failfast;
 pub mod retrieval;
 pub mod scaling;
+pub mod sparse;
 pub mod temporal;
 pub mod temporal_realdata;
 pub mod topic;
@@ -20,6 +21,10 @@ pub use causal::{
 pub use comparative::{BenchmarkHarness, BenchmarkResults, ComparativeResults};
 pub use retrieval::RetrievalRunner;
 pub use scaling::ScalingRunner;
+pub use sparse::{
+    E6BenchmarkTimings, E6DatasetStats, E6SparseBenchmarkConfig, E6SparseBenchmarkResults,
+    E6SparseBenchmarkRunner, ThresholdMetrics, ThresholdSweepResults,
+};
 pub use temporal::{
     TemporalBenchmarkConfig, TemporalBenchmarkResults, TemporalBenchmarkRunner,
     // Mode-specific benchmark functions

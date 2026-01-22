@@ -6,6 +6,7 @@
 pub mod causal;
 pub mod generator;
 pub mod ground_truth;
+pub mod sparse;
 pub mod temporal;
 pub mod temporal_sessions;
 pub mod topic_clusters;
@@ -13,6 +14,10 @@ pub mod topic_clusters;
 pub use causal::{CausalBenchmarkDataset, CausalDatasetConfig, CausalDatasetGenerator, CausalDomain};
 pub use generator::{DatasetGenerator, GeneratorConfig};
 pub use ground_truth::GroundTruth;
+pub use sparse::{
+    E6SparseBenchmarkDataset, E6SparseDatasetConfig, E6SparseDatasetGenerator,
+    E6SparseDatasetStats, KeywordDomain, SparseDocument, SparseQuery,
+};
 pub use temporal::{TemporalBenchmarkDataset, TemporalDatasetConfig, TemporalDatasetGenerator};
 pub use temporal_sessions::{
     BoundaryQuery, ChainQuery, DirectionQuery, SequenceDirection, SequenceGroundTruth,

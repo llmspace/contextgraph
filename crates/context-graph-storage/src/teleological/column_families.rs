@@ -31,6 +31,19 @@ pub const CF_TOPIC_PROFILES: &str = "topic_profiles";
 /// SPLADE vocabulary size: 30,522 terms (per semantic.rs E13_SPLADE_VOCAB)
 pub const CF_E13_SPLADE_INVERTED: &str = "e13_splade_inverted";
 
+/// Column family for E6 Sparse (V_selectivity) inverted index.
+///
+/// Enables fast exact keyword matching for Stage 1 dual recall (per e6upgrade.md).
+/// Key: term_id (u16, 2 bytes) → Value: Vec<Uuid> (memory IDs with that term)
+///
+/// E6 vocabulary size: 30,522 terms (BERT tokenizer, same as E13)
+/// Typical active terms per doc: ~235 (0.77% sparsity)
+///
+/// # Usage
+/// - Stage 1: Co-pilot with E13 for dual sparse recall
+/// - Stage 3.5: Tie-breaker when E1 scores are close
+pub const CF_E6_SPARSE_INVERTED: &str = "e6_sparse_inverted";
+
 /// Column family for E1 Matryoshka 128D truncated vectors.
 ///
 /// Enables fast approximate search using truncated E1 embeddings.
@@ -165,11 +178,12 @@ pub const CF_SESSION_IDENTITY: &str = "session_identity";
 /// It is no longer used but must be opened for databases created with older versions.
 pub const CF_EGO_NODE: &str = "ego_node";
 
-/// All teleological column family names (14 total: 4 original + 3 teleological + 1 content + 1 source_metadata + 1 file_index + 1 topic_portfolio + 1 e12_late_interaction + 2 legacy).
+/// All teleological column family names (15 total: 5 original + 3 teleological + 1 content + 1 source_metadata + 1 file_index + 1 topic_portfolio + 1 e12_late_interaction + 2 legacy).
 pub const TELEOLOGICAL_CFS: &[&str] = &[
     CF_FINGERPRINTS,
     CF_TOPIC_PROFILES,
     CF_E13_SPLADE_INVERTED,
+    CF_E6_SPARSE_INVERTED, // E6 inverted index for dual Stage 1 recall (e6upgrade.md)
     CF_E1_MATRYOSHKA_128,
     // TASK-TELEO-006: New teleological vector CFs
     CF_SYNERGY_MATRIX,
@@ -190,8 +204,8 @@ pub const TELEOLOGICAL_CFS: &[&str] = &[
     CF_EGO_NODE,
 ];
 
-/// Total count of teleological CFs (should be 14: 12 active + 2 legacy).
-pub const TELEOLOGICAL_CF_COUNT: usize = 14;
+/// Total count of teleological CFs (should be 15: 13 active + 2 legacy).
+pub const TELEOLOGICAL_CF_COUNT: usize = 15;
 
 // =============================================================================
 // QUANTIZED EMBEDDER COLUMN FAMILIES (13 CFs for per-embedder storage)
@@ -324,6 +338,32 @@ pub fn topic_profile_cf_options(cache: &Cache) -> Options {
 /// - Bloom filter on term_id
 /// - Suitable for both point and range queries
 pub fn e13_splade_inverted_cf_options(cache: &Cache) -> Options {
+    let mut block_opts = BlockBasedOptions::default();
+    block_opts.set_block_cache(cache);
+    block_opts.set_bloom_filter(10.0, false);
+    block_opts.set_cache_index_and_filter_blocks(true);
+
+    let mut opts = Options::default();
+    opts.set_block_based_table_factory(&block_opts);
+    opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    opts.create_if_missing(true);
+    opts
+}
+
+/// Options for E6 Sparse (V_selectivity) inverted index.
+///
+/// Configuration (same as E13 SPLADE inverted):
+/// - LZ4 compression (posting lists can be large)
+/// - Bloom filter on term_id for fast lookups
+/// - Suitable for both point and range queries
+///
+/// # Usage
+/// - Stage 1: Dual sparse recall with E13 (union of candidates)
+/// - Stage 3.5: E6 tie-breaker for close E1 scores
+///
+/// # FAIL FAST Policy
+/// No fallback options - let RocksDB error on open if misconfigured.
+pub fn e6_sparse_inverted_cf_options(cache: &Cache) -> Options {
     let mut block_opts = BlockBasedOptions::default();
     block_opts.set_block_cache(cache);
     block_opts.set_bloom_filter(10.0, false);
@@ -646,15 +686,15 @@ pub fn quantized_embedder_cf_options(cache: &Cache) -> Options {
     opts
 }
 
-/// Get all 14 teleological column family descriptors.
+/// Get all 15 teleological column family descriptors.
 ///
-/// Returns 14 descriptors: 4 original + 3 teleological + 1 content + 1 source_metadata + 1 file_index + 1 topic_portfolio + 1 e12_late_interaction + 2 legacy.
+/// Returns 15 descriptors: 5 original + 3 teleological + 1 content + 1 source_metadata + 1 file_index + 1 topic_portfolio + 1 e12_late_interaction + 2 legacy.
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 14 `ColumnFamilyDescriptor`s for teleological storage.
+/// Vector of 15 `ColumnFamilyDescriptor`s for teleological storage.
 ///
 /// # Example
 /// ```ignore
@@ -663,7 +703,7 @@ pub fn quantized_embedder_cf_options(cache: &Cache) -> Options {
 ///
 /// let cache = Cache::new_lru_cache(256 * 1024 * 1024); // 256MB
 /// let descriptors = get_teleological_cf_descriptors(&cache);
-/// assert_eq!(descriptors.len(), 14);
+/// assert_eq!(descriptors.len(), 15);
 /// ```
 pub fn get_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     vec![
@@ -672,6 +712,10 @@ pub fn get_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescrip
         ColumnFamilyDescriptor::new(
             CF_E13_SPLADE_INVERTED,
             e13_splade_inverted_cf_options(cache),
+        ),
+        ColumnFamilyDescriptor::new(
+            CF_E6_SPARSE_INVERTED,
+            e6_sparse_inverted_cf_options(cache),
         ),
         ColumnFamilyDescriptor::new(CF_E1_MATRYOSHKA_128, e1_matryoshka_128_cf_options(cache)),
         // TASK-TELEO-006: New teleological vector CFs
@@ -732,14 +776,14 @@ pub fn get_quantized_embedder_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyD
 
 /// Get ALL teleological + quantized embedder column family descriptors.
 ///
-/// Returns 27 descriptors total: 14 teleological (12 active + 2 legacy) + 13 quantized embedder.
+/// Returns 28 descriptors total: 15 teleological (13 active + 2 legacy) + 13 quantized embedder.
 /// Use this when opening a database that needs both fingerprint and per-embedder storage.
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 27 `ColumnFamilyDescriptor`s.
+/// Vector of 28 `ColumnFamilyDescriptor`s.
 ///
 /// # Example
 /// ```ignore
@@ -748,7 +792,7 @@ pub fn get_quantized_embedder_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyD
 ///
 /// let cache = Cache::new_lru_cache(256 * 1024 * 1024); // 256MB
 /// let descriptors = get_all_teleological_cf_descriptors(&cache);
-/// assert_eq!(descriptors.len(), 27); // 14 teleological + 13 embedder
+/// assert_eq!(descriptors.len(), 28); // 15 teleological + 13 embedder
 /// ```
 pub fn get_all_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     let mut descriptors = get_teleological_cf_descriptors(cache);

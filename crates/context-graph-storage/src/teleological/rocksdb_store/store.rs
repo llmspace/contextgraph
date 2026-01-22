@@ -682,6 +682,17 @@ impl RocksDbTeleologicalStore {
         // 4. Update E13 SPLADE inverted index
         self.update_splade_inverted_index(&mut batch, &id, &fp.semantic.e13_splade)?;
 
+        // 4b. Update E6 sparse inverted index (if e6_sparse is present)
+        // Per e6upgrade.md: E6 sparse enables Stage 1 dual recall and Stage 3.5 tie-breaker
+        if let Some(e6_sparse) = &fp.e6_sparse {
+            self.update_e6_sparse_inverted_index(&mut batch, &id, e6_sparse)?;
+            debug!(
+                "Updated E6 sparse inverted index for fingerprint {} ({} active terms)",
+                id,
+                e6_sparse.indices.len()
+            );
+        }
+
         // 5. Store E12 late interaction tokens
         if !fp.semantic.e12_late_interaction.is_empty() {
             let cf_e12 = self.get_cf(CF_E12_LATE_INTERACTION)?;

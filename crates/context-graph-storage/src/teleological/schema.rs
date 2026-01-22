@@ -68,6 +68,45 @@ pub fn e13_splade_inverted_key(term_id: u16) -> [u8; 2] {
     term_id.to_be_bytes()
 }
 
+/// Key for e6_sparse_inverted CF: term_id as 2 bytes (big-endian).
+///
+/// Used for E6 (V_selectivity) sparse inverted index to enable:
+/// - Stage 1: Dual sparse recall with E13 SPLADE
+/// - Stage 3.5: Tie-breaker for close E1 scores
+///
+/// # Arguments
+/// * `term_id` - The BERT vocabulary term index (0..30522, same vocab as E13)
+///
+/// # Returns
+/// Exactly 2 bytes (u16 in big-endian format)
+#[inline]
+pub fn e6_sparse_inverted_key(term_id: u16) -> [u8; 2] {
+    term_id.to_be_bytes()
+}
+
+/// Parse E6 sparse inverted key back to term_id.
+///
+/// # Arguments
+/// * `key` - Exactly 2 bytes
+///
+/// # Returns
+/// The parsed term_id (u16)
+///
+/// # Panics
+/// Panics if key is not exactly 2 bytes (FAIL FAST).
+#[inline]
+pub fn parse_e6_sparse_key(key: &[u8]) -> u16 {
+    if key.len() != 2 {
+        panic!(
+            "STORAGE ERROR: e6_sparse key must be 2 bytes, got {} bytes. \
+             Key data: {:02x?}. This indicates corrupted storage or wrong CF access.",
+            key.len(),
+            key
+        );
+    }
+    u16::from_be_bytes([key[0], key[1]])
+}
+
 /// Key for e1_matryoshka_128 CF: UUID as 16 bytes.
 ///
 /// # Arguments

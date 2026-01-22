@@ -15,6 +15,7 @@ pub mod clustering;
 pub mod divergence;
 pub mod performance;
 pub mod retrieval;
+pub mod sparse;
 pub mod temporal;
 pub mod temporal_realdata;
 pub mod validation;
@@ -24,6 +25,10 @@ pub use clustering::ClusteringMetrics;
 pub use divergence::DivergenceMetrics;
 pub use performance::PerformanceMetrics;
 pub use retrieval::RetrievalMetrics;
+pub use sparse::{
+    E6AblationMetrics, E6SparseMetrics, KeywordPrecisionMetrics, KeywordQueryResult,
+    RetrievalQualityMetrics, SparsityAnalysisMetrics, SparseVectorStats,
+};
 pub use temporal::TemporalMetrics;
 pub use temporal_realdata::TemporalRealdataMetrics;
 pub use validation::{

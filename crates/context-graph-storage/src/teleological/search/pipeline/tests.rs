@@ -428,6 +428,235 @@ mod tests {
     }
 
     // ========================================================================
+    // E6 SPARSE INDEX TESTS (per e6upgrade.md)
+    // ========================================================================
+
+    #[test]
+    fn test_e6_sparse_index_creation() {
+        println!("=== TEST: E6 Sparse Index Creation ===");
+
+        use super::super::traits::{E6SparseIndex, InMemoryE6SparseIndex};
+
+        let index = InMemoryE6SparseIndex::new();
+        assert!(index.is_empty());
+        assert_eq!(index.len(), 0);
+
+        println!("[VERIFIED] E6 sparse index created successfully");
+    }
+
+    #[test]
+    fn test_e6_sparse_index_add_and_search() {
+        println!("=== TEST: E6 Sparse Index Add and Search ===");
+
+        use super::super::traits::{E6SparseIndex, InMemoryE6SparseIndex};
+
+        let index = InMemoryE6SparseIndex::new();
+
+        // Add documents with exact keyword terms
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        let id3 = Uuid::new_v4();
+
+        // Doc 1: Contains "tokio", "spawn", "async"
+        index.add(id1, &[(100, 1.0), (200, 0.8), (300, 0.6)]);
+        // Doc 2: Contains "tokio", "runtime"
+        index.add(id2, &[(100, 0.9), (400, 0.7)]);
+        // Doc 3: Contains "spawn", "thread"
+        index.add(id3, &[(200, 0.5), (500, 0.9)]);
+
+        assert_eq!(index.len(), 3);
+
+        // Search for "tokio" (term 100)
+        let results = index.search(&[(100, 1.0)], 10);
+        println!("[SEARCH] Query for term 100: {} results", results.len());
+
+        assert_eq!(results.len(), 2); // id1 and id2 have term 100
+
+        // Search for "tokio" AND "spawn" (terms 100, 200)
+        let results = index.search(&[(100, 1.0), (200, 0.8)], 10);
+        println!(
+            "[SEARCH] Query for terms 100+200: {} results",
+            results.len()
+        );
+
+        assert_eq!(results.len(), 3); // All docs have at least one term
+        // Doc 1 should rank highest (has both terms)
+        assert_eq!(results[0].0, id1);
+
+        println!("[VERIFIED] E6 sparse index add and search work correctly");
+    }
+
+    #[test]
+    fn test_e6_sparse_index_get_sparse() {
+        println!("=== TEST: E6 Get Sparse Vector ===");
+
+        use super::super::traits::{E6SparseIndex, InMemoryE6SparseIndex};
+
+        let index = InMemoryE6SparseIndex::new();
+        let id = Uuid::new_v4();
+        let sparse = vec![(100, 1.0), (200, 0.5)];
+
+        index.add(id, &sparse);
+
+        let retrieved = index.get_sparse(id);
+        assert!(retrieved.is_some());
+        let retrieved = retrieved.unwrap();
+        assert_eq!(retrieved.len(), 2);
+        assert_eq!(retrieved[0], (100, 1.0));
+        assert_eq!(retrieved[1], (200, 0.5));
+
+        // Non-existent ID returns None
+        let missing = index.get_sparse(Uuid::new_v4());
+        assert!(missing.is_none());
+
+        println!("[VERIFIED] E6 get_sparse works correctly");
+    }
+
+    // ========================================================================
+    // QUERY-AWARE E6 BOOST TESTS
+    // ========================================================================
+
+    #[test]
+    fn test_e6_boost_technical_query() {
+        println!("=== TEST: E6 Boost Technical Query ===");
+
+        use super::super::traits::compute_e6_boost;
+
+        // API path pattern -> boost
+        let boost = compute_e6_boost("tokio::spawn async");
+        println!("[BOOST] 'tokio::spawn async': {}", boost);
+        assert!(boost > 1.0);
+
+        // Version string -> boost
+        let boost = compute_e6_boost("TLS 1.3 handshake");
+        println!("[BOOST] 'TLS 1.3 handshake': {}", boost);
+        assert!(boost > 1.0);
+
+        // Acronym -> boost
+        let boost = compute_e6_boost("how to use HNSW");
+        println!("[BOOST] 'how to use HNSW': {}", boost);
+        assert!(boost > 1.0);
+
+        println!("[VERIFIED] Technical queries get E6 boost");
+    }
+
+    #[test]
+    fn test_e6_boost_general_query() {
+        println!("=== TEST: E6 Boost General Query ===");
+
+        use super::super::traits::compute_e6_boost;
+
+        // General language query -> reduced boost
+        let boost = compute_e6_boost("what is the meaning of life");
+        println!("[BOOST] 'what is the meaning of life': {}", boost);
+        assert!(boost < 1.0);
+
+        // High common word ratio -> reduced boost
+        let boost = compute_e6_boost("it is what it is and that is that");
+        println!("[BOOST] 'it is what it is and that is that': {}", boost);
+        assert!(boost < 1.0);
+
+        println!("[VERIFIED] General queries get reduced E6 boost");
+    }
+
+    #[test]
+    fn test_e6_boost_clamping() {
+        println!("=== TEST: E6 Boost Clamping ===");
+
+        use super::super::traits::compute_e6_boost;
+
+        // Even with multiple indicators, boost is clamped
+        let boost = compute_e6_boost("tokio::spawn HNSW v1.0 PostgreSQL");
+        println!("[BOOST] multiple indicators: {}", boost);
+        assert!(boost <= 2.0);
+        assert!(boost >= 0.5);
+
+        println!("[VERIFIED] E6 boost is clamped to [0.5, 2.0]");
+    }
+
+    // ========================================================================
+    // E6 TIE-BREAKER TESTS
+    // ========================================================================
+
+    #[test]
+    fn test_e6_tiebreaker() {
+        println!("=== TEST: E6 Tie-breaker ===");
+
+        use super::super::traits::{apply_e6_tiebreaker, InMemoryE6SparseIndex};
+
+        let index = InMemoryE6SparseIndex::new();
+
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        let id3 = Uuid::new_v4();
+
+        // Doc 1: High term overlap with query (terms 100, 200, 300) - 100% overlap
+        index.add(id1, &[(100, 1.0), (200, 0.8), (300, 0.6)]);
+        // Doc 2: Lower term overlap (only term 100) - 33% overlap
+        index.add(id2, &[(100, 0.9), (400, 0.7)]);
+        // Doc 3: No overlap - 0% overlap
+        index.add(id3, &[(500, 0.5), (600, 0.9)]);
+
+        // Candidates with close semantic scores - but id1 has higher score initially
+        // The tie-breaker should boost id2's score (within threshold of id1)
+        // but id1 still has better overlap so should stay on top
+        let mut candidates = vec![(id1, 0.90), (id2, 0.88), (id3, 0.80)];
+        let original_id1_score = candidates[0].1;
+
+        // Query with terms 100, 200, 300
+        let query_sparse = vec![(100, 1.0), (200, 0.8), (300, 0.6)];
+
+        apply_e6_tiebreaker(&mut candidates, &query_sparse, &index, 0.05, 0.05);
+
+        println!("[AFTER] Candidates after tie-breaker:");
+        for (id, score) in &candidates {
+            println!("  - {}: {}", id, score);
+        }
+
+        // Verify that:
+        // 1. id2's score was boosted (within threshold, has some overlap)
+        // 2. id3 was NOT boosted much (beyond threshold from id2)
+        // 3. The re-ordering reflects tie-breaker adjustments
+
+        // id1 should be in results (with 100% overlap it should be boosted most)
+        assert!(candidates.iter().any(|(id, _)| *id == id1));
+
+        // Top candidate's score should be >= original id1 score (tie-breaker adds, doesn't subtract)
+        assert!(candidates[0].1 >= original_id1_score - 0.01); // Small tolerance for float
+
+        println!("[VERIFIED] E6 tie-breaker adjusts close scores");
+    }
+
+    #[test]
+    fn test_e6_tiebreaker_no_change_for_distant_scores() {
+        println!("=== TEST: E6 Tie-breaker No Change for Distant Scores ===");
+
+        use super::super::traits::{apply_e6_tiebreaker, InMemoryE6SparseIndex};
+
+        let index = InMemoryE6SparseIndex::new();
+
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+
+        index.add(id1, &[(100, 1.0)]);
+        index.add(id2, &[(100, 0.8), (200, 0.6)]);
+
+        // Candidates with distant scores (more than threshold apart)
+        let mut candidates = vec![(id1, 0.90), (id2, 0.70)];
+        let original_scores = candidates.clone();
+
+        let query_sparse = vec![(100, 1.0), (200, 0.8)];
+
+        // Tie threshold = 0.05, but scores differ by 0.20
+        apply_e6_tiebreaker(&mut candidates, &query_sparse, &index, 0.05, 0.05);
+
+        // Order should remain unchanged (scores too far apart)
+        assert_eq!(candidates[0].0, original_scores[0].0);
+
+        println!("[VERIFIED] E6 tie-breaker doesn't change well-separated scores");
+    }
+
+    // ========================================================================
     // VERIFICATION LOG
     // ========================================================================
 

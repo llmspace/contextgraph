@@ -78,11 +78,20 @@ impl RocksDbTeleologicalStore {
             return Ok(false);
         }
 
-        // If updating, we need to remove old terms from inverted index first
+        // If updating, we need to remove old terms from inverted indexes first
         if let Some(old_data) = existing {
             let old_fp = deserialize_teleological_fingerprint(&old_data);
             let mut batch = WriteBatch::default();
+
+            // Remove from E13 SPLADE inverted index
             self.remove_from_splade_inverted_index(&mut batch, &id, &old_fp.semantic.e13_splade)?;
+
+            // Remove from E6 sparse inverted index (if present)
+            // Per e6upgrade.md: must remove old terms before adding new ones
+            if let Some(old_e6_sparse) = &old_fp.e6_sparse {
+                self.remove_from_e6_sparse_inverted_index(&mut batch, &id, old_e6_sparse)?;
+            }
+
             self.db.write(batch).map_err(|e| {
                 TeleologicalStoreError::rocksdb_op(
                     "write_batch",
@@ -140,8 +149,14 @@ impl RocksDbTeleologicalStore {
             let cf_mat = self.get_cf(CF_E1_MATRYOSHKA_128)?;
             batch.delete_cf(cf_mat, e1_matryoshka_128_key(&id));
 
-            // Remove from inverted index
+            // Remove from E13 SPLADE inverted index
             self.remove_from_splade_inverted_index(&mut batch, &id, &old_fp.semantic.e13_splade)?;
+
+            // Remove from E6 sparse inverted index (if present)
+            // Per e6upgrade.md: clean up E6 terms on delete
+            if let Some(e6_sparse) = &old_fp.e6_sparse {
+                self.remove_from_e6_sparse_inverted_index(&mut batch, &id, e6_sparse)?;
+            }
 
             // Remove content (TASK-CONTENT-009: cascade content deletion)
             let cf_content = self.cf_content();

@@ -50,6 +50,9 @@ md5 = "0.7"
 # Optional: Real embeddings (GPU required)
 context-graph-embeddings = { path = "../context-graph-embeddings", optional = true }
 
+# CLI parsing
+clap = { version = "4.5", features = ["derive", "env"] }
+
 # Criterion for benchmarking
 criterion = { version = "0.5", features = ["html_reports"] }
 
@@ -109,3 +112,7 @@ path = "src/bin/temporal_realdata_bench.rs"
 [[bin]]
 name = "validation-bench"
 path = "src/bin/validation_bench.rs"
+
+[[bin]]
+name = "sparse-bench"
+path = "src/bin/sparse_bench.rs"

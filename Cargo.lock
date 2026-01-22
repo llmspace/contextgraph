@@ -699,6 +699,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "clap",
  "context-graph-core",
  "context-graph-embeddings",
  "context-graph-mcp",

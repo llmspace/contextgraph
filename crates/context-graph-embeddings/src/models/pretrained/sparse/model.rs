@@ -399,6 +399,145 @@ impl SparseModel {
     pub fn model_id(&self) -> ModelId {
         self.model_id
     }
+
+    /// Embed input and return BOTH sparse and dense vectors.
+    ///
+    /// This method supports the E6 upgrade proposal (docs/e6upgrade.md) by returning:
+    /// 1. The original sparse vector for Stage 1 inverted index recall
+    /// 2. The projected dense vector for Stage 3 multi-space fusion
+    ///
+    /// # Pipeline
+    /// 1. Forward through BERT + MLM head -> SparseVector (30522D)
+    /// 2. Project sparse -> dense via learned ProjectionMatrix (1536D)
+    /// 3. Return both vectors for dual storage in TeleologicalFingerprint
+    ///
+    /// # Returns
+    /// `DualEmbedding` containing both sparse and dense representations
+    ///
+    /// # Errors
+    /// - `NotInitialized` - Model not loaded
+    /// - `UnsupportedModality` - Input is not text
+    /// - `GpuError` - GPU operation failed
+    pub async fn embed_dual(&self, input: &ModelInput) -> EmbeddingResult<DualEmbedding> {
+        if !self.is_initialized() {
+            return Err(EmbeddingError::NotInitialized {
+                model_id: self.model_id(),
+            });
+        }
+
+        self.validate_input(input)?;
+        let text = extract_text(input)?;
+
+        let state = self
+            .model_state
+            .read()
+            .map_err(|e| EmbeddingError::InternalError {
+                message: format!("SparseModel failed to acquire read lock: {}", e),
+            })?;
+
+        match &*state {
+            ModelState::Loaded {
+                weights,
+                tokenizer,
+                mlm_head,
+                projection,
+            } => {
+                let start = Instant::now();
+
+                // Step 1: Forward through BERT + MLM head to get sparse vector
+                let sparse_vector = gpu_forward_sparse(&text, weights, tokenizer, mlm_head)?;
+
+                tracing::debug!(
+                    "Sparse vector: {} non-zero elements, sparsity={:.2}%",
+                    sparse_vector.nnz(),
+                    sparse_vector.sparsity() * 100.0
+                );
+
+                // Step 2: Project sparse (30522D) -> dense (1536D)
+                let dense_vector =
+                    projection
+                        .project(&sparse_vector)
+                        .map_err(|e| EmbeddingError::GpuError {
+                            message: format!("Sparse projection failed: {}", e),
+                        })?;
+
+                let latency_us = start.elapsed().as_micros() as u64;
+
+                tracing::debug!(
+                    "Dual embedding: sparse={}D ({}nnz), dense={}D in {}us",
+                    sparse_vector.dimension,
+                    sparse_vector.nnz(),
+                    dense_vector.len(),
+                    latency_us
+                );
+
+                // Step 3: Return both vectors
+                Ok(DualEmbedding {
+                    sparse: sparse_vector,
+                    dense: ModelEmbedding {
+                        model_id: self.model_id,
+                        vector: dense_vector,
+                        latency_us,
+                        attention_weights: None,
+                        is_projected: true,
+                    },
+                })
+            }
+            _ => Err(EmbeddingError::NotInitialized {
+                model_id: self.model_id,
+            }),
+        }
+    }
+}
+
+/// Result of dual embedding containing both sparse and dense representations.
+///
+/// This type supports the E6 upgrade proposal by providing both:
+/// - Original sparse vector for Stage 1 inverted index recall
+/// - Projected dense vector for Stage 3 multi-space fusion
+#[derive(Debug, Clone)]
+pub struct DualEmbedding {
+    /// Original sparse vector (30522D, ~235 active terms).
+    /// Use for inverted index storage and exact keyword matching.
+    pub sparse: SparseVector,
+
+    /// Projected dense vector (1536D).
+    /// Use for HNSW indexing and multi-space fusion.
+    pub dense: ModelEmbedding,
+}
+
+impl DualEmbedding {
+    /// Convert the embeddings SparseVector to context-graph-core SparseVector.
+    ///
+    /// This converts from the embeddings crate format (indices: Vec<usize>)
+    /// to the core crate format (indices: Vec<u16>) for storage in
+    /// TeleologicalFingerprint.e6_sparse.
+    ///
+    /// # Returns
+    /// The sparse vector in context-graph-core format, ready for storage.
+    ///
+    /// # Panics
+    /// Debug builds will panic if any index > u16::MAX (should never happen
+    /// since SPLADE vocab is 30522 < 65535).
+    pub fn to_core_sparse(&self) -> context_graph_core::types::fingerprint::SparseVector {
+        // Convert indices from usize to u16 (SPLADE vocab 30522 fits in u16)
+        let indices: Vec<u16> = self
+            .sparse
+            .indices
+            .iter()
+            .map(|&i| {
+                debug_assert!(i <= u16::MAX as usize, "Index {} exceeds u16::MAX", i);
+                i as u16
+            })
+            .collect();
+
+        // Use weights as values (same semantics, different field name)
+        let values = self.sparse.weights.clone();
+
+        // Use the constructor which validates sorting and bounds
+        context_graph_core::types::fingerprint::SparseVector::new(indices, values)
+            .expect("SparseVector conversion failed - indices should already be valid")
+    }
 }
 
 // Implement Send and Sync manually since RwLock is involved
