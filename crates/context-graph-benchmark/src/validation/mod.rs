@@ -31,6 +31,7 @@ pub mod asymmetric_validation;
 pub mod ablation_validation;
 pub mod e1_foundation;
 pub mod fusion_validation;
+pub mod results_aggregator;
 
 pub use config_validation::{ConfigValidator, ConfigValidationResult};
 pub use temporal_validation::{TemporalValidator, TemporalValidationResult};
@@ -40,6 +41,7 @@ pub use asymmetric_validation::{AsymmetricValidator, AsymmetricValidationResult}
 pub use ablation_validation::{AblationValidator, AblationValidationResult};
 pub use e1_foundation::{E1FoundationValidator, E1FoundationResult};
 pub use fusion_validation::{FusionValidator, FusionValidationResult};
+pub use results_aggregator::{BenchmarkResultsAggregator, AggregatedResults};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -216,6 +218,13 @@ impl ValidationCheck {
 
     pub fn warning(mut self, actual: &str, expected: &str) -> Self {
         self.status = ValidationStatus::Warning;
+        self.actual = actual.to_string();
+        self.expected = expected.to_string();
+        self
+    }
+
+    pub fn skip(mut self, actual: &str, expected: &str) -> Self {
+        self.status = ValidationStatus::Skip;
         self.actual = actual.to_string();
         self.expected = expected.to_string();
         self

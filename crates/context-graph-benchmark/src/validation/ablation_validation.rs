@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use crate::realdata::config::EmbedderName;
 use crate::realdata::results::AblationResults;
 use super::{ValidationCheck, CheckPriority, PhaseResult, ValidationPhase, Recommendation, RecommendationCategory};
+use super::results_aggregator::AggregatedResults;
 
 /// Ablation validation results.
 #[derive(Debug, Clone)]
@@ -27,6 +28,21 @@ pub struct AblationValidationResult {
     pub redundant_embedders: Vec<EmbedderName>,
     /// Recommendations.
     pub recommendations: Vec<Recommendation>,
+    /// Measured contribution data from benchmark results.
+    pub measured_contributions: Option<MeasuredContributions>,
+}
+
+/// Measured contribution data from benchmark results.
+#[derive(Debug, Clone, Default)]
+pub struct MeasuredContributions {
+    /// E5 causal contribution percentage.
+    pub e5_contribution: Option<f64>,
+    /// E7 code contribution percentage.
+    pub e7_contribution: Option<f64>,
+    /// E8 graph contribution percentage.
+    pub e8_contribution: Option<f64>,
+    /// E10 multimodal contribution percentage.
+    pub e10_contribution: Option<f64>,
 }
 
 /// Impact metrics for a single embedder.
@@ -52,7 +68,26 @@ pub struct AblationValidator;
 
 impl AblationValidator {
     /// Run all ablation validation checks.
-    pub fn validate(ablation_results: Option<&AblationResults>) -> AblationValidationResult {
+    pub fn validate(
+        ablation_results: Option<&AblationResults>,
+        aggregated: Option<&AggregatedResults>,
+    ) -> AblationValidationResult {
+        // Extract measured contributions from aggregated results
+        let measured = aggregated.map(|agg| {
+            let mut contributions = MeasuredContributions::default();
+            if let Some(causal) = &agg.causal {
+                // Use e5_asymmetric_accuracy as the contribution metric (how well E5 performs)
+                contributions.e5_contribution = Some(causal.e5_asymmetric_accuracy);
+            }
+            if let Some(graph) = &agg.graph {
+                contributions.e8_contribution = Some(graph.e8_contribution);
+            }
+            if let Some(multimodal) = &agg.multimodal {
+                contributions.e10_contribution = Some(multimodal.e10_contribution_pct);
+            }
+            contributions
+        });
+
         let mut result = AblationValidationResult {
             all_passed: true,
             checks: Vec::new(),
@@ -60,6 +95,7 @@ impl AblationValidator {
             critical_embedders: Vec::new(),
             redundant_embedders: Vec::new(),
             recommendations: Vec::new(),
+            measured_contributions: measured.clone(),
         };
 
         // Test 1: E1 foundation check (design)
@@ -141,6 +177,27 @@ impl AblationValidator {
                     // This is a warning, not failure
                     result.checks.push(check);
                 }
+            }
+        }
+
+        // Test measured contributions if available
+        if let Some(contributions) = &result.measured_contributions {
+            // Test E5 causal contribution
+            if let Some(e5_contrib) = contributions.e5_contribution {
+                let check = Self::test_measured_contribution(EmbedderName::E5Causal, e5_contrib, 0.7);
+                result.checks.push(check);
+            }
+
+            // Test E8 graph contribution
+            if let Some(e8_contrib) = contributions.e8_contribution {
+                let check = Self::test_measured_contribution(EmbedderName::E8Graph, e8_contrib, 0.05);
+                result.checks.push(check);
+            }
+
+            // Test E10 multimodal contribution
+            if let Some(e10_contrib) = contributions.e10_contribution {
+                let check = Self::test_measured_contribution(EmbedderName::E10Multimodal, e10_contrib, 0.05);
+                result.checks.push(check);
             }
         }
 
@@ -286,6 +343,31 @@ impl AblationValidator {
 
         (critical, redundant)
     }
+
+    /// Test measured contribution from benchmark results.
+    fn test_measured_contribution(embedder: EmbedderName, contribution: f64, target: f64) -> ValidationCheck {
+        let check = ValidationCheck::new(
+            &format!("{}_measured_contribution", embedder.as_str()),
+            &format!("{} measured contribution (benchmark)", embedder.as_str()),
+        ).with_priority(CheckPriority::High);
+
+        if contribution >= target {
+            check.pass(
+                &format!("{:.1}%", contribution * 100.0),
+                &format!(">= {:.0}%", target * 100.0),
+            )
+        } else if contribution >= target * 0.5 {
+            check.warning(
+                &format!("{:.1}%", contribution * 100.0),
+                &format!(">= {:.0}%", target * 100.0),
+            ).with_details("Below target but showing positive contribution")
+        } else {
+            check.fail(
+                &format!("{:.1}%", contribution * 100.0),
+                &format!(">= {:.0}%", target * 100.0),
+            )
+        }
+    }
 }
 
 #[cfg(test)]
@@ -294,7 +376,7 @@ mod tests {
 
     #[test]
     fn test_ablation_validation_config() {
-        let result = AblationValidator::validate(None);
+        let result = AblationValidator::validate(None, None);
         assert!(result.all_passed);
         assert!(!result.checks.is_empty());
     }
@@ -323,5 +405,28 @@ mod tests {
         assert!(redundant.contains(&EmbedderName::E9HDC));
         assert!(!critical.contains(&EmbedderName::E5Causal));
         assert!(!redundant.contains(&EmbedderName::E5Causal));
+    }
+
+    #[test]
+    fn test_with_aggregated_results() {
+        use super::super::results_aggregator::{AggregatedResults, GraphMetrics, MultimodalMetrics};
+
+        let mut agg = AggregatedResults::default();
+        agg.graph = Some(GraphMetrics {
+            e8_contribution: 0.08,
+            ..Default::default()
+        });
+        agg.multimodal = Some(MultimodalMetrics {
+            e10_contribution_pct: 0.07,
+            ..Default::default()
+        });
+
+        let result = AblationValidator::validate(None, Some(&agg));
+        assert!(result.all_passed);
+        assert!(result.measured_contributions.is_some());
+
+        let contributions = result.measured_contributions.unwrap();
+        assert!(contributions.e8_contribution.is_some());
+        assert!(contributions.e10_contribution.is_some());
     }
 }

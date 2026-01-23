@@ -1,0 +1,110 @@
+{
+  "phase": "Arch",
+  "duration_ms": 0,
+  "checks": [
+    {
+      "name": "ARCH-01",
+      "description": "TeleologicalArray is atomic - store all 13 embeddings or nothing",
+      "status": "Pass",
+      "expected": "13 embedders",
+      "actual": "13 embedders defined",
+      "details": null,
+      "priority": "Critical"
+    },
+    {
+      "name": "ARCH-02",
+      "description": "Apples-to-apples only - compare E1<->E1, never E1<->E5",
+      "status": "Pass",
+      "expected": "distinct embedder indices",
+      "actual": "unique indices 0-12",
+      "details": null,
+      "priority": "Critical"
+    },
+    {
+      "name": "ARCH-09",
+      "description": "Topic threshold is weighted_agreement >= 2.5",
+      "status": "Pass",
+      "expected": ">= 2.5 threshold",
+      "actual": "max=8.5, threshold=2.5",
+      "details": "3 semantic spaces agreeing = 3.0 -> TOPIC",
+      "priority": "Critical"
+    },
+    {
+      "name": "ARCH-10",
+      "description": "Divergence detection uses SEMANTIC embedders only",
+      "status": "Pass",
+      "expected": "7 semantic only",
+      "actual": "7 semantic embedders",
+      "details": null,
+      "priority": "Critical"
+    },
+    {
+      "name": "ARCH-12",
+      "description": "E1 is THE semantic foundation - all retrieval starts with E1",
+      "status": "Pass",
+      "expected": "E1 is foundation",
+      "actual": "E1 in semantic, weight=1.0",
+      "details": null,
+      "priority": "Critical"
+    },
+    {
+      "name": "ARCH-13",
+      "description": "Search strategies: E1Only, MultiSpace, Pipeline",
+      "status": "Pass",
+      "expected": "E1Only default",
+      "actual": "E1Only default, 3 strategies",
+      "details": null,
+      "priority": "High"
+    },
+    {
+      "name": "ARCH-14",
+      "description": "Weight profiles MUST have E2-E4=0.0 for semantic scoring",
+      "status": "Pass",
+      "expected": "temporal weight = 0.0",
+      "actual": "E2-E4 = 0.0",
+      "details": "E2_Recency=0, E3_Periodic=0, E4_Sequence=0",
+      "priority": "Critical"
+    },
+    {
+      "name": "ARCH-18",
+      "description": "E5 Causal MUST use asymmetric similarity",
+      "status": "Pass",
+      "expected": "E5 asymmetric",
+      "actual": "E5 in asymmetric list",
+      "details": "cause→effect direction matters",
+      "priority": "Critical"
+    },
+    {
+      "name": "AP-73",
+      "description": "Temporal embedders (E2-E4) MUST NOT be in similarity fusion",
+      "status": "Pass",
+      "expected": "temporal excluded from fusion",
+      "actual": "E2-E4 weight=0 (excluded)",
+      "details": null,
+      "priority": "Critical"
+    },
+    {
+      "name": "AP-74",
+      "description": "E12 ColBERT MUST only be used for re-ranking, NOT initial retrieval",
+      "status": "Pass",
+      "expected": "E12 for rerank only",
+      "actual": "E12 defined, rerank-only guidance",
+      "details": "Pipeline Stage 3: E12 MaxSim precision",
+      "priority": "High"
+    },
+    {
+      "name": "AP-75",
+      "description": "E13 SPLADE MUST be used for Stage 1 recall, NOT final ranking",
+      "status": "Pass",
+      "expected": "E13 for recall only",
+      "actual": "E13 defined, recall-only guidance",
+      "details": "Pipeline Stage 1: BM25+E13 sparse recall",
+      "priority": "High"
+    }
+  ],
+  "passed": 11,
+  "failed": 0,
+  "warnings": 0,
+  "skipped": 0,
+  "all_passed": true
+}

@@ -2,27 +2,27 @@
   "metrics": {
     "recency": {
       "freshness_precision_at": {
-        "10": 1.0,
         "5": 1.0,
         "1": 1.0,
-        "20": 1.0
+        "20": 1.0,
+        "10": 1.0
       },
-      "recency_weighted_mrr": 0.9866051717324074,
-      "decay_accuracy": 0.6963465407193069,
+      "recency_weighted_mrr": 0.9908384808696581,
+      "decay_accuracy": 0.6892463514832002,
       "avg_position_improvement": 0.0,
       "fresh_retrieval_rate_at": {
         "1": 1.0,
-        "20": 1.0,
+        "5": 1.0,
         "10": 1.0,
-        "5": 1.0
+        "20": 1.0
       }
     },
     "periodic": {
       "periodic_recall_at": {
         "1": 1.0,
+        "10": 1.0,
         "5": 1.0,
-        "20": 1.0,
-        "10": 1.0
+        "20": 1.0
       },
       "hourly_cluster_quality": 1.0,
       "daily_cluster_quality": 1.0,
@@ -30,48 +30,48 @@
       "pattern_detection_recall": 0.0
     },
     "sequence": {
-      "sequence_accuracy": 0.47230150536763765,
+      "sequence_accuracy": 0.469421325132748,
       "temporal_ordering_precision": 1.0,
-      "episode_boundary_f1": 0.8,
+      "episode_boundary_f1": 0.7916666666666666,
       "before_after_accuracy": 1.0,
       "avg_sequence_distance_error": 0.0
     },
     "composite": {
-      "overall_temporal_score": 0.8373646735179795,
-      "improvement_over_baseline": 1.7912155783932653,
+      "overall_temporal_score": 0.8362605547020168,
+      "improvement_over_baseline": 1.7875351823400558,
       "feature_contributions": {
-        "e2_recency": 0.9035460309087551,
+        "e2_recency": 0.9031092977928232,
         "e3_periodic": 0.7,
-        "e4_sequence": 0.8016904516102914
+        "e4_sequence": 0.7991597308731577
       }
     },
-    "query_count": 198
+    "query_count": 99
   },
   "ablation": {
     "baseline_score": 0.3,
-    "e2_only_score": 0.9035460309087551,
+    "e2_only_score": 0.9031092977928232,
     "e3_only_score": 0.7,
-    "e4_only_score": 0.8016904516102914,
-    "full_score": 0.8373646735179795,
+    "e4_only_score": 0.7991597308731577,
+    "full_score": 0.8362605547020168,
     "improvements": {
+      "e4_sequence": 1.6638657695771926,
+      "e2_recency": 2.0103643259760773,
       "e3_periodic": 1.3333333333333333,
-      "e4_sequence": 1.672301505367638,
-      "e2_recency": 2.0118201030291836,
-      "full": 1.7912155783932653
+      "full": 1.7875351823400558
     }
   },
   "timings": {
-    "total_ms": 78,
+    "total_ms": 56,
     "dataset_generation_ms": 1,
-    "recency_benchmark_ms": 4,
+    "recency_benchmark_ms": 3,
     "periodic_benchmark_ms": 0,
     "sequence_benchmark_ms": 0,
-    "ablation_ms": 44
+    "ablation_ms": 33
   },
   "config": {
     "dataset": {
       "num_memories": 1000,
-      "num_queries": 200,
+      "num_queries": 100,
       "time_span_days": 30,
       "base_timestamp": null,
       "seed": 42,
@@ -174,8 +174,8 @@
   },
   "dataset_stats": {
     "total_memories": 1000,
-    "total_queries": 198,
+    "total_queries": 99,
     "chain_count": 38,
-    "episode_boundaries": 57
+    "episode_boundaries": 58
   }
 }

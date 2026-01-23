@@ -233,8 +233,11 @@ impl TemporalMetadataInjector {
                     let age_secs = (base_time - chunk_time).num_seconds();
 
                     // Default recency score using exponential decay
+                    // Clamp age to non-negative to prevent scores > 1.0 when timestamps
+                    // are in the future relative to base_time (negative age)
                     let half_life = self.config.recency_half_life_secs as f64;
-                    let default_recency_score = (-age_secs as f64 * 0.693 / half_life).exp();
+                    let clamped_age = age_secs.max(0);
+                    let default_recency_score = (-clamped_age as f64 * 0.693 / half_life).exp();
 
                     timestamps.insert(
                         chunk.uuid(),
@@ -451,7 +454,9 @@ impl DecayFunction {
                 (1.0 - age_secs as f64 / max_age).max(0.0)
             }
             DecayFunction::Exponential => {
-                (-age_secs as f64 * 0.693 / half_life_secs as f64).exp()
+                // Clamp age to non-negative to prevent scores > 1.0
+                let clamped_age = age_secs.max(0);
+                (-clamped_age as f64 * 0.693 / half_life_secs as f64).exp()
             }
             DecayFunction::Step => {
                 if age_secs < 300 { // < 5 min
@@ -614,6 +619,20 @@ mod tests {
 
         // No decay
         assert_eq!(DecayFunction::NoDecay.score(1000000, half_life), 1.0);
+    }
+
+    #[test]
+    fn test_negative_age_clamped() {
+        let half_life = 3600; // 1 hour
+
+        // Negative age (future timestamps) should be clamped to 0, giving score = 1.0
+        let score = DecayFunction::Exponential.score(-1000, half_life);
+        assert!((score - 1.0).abs() < f64::EPSILON, "Negative age should give score 1.0, got {}", score);
+        assert!(score <= 1.0, "Score should never exceed 1.0, got {}", score);
+
+        // Very negative age should still give 1.0
+        let score = DecayFunction::Exponential.score(-100000, half_life);
+        assert!((score - 1.0).abs() < f64::EPSILON, "Negative age should give score 1.0, got {}", score);
     }
 
     #[test]

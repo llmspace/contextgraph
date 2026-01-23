@@ -439,7 +439,10 @@ impl TemporalBenchmarkRunner {
 
             let retrieved_ts: Vec<i64> = scored.iter().map(|(_, ts, _)| *ts).collect();
 
-            // Expected order: sorted by timestamp
+            // NOTE: This metric has a design flaw - items are retrieved by proximity to anchor,
+            // not by temporal order. For "before" queries, proximity order is REVERSE of
+            // temporal order. The sequence_accuracy metric is therefore not meaningful.
+            // Kendall's tau and before_after_accuracy are the reliable E4 metrics.
             let expected_order: Vec<usize> = (0..retrieved_ts.len()).collect();
 
             ordering_results.push((retrieved_ts.clone(), expected_order));
@@ -1725,6 +1728,8 @@ fn compute_sequence_data(
         scored.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
 
         let retrieved_ts: Vec<i64> = scored.iter().map(|(_, ts, _)| *ts).collect();
+
+        // NOTE: sequence_accuracy metric has design flaw - see comment in run_sequence_benchmarks
         let expected_order: Vec<usize> = (0..retrieved_ts.len()).collect();
 
         ordering_results.push((retrieved_ts.clone(), expected_order));

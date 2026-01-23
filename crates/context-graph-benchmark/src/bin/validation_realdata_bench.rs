@@ -45,6 +45,7 @@ use context_graph_benchmark::validation::{
     ValidationBenchmarkConfig, ValidationBenchmarkResults, ValidationPhase,
     ValidationDatasetInfo, ValidationSummary, PhaseResult, ValidationReportGenerator,
     generate_console_summary, Recommendation, RecommendationCategory,
+    BenchmarkResultsAggregator,
 };
 use context_graph_benchmark::validation::config_validation::ConfigValidator;
 use context_graph_benchmark::validation::temporal_validation::TemporalValidator;
@@ -68,6 +69,8 @@ use context_graph_benchmark::realdata::ground_truth::GroundTruthGenerator;
 struct Args {
     /// Directory containing chunks.jsonl and metadata.json.
     data_dir: PathBuf,
+    /// Directory containing benchmark results (for aggregation).
+    results_dir: PathBuf,
     /// Maximum chunks to load (0 = unlimited).
     max_chunks: usize,
     /// Phases to run (empty = all).
@@ -88,6 +91,7 @@ impl Default for Args {
     fn default() -> Self {
         Self {
             data_dir: PathBuf::from("data/hf_benchmark_diverse"),
+            results_dir: PathBuf::from("benchmark_results"),
             max_chunks: 10000,
             phases: vec![],
             output_dir: PathBuf::from("benchmark_results/validation"),
@@ -107,6 +111,9 @@ fn parse_args() -> Args {
         match arg.as_str() {
             "--data-dir" | "-d" => {
                 args.data_dir = PathBuf::from(argv.next().expect("--data-dir requires a value"));
+            }
+            "--results-dir" | "-r" => {
+                args.results_dir = PathBuf::from(argv.next().expect("--results-dir requires a value"));
             }
             "--max-chunks" | "-n" => {
                 args.max_chunks = argv
@@ -179,6 +186,9 @@ USAGE:
 OPTIONS:
     --data-dir, -d <PATH>       Directory with chunks.jsonl and metadata.json
                                 Default: data/hf_benchmark_diverse
+
+    --results-dir, -r <PATH>    Directory with benchmark results (for aggregation)
+                                Default: benchmark_results
 
     --max-chunks, -n <NUM>      Maximum chunks to load (0 = unlimited)
                                 Default: 10000
@@ -287,6 +297,25 @@ fn main() {
     let mut critical_failure = false;
 
     // ========================================================================
+    // Load aggregated benchmark results (if available)
+    // ========================================================================
+    let mut aggregator = BenchmarkResultsAggregator::new(&args.results_dir);
+    let _ = aggregator.load_all();
+
+    let measured_ratios = if aggregator.has_results() {
+        if args.verbose {
+            eprintln!("Loaded benchmark results from: {}", args.results_dir.display());
+            eprintln!("  Files loaded: {:?}", aggregator.loaded_files());
+        }
+        Some(aggregator.get_all_asymmetric_ratios())
+    } else {
+        if args.verbose {
+            eprintln!("No benchmark results found in {}. Using structural validation only.", args.results_dir.display());
+        }
+        None
+    };
+
+    // ========================================================================
     // Phase: Config Validation
     // ========================================================================
     if args.phases.contains(&ValidationPhase::Config) {
@@ -329,9 +358,12 @@ fn main() {
     if args.phases.contains(&ValidationPhase::Asymmetric) && (!args.fail_fast || !critical_failure) {
         if args.verbose {
             eprintln!("Running Asymmetric Validation...");
+            if let Some(ref ratios) = measured_ratios {
+                eprintln!("  Using measured ratios: {:?}", ratios);
+            }
         }
         let phase_start = Instant::now();
-        let result = AsymmetricValidator::validate(None, None);
+        let result = AsymmetricValidator::validate(measured_ratios.as_ref(), None);
         recommendations.extend(result.recommendations.clone());
         let phase_result = AsymmetricValidator::to_phase_result(result, phase_start.elapsed().as_millis() as u64);
 
@@ -349,7 +381,9 @@ fn main() {
             eprintln!("Running Ablation Validation...");
         }
         let phase_start = Instant::now();
-        let result = AblationValidator::validate(None);
+        // Pass aggregated results for measured contribution validation
+        let aggregated = if aggregator.has_results() { Some(aggregator.results()) } else { None };
+        let result = AblationValidator::validate(None, aggregated);
         recommendations.extend(result.recommendations.clone());
         let phase_result = AblationValidator::to_phase_result(result, phase_start.elapsed().as_millis() as u64);
 
@@ -367,7 +401,14 @@ fn main() {
             eprintln!("Running E1 Foundation Validation...");
         }
         let phase_start = Instant::now();
-        let result = E1FoundationValidator::validate(None, None, None, None, None);
+
+        // Get E1 MRR from aggregator if available
+        let e1_mrr = aggregator.get_e1_baseline_mrr();
+        if args.verbose && e1_mrr.is_some() {
+            eprintln!("  Using measured E1 MRR: {:.3}", e1_mrr.unwrap());
+        }
+
+        let result = E1FoundationValidator::validate(e1_mrr, None, None, None, None);
         recommendations.extend(result.recommendations.clone());
         let phase_result = E1FoundationValidator::to_phase_result(result, phase_start.elapsed().as_millis() as u64);
 
@@ -431,7 +472,9 @@ fn main() {
                     let mut injector = TemporalMetadataInjector::new(temporal_config.clone(), args.seed);
                     let metadata = injector.inject(&dataset);
 
-                    let result = TemporalValidator::validate(&temporal_config, Some(&metadata), dataset.chunks.len());
+                    // Get measured temporal metrics from aggregator
+                    let measured_temporal = aggregator.get_temporal_metrics();
+                    let result = TemporalValidator::validate(&temporal_config, Some(&metadata), dataset.chunks.len(), measured_temporal);
                     let phase_result = TemporalValidator::to_phase_result(result, phase_start.elapsed().as_millis() as u64);
 
                     if !phase_result.all_passed {

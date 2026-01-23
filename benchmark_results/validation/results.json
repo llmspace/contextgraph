@@ -1,0 +1,832 @@
+{
+  "config": {
+    "data_dir": "data/hf_benchmark_diverse",
+    "max_chunks": 500,
+    "phases": [
+      "Config",
+      "Temporal",
+      "GroundTruth",
+      "Arch",
+      "Asymmetric",
+      "Ablation",
+      "E1Foundation",
+      "Fusion"
+    ],
+    "output_dir": "benchmark_results/validation",
+    "verbose": true,
+    "fail_fast": false,
+    "seed": 42,
+    "num_queries": 50
+  },
+  "start_time": "2026-01-23T11:21:50.153804112Z",
+  "end_time": "2026-01-23T11:21:50.169627508Z",
+  "duration_secs": 0.015822891,
+  "dataset_info": {
+    "total_chunks": 500,
+    "chunks_used": 500,
+    "num_topics": 100,
+    "num_documents": 2437,
+    "loaded": true
+  },
+  "phase_results": {
+    "Ablation": {
+      "phase": "Ablation",
+      "duration_ms": 0,
+      "checks": [
+        {
+          "name": "e1_is_foundation",
+          "description": "[ARCH-12] E1 is THE semantic foundation",
+          "status": "Pass",
+          "expected": "E1 foundation",
+          "actual": "E1 semantic, weight=1.0",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "temporal_excluded",
+          "description": "[AP-60] Temporal embedders (E2-E4) MUST NOT count toward topic detection",
+          "status": "Pass",
+          "expected": "temporal excluded",
+          "actual": "E2-E4 weight=0",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "enhancement_embedders_defined",
+          "description": "Enhancement embedders (E5, E7, E10) defined for contribution analysis",
+          "status": "Pass",
+          "expected": "enhancers defined",
+          "actual": "E5, E7, E10 in semantic",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "E5_Causal_measured_contribution",
+          "description": "E5_Causal measured contribution (benchmark)",
+          "status": "Pass",
+          "expected": ">= 70%",
+          "actual": "72.0%",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "E8_Graph_measured_contribution",
+          "description": "E8_Graph measured contribution (benchmark)",
+          "status": "Pass",
+          "expected": ">= 5%",
+          "actual": "100.0%",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "E10_Multimodal_measured_contribution",
+          "description": "E10_Multimodal measured contribution (benchmark)",
+          "status": "Pass",
+          "expected": ">= 5%",
+          "actual": "30.8%",
+          "details": null,
+          "priority": "High"
+        }
+      ],
+      "passed": 6,
+      "failed": 0,
+      "warnings": 0,
+      "skipped": 0,
+      "all_passed": true
+    },
+    "Temporal": {
+      "phase": "Temporal",
+      "duration_ms": 0,
+      "checks": [
+        {
+          "name": "config_valid",
+          "description": "Temporal injection config has valid parameters",
+          "status": "Pass",
+          "expected": "valid",
+          "actual": "valid",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "decay_half_life_positive",
+          "description": "[ARCH-22] Decay half-life is positive",
+          "status": "Pass",
+          "expected": "> 0",
+          "actual": "86400",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "e2_timestamp_span",
+          "description": "E2 timestamps span >= 90% of configured range",
+          "status": "Pass",
+          "expected": ">= 328.5 days (90%)",
+          "actual": "340.7 days (93%)",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "e2_recency_scores_valid",
+          "description": "E2 recency scores in [0.0, 1.0]",
+          "status": "Pass",
+          "expected": "[0.0, 1.0]",
+          "actual": "[0.00, 1.00]",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "e3_periodic_clusters",
+          "description": "E3 periodic creates expected number of hour clusters",
+          "status": "Pass",
+          "expected": "<= 10 clusters",
+          "actual": "3 clusters",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "e3_hour_day_valid",
+          "description": "[ARCH-23] E3 periodic hour in [0,23], day in [0,6]",
+          "status": "Pass",
+          "expected": "hour < 24, day < 7",
+          "actual": "all valid",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "e4_session_sequences",
+          "description": "E4 creates expected number of sessions",
+          "status": "Pass",
+          "expected": "~100 sessions",
+          "actual": "43 sessions",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "e4_session_positions_monotonic",
+          "description": "[ARCH-24] E4 sequence positions are monotonic within sessions",
+          "status": "Pass",
+          "expected": "monotonic",
+          "actual": "monotonic",
+          "details": "43 sessions verified",
+          "priority": "High"
+        },
+        {
+          "name": "temporal_coverage",
+          "description": "Temporal metadata covers most chunks",
+          "status": "Pass",
+          "expected": ">= 90%",
+          "actual": "100%",
+          "details": null,
+          "priority": "Medium"
+        },
+        {
+          "name": "decay_exponential",
+          "description": "[ARCH-22] Exponential decay: score = 0.5 at half-life",
+          "status": "Pass",
+          "expected": "0.5",
+          "actual": "0.500",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "decay_linear",
+          "description": "[ARCH-22] Linear decay: score = max(0, 1 - age/max_age)",
+          "status": "Pass",
+          "expected": "0.5",
+          "actual": "0.500",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "decay_step",
+          "description": "[ARCH-22] Step decay: Fresh(<5min)=1.0, Recent(<1h)=0.8, Today(<1d)=0.5",
+          "status": "Pass",
+          "expected": "1.0, 0.8, 0.5, 0.1",
+          "actual": "1.0, 0.8, 0.5, 0.1",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "e2_measured_quality",
+          "description": "[ARCH-22] E2 recency has good decay accuracy (measured)",
+          "status": "Pass",
+          "expected": ">= 65%",
+          "actual": "68.9%",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "e4_measured_accuracy",
+          "description": "[ARCH-24] E4 sequence accuracy (measured)",
+          "status": "Pass",
+          "expected": ">= 80% before_after",
+          "actual": "before_after=100.0%",
+          "details": "sequence_accuracy=46.9% (metric has design limitations), ordering_tau=1.00",
+          "priority": "Medium"
+        },
+        {
+          "name": "symmetry_validated",
+          "description": "Temporal embeddings pass symmetry validation",
+          "status": "Skip",
+          "expected": "symmetric",
+          "actual": "not computed",
+          "details": "Symmetry validation not performed in this benchmark run",
+          "priority": "Medium"
+        }
+      ],
+      "passed": 14,
+      "failed": 0,
+      "warnings": 0,
+      "skipped": 1,
+      "all_passed": true
+    },
+    "Config": {
+      "phase": "Config",
+      "duration_ms": 0,
+      "checks": [
+        {
+          "name": "all_embedders_count",
+          "description": "All 13 embedders exist",
+          "status": "Pass",
+          "expected": "13",
+          "actual": "13",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "semantic_embedders_count",
+          "description": "Semantic embedders = 7 (E1, E5, E6, E7, E10, E12, E13)",
+          "status": "Pass",
+          "expected": "7",
+          "actual": "7",
+          "details": "E1, E5, E6, E7, E10, E12, E13",
+          "priority": "Critical"
+        },
+        {
+          "name": "temporal_embedders_count",
+          "description": "Temporal embedders = 3 (E2, E3, E4)",
+          "status": "Pass",
+          "expected": "3",
+          "actual": "3",
+          "details": "E2, E3, E4",
+          "priority": "Critical"
+        },
+        {
+          "name": "relational_embedders_count",
+          "description": "Relational embedders = 2 (E8, E11)",
+          "status": "Pass",
+          "expected": "2",
+          "actual": "2",
+          "details": "E8, E11",
+          "priority": "High"
+        },
+        {
+          "name": "structural_embedders_count",
+          "description": "Structural embedders = 1 (E9)",
+          "status": "Pass",
+          "expected": "1",
+          "actual": "1",
+          "details": "E9",
+          "priority": "High"
+        },
+        {
+          "name": "asymmetric_embedders_count",
+          "description": "Asymmetric embedders = 3 (E5, E8, E10)",
+          "status": "Pass",
+          "expected": "3",
+          "actual": "3",
+          "details": "E5, E8, E10",
+          "priority": "High"
+        },
+        {
+          "name": "category_sum",
+          "description": "Category sum = 13 (7 + 3 + 2 + 1)",
+          "status": "Pass",
+          "expected": "13",
+          "actual": "13",
+          "details": "7 + 3 + 2 + 1 = 13",
+          "priority": "Critical"
+        },
+        {
+          "name": "semantic_weights",
+          "description": "All semantic embedders have topic_weight = 1.0",
+          "status": "Pass",
+          "expected": "1.0",
+          "actual": "1.0",
+          "details": "E1_Semantic=1, E5_Causal=1, E6_Sparse=1, E7_Code=1, E10_Multimodal=1, E12_LateInteraction=1, E13_SPLADE=1",
+          "priority": "Critical"
+        },
+        {
+          "name": "temporal_weights",
+          "description": "[ARCH-14] Temporal embedders have topic_weight = 0.0",
+          "status": "Pass",
+          "expected": "0.0",
+          "actual": "0.0",
+          "details": "E2_Recency=0, E3_Periodic=0, E4_Sequence=0",
+          "priority": "Critical"
+        },
+        {
+          "name": "relational_structural_weights",
+          "description": "Relational and structural embedders have topic_weight = 0.5",
+          "status": "Pass",
+          "expected": "0.5",
+          "actual": "0.5",
+          "details": "E8_Graph=0.5, E11_Entity=0.5, E9_HDC=0.5",
+          "priority": "Critical"
+        },
+        {
+          "name": "max_weighted_agreement",
+          "description": "[ARCH-09] Max weighted_agreement = 8.5",
+          "status": "Pass",
+          "expected": "8.5",
+          "actual": "8.5",
+          "details": "7*1.0 (semantic) + 2*0.5 (relational) + 1*0.5 (structural) = 8.5",
+          "priority": "Critical"
+        },
+        {
+          "name": "e1_is_foundation",
+          "description": "[ARCH-12] E1 is in semantic embedders (foundation)",
+          "status": "Pass",
+          "expected": "E1 in semantic",
+          "actual": "E1 in semantic",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "default_fusion_strategy",
+          "description": "[ARCH-13] Default fusion strategy is E1Only",
+          "status": "Pass",
+          "expected": "E1Only",
+          "actual": "E1Only",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "embedder_indices",
+          "description": "Embedder indices are unique 0-12",
+          "status": "Pass",
+          "expected": "0-12",
+          "actual": "0-12",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "divergence_embedders",
+          "description": "[ARCH-10] Divergence detection uses semantic embedders only",
+          "status": "Pass",
+          "expected": "7 semantic",
+          "actual": "7 embedders",
+          "details": null,
+          "priority": "Critical"
+        }
+      ],
+      "passed": 15,
+      "failed": 0,
+      "warnings": 0,
+      "skipped": 0,
+      "all_passed": true
+    },
+    "GroundTruth": {
+      "phase": "GroundTruth",
+      "duration_ms": 11,
+      "checks": [
+        {
+          "name": "all_embedders_have_gt",
+          "description": "All 13 embedders have ground truth",
+          "status": "Pass",
+          "expected": "13/13",
+          "actual": "13/13",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "semantic_gt_topic_based",
+          "description": "Semantic embedders use topic-based relevance",
+          "status": "Pass",
+          "expected": "7/7 semantic",
+          "actual": "7/7",
+          "details": "E1, E5, E6, E7, E10, E12, E13 have topic-based GT",
+          "priority": "High"
+        },
+        {
+          "name": "e4_gt_uses_sessions",
+          "description": "E4 ground truth uses session sequences",
+          "status": "Pass",
+          "expected": "session-based GT",
+          "actual": "48 queries",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "e8_gt_uses_documents",
+          "description": "E8 ground truth uses document structure",
+          "status": "Pass",
+          "expected": "graph-based GT",
+          "actual": "48 queries",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "min_relevant_per_query",
+          "description": "Queries have >= 3 relevant docs on average",
+          "status": "Pass",
+          "expected": ">= 3 avg",
+          "actual": "95.6 avg",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "no_empty_embedder_gt",
+          "description": "No embedder has empty ground truth",
+          "status": "Pass",
+          "expected": "none empty",
+          "actual": "none empty",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "queries_have_chunk_ids",
+          "description": "All queries have associated chunk IDs",
+          "status": "Pass",
+          "expected": "all have chunk_id",
+          "actual": "48/48",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "relevant_chunk_ids_valid",
+          "description": "Relevant chunk IDs are non-nil UUIDs",
+          "status": "Pass",
+          "expected": "no nil UUIDs",
+          "actual": "59625 valid",
+          "details": null,
+          "priority": "High"
+        }
+      ],
+      "passed": 8,
+      "failed": 0,
+      "warnings": 0,
+      "skipped": 0,
+      "all_passed": true
+    },
+    "Arch": {
+      "phase": "Arch",
+      "duration_ms": 0,
+      "checks": [
+        {
+          "name": "ARCH-01",
+          "description": "TeleologicalArray is atomic - store all 13 embeddings or nothing",
+          "status": "Pass",
+          "expected": "13 embedders",
+          "actual": "13 embedders defined",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "ARCH-02",
+          "description": "Apples-to-apples only - compare E1<->E1, never E1<->E5",
+          "status": "Pass",
+          "expected": "distinct embedder indices",
+          "actual": "unique indices 0-12",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "ARCH-09",
+          "description": "Topic threshold is weighted_agreement >= 2.5",
+          "status": "Pass",
+          "expected": ">= 2.5 threshold",
+          "actual": "max=8.5, threshold=2.5",
+          "details": "3 semantic spaces agreeing = 3.0 -> TOPIC",
+          "priority": "Critical"
+        },
+        {
+          "name": "ARCH-10",
+          "description": "Divergence detection uses SEMANTIC embedders only",
+          "status": "Pass",
+          "expected": "7 semantic only",
+          "actual": "7 semantic embedders",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "ARCH-12",
+          "description": "E1 is THE semantic foundation - all retrieval starts with E1",
+          "status": "Pass",
+          "expected": "E1 is foundation",
+          "actual": "E1 in semantic, weight=1.0",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "ARCH-13",
+          "description": "Search strategies: E1Only, MultiSpace, Pipeline",
+          "status": "Pass",
+          "expected": "E1Only default",
+          "actual": "E1Only default, 3 strategies",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "ARCH-14",
+          "description": "Weight profiles MUST have E2-E4=0.0 for semantic scoring",
+          "status": "Pass",
+          "expected": "temporal weight = 0.0",
+          "actual": "E2-E4 = 0.0",
+          "details": "E2_Recency=0, E3_Periodic=0, E4_Sequence=0",
+          "priority": "Critical"
+        },
+        {
+          "name": "ARCH-18",
+          "description": "E5 Causal MUST use asymmetric similarity",
+          "status": "Pass",
+          "expected": "E5 asymmetric",
+          "actual": "E5 in asymmetric list",
+          "details": "cause→effect direction matters",
+          "priority": "Critical"
+        },
+        {
+          "name": "AP-73",
+          "description": "Temporal embedders (E2-E4) MUST NOT be in similarity fusion",
+          "status": "Pass",
+          "expected": "temporal excluded from fusion",
+          "actual": "E2-E4 weight=0 (excluded)",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "AP-74",
+          "description": "E12 ColBERT MUST only be used for re-ranking, NOT initial retrieval",
+          "status": "Pass",
+          "expected": "E12 for rerank only",
+          "actual": "E12 defined, rerank-only guidance",
+          "details": "Pipeline Stage 3: E12 MaxSim precision",
+          "priority": "High"
+        },
+        {
+          "name": "AP-75",
+          "description": "E13 SPLADE MUST be used for Stage 1 recall, NOT final ranking",
+          "status": "Pass",
+          "expected": "E13 for recall only",
+          "actual": "E13 defined, recall-only guidance",
+          "details": "Pipeline Stage 1: BM25+E13 sparse recall",
+          "priority": "High"
+        }
+      ],
+      "passed": 11,
+      "failed": 0,
+      "warnings": 0,
+      "skipped": 0,
+      "all_passed": true
+    },
+    "Fusion": {
+      "phase": "Fusion",
+      "duration_ms": 0,
+      "checks": [
+        {
+          "name": "fusion_strategies_defined",
+          "description": "[ARCH-13] Fusion strategies: E1Only, MultiSpace, Pipeline",
+          "status": "Pass",
+          "expected": "4 strategies",
+          "actual": "4 strategies",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "default_is_e1only",
+          "description": "Default fusion strategy is E1Only",
+          "status": "Pass",
+          "expected": "E1Only",
+          "actual": "E1Only",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "e1only_semantics",
+          "description": "E1Only strategy uses only E1 embedder",
+          "status": "Pass",
+          "expected": "E1 only",
+          "actual": "E1 is foundation (index=0, weight=1.0)",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "multispace_excludes_temporal",
+          "description": "[AP-73] MultiSpace MUST exclude temporal embedders (E2-E4)",
+          "status": "Pass",
+          "expected": "temporal excluded",
+          "actual": "E2-E4 weight=0.0",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "pipeline_architecture",
+          "description": "[AP-74, AP-75] Pipeline: Stage 1 (E13 recall) → Stage 2 (E1 dense) → Stage 3 (E12 rerank)",
+          "status": "Pass",
+          "expected": "3-stage pipeline",
+          "actual": "E13 → E1 → E12",
+          "details": "Stage 1: E13 SPLADE recall, Stage 2: E1 dense scoring, Stage 3: E12 rerank",
+          "priority": "High"
+        }
+      ],
+      "passed": 5,
+      "failed": 0,
+      "warnings": 0,
+      "skipped": 0,
+      "all_passed": true
+    },
+    "E1Foundation": {
+      "phase": "E1Foundation",
+      "duration_ms": 0,
+      "checks": [
+        {
+          "name": "e1_in_semantic",
+          "description": "E1 is in semantic embedders",
+          "status": "Pass",
+          "expected": "E1 in semantic",
+          "actual": "E1 in semantic",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "e1_is_entry_embedder",
+          "description": "[ARCH-12] E1 is the default entry point for all retrieval",
+          "status": "Pass",
+          "expected": "E1 is entry point",
+          "actual": "index=0, default=E1Only",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "default_is_e1only",
+          "description": "[ARCH-13] Default fusion strategy is E1Only",
+          "status": "Pass",
+          "expected": "E1Only",
+          "actual": "E1Only",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "e1_max_weight",
+          "description": "E1 has maximum topic weight (1.0)",
+          "status": "Pass",
+          "expected": "1.0 (max)",
+          "actual": "1.0",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "e1_used_for_divergence",
+          "description": "[ARCH-10] E1 used for divergence detection",
+          "status": "Pass",
+          "expected": "E1 used",
+          "actual": "E1 in divergence",
+          "details": null,
+          "priority": "High"
+        }
+      ],
+      "passed": 5,
+      "failed": 0,
+      "warnings": 0,
+      "skipped": 0,
+      "all_passed": true
+    },
+    "Asymmetric": {
+      "phase": "Asymmetric",
+      "duration_ms": 0,
+      "checks": [
+        {
+          "name": "asymmetric_embedders_defined",
+          "description": "Asymmetric embedders = 3 (E5, E8, E10)",
+          "status": "Pass",
+          "expected": "3",
+          "actual": "3",
+          "details": "E5_Causal, E8_Graph, E10_Multimodal",
+          "priority": "Critical"
+        },
+        {
+          "name": "e5_is_asymmetric",
+          "description": "[ARCH-18] E5 Causal uses asymmetric similarity",
+          "status": "Pass",
+          "expected": "E5 asymmetric",
+          "actual": "E5 in asymmetric",
+          "details": null,
+          "priority": "Critical"
+        },
+        {
+          "name": "e8_is_asymmetric",
+          "description": "E8 Graph uses asymmetric similarity",
+          "status": "Pass",
+          "expected": "E8 asymmetric",
+          "actual": "E8 in asymmetric",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "e10_is_asymmetric",
+          "description": "E10 Multimodal uses asymmetric similarity",
+          "status": "Pass",
+          "expected": "E10 asymmetric",
+          "actual": "E10 in asymmetric",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "direction_modifiers",
+          "description": "Direction modifiers: cause→effect=1.2, effect→cause=0.8, same=1.0",
+          "status": "Pass",
+          "expected": "1.2, 0.8, 1.0",
+          "actual": "1.2, 0.8, 1.0",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "E5_Causal_asymmetric_ratio",
+          "description": "E5_Causal asymmetric ratio within 1.5 ± 0.15",
+          "status": "Pass",
+          "expected": "[1.35, 1.65]",
+          "actual": "1.500",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "E10_Multimodal_asymmetric_ratio",
+          "description": "E10_Multimodal asymmetric ratio within 1.5 ± 0.15",
+          "status": "Pass",
+          "expected": "[1.35, 1.65]",
+          "actual": "1.500",
+          "details": null,
+          "priority": "High"
+        },
+        {
+          "name": "E8_Graph_asymmetric_ratio",
+          "description": "E8_Graph asymmetric ratio within 1.5 ± 0.15",
+          "status": "Pass",
+          "expected": "[1.35, 1.65]",
+          "actual": "1.500",
+          "details": null,
+          "priority": "High"
+        }
+      ],
+      "passed": 8,
+      "failed": 0,
+      "warnings": 0,
+      "skipped": 0,
+      "all_passed": true
+    }
+  },
+  "summary": {
+    "total_checks": 73,
+    "passed_checks": 72,
+    "failed_checks": 0,
+    "warning_checks": 0,
+    "skipped_checks": 1,
+    "critical_failures": 0,
+    "all_passed": true,
+    "arch_rules_passed": 11,
+    "arch_rules_total": 11,
+    "per_phase": {
+      "GroundTruth": {
+        "passed": 8,
+        "failed": 0,
+        "total": 8
+      },
+      "Config": {
+        "passed": 15,
+        "failed": 0,
+        "total": 15
+      },
+      "Arch": {
+        "passed": 11,
+        "failed": 0,
+        "total": 11
+      },
+      "Fusion": {
+        "passed": 5,
+        "failed": 0,
+        "total": 5
+      },
+      "Ablation": {
+        "passed": 6,
+        "failed": 0,
+        "total": 6
+      },
+      "Asymmetric": {
+        "passed": 8,
+        "failed": 0,
+        "total": 8
+      },
+      "E1Foundation": {
+        "passed": 5,
+        "failed": 0,
+        "total": 5
+      },
+      "Temporal": {
+        "passed": 14,
+        "failed": 0,
+        "total": 14
+      }
+    }
+  },
+  "recommendations": []
+}
