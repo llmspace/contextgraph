@@ -43,8 +43,8 @@ MODELS = {
         "description": "Longformer for causal embeddings (768D)",
     },
     "contextual": {
-        "repo_id": "sentence-transformers/all-mpnet-base-v2",
-        "description": "MPNet for contextual embeddings (768D)",
+        "repo_id": "intfloat/e5-base-v2",
+        "description": "E5-base-v2 asymmetric retrieval (768D) - query/passage prefixes",
     },
     "graph": {
         "repo_id": "sentence-transformers/paraphrase-MiniLM-L6-v2",

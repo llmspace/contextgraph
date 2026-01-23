@@ -1,0 +1,152 @@
+{
+  "metrics": {
+    "clustering": {
+      "intra_session_similarity": 0.7962165644843155,
+      "inter_session_similarity": 0.3035662987424133,
+      "session_separation_ratio": 2.6228753579788293,
+      "silhouette_score": 0.6841518023471574,
+      "boundary_f1": 1.0,
+      "num_sessions": 10,
+      "num_pairs_evaluated": 7021
+    },
+    "ordering": {
+      "ordering_accuracy": 1.0,
+      "kendalls_tau": 1.0,
+      "before_accuracy": 1.0,
+      "after_accuracy": 1.0,
+      "symmetry_score": 1.0,
+      "position_mrr": 1.0,
+      "num_sessions": 10,
+      "num_queries": 1056
+    },
+    "hybrid_effectiveness": {
+      "vs_legacy_improvement": 1.6470896624142328,
+      "vs_timestamp_improvement": 1.5766882261183752,
+      "signature_distinctness": 0.0,
+      "position_preservation": 0.0,
+      "legacy_separation_ratio": 0.990852480450806,
+      "timestamp_separation_ratio": 1.0179249982175889
+    },
+    "composite": {
+      "overall_score": 0.8633366439387123,
+      "clustering_score": 0.8583416098467809,
+      "ordering_score": 1.0,
+      "effectiveness_score": 0.6,
+      "all_targets_met": true,
+      "targets_met_count": 4,
+      "targets_total": 4
+    }
+  },
+  "legacy_comparison": {
+    "clustering": {
+      "intra_session_similarity": 0.7961037323129586,
+      "inter_session_similarity": 0.803453337423909,
+      "session_separation_ratio": 0.990852480450806,
+      "silhouette_score": -0.3094299553889078,
+      "boundary_f1": 0.20408163265306126,
+      "num_sessions": 10,
+      "num_pairs_evaluated": 7021
+    },
+    "ordering": {
+      "ordering_accuracy": 1.0,
+      "kendalls_tau": 1.0,
+      "before_accuracy": 1.0,
+      "after_accuracy": 1.0,
+      "symmetry_score": 1.0,
+      "position_mrr": 1.0,
+      "num_sessions": 10,
+      "num_queries": 1056
+    },
+    "hybrid_improvement": 1.6470896624142328,
+    "hybrid_is_better": true
+  },
+  "timestamp_baseline": {
+    "clustering": {
+      "intra_session_similarity": 0.999988864832403,
+      "inter_session_similarity": 0.9823797102766977,
+      "session_separation_ratio": 1.0179249982175889,
+      "silhouette_score": 0.9895579226443507,
+      "boundary_f1": 0.3440134907251265,
+      "num_sessions": 10,
+      "num_pairs_evaluated": 7021
+    },
+    "hybrid_improvement": 1.5766882261183752,
+    "hybrid_is_better": true
+  },
+  "timings": {
+    "total_ms": 56,
+    "session_generation_ms": 0,
+    "embedding_extraction_ms": 0,
+    "clustering_benchmark_ms": 18,
+    "ordering_benchmark_ms": 1,
+    "legacy_comparison_ms": 18,
+    "timestamp_baseline_ms": 17
+  },
+  "config": {
+    "session_config": {
+      "min_session_length": 5,
+      "max_session_length": 20,
+      "num_sessions": 10,
+      "coherence_threshold": 0.5,
+      "seed": 42,
+      "num_direction_queries": 500,
+      "num_chain_queries": 100,
+      "num_boundary_queries": 50
+    },
+    "k_values": [
+      1,
+      5,
+      10,
+      20
+    ],
+    "run_legacy_comparison": true,
+    "run_timestamp_baseline": true,
+    "num_clustering_pairs": 5000,
+    "show_progress": true,
+    "seed": 42
+  },
+  "dataset_stats": {
+    "num_sessions": 10,
+    "num_chunks": 119,
+    "avg_session_length": 11.9,
+    "min_session_length": 5,
+    "max_session_length": 19,
+    "num_chunks_with_embeddings": 119,
+    "num_topics": 3
+  },
+  "validation": {
+    "all_passed": true,
+    "checks_passed": 4,
+    "checks_total": 4,
+    "checks": [
+      {
+        "name": "session_separation_ratio",
+        "description": "Session separation ratio >= 2.0",
+        "passed": true,
+        "actual": "2.62x",
+        "expected": ">= 2.0x"
+      },
+      {
+        "name": "intra_session_ordering",
+        "description": "Intra-session ordering accuracy >= 80%",
+        "passed": true,
+        "actual": "100.0%",
+        "expected": ">= 80%"
+      },
+      {
+        "name": "before_after_symmetry",
+        "description": "Before/after symmetry >= 0.8",
+        "passed": true,
+        "actual": "1.00",
+        "expected": ">= 0.8"
+      },
+      {
+        "name": "hybrid_vs_legacy",
+        "description": "Hybrid vs legacy improvement >= +10%",
+        "passed": true,
+        "actual": "+164.7%",
+        "expected": ">= +10%"
+      }
+    ]
+  }
+}

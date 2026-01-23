@@ -1,25 +1,31 @@
-//! Contextual embedding model using sentence-transformers/all-mpnet-base-v2.
+//! Contextual embedding model using intfloat/e5-base-v2.
 //!
-//! This model (part of E10) produces 768D vectors optimized for contextual
-//! similarity and relationship understanding. It supports asymmetric
-//! intent/context embeddings via `embed_dual()`.
+//! This model (part of E10) produces 768D vectors optimized for asymmetric
+//! retrieval. It uses E5-base-v2's prefix-based encoding for intent vs
+//! context differentiation:
+//!
+//! - "query: " prefix for intent/query embeddings
+//! - "passage: " prefix for context/document embeddings
 //!
 //! # GPU Acceleration
 //!
 //! When the `candle` feature is enabled, this model uses GPU-accelerated
-//! MPNet inference via Candle with the following pipeline:
-//! 1. Tokenization with HuggingFace tokenizers
+//! BERT inference via Candle with the following pipeline:
+//! 1. Tokenization with HuggingFace tokenizers (with prefix prepending)
 //! 2. GPU embedding lookup and position encoding
 //! 3. GPU-accelerated transformer forward pass (12 layers)
 //! 4. Mean pooling over sequence dimension
 //! 5. L2 normalization on GPU
-//! 6. Optional: Dual projection for asymmetric embeddings
 //!
-//! # Asymmetric Embeddings
+//! # Asymmetric Embeddings (E5-base-v2)
 //!
-//! The `embed_dual()` method produces two distinct vectors:
-//! - **Intent**: What the text is trying to accomplish
-//! - **Context**: What contextual relationships the text establishes
+//! Unlike the previous MPNet + projection approach, E5-base-v2 achieves
+//! asymmetry through learned prefix-based encoding:
+//! - Queries (intent): "query: " prefix encodes search intent
+//! - Documents (context): "passage: " prefix encodes document content
+//!
+//! This creates genuinely learned asymmetric representations without
+//! requiring separate projection matrices.
 //!
 //! # Thread Safety
 //! - `AtomicBool` for `loaded` state (lock-free reads)
@@ -32,18 +38,30 @@
 mod constants;
 mod marker_detection;
 mod model;
-mod projections;
 mod state;
+
+// DEPRECATED: projections.rs is kept for reference but no longer used.
+// E5-base-v2 uses prefix-based asymmetry, not projection matrices.
+// Items inside are marked #[deprecated] individually.
+mod projections;
 
 // Re-export public API
 pub use constants::{
     CONTEXTUAL_DIMENSION, CONTEXTUAL_HIDDEN_SIZE, CONTEXTUAL_INTERMEDIATE_SIZE,
     CONTEXTUAL_LATENCY_BUDGET_MS, CONTEXTUAL_LAYER_NORM_EPS, CONTEXTUAL_MAX_TOKENS,
     CONTEXTUAL_MODEL_NAME, CONTEXTUAL_NUM_HEADS, CONTEXTUAL_NUM_LAYERS, CONTEXTUAL_VOCAB_SIZE,
+    // E5-base-v2 prefix constants for asymmetric encoding
+    INTENT_PREFIX, CONTEXT_PREFIX,
 };
+
+// Marker detection is still useful for context analysis
 pub use marker_detection::{
     context_pooling_weights, detect_context_markers, intent_pooling_weights, ContextMarkerResult,
     ContextType,
 };
+
 pub use model::ContextualModel;
+
+// DEPRECATED exports - kept for backwards compatibility but will be removed
+#[allow(deprecated)]
 pub use projections::{ContextProjectionWeights, CONTEXT_PROJECTION_SEED};

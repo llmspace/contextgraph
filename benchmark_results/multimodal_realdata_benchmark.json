@@ -1,0 +1,122 @@
+{
+  "timestamp": "2026-01-23T19:42:07.547922770+00:00",
+  "config": {
+    "max_chunks": 500,
+    "num_intent_queries": 50,
+    "num_context_queries": 50,
+    "num_asymmetric_queries": 200,
+    "seed": 42
+  },
+  "dataset_info": {
+    "total_chunks": 500,
+    "total_documents": 2437,
+    "source_datasets": [
+      "wikipedia"
+    ],
+    "topic_count": 100,
+    "has_asymmetric_e10": true,
+    "e10_coverage": 1.0
+  },
+  "embedding_stats": {
+    "total_embeddings": 500,
+    "embedding_time_secs": 684.871908516,
+    "embeddings_per_sec": 0.7300635254312215,
+    "e10_as_intent_populated": 500,
+    "e10_as_context_populated": 500
+  },
+  "e10_asymmetry_verification": {
+    "total_pairs": 500,
+    "identical_pairs": 0,
+    "identity_rate": 0.0,
+    "avg_distinctness": 0.24880332,
+    "high_similarity_pairs": 0,
+    "passed": true
+  },
+  "intent_retrieval": {
+    "num_queries": 50,
+    "mrr_intent_to_context": 1.0,
+    "mrr_e1_baseline": 1.0,
+    "improvement_over_e1": 0.0,
+    "hits_at_1": 1.0,
+    "hits_at_5": 1.0
+  },
+  "context_retrieval": {
+    "num_queries": 50,
+    "mrr_context_to_intent": 1.0,
+    "mrr_e1_baseline": 1.0,
+    "improvement_over_e1": 0.0,
+    "hits_at_1": 1.0,
+    "hits_at_5": 1.0
+  },
+  "asymmetric_comparison": {
+    "num_queries": 10000,
+    "observed_asymmetry_ratio": 0.9985711770892549,
+    "expected_asymmetry_ratio": 1.5,
+    "formula_compliant": false,
+    "avg_intent_to_context_sim": 0.28136870324870106,
+    "avg_context_to_intent_sim": 0.2817713045442244
+  },
+  "e10_contribution": {
+    "mrr_e1_e10_blend": 1.0,
+    "mrr_e1_only": 1.0,
+    "e10_contribution": 0.0,
+    "e10_contribution_pct": 0.0,
+    "per_topic_contribution": {
+      "60": 0.0,
+      "0": 0.0,
+      "20": 0.0
+    }
+  },
+  "ablation_study": {
+    "e1_only_mrr": 1.0,
+    "e10_only_mrr": 0.9891666666666665,
+    "e1_e10_blend_mrr": 1.0,
+    "full_13_space_mrr": 1.0,
+    "blend_analysis": [
+      {
+        "blend": 0.0,
+        "mrr": 1.0,
+        "precision_at_5": 0.9850000000000001
+      },
+      {
+        "blend": 0.1,
+        "mrr": 1.0,
+        "precision_at_5": 0.9850000000000001
+      },
+      {
+        "blend": 0.2,
+        "mrr": 1.0,
+        "precision_at_5": 0.9850000000000001
+      },
+      {
+        "blend": 0.3,
+        "mrr": 1.0,
+        "precision_at_5": 0.9860000000000001
+      },
+      {
+        "blend": 0.4,
+        "mrr": 1.0,
+        "precision_at_5": 0.9839999999999999
+      },
+      {
+        "blend": 0.5,
+        "mrr": 0.99625,
+        "precision_at_5": 0.9790000000000001
+      },
+      {
+        "blend": 0.7,
+        "mrr": 0.9955555555555555,
+        "precision_at_5": 0.965
+      },
+      {
+        "blend": 1.0,
+        "mrr": 0.9891666666666665,
+        "precision_at_5": 0.9330000000000003
+      }
+    ]
+  },
+  "recommendations": [
+    "Asymmetry ratio (1.00) outside expected range (1.2-2.0). Consider tuning direction modifiers.",
+    "E10 contribution below 5%. Consider increasing E10 weight in fusion formula."
+  ]
+}

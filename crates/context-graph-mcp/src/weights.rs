@@ -167,6 +167,29 @@ pub const WEIGHT_PROFILES: &[(&str, [f32; NUM_EMBEDDERS])] = &[
         ],
     ),
 
+    // Intent Enhanced: Stronger E10 weighting for explicit intent-aware queries
+    // Use when intentMode != "none" in search_graph for asymmetric E10 reranking
+    // E10 weight 0.30 (vs 0.25 in intent_search) for more aggressive intent matching
+    // Per E10 Multimodal Upgrade Plan: Phase 2 intent-enhanced profile
+    (
+        "intent_enhanced",
+        [
+            0.35, // E1_Semantic (foundation per ARCH-12)
+            0.0,  // E2_Temporal_Recent - NOT for semantic search per AP-71
+            0.0,  // E3_Temporal_Periodic - NOT for semantic search per AP-71
+            0.0,  // E4_Temporal_Positional - NOT for semantic search per AP-71
+            0.10, // E5_Causal (intent often has causal structure)
+            0.05, // E6_Sparse (keyword backup)
+            0.10, // E7_Code (code intent/purpose)
+            0.05, // E8_Graph (relational)
+            0.0,  // E9_HDC
+            0.30, // E10_Multimodal (ENHANCED - stronger intent weighting)
+            0.05, // E11_Entity (entities in intent)
+            0.0,  // E12_Late_Interaction (Stage 3 rerank only per AP-73)
+            0.0,  // E13_SPLADE (Stage 1 recall only per AP-74)
+        ],
+    ),
+
     // =========================================================================
     // SPECIAL PROFILES
     // =========================================================================
@@ -537,7 +560,7 @@ mod tests {
         // Per AP-71: Temporal embedders (E2-E4) MUST NOT be used in similarity scoring
         // All semantic search profiles should have E2-E4 = 0.0
 
-        let semantic_profiles = ["semantic_search", "causal_reasoning", "code_search", "fact_checking", "category_weighted"];
+        let semantic_profiles = ["semantic_search", "causal_reasoning", "code_search", "fact_checking", "category_weighted", "intent_search", "intent_enhanced"];
 
         for profile_name in semantic_profiles {
             let weights = get_weight_profile(profile_name).expect(&format!(
@@ -574,7 +597,7 @@ mod tests {
         // E12 is used in Stage 3 re-ranking (ColBERT MaxSim) per AP-73
         // E13 is used in Stage 1 recall (SPLADE inverted index) per AP-74
 
-        let semantic_profiles = ["semantic_search", "causal_reasoning", "code_search", "fact_checking", "category_weighted"];
+        let semantic_profiles = ["semantic_search", "causal_reasoning", "code_search", "fact_checking", "category_weighted", "intent_search", "intent_enhanced"];
 
         for profile_name in semantic_profiles {
             let weights = get_weight_profile(profile_name).expect(&format!(
@@ -861,5 +884,64 @@ mod tests {
                 profile_name, sum
             );
         }
+    }
+
+    // =========================================================================
+    // INTENT PROFILE TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_intent_search_profile_exists() {
+        let weights = get_weight_profile("intent_search");
+        assert!(weights.is_some(), "intent_search profile should exist");
+        println!("[VERIFIED] intent_search profile exists");
+    }
+
+    #[test]
+    fn test_intent_enhanced_profile_exists() {
+        let weights = get_weight_profile("intent_enhanced");
+        assert!(weights.is_some(), "intent_enhanced profile should exist");
+        println!("[VERIFIED] intent_enhanced profile exists");
+    }
+
+    #[test]
+    fn test_intent_search_e10_weight() {
+        // E10 should be 0.25 in intent_search
+        let weights = get_weight_profile("intent_search").unwrap();
+        assert!(
+            (weights[9] - 0.25).abs() < 0.001,
+            "E10 should be 0.25 in intent_search (got {})",
+            weights[9]
+        );
+        println!("[VERIFIED] intent_search has E10={:.2}", weights[9]);
+    }
+
+    #[test]
+    fn test_intent_enhanced_e10_weight() {
+        // E10 should be 0.30 in intent_enhanced (higher than intent_search)
+        let weights = get_weight_profile("intent_enhanced").unwrap();
+        assert!(
+            (weights[9] - 0.30).abs() < 0.001,
+            "E10 should be 0.30 in intent_enhanced (got {})",
+            weights[9]
+        );
+        println!("[VERIFIED] intent_enhanced has E10={:.2}", weights[9]);
+    }
+
+    #[test]
+    fn test_intent_enhanced_stronger_than_intent_search() {
+        // intent_enhanced should have higher E10 weight than intent_search
+        let intent_search = get_weight_profile("intent_search").unwrap();
+        let intent_enhanced = get_weight_profile("intent_enhanced").unwrap();
+        assert!(
+            intent_enhanced[9] > intent_search[9],
+            "intent_enhanced E10 ({}) should be > intent_search E10 ({})",
+            intent_enhanced[9],
+            intent_search[9]
+        );
+        println!(
+            "[VERIFIED] intent_enhanced E10={:.2} > intent_search E10={:.2}",
+            intent_enhanced[9], intent_search[9]
+        );
     }
 }

@@ -56,5 +56,8 @@ pub use teleological_memory_store::{
     SequenceOptions, TemporalScale, TemporalSearchOptions, TimeWindow,
 };
 
+// E10 Intent Gate options (Phase 4)
+pub use teleological_memory_store::IntentDirection;
+
 // UTL processor trait
 pub use utl_processor::UtlProcessor;

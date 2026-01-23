@@ -1,7 +1,27 @@
-//! Context Projection Weights for Asymmetric Intent/Context Embeddings.
+// Allow deprecated items within this deprecated module
+#![allow(deprecated)]
+
+//! DEPRECATED: Context Projection Weights for Asymmetric Intent/Context Embeddings.
+//!
+//! # DEPRECATION NOTICE
+//!
+//! This module is **DEPRECATED** as of v0.2.0. The ContextualModel now uses
+//! intfloat/e5-base-v2 with prefix-based asymmetric encoding instead of
+//! projection matrices.
+//!
+//! E5-base-v2 achieves asymmetry through learned prefixes:
+//! - "query: " prefix for intent embeddings
+//! - "passage: " prefix for context embeddings
+//!
+//! This creates genuinely learned asymmetric representations, unlike the
+//! projection-based approach which only added random perturbations.
+//!
+//! See `model.rs::embed_dual()` for the new implementation.
+//!
+//! # Original Documentation (for reference)
 //!
 //! Following the E5 Causal pattern (ARCH-15) and E8 Graph pattern, this module
-//! provides learned projection matrices for creating asymmetric intent/context embeddings.
+//! provided learned projection matrices for creating asymmetric intent/context embeddings.
 //!
 //! # Architecture
 //!
@@ -39,12 +59,19 @@ use super::constants::CONTEXTUAL_DIMENSION;
 
 /// Seed for context projection initialization (deterministic).
 /// Different from E5's 0xCA05A1 and E8's 0xE8_6FA9 to ensure distinct projections.
+#[deprecated(
+    since = "0.2.0",
+    note = "E5-base-v2 uses prefix-based asymmetry. See model.rs embed_dual()."
+)]
 pub const CONTEXT_PROJECTION_SEED: u64 = 0xE10_C0E7;
 
 /// Standard deviation for initializing projection weight perturbations.
 const PROJECTION_INIT_STD: f64 = 0.02;
 
 /// Learned projection weights for asymmetric intent/context embeddings.
+///
+/// **DEPRECATED**: This struct is deprecated as of v0.2.0. The ContextualModel
+/// now uses E5-base-v2's prefix-based asymmetric encoding instead.
 ///
 /// These projections transform the base MPNet embedding into
 /// intent-role and context-role vectors for directional relationships.
@@ -68,6 +95,10 @@ const PROJECTION_INIT_STD: f64 = 0.02;
 /// 2. **Preserved semantics**: Identity component ensures the base meaning is retained
 /// 3. **No training required**: Works out-of-the-box without fine-tuning
 /// 4. **Deterministic**: Same seed produces same weights across runs
+#[deprecated(
+    since = "0.2.0",
+    note = "E5-base-v2 uses prefix-based asymmetry. See model.rs embed_dual()."
+)]
 #[derive(Debug)]
 pub struct ContextProjectionWeights {
     /// Intent projection matrix: [768, 768]
@@ -295,6 +326,7 @@ fn create_perturbed_identity<R: Rng>(size: usize, rng: &mut R, std: f64) -> Vec<
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
 

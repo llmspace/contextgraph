@@ -49,6 +49,7 @@ pub mod monitoring;
 pub mod neuromod;
 pub mod quantization;
 pub mod retrieval;
+pub mod session;
 pub mod similarity;
 pub mod steering;
 pub mod stubs;
@@ -124,4 +125,10 @@ pub use graph::{
     GraphDirection, ConnectivityContext, compute_graph_asymmetric_similarity,
     compute_graph_asymmetric_similarity_simple, compute_e8_asymmetric_fingerprint_similarity,
     compute_e8_asymmetric_full, detect_graph_query_intent, adjust_batch_graph_similarities,
+};
+
+// Session intent tracking (Phase 5) - E10 intent drift detection
+pub use session::{
+    IntentDrift, IntentSnapshot, IntentTracker, IntentTrajectoryStats,
+    DEFAULT_DRIFT_THRESHOLD, DEFAULT_WINDOW_SIZE,
 };

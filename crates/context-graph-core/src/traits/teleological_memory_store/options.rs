@@ -76,6 +76,47 @@ pub enum SearchStrategy {
     Pipeline,
 }
 
+/// Intent direction for E10 asymmetric intent gate.
+///
+/// Controls how E10 similarity is computed during the intent gate stage.
+/// Per the plan Phase 4: E10 intent gate between E1 scoring and E12 reranking.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum IntentDirection {
+    /// Query is a goal/purpose seeking context.
+    /// Uses query.e10_as_intent vs doc.e10_as_context with 1.2x boost.
+    SeekingIntent,
+
+    /// Query is a situation seeking intent/purpose.
+    /// Uses query.e10_as_context vs doc.e10_as_intent with 0.8x dampening.
+    SeekingContext,
+
+    /// Auto-detect from query text.
+    /// Falls back to symmetric similarity if detection uncertain.
+    #[default]
+    Auto,
+}
+
+impl IntentDirection {
+    /// Get the direction modifier for E10 asymmetric similarity.
+    ///
+    /// - SeekingIntent: 1.2x (intent→context boost)
+    /// - SeekingContext: 0.8x (context→intent dampening)
+    /// - Auto: 1.0x (no modifier, use symmetric)
+    pub fn modifier(&self) -> f32 {
+        match self {
+            IntentDirection::SeekingIntent => 1.2,
+            IntentDirection::SeekingContext => 0.8,
+            IntentDirection::Auto => 1.0,
+        }
+    }
+
+    /// Check if this is an explicit direction (not Auto).
+    pub fn is_explicit(&self) -> bool {
+        !matches!(self, IntentDirection::Auto)
+    }
+}
+
 /// Score normalization strategy for multi-space fusion.
 ///
 /// Applied before combining scores from multiple embedders.
@@ -1331,6 +1372,71 @@ pub struct TeleologicalSearchOptions {
     /// Default: `Unknown` (symmetric similarity for backward compatibility)
     #[serde(default)]
     pub causal_direction: CausalDirection,
+
+    // =========================================================================
+    // E10 Intent Gate Options (Phase 4)
+    // =========================================================================
+
+    /// Enable E10 intent gate in pipeline strategy.
+    ///
+    /// When enabled with `SearchStrategy::Pipeline`, adds an E10 intent filtering
+    /// stage between E1 dense scoring and E12 ColBERT reranking:
+    ///
+    /// Pipeline stages: E13 SPLADE (recall) → E1 Dense (score) → **E10 Intent Gate** → E12 Rerank
+    ///
+    /// The intent gate filters candidates based on E10 asymmetric similarity,
+    /// keeping only those that match the query's intent direction.
+    ///
+    /// Per the plan: "Only compute E10 similarity for top-100 from E1 stage"
+    ///
+    /// Default: `false` (disabled, backward compatible)
+    #[serde(default)]
+    pub enable_intent_gate: bool,
+
+    /// Minimum E10 intent similarity threshold for the intent gate [0.0, 1.0].
+    ///
+    /// Candidates below this threshold are filtered out during the intent gate stage.
+    /// Higher values = more restrictive filtering.
+    ///
+    /// Only used when `enable_intent_gate = true` and `strategy = Pipeline`.
+    ///
+    /// Default: `0.3` (moderate filtering)
+    #[serde(default = "TeleologicalSearchOptions::default_intent_gate_threshold")]
+    pub intent_gate_threshold: f32,
+
+    /// Intent direction for E10 asymmetric intent gate.
+    ///
+    /// Controls how E10 similarity is computed:
+    /// - `SeekingIntent`: Query is a goal, seeking relevant context (1.2x boost)
+    /// - `SeekingContext`: Query is a situation, seeking relevant intent (0.8x dampening)
+    /// - `Auto`: Auto-detect from query text
+    ///
+    /// Default: `Auto`
+    #[serde(default)]
+    pub intent_direction: IntentDirection,
+
+    /// E10 intent blend weight for combining E1 and E10 scores [0.0, 1.0].
+    ///
+    /// When `enable_intent_gate = true`, this controls how E10 scores are blended
+    /// with E1 scores: `final = e1_score * (1.0 - blend) + e10_score * blend`
+    ///
+    /// - `0.0`: Pure E1 scoring (E10 only used for filtering)
+    /// - `0.3`: Balanced blend (default)
+    /// - `1.0`: Pure E10 scoring (not recommended)
+    ///
+    /// Default: `0.3`
+    #[serde(default = "TeleologicalSearchOptions::default_intent_blend")]
+    pub intent_blend: f32,
+}
+
+impl TeleologicalSearchOptions {
+    fn default_intent_gate_threshold() -> f32 {
+        0.3
+    }
+
+    fn default_intent_blend() -> f32 {
+        0.3
+    }
 }
 
 impl Default for TeleologicalSearchOptions {
@@ -1358,6 +1464,11 @@ impl Default for TeleologicalSearchOptions {
             temporal_options: TemporalSearchOptions::default(),
             // Causal search options (ARCH-15) - Unknown (symmetric) by default
             causal_direction: CausalDirection::Unknown,
+            // E10 Intent Gate options (Phase 4) - Disabled by default
+            enable_intent_gate: false,
+            intent_gate_threshold: Self::default_intent_gate_threshold(),
+            intent_direction: IntentDirection::default(),
+            intent_blend: Self::default_intent_blend(),
         }
     }
 }
@@ -1830,6 +1941,91 @@ impl TeleologicalSearchOptions {
     #[inline]
     pub fn has_causal_direction(&self) -> bool {
         !matches!(self.causal_direction, CausalDirection::Unknown)
+    }
+
+    // =========================================================================
+    // E10 Intent Gate Builder Methods (Phase 4)
+    // =========================================================================
+
+    /// Enable or disable E10 intent gate in pipeline strategy.
+    ///
+    /// When enabled, adds an E10 intent filtering stage between E1 scoring
+    /// and E12 reranking. Only effective with `SearchStrategy::Pipeline`.
+    ///
+    /// # Arguments
+    ///
+    /// * `enable` - Whether to enable the intent gate
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use context_graph_core::traits::{TeleologicalSearchOptions, SearchStrategy};
+    ///
+    /// let opts = TeleologicalSearchOptions::quick(10)
+    ///     .with_strategy(SearchStrategy::Pipeline)
+    ///     .with_intent_gate(true)
+    ///     .with_intent_gate_threshold(0.3);
+    /// ```
+    #[inline]
+    pub fn with_intent_gate(mut self, enable: bool) -> Self {
+        self.enable_intent_gate = enable;
+        self
+    }
+
+    /// Set the E10 intent gate threshold.
+    ///
+    /// Candidates below this threshold are filtered out during the intent gate.
+    ///
+    /// # Arguments
+    ///
+    /// * `threshold` - Minimum E10 similarity [0.0, 1.0]
+    #[inline]
+    pub fn with_intent_gate_threshold(mut self, threshold: f32) -> Self {
+        self.intent_gate_threshold = threshold.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Set the E10 intent direction for asymmetric similarity.
+    ///
+    /// # Arguments
+    ///
+    /// * `direction` - Intent direction (SeekingIntent, SeekingContext, Auto)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use context_graph_core::traits::{TeleologicalSearchOptions, IntentDirection};
+    ///
+    /// let opts = TeleologicalSearchOptions::quick(10)
+    ///     .with_intent_gate(true)
+    ///     .with_intent_direction(IntentDirection::SeekingIntent);
+    /// ```
+    #[inline]
+    pub fn with_intent_direction(mut self, direction: IntentDirection) -> Self {
+        self.intent_direction = direction;
+        self
+    }
+
+    /// Set the E10 intent blend weight.
+    ///
+    /// Controls how E10 scores are blended with E1 scores when the intent gate
+    /// is enabled: `final = e1_score * (1.0 - blend) + e10_score * blend`
+    ///
+    /// # Arguments
+    ///
+    /// * `blend` - Blend weight [0.0, 1.0]
+    #[inline]
+    pub fn with_intent_blend(mut self, blend: f32) -> Self {
+        self.intent_blend = blend.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Check if E10 intent gate is active.
+    ///
+    /// Returns true if `enable_intent_gate = true` and `strategy = Pipeline`.
+    #[inline]
+    pub fn has_intent_gate(&self) -> bool {
+        self.enable_intent_gate && matches!(self.strategy, SearchStrategy::Pipeline)
     }
 }
 

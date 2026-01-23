@@ -37,6 +37,89 @@ pub const INTENT_TO_CONTEXT_MODIFIER: f32 = 1.2;
 /// Per plan: context→intent = 0.8x dampening.
 pub const CONTEXT_TO_INTENT_MODIFIER: f32 = 0.8;
 
+/// Configurable direction modifiers for E10 asymmetric similarity.
+///
+/// Allows tuning the asymmetry between intent→context and context→intent directions.
+/// The expected asymmetry ratio is intent_to_context / context_to_intent.
+///
+/// Default values: intent_to_context = 1.2, context_to_intent = 0.8
+/// Expected ratio: 1.5 (= 1.2 / 0.8)
+///
+/// # Usage for Tuning
+///
+/// ```rust
+/// let modifiers = DirectionModifiers::new(1.3, 0.7); // More aggressive asymmetry
+/// let expected_ratio = modifiers.expected_ratio(); // 1.857
+/// ```
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct DirectionModifiers {
+    /// Modifier for intent→context direction (boost)
+    pub intent_to_context: f32,
+    /// Modifier for context→intent direction (dampening)
+    pub context_to_intent: f32,
+}
+
+impl Default for DirectionModifiers {
+    fn default() -> Self {
+        Self {
+            intent_to_context: INTENT_TO_CONTEXT_MODIFIER,
+            context_to_intent: CONTEXT_TO_INTENT_MODIFIER,
+        }
+    }
+}
+
+impl DirectionModifiers {
+    /// Create new direction modifiers with custom values.
+    ///
+    /// # Arguments
+    /// * `intent_to_context` - Modifier for intent→context (typically > 1.0)
+    /// * `context_to_intent` - Modifier for context→intent (typically < 1.0)
+    pub fn new(intent_to_context: f32, context_to_intent: f32) -> Self {
+        Self {
+            intent_to_context,
+            context_to_intent,
+        }
+    }
+
+    /// Calculate the expected asymmetry ratio (intent_to_context / context_to_intent).
+    pub fn expected_ratio(&self) -> f32 {
+        if self.context_to_intent.abs() < f32::EPSILON {
+            return f32::INFINITY;
+        }
+        self.intent_to_context / self.context_to_intent
+    }
+
+    /// Apply intent→context modifier to a raw similarity score.
+    pub fn apply_intent_to_context(&self, raw_similarity: f32) -> f32 {
+        (raw_similarity * self.intent_to_context).clamp(0.0, 1.0)
+    }
+
+    /// Apply context→intent modifier to a raw similarity score.
+    pub fn apply_context_to_intent(&self, raw_similarity: f32) -> f32 {
+        (raw_similarity * self.context_to_intent).clamp(0.0, 1.0)
+    }
+
+    /// Validate the modifiers are within reasonable bounds.
+    ///
+    /// # Returns
+    /// Error message if validation fails.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.intent_to_context < 0.5 || self.intent_to_context > 2.0 {
+            return Err(format!(
+                "intent_to_context must be in [0.5, 2.0], got {}",
+                self.intent_to_context
+            ));
+        }
+        if self.context_to_intent < 0.3 || self.context_to_intent > 1.5 {
+            return Err(format!(
+                "context_to_intent must be in [0.3, 1.5], got {}",
+                self.context_to_intent
+            ));
+        }
+        Ok(())
+    }
+}
+
 // ============================================================================
 // REQUEST DTOs
 // ============================================================================
@@ -398,5 +481,57 @@ mod tests {
         // Default 0.3 means 70% E1, 30% E10
         let e1_weight = 1.0 - DEFAULT_BLEND_WITH_SEMANTIC;
         assert!(e1_weight > DEFAULT_BLEND_WITH_SEMANTIC);
+    }
+
+    #[test]
+    fn test_direction_modifiers_struct_default() {
+        let modifiers = DirectionModifiers::default();
+        assert!((modifiers.intent_to_context - 1.2).abs() < 0.001);
+        assert!((modifiers.context_to_intent - 0.8).abs() < 0.001);
+        assert!((modifiers.expected_ratio() - 1.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_direction_modifiers_custom() {
+        let modifiers = DirectionModifiers::new(1.4, 0.6);
+        assert!((modifiers.expected_ratio() - 2.333).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_direction_modifiers_apply() {
+        let modifiers = DirectionModifiers::default();
+
+        // Intent→Context: 0.5 * 1.2 = 0.6
+        let i2c = modifiers.apply_intent_to_context(0.5);
+        assert!((i2c - 0.6).abs() < 0.001);
+
+        // Context→Intent: 0.5 * 0.8 = 0.4
+        let c2i = modifiers.apply_context_to_intent(0.5);
+        assert!((c2i - 0.4).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_direction_modifiers_clamping() {
+        let modifiers = DirectionModifiers::default();
+
+        // Should clamp to 1.0 max
+        let high = modifiers.apply_intent_to_context(0.9);
+        assert!(high <= 1.0);
+
+        // Should clamp to 0.0 min
+        let low = modifiers.apply_context_to_intent(-0.1);
+        assert!(low >= 0.0);
+    }
+
+    #[test]
+    fn test_direction_modifiers_validation() {
+        let valid = DirectionModifiers::default();
+        assert!(valid.validate().is_ok());
+
+        let invalid_i2c = DirectionModifiers::new(2.5, 0.8);
+        assert!(invalid_i2c.validate().is_err());
+
+        let invalid_c2i = DirectionModifiers::new(1.2, 0.2);
+        assert!(invalid_c2i.validate().is_err());
     }
 }

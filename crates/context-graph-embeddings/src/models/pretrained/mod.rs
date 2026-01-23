@@ -28,12 +28,16 @@ pub use causal::{
 };
 pub use contextual::{
     context_pooling_weights, detect_context_markers, intent_pooling_weights,
-    ContextMarkerResult, ContextProjectionWeights, ContextType, ContextualModel,
+    ContextMarkerResult, ContextType, ContextualModel,
     CONTEXTUAL_DIMENSION, CONTEXTUAL_HIDDEN_SIZE, CONTEXTUAL_INTERMEDIATE_SIZE,
     CONTEXTUAL_LATENCY_BUDGET_MS, CONTEXTUAL_LAYER_NORM_EPS, CONTEXTUAL_MAX_TOKENS,
     CONTEXTUAL_MODEL_NAME, CONTEXTUAL_NUM_HEADS, CONTEXTUAL_NUM_LAYERS, CONTEXTUAL_VOCAB_SIZE,
-    CONTEXT_PROJECTION_SEED,
+    // E5-base-v2 prefix constants
+    INTENT_PREFIX, CONTEXT_PREFIX,
 };
+// Deprecated re-exports for backwards compatibility
+#[allow(deprecated)]
+pub use contextual::{ContextProjectionWeights, CONTEXT_PROJECTION_SEED};
 pub use code::{
     CodeModel, CODE_LATENCY_BUDGET_MS, CODE_MAX_TOKENS, CODE_MODEL_NAME, CODE_NATIVE_DIMENSION,
     CODE_PROJECTED_DIMENSION,

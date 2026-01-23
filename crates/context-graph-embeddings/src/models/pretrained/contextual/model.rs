@@ -1,22 +1,24 @@
 //! Core ContextualModel struct and lifecycle management.
 //!
-//! # Asymmetric Dual Embeddings
+//! # E5-base-v2 Asymmetric Dual Embeddings
 //!
-//! Following the E5 Causal pattern (ARCH-15) and E8 Graph pattern, this model
-//! supports asymmetric intent/context embeddings via `embed_dual()`:
+//! This model uses intfloat/e5-base-v2, which is specifically trained for
+//! asymmetric retrieval using prefix-based encoding:
 //!
-//! - **Intent embedding**: Represents what the text is trying to accomplish
-//!   (action-focused, e.g., "What is the user trying to do?")
-//! - **Context embedding**: Represents contextual relationships the text establishes
-//!   (relation-focused, e.g., "What context does this connect to?")
+//! - **Intent embedding**: "query: " + content (what the user wants to find)
+//! - **Context embedding**: "passage: " + content (document/passage to be searched)
+//!
+//! Unlike the previous projection-based approach, E5's asymmetry is learned
+//! during training, producing genuinely different semantic representations
+//! for queries vs documents.
 //!
 //! # Model
 //!
-//! Uses sentence-transformers/all-mpnet-base-v2:
-//! - Architecture: MPNet (microsoft/mpnet-base fine-tuned)
+//! Uses intfloat/e5-base-v2:
+//! - Architecture: BERT-base (12 layers)
 //! - Dimension: 768D
-//! - Max tokens: 384
-//! - Training: 1.17B sentence pairs from diverse sources
+//! - Max tokens: 512
+//! - Training: Trained for asymmetric retrieval on large corpus
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -29,20 +31,25 @@ use crate::gpu::{init_gpu, GpuModelLoader, normalize_gpu};
 use crate::traits::{EmbeddingModel, SingleModelConfig};
 use crate::types::{InputType, ModelEmbedding, ModelId, ModelInput};
 
-// Note: ContextualModel is part of E10 (Multimodal) system, not a separate embedder.
-// It provides the "context" half of the dual intent/context embedding.
-
-use super::constants::{CONTEXTUAL_DIMENSION, CONTEXTUAL_MAX_TOKENS};
-use super::projections::{ContextProjectionWeights, CONTEXT_PROJECTION_SEED};
+use super::constants::{CONTEXTUAL_DIMENSION, CONTEXTUAL_MAX_TOKENS, INTENT_PREFIX, CONTEXT_PREFIX};
 use super::state::ModelState;
 
-/// Contextual embedding model using sentence-transformers/all-mpnet-base-v2.
+/// Contextual embedding model using intfloat/e5-base-v2.
 ///
-/// Produces 768D vectors optimized for contextual similarity and relationship
-/// understanding. Uses MPNet architecture (BERT-like with relative positions).
+/// Produces 768D vectors optimized for asymmetric retrieval. Uses BERT architecture
+/// with prefix-based encoding for intent vs context differentiation.
+///
+/// # Asymmetric Encoding
+///
+/// E5-base-v2 was trained with prefix-based asymmetric encoding:
+/// - Queries (intent): Prefix with "query: "
+/// - Documents (context): Prefix with "passage: "
+///
+/// This creates genuinely learned asymmetric representations, unlike
+/// projection-based approaches that add artificial perturbations.
 ///
 /// # Example
-/// ```rust,no_run
+/// ```rust,ignore
 /// use context_graph_embeddings::models::ContextualModel;
 /// use context_graph_embeddings::traits::SingleModelConfig;
 /// use context_graph_embeddings::error::EmbeddingResult;
@@ -54,7 +61,8 @@ use super::state::ModelState;
 ///         SingleModelConfig::default(),
 ///     )?;
 ///     model.load().await?;
-///     let (intent, context) = model.embed_dual("User wants to fix the bug").await?;
+///     let (intent, context): (Vec<f32>, Vec<f32>) =
+///         model.embed_dual("User wants to fix the bug").await?;
 ///     assert_eq!(intent.len(), 768);
 ///     assert_eq!(context.len(), 768);
 ///     Ok(())
@@ -93,6 +101,13 @@ impl ContextualModel {
     ///
     /// Initializes CUDA device, loads tokenizer.json and model.safetensors,
     /// and transfers weight tensors to GPU VRAM.
+    ///
+    /// # E5-base-v2 Architecture
+    ///
+    /// E5-base-v2 uses prefix-based asymmetry, so no projection weights are
+    /// needed. The asymmetric behavior is achieved through:
+    /// - "query: " prefix for intent embeddings
+    /// - "passage: " prefix for context embeddings
     pub async fn load(&self) -> EmbeddingResult<()> {
         let _device = init_gpu().map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel GPU init failed: {}", e),
@@ -134,18 +149,8 @@ impl ContextualModel {
             });
         }
 
-        // Initialize context projection weights for asymmetric intent/context embeddings
-        let device = init_gpu().map_err(|e| EmbeddingError::GpuError {
-            message: format!("ContextualModel GPU init for projections failed: {}", e),
-        })?;
-        let projection = ContextProjectionWeights::initialize(
-            CONTEXTUAL_DIMENSION,
-            device,
-            CONTEXT_PROJECTION_SEED,
-        )?;
-
         tracing::info!(
-            "ContextualModel loaded: {} params, {:.2} MB VRAM, hidden_size={}, with context projections",
+            "ContextualModel loaded: E5-base-v2 with prefix-based asymmetry, {} params, {:.2} MB VRAM, {}D",
             weights.param_count(),
             weights.vram_bytes() as f64 / (1024.0 * 1024.0),
             weights.config.hidden_size
@@ -160,7 +165,6 @@ impl ContextualModel {
         *state = ModelState::Loaded {
             weights: Box::new(weights),
             tokenizer: Box::new(tokenizer),
-            projection,
         };
         self.loaded.store(true, Ordering::SeqCst);
         Ok(())
@@ -220,22 +224,24 @@ impl ContextualModel {
     }
 
     // =========================================================================
-    // ASYMMETRIC DUAL EMBEDDING METHODS (Following E5/E8 Pattern)
+    // E5-BASE-V2 PREFIX-BASED ASYMMETRIC EMBEDDING
     // =========================================================================
     //
-    // These methods produce genuinely different intent and context vectors through:
-    // 1. Structural marker detection (intent/context indicator tokens)
-    // 2. Learned projections (W_intent, W_context) initialized as perturbed identities
+    // E5-base-v2 achieves asymmetry through prefix-based encoding:
+    // - "query: " prefix for intent/query embeddings
+    // - "passage: " prefix for context/document embeddings
     //
-    // This creates meaningful asymmetry for contextual retrieval with:
-    // - intent→context direction: captures what text wants to accomplish
-    // - context→intent direction: captures what context text establishes
+    // This is fundamentally different from projection-based approaches:
+    // - Learned asymmetry: The model was trained to produce different
+    //   representations based on the prefix
+    // - No random perturbations: The asymmetry has semantic meaning
+    // - Natural directionality: Queries find passages, not vice versa
     // =========================================================================
 
     /// Embed text as a potential INTENT in contextual relationships.
     ///
-    /// Uses the base embedding projected through W_intent matrix.
-    /// Use this when embedding text that represents "what the user wants to do".
+    /// Uses E5's "query: " prefix encoding.
+    /// Use this when embedding text that represents "what the user wants to find".
     ///
     /// # Arguments
     /// * `content` - Text content to embed as an intent
@@ -249,8 +255,8 @@ impl ContextualModel {
 
     /// Embed text as a potential CONTEXT in contextual relationships.
     ///
-    /// Uses the base embedding projected through W_context matrix.
-    /// Use this when embedding text that represents "contextual background".
+    /// Uses E5's "passage: " prefix encoding.
+    /// Use this when embedding text that represents "contextual background/documents".
     ///
     /// # Arguments
     /// * `content` - Text content to embed as context
@@ -264,22 +270,24 @@ impl ContextualModel {
 
     /// Embed text as BOTH intent and context roles simultaneously.
     ///
-    /// Produces two distinct 768D vectors from a single encoder pass:
-    /// - intent_vec: Base embedding projected through W_intent
-    /// - context_vec: Base embedding projected through W_context
+    /// Produces two distinct 768D vectors using E5's prefix-based encoding:
+    /// - intent_vec: "query: " + content → encoder → L2 normalize
+    /// - context_vec: "passage: " + content → encoder → L2 normalize
     ///
     /// # Architecture
     ///
     /// ```text
-    /// Input Text
-    ///     |
-    /// [Tokenize]
-    ///     |
-    /// [Encoder (single pass)]
+    /// Input Text: "fix authentication bug"
     ///     |
     ///     +------------------------+
     ///     |                        |
-    /// [W_intent Projection]   [W_context Projection]
+    /// "query: fix auth..."    "passage: fix auth..."
+    ///     |                        |
+    /// [Tokenize]              [Tokenize]
+    ///     |                        |
+    /// [Encoder Pass 1]        [Encoder Pass 2]
+    ///     |                        |
+    /// [Mean Pool]             [Mean Pool]
     ///     |                        |
     /// [L2 Normalize]          [L2 Normalize]
     ///     |                        |
@@ -293,7 +301,8 @@ impl ContextualModel {
     /// Tuple of (intent_vector, context_vector), each 768D
     ///
     /// # Performance
-    /// Single encoder forward pass + dual projection (efficient).
+    /// Requires two encoder forward passes (one per prefix).
+    /// This is the tradeoff for genuine learned asymmetry.
     pub async fn embed_dual(&self, content: &str) -> EmbeddingResult<(Vec<f32>, Vec<f32>)> {
         if !self.is_initialized() {
             return Err(EmbeddingError::NotInitialized {
@@ -309,35 +318,16 @@ impl ContextualModel {
             })?;
 
         match &*state {
-            ModelState::Loaded {
-                weights,
-                tokenizer,
-                projection,
-            } => {
-                // Step 1: Get base embedding via standard forward pass
-                let base_embedding = gpu_forward(content, weights, tokenizer)?;
+            ModelState::Loaded { weights, tokenizer } => {
+                // Intent embedding: "query: " + content
+                let intent_text = format!("{}{}", INTENT_PREFIX, content);
+                let intent_vec = gpu_forward(&intent_text, weights, tokenizer)?;
 
-                // Step 2: Convert to tensor for projection
-                let device = init_gpu().map_err(|e| EmbeddingError::GpuError {
-                    message: format!("ContextualModel GPU init for projection failed: {}", e),
-                })?;
+                // Context embedding: "passage: " + content
+                let context_text = format!("{}{}", CONTEXT_PREFIX, content);
+                let context_vec = gpu_forward(&context_text, weights, tokenizer)?;
 
-                let base_tensor = Tensor::from_slice(&base_embedding, (1, CONTEXTUAL_DIMENSION), device)
-                    .map_err(|e| EmbeddingError::GpuError {
-                        message: format!("Failed to create base embedding tensor: {}", e),
-                    })?;
-
-                // Step 3: Apply intent projection
-                let intent_tensor = projection.project_intent(&base_tensor)?;
-                let intent_normalized = l2_normalize_tensor(&intent_tensor)?;
-                let intent_vec = tensor_to_vec(&intent_normalized)?;
-
-                // Step 4: Apply context projection
-                let context_tensor = projection.project_context(&base_tensor)?;
-                let context_normalized = l2_normalize_tensor(&context_tensor)?;
-                let context_vec = tensor_to_vec(&context_normalized)?;
-
-                // Step 5: Validate dimensions (fail fast on implementation error)
+                // Validate dimensions (fail fast on implementation error)
                 if intent_vec.len() != CONTEXTUAL_DIMENSION || context_vec.len() != CONTEXTUAL_DIMENSION {
                     return Err(EmbeddingError::InternalError {
                         message: format!(
@@ -658,6 +648,12 @@ fn encoder_layer_forward(
 }
 
 /// Self-attention forward pass.
+///
+/// Uses flatten/reshape pattern for Candle matmul compatibility:
+/// 1. Flatten hidden_states from [batch, seq, hidden] to [batch*seq, hidden]
+/// 2. Perform matmul with 2D weight matrices
+/// 3. Reshape back to [batch, seq, hidden]
+/// 4. Use broadcast_add for bias
 fn self_attention(
     hidden_states: &Tensor,
     layer: &crate::gpu::EncoderLayerWeights,
@@ -667,49 +663,72 @@ fn self_attention(
     let att = &layer.attention;
     let num_heads = config.num_attention_heads;
     let head_dim = config.hidden_size / num_heads;
+    let hidden_size = config.hidden_size;
 
     let (batch, seq_len, _) = hidden_states.dims3().map_err(|e| EmbeddingError::GpuError {
         message: format!("ContextualModel attention dims3 failed: {}", e),
     })?;
 
-    // QKV projections
-    let query = (hidden_states
+    // Flatten to [batch*seq, hidden] for Candle matmul compatibility
+    let hidden_flat = hidden_states
+        .reshape((batch * seq_len, hidden_size))
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel flatten hidden failed: {}", e),
+        })?;
+
+    // Q projection: flatten -> matmul -> reshape -> broadcast_add bias
+    let query = hidden_flat
         .matmul(&att.query_weight.t().map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel query weight transpose failed: {}", e),
         })?)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel query matmul failed: {}", e),
         })?
-        + &att.query_bias)
+        .reshape((batch, seq_len, hidden_size))
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel query reshape failed: {}", e),
+        })?
+        .broadcast_add(&att.query_bias)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel query bias failed: {}", e),
         })?;
 
-    let key = (hidden_states
+    // K projection
+    let key = hidden_flat
         .matmul(&att.key_weight.t().map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel key weight transpose failed: {}", e),
         })?)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel key matmul failed: {}", e),
         })?
-        + &att.key_bias)
+        .reshape((batch, seq_len, hidden_size))
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel key reshape failed: {}", e),
+        })?
+        .broadcast_add(&att.key_bias)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel key bias failed: {}", e),
         })?;
 
-    let value = (hidden_states
+    // V projection
+    let value = hidden_flat
         .matmul(&att.value_weight.t().map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel value weight transpose failed: {}", e),
         })?)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel value matmul failed: {}", e),
         })?
-        + &att.value_bias)
+        .reshape((batch, seq_len, hidden_size))
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel value reshape failed: {}", e),
+        })?
+        .broadcast_add(&att.value_bias)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel value bias failed: {}", e),
         })?;
 
     // Reshape to [batch, num_heads, seq_len, head_dim]
+    // Use contiguous() after transpose for matmul compatibility
     let query = query
         .reshape((batch, seq_len, num_heads, head_dim))
         .map_err(|e| EmbeddingError::GpuError {
@@ -718,6 +737,10 @@ fn self_attention(
         .transpose(1, 2)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel query transpose failed: {}", e),
+        })?
+        .contiguous()
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel query contiguous failed: {}", e),
         })?;
 
     let key = key
@@ -728,6 +751,10 @@ fn self_attention(
         .transpose(1, 2)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel key transpose failed: {}", e),
+        })?
+        .contiguous()
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel key contiguous failed: {}", e),
         })?;
 
     let value = value
@@ -738,13 +765,25 @@ fn self_attention(
         .transpose(1, 2)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel value transpose failed: {}", e),
+        })?
+        .contiguous()
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel value contiguous failed: {}", e),
         })?;
 
     // Attention scores: Q @ K^T / sqrt(d)
-    let scores = (query
-        .matmul(&key.transpose(2, 3).map_err(|e| EmbeddingError::GpuError {
+    let key_t = key
+        .transpose(2, 3)
+        .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel key transpose for scores failed: {}", e),
-        })?)
+        })?
+        .contiguous()
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel key_t contiguous failed: {}", e),
+        })?;
+
+    let scores = (query
+        .matmul(&key_t)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel attention scores matmul failed: {}", e),
         })?
@@ -753,10 +792,12 @@ fn self_attention(
         message: format!("ContextualModel attention scores scale failed: {}", e),
     })?;
 
-    // Add attention mask
-    let scores = (scores + extended_attention_mask).map_err(|e| EmbeddingError::GpuError {
-        message: format!("ContextualModel attention mask add failed: {}", e),
-    })?;
+    // Add attention mask using broadcast_add for proper shape handling
+    let scores = scores
+        .broadcast_add(extended_attention_mask)
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel attention mask add failed: {}", e),
+        })?;
 
     // Softmax
     let attention_probs = candle_nn::ops::softmax(&scores, 3).map_err(|e| EmbeddingError::GpuError {
@@ -773,42 +814,75 @@ fn self_attention(
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel attention context transpose failed: {}", e),
         })?
+        .contiguous()
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel attention context contiguous failed: {}", e),
+        })?
         .reshape((batch, seq_len, config.hidden_size))
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel attention context reshape failed: {}", e),
         })?;
 
-    // Output projection
-    (context
+    // Output projection: flatten -> matmul -> reshape -> broadcast_add bias
+    let context_flat = context
+        .reshape((batch * seq_len, hidden_size))
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel output flatten failed: {}", e),
+        })?;
+
+    context_flat
         .matmul(&att.output_weight.t().map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel attention output weight transpose failed: {}", e),
         })?)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel attention output matmul failed: {}", e),
         })?
-        + &att.output_bias)
+        .reshape((batch, seq_len, hidden_size))
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel output reshape failed: {}", e),
+        })?
+        .broadcast_add(&att.output_bias)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel attention output bias failed: {}", e),
         })
 }
 
 /// FFN forward pass.
+///
+/// Uses flatten/reshape pattern for Candle matmul compatibility.
 fn ffn_forward(
     hidden_states: &Tensor,
     layer: &crate::gpu::EncoderLayerWeights,
-    _config: &crate::gpu::BertConfig,
+    config: &crate::gpu::BertConfig,
 ) -> EmbeddingResult<Tensor> {
     let ffn = &layer.ffn;
+    let hidden_size = config.hidden_size;
+    let intermediate_size = config.intermediate_size;
 
-    // Intermediate: hidden @ W_int^T + b_int
-    let intermediate = (hidden_states
+    let (batch, seq_len, _) = hidden_states.dims3().map_err(|e| EmbeddingError::GpuError {
+        message: format!("ContextualModel ffn dims3 failed: {}", e),
+    })?;
+
+    // Flatten to [batch*seq, hidden] for Candle matmul compatibility
+    let hidden_flat = hidden_states
+        .reshape((batch * seq_len, hidden_size))
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel ffn flatten hidden failed: {}", e),
+        })?;
+
+    // Intermediate: flatten -> matmul -> reshape -> broadcast_add bias
+    let intermediate = hidden_flat
         .matmul(&ffn.intermediate_weight.t().map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel ffn intermediate weight transpose failed: {}", e),
         })?)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel ffn intermediate matmul failed: {}", e),
         })?
-        + &ffn.intermediate_bias)
+        .reshape((batch, seq_len, intermediate_size))
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel ffn intermediate reshape failed: {}", e),
+        })?
+        .broadcast_add(&ffn.intermediate_bias)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel ffn intermediate bias failed: {}", e),
         })?;
@@ -818,15 +892,25 @@ fn ffn_forward(
         message: format!("ContextualModel ffn gelu failed: {}", e),
     })?;
 
-    // Output: activated @ W_out^T + b_out
-    (activated
+    // Output: flatten -> matmul -> reshape -> broadcast_add bias
+    let activated_flat = activated
+        .reshape((batch * seq_len, intermediate_size))
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel ffn flatten activated failed: {}", e),
+        })?;
+
+    activated_flat
         .matmul(&ffn.output_weight.t().map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel ffn output weight transpose failed: {}", e),
         })?)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel ffn output matmul failed: {}", e),
         })?
-        + &ffn.output_bias)
+        .reshape((batch, seq_len, hidden_size))
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("ContextualModel ffn output reshape failed: {}", e),
+        })?
+        .broadcast_add(&ffn.output_bias)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("ContextualModel ffn output bias failed: {}", e),
         })
@@ -880,56 +964,6 @@ fn mean_pooling(
     })
 }
 
-/// L2-normalize a tensor.
-fn l2_normalize_tensor(tensor: &Tensor) -> EmbeddingResult<Tensor> {
-    let squared = tensor
-        .sqr()
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!("L2 norm squared failed: {}", e),
-        })?;
-    let sum = squared
-        .sum_all()
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!("L2 norm sum failed: {}", e),
-        })?;
-    let norm = sum
-        .sqrt()
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!("L2 norm sqrt failed: {}", e),
-        })?;
-
-    // Avoid division by zero
-    let norm_val: f32 = norm
-        .to_scalar()
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!("L2 norm to_scalar failed: {}", e),
-        })?;
-
-    if norm_val < f32::EPSILON {
-        return Ok(tensor.clone());
-    }
-
-    tensor
-        .broadcast_div(&norm)
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!("L2 normalize broadcast_div failed: {}", e),
-        })
-}
-
-/// Convert tensor to Vec<f32>.
-fn tensor_to_vec(tensor: &Tensor) -> EmbeddingResult<Vec<f32>> {
-    let flattened = tensor
-        .flatten_all()
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!("Tensor flatten failed: {}", e),
-        })?;
-    flattened
-        .to_vec1()
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!("Tensor to_vec1 failed: {}", e),
-        })
-}
-
 #[async_trait]
 impl EmbeddingModel for ContextualModel {
     fn model_id(&self) -> ModelId {
@@ -966,7 +1000,7 @@ impl EmbeddingModel for ContextualModel {
             })?;
 
         let (weights, tokenizer) = match &*state {
-            ModelState::Loaded { weights, tokenizer, .. } => (weights, tokenizer),
+            ModelState::Loaded { weights, tokenizer } => (weights, tokenizer),
             _ => {
                 return Err(EmbeddingError::NotInitialized {
                     model_id: ModelId::Multimodal,
@@ -974,7 +1008,9 @@ impl EmbeddingModel for ContextualModel {
             }
         };
 
-        let vector = gpu_forward(&content, weights, tokenizer)?;
+        // For single embed, use passage prefix (context mode)
+        let prefixed_content = format!("{}{}", CONTEXT_PREFIX, content);
+        let vector = gpu_forward(&prefixed_content, weights, tokenizer)?;
         let latency_us = start.elapsed().as_micros() as u64;
         Ok(ModelEmbedding::new(ModelId::Multimodal, vector, latency_us))
     }
@@ -1084,5 +1120,12 @@ mod tests {
             let output = result.unwrap();
             assert_eq!(output.dims(), &[1, seq_len, 768]);
         }
+    }
+
+    #[test]
+    fn test_prefix_constants_are_correct() {
+        // Verify E5 prefix constants are as expected
+        assert_eq!(INTENT_PREFIX, "query: ");
+        assert_eq!(CONTEXT_PREFIX, "passage: ");
     }
 }

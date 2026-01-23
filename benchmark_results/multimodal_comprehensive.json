@@ -1,0 +1,127 @@
+{
+  "timestamp": "2026-01-23T21:17:45.779595493+00:00",
+  "config": {
+    "max_chunks": 300,
+    "num_intent_queries": 200,
+    "num_context_queries": 200,
+    "num_asymmetric_queries": 200,
+    "seed": 42
+  },
+  "dataset_info": {
+    "total_chunks": 300,
+    "total_documents": 2437,
+    "source_datasets": [
+      "wikipedia"
+    ],
+    "topic_count": 100,
+    "has_asymmetric_e10": true,
+    "e10_coverage": 1.0
+  },
+  "embedding_stats": {
+    "total_embeddings": 300,
+    "embedding_time_secs": 318.250881085,
+    "embeddings_per_sec": 0.9426525355632073,
+    "e10_as_intent_populated": 300,
+    "e10_as_context_populated": 300
+  },
+  "e10_asymmetry_verification": {
+    "total_pairs": 300,
+    "identical_pairs": 0,
+    "identity_rate": 0.0,
+    "avg_distinctness": 0.24990521,
+    "high_similarity_pairs": 0,
+    "passed": true
+  },
+  "intent_retrieval": {
+    "num_queries": 200,
+    "mrr_intent_to_context": 0.8975198412698414,
+    "mrr_e1_baseline": 0.9733809523809523,
+    "improvement_over_e1": -0.07793568481646347,
+    "hits_at_1": 0.83,
+    "hits_at_5": 0.97
+  },
+  "context_retrieval": {
+    "num_queries": 200,
+    "mrr_context_to_intent": 0.8722142857142856,
+    "mrr_e1_baseline": 0.9757142857142856,
+    "improvement_over_e1": -0.10607613469985364,
+    "hits_at_1": 0.78,
+    "hits_at_5": 0.985
+  },
+  "asymmetric_comparison": {
+    "num_queries": 10000,
+    "raw_asymmetry_ratio": 1.0110718125485243,
+    "modified_asymmetry_ratio": 1.5166077188227889,
+    "observed_asymmetry_ratio": 1.5166077188227889,
+    "expected_asymmetry_ratio": 1.4999999999999998,
+    "formula_compliant": true,
+    "modifiers_applied": true,
+    "avg_intent_to_context_sim": 0.294245041765389,
+    "avg_context_to_intent_sim": 0.29102289087034294,
+    "avg_modified_intent_to_context_sim": 0.35309405011846623,
+    "avg_modified_context_to_intent_sim": 0.2328183126962736
+  },
+  "e10_contribution": {
+    "mrr_e1_e10_blend": 0.886922619047619,
+    "mrr_e1_only": 0.9692142857142856,
+    "e10_contribution": -0.08229166666666654,
+    "e10_contribution_pct": -0.08490554450094566,
+    "per_topic_contribution": {
+      "60": -0.11275831087151841,
+      "20": -0.11111111111111112,
+      "0": -0.06961330631543398
+    }
+  },
+  "ablation_study": {
+    "e1_only_mrr": 0.975,
+    "e10_only_mrr": 0.3676388888888891,
+    "e1_e10_blend_mrr": 0.8749007936507935,
+    "full_13_space_mrr": 0.8749007936507935,
+    "blend_analysis": [
+      {
+        "blend": 0.0,
+        "mrr": 0.975,
+        "precision_at_5": 0.3850000000000003
+      },
+      {
+        "blend": 0.1,
+        "mrr": 0.9642142857142857,
+        "precision_at_5": 0.3800000000000002
+      },
+      {
+        "blend": 0.2,
+        "mrr": 0.9300952380952381,
+        "precision_at_5": 0.36100000000000015
+      },
+      {
+        "blend": 0.3,
+        "mrr": 0.8749007936507935,
+        "precision_at_5": 0.3440000000000001
+      },
+      {
+        "blend": 0.4,
+        "mrr": 0.8019841269841269,
+        "precision_at_5": 0.30799999999999983
+      },
+      {
+        "blend": 0.5,
+        "mrr": 0.7300873015873015,
+        "precision_at_5": 0.26799999999999985
+      },
+      {
+        "blend": 0.7,
+        "mrr": 0.5534920634920635,
+        "precision_at_5": 0.21199999999999983
+      },
+      {
+        "blend": 1.0,
+        "mrr": 0.3676388888888891,
+        "precision_at_5": 0.13599999999999976
+      }
+    ]
+  },
+  "recommendations": [
+    "E10 intent->context performing worse than E1. Check E10 embedding quality.",
+    "E10 contribution below 5%. Consider increasing E10 weight in fusion formula."
+  ]
+}

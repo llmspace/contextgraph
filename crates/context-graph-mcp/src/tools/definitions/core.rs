@@ -97,13 +97,14 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "required": []
             }),
         ),
-        // search_graph - semantic search with E5 causal asymmetric similarity (ARCH-15, AP-77)
+        // search_graph - semantic search with E5 causal and E10 intent asymmetric similarity (ARCH-15, AP-77)
         ToolDefinition::new(
             "search_graph",
             "Search the knowledge graph using multi-space semantic similarity. \
              For causal queries ('why', 'what happens'), automatically applies \
              asymmetric E5 similarity with direction modifiers (cause→effect 1.2x, \
-             effect→cause 0.8x). Returns nodes matching the query with relevance scores.",
+             effect→cause 0.8x). For intent queries, applies E10 asymmetric similarity \
+             (intent→context 1.2x, context→intent 0.8x). Returns nodes matching the query with relevance scores.",
             json!({
                 "type": "object",
                 "properties": {
@@ -143,8 +144,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     },
                     "weightProfile": {
                         "type": "string",
-                        "enum": ["semantic_search", "causal_reasoning", "code_search", "fact_checking", "temporal_navigation", "category_weighted", "sequence_navigation", "conversation_history"],
-                        "description": "Weight profile for multi-space search (auto-selected for causal queries). sequence_navigation (E4 primary) for explicit sequence traversal, conversation_history (E1+E4 balanced) for contextual recall."
+                        "enum": ["semantic_search", "causal_reasoning", "code_search", "fact_checking", "temporal_navigation", "category_weighted", "sequence_navigation", "conversation_history", "intent_search", "intent_enhanced"],
+                        "description": "Weight profile for multi-space search. intent_search (E10=0.25) for intent-aware queries. intent_enhanced (E10=0.30) for stronger E10 weighting."
                     },
                     "enableRerank": {
                         "type": "boolean",
@@ -166,6 +167,31 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "type": "boolean",
                         "default": false,
                         "description": "Expand causal queries with related terms for better recall"
+                    },
+                    "intentMode": {
+                        "type": "string",
+                        "enum": ["none", "seeking_intent", "seeking_context", "auto"],
+                        "default": "none",
+                        "description": "E10 intent mode: none (disabled), seeking_intent (query is a goal/purpose, apply 1.2x boost), seeking_context (query is a situation, apply 0.8x), auto (detect from query)"
+                    },
+                    "intentBlend": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.3,
+                        "description": "E10 intent blend weight when intentMode is active [0.0=pure E1, 1.0=pure E10]. Only used when intentMode != none."
+                    },
+                    "enableIntentGate": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Enable E10 intent gate in pipeline strategy. Adds intent filtering between E1 scoring and E12 reranking. Only effective with strategy='pipeline'."
+                    },
+                    "intentGateThreshold": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.3,
+                        "description": "Minimum E10 intent similarity for pipeline gate. Candidates below threshold are filtered out. Only used when enableIntentGate=true."
                     },
                     "temporalWeight": {
                         "type": "number",

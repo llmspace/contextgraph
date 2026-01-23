@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-01-23T21:12:10.353465154+00:00",
+  "corpus_size": 100,
+  "num_topics": 10,
+  "num_queries": 10,
+  "mcp_multispace": {
+    "mrr": 0.8,
+    "precision_at_5": 0.6599999999999999,
+    "precision_at_10": 0.4800000000000001,
+    "recall_at_10": 0.5333333333333334
+  },
+  "e1_baseline": {
+    "mrr": 0.8833333333333332,
+    "precision_at_5": 0.6799999999999999,
+    "precision_at_10": 0.5199999999999999,
+    "recall_at_10": 0.5777777777777777
+  },
+  "improvements": {
+    "mrr_pct": -9.433962264150923,
+    "precision_5_pct": -2.941176470588238,
+    "precision_10_pct": -7.692307692307658,
+    "recall_10_pct": -7.692307692307667
+  },
+  "total_injection_time_secs": 130.42207904,
+  "total_search_time_secs": 32.523904437,
+  "avg_embedding_ms": 1303.7
+}
