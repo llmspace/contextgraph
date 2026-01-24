@@ -124,6 +124,12 @@ impl Handlers {
                 self.call_find_contextual_matches(id, arguments).await
             }
 
+            // ========== KEYWORD TOOLS (E6 Keyword Search Enhancement) ==========
+            tool_names::SEARCH_BY_KEYWORDS => self.call_search_by_keywords(id, arguments).await,
+
+            // ========== CODE TOOLS (E7 Code Search Enhancement) ==========
+            tool_names::SEARCH_CODE => self.call_search_code(id, arguments).await,
+
             // ========== ENTITY TOOLS (E11 Entity Integration) ==========
             tool_names::EXTRACT_ENTITIES => self.call_extract_entities(id, arguments).await,
             tool_names::SEARCH_BY_ENTITIES => self.call_search_by_entities(id, arguments).await,

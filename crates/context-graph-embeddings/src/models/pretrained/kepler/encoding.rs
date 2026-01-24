@@ -19,7 +19,7 @@ impl KeplerModel {
     ///
     /// # Examples
     /// ```rust
-    /// use context_graph_embeddings::models::kepler::KeplerModel;
+    /// use context_graph_embeddings::models::pretrained::KeplerModel;
     ///
     /// let text = KeplerModel::encode_entity("Paris", Some("location"));
     /// assert_eq!(text, "[LOCATION] Paris");
@@ -47,7 +47,7 @@ impl KeplerModel {
     ///
     /// # Examples
     /// ```rust
-    /// use context_graph_embeddings::models::kepler::KeplerModel;
+    /// use context_graph_embeddings::models::pretrained::KeplerModel;
     ///
     /// let text = KeplerModel::encode_relation("capital_of");
     /// assert_eq!(text, "capital of");
@@ -73,7 +73,7 @@ impl KeplerModel {
     ///
     /// # Examples
     /// ```rust
-    /// use context_graph_embeddings::models::kepler::KeplerModel;
+    /// use context_graph_embeddings::models::pretrained::KeplerModel;
     ///
     /// // With label
     /// let text = KeplerModel::encode_wikidata_relation("P36", Some("capital"));
@@ -105,7 +105,7 @@ impl KeplerModel {
     ///
     /// # Examples
     /// ```rust
-    /// use context_graph_embeddings::models::kepler::KeplerModel;
+    /// use context_graph_embeddings::models::pretrained::KeplerModel;
     ///
     /// let text = KeplerModel::encode_triple("Paris", "capital_of", "France");
     /// assert_eq!(text, "Paris capital of France");

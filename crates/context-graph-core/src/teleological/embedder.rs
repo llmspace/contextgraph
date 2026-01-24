@@ -174,7 +174,7 @@ impl Embedder {
             Self::Emotional => EmbedderDims::Dense(E8_DIM), // 384
             Self::Hdc => EmbedderDims::Dense(E9_DIM),      // 1024 (projected)
             Self::Multimodal => EmbedderDims::Dense(E10_DIM), // 768
-            Self::Entity => EmbedderDims::Dense(E11_DIM),  // 384
+            Self::Entity => EmbedderDims::Dense(E11_DIM),  // 768 (KEPLER)
             Self::LateInteraction => EmbedderDims::TokenLevel {
                 per_token: E12_TOKEN_DIM,
             }, // 128

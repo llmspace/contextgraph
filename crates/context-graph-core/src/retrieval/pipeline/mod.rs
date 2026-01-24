@@ -29,6 +29,7 @@
 
 mod default;
 mod filtering;
+pub mod stage5;
 mod traits;
 
 #[cfg(test)]
@@ -36,4 +37,5 @@ mod tests;
 
 // Re-export public API
 pub use default::DefaultTeleologicalPipeline;
+pub use stage5::{LateInteractionReranker, Stage5Result, TokenStorage, E12_TOKEN_DIM, DEFAULT_STAGE5_LIMIT};
 pub use traits::{PipelineHealth, TeleologicalRetrievalPipeline};

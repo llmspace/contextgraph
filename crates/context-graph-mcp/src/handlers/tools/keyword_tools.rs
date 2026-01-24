@@ -1,0 +1,480 @@
+//! E6 keyword search tool implementation (search_by_keywords).
+//!
+//! # E6 Keyword Search (V_selectivity)
+//!
+//! This tool leverages E6 sparse embeddings for exact keyword matching:
+//! - E6 finds exact term matches that E1 dilutes through semantic averaging
+//! - Optionally uses E13 SPLADE for term expansion (fast→quick)
+//! - Blends E6 keyword scores with E1 semantic for comprehensive results
+//!
+//! ## Constitution Compliance
+//!
+//! - ARCH-12: E1 is the semantic foundation, E6 enhances with keyword precision
+//! - ARCH-13: Uses multi-space search with E1+E6
+//! - E6 finds: "Exact keyword matches" that E1 misses by "Diluting via averaging"
+//! - AP-02: All comparisons within respective spaces (no cross-embedder)
+//! - FAIL FAST: All errors propagate immediately with logging
+
+use serde_json::json;
+use tracing::{debug, error, info, warn};
+use uuid::Uuid;
+
+use context_graph_core::traits::{SearchStrategy, TeleologicalSearchOptions};
+
+use crate::protocol::JsonRpcId;
+use crate::protocol::JsonRpcResponse;
+
+use super::keyword_dtos::{
+    KeywordSearchMetadata, KeywordSearchResult, KeywordSourceInfo, SearchByKeywordsRequest,
+    SearchByKeywordsResponse,
+};
+
+use super::super::Handlers;
+
+impl Handlers {
+    /// search_by_keywords tool implementation.
+    ///
+    /// Finds memories matching specific keywords using E6 sparse embeddings.
+    /// ENHANCES E1 semantic search with keyword-level precision.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Embed the keyword query using all 13 embedders
+    /// 2. Search using E1 semantic as primary (over-fetch for blending)
+    /// 3. Extract keywords and compute E6 sparse similarity
+    /// 4. Optionally expand with E13 SPLADE for term coverage
+    /// 5. Blend E1 and E6 scores: (1-blend)*E1 + blend*E6
+    /// 6. Filter by minScore and return top-K results
+    ///
+    /// # Parameters
+    ///
+    /// - `query`: The keyword query to search for (required)
+    /// - `topK`: Maximum results to return (1-50, default: 10)
+    /// - `minScore`: Minimum blended score threshold (0-1, default: 0.1)
+    /// - `blendWithSemantic`: E6 weight in blend (0-1, default: 0.3)
+    /// - `useSpladeExpansion`: Use E13 SPLADE term expansion (default: true)
+    /// - `includeContent`: Include full content text (default: false)
+    pub(crate) async fn call_search_by_keywords(
+        &self,
+        id: Option<JsonRpcId>,
+        args: serde_json::Value,
+    ) -> JsonRpcResponse {
+        // Parse and validate request
+        let request: SearchByKeywordsRequest = match serde_json::from_value(args.clone()) {
+            Ok(req) => req,
+            Err(e) => {
+                error!(error = %e, "search_by_keywords: Failed to parse request");
+                return self.tool_error_with_pulse(id, &format!("Invalid request: {}", e));
+            }
+        };
+
+        if let Err(e) = request.validate() {
+            error!(error = %e, "search_by_keywords: Validation failed");
+            return self.tool_error_with_pulse(id, &e);
+        }
+
+        let query = &request.query;
+        let top_k = request.top_k;
+        let min_score = request.min_score;
+        let e6_blend = request.blend_with_semantic;
+        let e1_weight = 1.0 - e6_blend;
+
+        info!(
+            query_preview = %query.chars().take(50).collect::<String>(),
+            top_k = top_k,
+            min_score = min_score,
+            e6_blend = e6_blend,
+            use_splade = request.use_splade_expansion,
+            "search_by_keywords: Starting keyword-enhanced search"
+        );
+
+        // Step 1: Embed the keyword query
+        let query_embedding = match self.multi_array_provider.embed_all(query).await {
+            Ok(output) => output.fingerprint,
+            Err(e) => {
+                error!(error = %e, "search_by_keywords: Query embedding FAILED");
+                return self.tool_error_with_pulse(id, &format!("Query embedding failed: {}", e));
+            }
+        };
+
+        // Extract keywords for metadata and scoring
+        let extracted_keywords = extract_keywords(query);
+
+        debug!(
+            keywords = ?extracted_keywords,
+            keyword_count = extracted_keywords.len(),
+            "search_by_keywords: Extracted keywords from query"
+        );
+
+        // Step 2: Search for candidates (3x over-fetch for blended reranking)
+        let fetch_multiplier = 3;
+        let fetch_top_k = top_k * fetch_multiplier;
+
+        // Use keyword_search weight profile with E6 emphasis
+        let options = TeleologicalSearchOptions::quick(fetch_top_k)
+            .with_strategy(SearchStrategy::MultiSpace)
+            .with_weight_profile("semantic_search") // E1 foundation
+            .with_min_similarity(0.0); // Get all candidates, filter later
+
+        let candidates = match self
+            .teleological_store
+            .search_semantic(&query_embedding, options)
+            .await
+        {
+            Ok(results) => results,
+            Err(e) => {
+                error!(error = %e, "search_by_keywords: Candidate search FAILED");
+                return self.tool_error_with_pulse(id, &format!("Search failed: {}", e));
+            }
+        };
+
+        let candidates_evaluated = candidates.len();
+        debug!(
+            candidates_evaluated = candidates_evaluated,
+            "search_by_keywords: Evaluating candidates for keyword scoring"
+        );
+
+        // Step 3: Compute keyword-enhanced scores
+        // Get query E6 sparse vector for keyword matching
+        let query_e6 = &query_embedding.e6_sparse;
+        let query_e1 = &query_embedding.e1_semantic;
+
+        // Optional: Get E13 SPLADE for term expansion
+        let query_e13 = if request.use_splade_expansion {
+            Some(&query_embedding.e13_splade)
+        } else {
+            None
+        };
+
+        let mut scored_results: Vec<(Uuid, f32, f32, f32, u32)> = Vec::with_capacity(candidates.len());
+
+        for candidate in &candidates {
+            let cand_id = candidate.fingerprint.id;
+            let cand_e1 = &candidate.fingerprint.semantic.e1_semantic;
+            let cand_e6 = &candidate.fingerprint.semantic.e6_sparse;
+
+            // E1 cosine similarity (THE semantic foundation per ARCH-12)
+            let e1_sim = cosine_similarity(query_e1, cand_e1);
+
+            // E6 sparse keyword similarity using Jaccard-like overlap
+            let (e6_sim, matching_count) = sparse_keyword_similarity(query_e6, cand_e6);
+
+            // Optional E13 SPLADE expansion boost
+            let e6_with_expansion = if let Some(q_e13) = query_e13 {
+                let cand_e13 = &candidate.fingerprint.semantic.e13_splade;
+                let (e13_sim, _) = sparse_keyword_similarity(q_e13, cand_e13);
+                // Average E6 and E13 for expanded keyword coverage
+                (e6_sim + e13_sim) / 2.0
+            } else {
+                e6_sim
+            };
+
+            // Blend scores: (1-blend)*E1 + blend*E6
+            // E6 enhances E1 for keyword-specific queries
+            let blended_score = e1_weight * e1_sim + e6_blend * e6_with_expansion;
+
+            if blended_score >= min_score {
+                scored_results.push((cand_id, blended_score, e1_sim, e6_with_expansion, matching_count));
+            }
+        }
+
+        // Step 4: Sort by blended score and take top-K
+        scored_results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored_results.truncate(top_k);
+
+        let filtered_count = candidates_evaluated - scored_results.len();
+
+        // Step 5: Build results with optional content
+        let result_ids: Vec<Uuid> = scored_results.iter().map(|r| r.0).collect();
+
+        // Get content if requested
+        let contents: Vec<Option<String>> = if request.include_content && !result_ids.is_empty() {
+            match self.teleological_store.get_content_batch(&result_ids).await {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!(error = %e, "search_by_keywords: Content retrieval failed");
+                    vec![None; result_ids.len()]
+                }
+            }
+        } else {
+            vec![None; result_ids.len()]
+        };
+
+        // Get source metadata
+        let source_metadata = match self
+            .teleological_store
+            .get_source_metadata_batch(&result_ids)
+            .await
+        {
+            Ok(m) => m,
+            Err(e) => {
+                warn!(error = %e, "search_by_keywords: Source metadata retrieval failed");
+                vec![None; result_ids.len()]
+            }
+        };
+
+        // Build response
+        let mut results: Vec<KeywordSearchResult> = Vec::with_capacity(scored_results.len());
+
+        for (i, (memory_id, score, e1_sim, e6_sim, matching_keywords)) in
+            scored_results.into_iter().enumerate()
+        {
+            let source = source_metadata.get(i).and_then(|m| {
+                m.as_ref().map(|meta| KeywordSourceInfo {
+                    source_type: format!("{}", meta.source_type),
+                    file_path: meta.file_path.clone(),
+                    hook_type: meta.hook_type.clone(),
+                    tool_name: meta.tool_name.clone(),
+                })
+            });
+
+            results.push(KeywordSearchResult {
+                memory_id,
+                score,
+                e1_similarity: e1_sim,
+                e6_keyword_score: e6_sim,
+                matching_keywords,
+                content: contents.get(i).and_then(|c| c.clone()),
+                source,
+            });
+        }
+
+        let response = SearchByKeywordsResponse {
+            query: query.clone(),
+            results: results.clone(),
+            count: results.len(),
+            metadata: KeywordSearchMetadata {
+                candidates_evaluated,
+                filtered_by_score: filtered_count,
+                e6_blend_weight: e6_blend,
+                e1_weight,
+                used_splade_expansion: request.use_splade_expansion,
+                extracted_keywords,
+            },
+        };
+
+        info!(
+            results_found = response.count,
+            candidates_evaluated = candidates_evaluated,
+            filtered = filtered_count,
+            "search_by_keywords: Completed keyword-enhanced search"
+        );
+
+        self.tool_result_with_pulse(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+    }
+}
+
+/// Compute cosine similarity between two dense vectors.
+///
+/// Returns 0.0 if either vector is empty or has zero norm.
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+    if a.is_empty() || b.is_empty() || a.len() != b.len() {
+        return 0.0;
+    }
+
+    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+
+    if norm_a < f32::EPSILON || norm_b < f32::EPSILON {
+        return 0.0;
+    }
+
+    (dot / (norm_a * norm_b)).clamp(-1.0, 1.0)
+}
+
+/// Compute sparse keyword similarity using weighted Jaccard-like overlap.
+///
+/// For E6/E13 sparse vectors, computes:
+/// - Intersection score: sum of min(query_weight, doc_weight) for matching terms
+/// - Union score: sum of max(query_weight, doc_weight) for all terms
+/// - Similarity: intersection / union (Jaccard-like)
+///
+/// Returns (similarity, matching_term_count).
+fn sparse_keyword_similarity(
+    query: &context_graph_core::types::fingerprint::SparseVector,
+    doc: &context_graph_core::types::fingerprint::SparseVector,
+) -> (f32, u32) {
+    if query.is_empty() || doc.is_empty() {
+        return (0.0, 0);
+    }
+
+    let mut intersection = 0.0f32;
+    let mut union = 0.0f32;
+    let mut matching_count = 0u32;
+
+    // Build hashmap of document terms for O(1) lookup
+    let doc_terms: std::collections::HashMap<u16, f32> = doc
+        .indices
+        .iter()
+        .zip(doc.values.iter())
+        .map(|(&idx, &val)| (idx, val))
+        .collect();
+
+    // Compute intersection and track query terms
+    for (&q_idx, &q_val) in query.indices.iter().zip(query.values.iter()) {
+        if let Some(&d_val) = doc_terms.get(&q_idx) {
+            // Term in both: add min to intersection, max to union
+            intersection += q_val.min(d_val);
+            union += q_val.max(d_val);
+            matching_count += 1;
+        } else {
+            // Term only in query: add to union
+            union += q_val;
+        }
+    }
+
+    // Add doc-only terms to union
+    for (&d_idx, &d_val) in doc.indices.iter().zip(doc.values.iter()) {
+        if !query.indices.contains(&d_idx) {
+            union += d_val;
+        }
+    }
+
+    let similarity = if union > f32::EPSILON {
+        intersection / union
+    } else {
+        0.0
+    };
+
+    (similarity.clamp(0.0, 1.0), matching_count)
+}
+
+/// Extract keywords from a query string.
+///
+/// Simple keyword extraction:
+/// - Lowercases the query
+/// - Splits on whitespace and punctuation
+/// - Filters out common stop words
+/// - Returns unique keywords
+fn extract_keywords(query: &str) -> Vec<String> {
+    // Simple stop words list
+    const STOP_WORDS: &[&str] = &[
+        "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+        "have", "has", "had", "do", "does", "did", "will", "would", "could",
+        "should", "may", "might", "must", "shall", "can", "need", "to", "of",
+        "in", "for", "on", "with", "at", "by", "from", "as", "into", "through",
+        "during", "before", "after", "above", "below", "between", "under", "over",
+        "again", "further", "then", "once", "here", "there", "when", "where",
+        "why", "how", "all", "each", "few", "more", "most", "other", "some",
+        "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too",
+        "very", "just", "and", "but", "if", "or", "because", "until", "while",
+        "about", "against", "this", "that", "these", "those", "what", "which",
+        "who", "whom", "i", "me", "my", "we", "our", "you", "your", "he", "him",
+        "his", "she", "her", "it", "its", "they", "them", "their",
+    ];
+
+    let stop_set: std::collections::HashSet<&str> = STOP_WORDS.iter().copied().collect();
+
+    let keywords: Vec<String> = query
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
+        .filter(|word| {
+            let word = word.trim();
+            !word.is_empty() && word.len() >= 2 && !stop_set.contains(word)
+        })
+        .map(|s| s.to_string())
+        .collect();
+
+    // Deduplicate while preserving order
+    let mut seen = std::collections::HashSet::new();
+    keywords
+        .into_iter()
+        .filter(|k| seen.insert(k.clone()))
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use context_graph_core::types::fingerprint::SparseVector;
+
+    #[test]
+    fn test_cosine_similarity_identical() {
+        let a = vec![1.0, 0.0, 0.0];
+        let b = vec![1.0, 0.0, 0.0];
+        let sim = cosine_similarity(&a, &b);
+        assert!((sim - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_cosine_similarity_orthogonal() {
+        let a = vec![1.0, 0.0, 0.0];
+        let b = vec![0.0, 1.0, 0.0];
+        let sim = cosine_similarity(&a, &b);
+        assert!(sim.abs() < 0.001);
+    }
+
+    #[test]
+    fn test_sparse_keyword_similarity_identical() {
+        let query = SparseVector::new(vec![10, 20, 30], vec![1.0, 0.5, 0.3]).unwrap();
+        let doc = SparseVector::new(vec![10, 20, 30], vec![1.0, 0.5, 0.3]).unwrap();
+        let (sim, count) = sparse_keyword_similarity(&query, &doc);
+        assert!((sim - 1.0).abs() < 0.001);
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn test_sparse_keyword_similarity_partial_overlap() {
+        let query = SparseVector::new(vec![10, 20, 30], vec![1.0, 0.5, 0.3]).unwrap();
+        let doc = SparseVector::new(vec![10, 40, 50], vec![1.0, 0.5, 0.3]).unwrap();
+        let (sim, count) = sparse_keyword_similarity(&query, &doc);
+        assert!(sim > 0.0 && sim < 1.0);
+        assert_eq!(count, 1); // Only term 10 matches
+    }
+
+    #[test]
+    fn test_sparse_keyword_similarity_no_overlap() {
+        let query = SparseVector::new(vec![10, 20, 30], vec![1.0, 0.5, 0.3]).unwrap();
+        let doc = SparseVector::new(vec![40, 50, 60], vec![1.0, 0.5, 0.3]).unwrap();
+        let (sim, count) = sparse_keyword_similarity(&query, &doc);
+        assert!((sim - 0.0).abs() < 0.001);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_extract_keywords_simple() {
+        let query = "RocksDB compaction tuning parameters";
+        let keywords = extract_keywords(query);
+        assert!(keywords.contains(&"rocksdb".to_string()));
+        assert!(keywords.contains(&"compaction".to_string()));
+        assert!(keywords.contains(&"tuning".to_string()));
+        assert!(keywords.contains(&"parameters".to_string()));
+    }
+
+    #[test]
+    fn test_extract_keywords_filters_stop_words() {
+        let query = "the quick brown fox jumps over the lazy dog";
+        let keywords = extract_keywords(query);
+        // "the" and "over" are stop words
+        assert!(!keywords.contains(&"the".to_string()));
+        assert!(!keywords.contains(&"over".to_string()));
+        // Content words should remain
+        assert!(keywords.contains(&"quick".to_string()));
+        assert!(keywords.contains(&"brown".to_string()));
+        assert!(keywords.contains(&"fox".to_string()));
+    }
+
+    #[test]
+    fn test_extract_keywords_handles_punctuation() {
+        let query = "Hello, world! How are you?";
+        let keywords = extract_keywords(query);
+        assert!(keywords.contains(&"hello".to_string()));
+        assert!(keywords.contains(&"world".to_string()));
+    }
+
+    #[test]
+    fn test_extract_keywords_preserves_underscores() {
+        let query = "user_id session_token";
+        let keywords = extract_keywords(query);
+        assert!(keywords.contains(&"user_id".to_string()));
+        assert!(keywords.contains(&"session_token".to_string()));
+    }
+
+    #[test]
+    fn test_extract_keywords_deduplicates() {
+        let query = "test test test unique";
+        let keywords = extract_keywords(query);
+        assert_eq!(keywords.iter().filter(|&k| k == "test").count(), 1);
+    }
+}

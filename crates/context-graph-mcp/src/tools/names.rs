@@ -58,6 +58,12 @@ pub const GET_GRAPH_PATH: &str = "get_graph_path";
 pub const SEARCH_BY_INTENT: &str = "search_by_intent";
 pub const FIND_CONTEXTUAL_MATCHES: &str = "find_contextual_matches";
 
+// ========== KEYWORD TOOLS (E6 Keyword Search Enhancement) ==========
+pub const SEARCH_BY_KEYWORDS: &str = "search_by_keywords";
+
+// ========== CODE TOOLS (E7 Code Search Enhancement) ==========
+pub const SEARCH_CODE: &str = "search_code";
+
 // ========== ENTITY TOOLS (E11 Entity Integration) ==========
 pub const EXTRACT_ENTITIES: &str = "extract_entities";
 pub const SEARCH_BY_ENTITIES: &str = "search_by_entities";

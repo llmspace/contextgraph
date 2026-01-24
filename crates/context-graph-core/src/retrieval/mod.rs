@@ -84,12 +84,15 @@ pub mod detector;
 pub mod distance;
 pub mod divergence;
 mod executor;
+pub mod insight_annotation;
 pub mod multi_space;
 mod pipeline;
 mod query;
+pub mod query_analyzer;
 mod result;
 pub mod retriever;
 pub mod similarity;
+pub mod sparse_index;
 mod teleological_query;
 mod teleological_result;
 
@@ -104,9 +107,12 @@ mod tests;
 mod manual_test;
 
 // Re-export all public types
-pub use aggregation::AggregationStrategy;
+pub use aggregation::{AggregationStrategy, CombinedResult};
 pub use executor::{IndexType, MultiEmbeddingQueryExecutor, SpaceInfo};
-pub use pipeline::{DefaultTeleologicalPipeline, PipelineHealth, TeleologicalRetrievalPipeline};
+pub use pipeline::{
+    DefaultTeleologicalPipeline, PipelineHealth, TeleologicalRetrievalPipeline,
+    LateInteractionReranker, Stage5Result, TokenStorage, E12_TOKEN_DIM, DEFAULT_STAGE5_LIMIT,
+};
 
 // AP-007: InMemoryMultiEmbeddingExecutor is TEST ONLY - uses stubs
 #[cfg(test)]
@@ -156,4 +162,22 @@ pub use detector::{
 // High-level retrieval orchestrator
 pub use retriever::{
     memory_to_recent, RetrieverError, SimilarityRetriever,
+};
+
+// Sparse inverted index for E6/E13 Stage 1 recall
+pub use sparse_index::{
+    RecallCandidate, RecallStats, SparseIndexError, SparseInvertedIndex,
+    DEFAULT_RECALL_LIMIT,
+};
+
+// Query type analyzer for intelligent embedder selection
+pub use query_analyzer::{
+    CausalDirection, DetectedLanguage, QueryAnalysis, QueryType, QueryTypeAnalyzer,
+};
+
+// Insight annotations and perspective coverage
+pub use insight_annotation::{
+    annotate_results, compute_perspective_coverage, generate_insight_annotation,
+    get_embedder_info, embedder_names_for_indices,
+    CategoryBreakdown, EmbedderCategory, MissingPerspective, PerspectiveCoverage,
 };

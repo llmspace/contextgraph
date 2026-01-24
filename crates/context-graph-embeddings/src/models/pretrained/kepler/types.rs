@@ -70,7 +70,7 @@ pub(crate) enum ModelState {
 /// # Construction
 ///
 /// ```rust,no_run
-/// use context_graph_embeddings::models::kepler::KeplerModel;
+/// use context_graph_embeddings::models::pretrained::KeplerModel;
 /// use context_graph_embeddings::traits::SingleModelConfig;
 /// use context_graph_embeddings::error::EmbeddingResult;
 /// use std::path::Path;

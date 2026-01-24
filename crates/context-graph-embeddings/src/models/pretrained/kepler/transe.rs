@@ -47,7 +47,7 @@ impl KeplerModel {
     ///
     /// # Examples
     /// ```rust
-    /// use context_graph_embeddings::models::kepler::KeplerModel;
+    /// use context_graph_embeddings::models::pretrained::KeplerModel;
     ///
     /// // Perfect triple: h + r = t
     /// let h: Vec<f32> = vec![1.0; 768];

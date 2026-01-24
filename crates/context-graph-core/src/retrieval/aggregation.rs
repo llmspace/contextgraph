@@ -170,6 +170,182 @@ impl AggregationStrategy {
     pub fn rrf_contribution(rank: usize, k: f32) -> f32 {
         1.0 / (k + (rank as f32) + 1.0)
     }
+
+    /// Additive RRF with unique contribution tracking.
+    ///
+    /// Tracks which embedders found each result and identifies unique
+    /// contributions (results found by only one embedder - blind spots).
+    ///
+    /// # Philosophy
+    /// Each embedder looks at content from its unique perspective:
+    /// - E1 finds semantically similar content
+    /// - E11 finds entity-related content E1 missed
+    /// - E5 finds causally-related content E1 missed
+    /// - etc.
+    ///
+    /// When an embedder finds something NO OTHER embedder found, that's
+    /// a "blind spot discovery" and gets a 10% boost.
+    ///
+    /// # Arguments
+    /// - ranked_lists: Vec of (space_index, Vec<memory_id>) per space
+    /// - k: RRF constant (default: 60)
+    /// - unique_boost: Boost for blind spot discoveries (default: 0.1 = 10%)
+    ///
+    /// # Returns
+    /// Vec of CombinedResult with full contribution tracking
+    pub fn aggregate_rrf_additive(
+        ranked_lists: &[(usize, Vec<Uuid>)],
+        k: f32,
+        unique_boost: f32,
+    ) -> Vec<CombinedResult> {
+        // Track contributions for each memory
+        let mut contributions: HashMap<Uuid, CombinedResultBuilder> = HashMap::new();
+
+        for (space_idx, ranked_ids) in ranked_lists {
+            for (rank, memory_id) in ranked_ids.iter().enumerate() {
+                let rrf_contribution = 1.0 / (k + (rank as f32) + 1.0);
+
+                let builder = contributions
+                    .entry(*memory_id)
+                    .or_insert_with(|| CombinedResultBuilder::new(*memory_id));
+
+                builder.add_contribution(*space_idx, rank, rrf_contribution);
+            }
+        }
+
+        // Convert to results and apply unique boost
+        let mut results: Vec<CombinedResult> = contributions
+            .into_iter()
+            .map(|(_, builder)| {
+                let mut result = builder.build();
+
+                // Apply unique boost if found by only one embedder
+                if result.unique_contribution {
+                    result.boosted_score = result.rrf_score * (1.0 + unique_boost);
+                } else {
+                    result.boosted_score = result.rrf_score;
+                }
+
+                result
+            })
+            .collect();
+
+        // Sort by boosted score descending
+        results.sort_by(|a, b| {
+            b.boosted_score
+                .partial_cmp(&a.boosted_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        results
+    }
+}
+
+/// Result from additive RRF aggregation with contribution tracking.
+#[derive(Debug, Clone)]
+pub struct CombinedResult {
+    /// Memory UUID.
+    pub memory_id: Uuid,
+
+    /// Base RRF score (before boost).
+    pub rrf_score: f32,
+
+    /// Boosted score (with unique contribution boost).
+    pub boosted_score: f32,
+
+    /// Set of embedder indices that found this result.
+    pub found_by: std::collections::HashSet<usize>,
+
+    /// The embedder with the highest contribution (lowest rank).
+    pub primary_embedder: usize,
+
+    /// Whether this was a unique contribution (found by only one embedder).
+    /// These are "blind spot discoveries" - insights other embedders missed.
+    pub unique_contribution: bool,
+
+    /// Best rank achieved across all embedders.
+    pub best_rank: usize,
+
+    /// Human-readable insight annotation describing the contribution.
+    pub insight_annotation: Option<String>,
+}
+
+impl CombinedResult {
+    /// Get embedder name for the primary embedder.
+    pub fn primary_embedder_name(&self) -> &'static str {
+        match self.primary_embedder {
+            0 => "E1_Semantic",
+            1 => "E2_Temporal_Recent",
+            2 => "E3_Temporal_Periodic",
+            3 => "E4_Temporal_Positional",
+            4 => "E5_Causal",
+            5 => "E6_Sparse",
+            6 => "E7_Code",
+            7 => "E8_Graph",
+            8 => "E9_HDC",
+            9 => "E10_Multimodal",
+            10 => "E11_Entity",
+            11 => "E12_Late_Interaction",
+            12 => "E13_SPLADE",
+            _ => "Unknown",
+        }
+    }
+
+    /// Number of embedders that found this result.
+    pub fn embedder_count(&self) -> usize {
+        self.found_by.len()
+    }
+}
+
+/// Builder for CombinedResult to track contributions during aggregation.
+struct CombinedResultBuilder {
+    memory_id: Uuid,
+    rrf_score: f32,
+    found_by: std::collections::HashSet<usize>,
+    best_rank: usize,
+    primary_embedder: usize,
+}
+
+impl CombinedResultBuilder {
+    fn new(memory_id: Uuid) -> Self {
+        Self {
+            memory_id,
+            rrf_score: 0.0,
+            found_by: std::collections::HashSet::new(),
+            best_rank: usize::MAX,
+            primary_embedder: 0,
+        }
+    }
+
+    fn add_contribution(&mut self, embedder_idx: usize, rank: usize, contribution: f32) {
+        self.rrf_score += contribution;
+        self.found_by.insert(embedder_idx);
+
+        // Track the embedder with the best (lowest) rank
+        if rank < self.best_rank {
+            self.best_rank = rank;
+            self.primary_embedder = embedder_idx;
+        }
+    }
+
+    fn build(self) -> CombinedResult {
+        let unique_contribution = self.found_by.len() == 1;
+
+        CombinedResult {
+            memory_id: self.memory_id,
+            rrf_score: self.rrf_score,
+            boosted_score: self.rrf_score, // Will be updated with boost
+            found_by: self.found_by,
+            primary_embedder: self.primary_embedder,
+            unique_contribution,
+            best_rank: if self.best_rank == usize::MAX {
+                0
+            } else {
+                self.best_rank
+            },
+            insight_annotation: None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -373,5 +549,144 @@ mod tests {
         }
 
         println!("[VERIFIED] Default strategy is RRF with k=60");
+    }
+
+    // ========================================================================
+    // ADDITIVE RRF TESTS
+    // ========================================================================
+
+    #[test]
+    fn test_additive_rrf_basic() {
+        println!("=== TEST: Additive RRF Basic ===");
+
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        let id3 = Uuid::new_v4();
+
+        // id1: found by E1 and E5
+        // id2: found only by E11 (unique contribution)
+        // id3: found by E1, E5, E7
+        let ranked_lists = vec![
+            (0, vec![id1, id3]),   // E1: id1=rank0, id3=rank1
+            (4, vec![id1, id3]),   // E5: id1=rank0, id3=rank1
+            (6, vec![id3]),        // E7: only id3
+            (10, vec![id2]),       // E11: only id2 (unique!)
+        ];
+
+        let results = AggregationStrategy::aggregate_rrf_additive(&ranked_lists, 60.0, 0.1);
+
+        println!("Results:");
+        for r in &results {
+            println!(
+                "  {}: rrf={:.4}, boosted={:.4}, unique={}, embedders={:?}",
+                r.memory_id, r.rrf_score, r.boosted_score, r.unique_contribution, r.found_by
+            );
+        }
+
+        // Find id2 (unique contribution)
+        let id2_result = results.iter().find(|r| r.memory_id == id2).unwrap();
+        assert!(id2_result.unique_contribution);
+        assert_eq!(id2_result.embedder_count(), 1);
+        assert!(id2_result.found_by.contains(&10)); // E11
+        assert!(id2_result.boosted_score > id2_result.rrf_score);
+
+        // Find id1 (not unique)
+        let id1_result = results.iter().find(|r| r.memory_id == id1).unwrap();
+        assert!(!id1_result.unique_contribution);
+        assert_eq!(id1_result.embedder_count(), 2);
+        assert!(id1_result.found_by.contains(&0)); // E1
+        assert!(id1_result.found_by.contains(&4)); // E5
+
+        println!("[VERIFIED] Additive RRF tracks unique contributions");
+    }
+
+    #[test]
+    fn test_additive_rrf_unique_boost() {
+        println!("=== TEST: Additive RRF Unique Boost ===");
+
+        let id_unique = Uuid::new_v4();
+        let id_common = Uuid::new_v4();
+
+        // id_unique: found only by E11 at rank 0
+        // id_common: found by E1, E5, E7 all at rank 0
+        let ranked_lists = vec![
+            (0, vec![id_common]),  // E1
+            (4, vec![id_common]),  // E5
+            (6, vec![id_common]),  // E7
+            (10, vec![id_unique]), // E11 only
+        ];
+
+        let results = AggregationStrategy::aggregate_rrf_additive(&ranked_lists, 60.0, 0.1);
+
+        let unique = results.iter().find(|r| r.memory_id == id_unique).unwrap();
+        let common = results.iter().find(|r| r.memory_id == id_common).unwrap();
+
+        // unique: rrf=1/61, boosted=1/61*1.1
+        // common: rrf=3/61, boosted=3/61
+        println!("Unique: rrf={:.4}, boosted={:.4}", unique.rrf_score, unique.boosted_score);
+        println!("Common: rrf={:.4}, boosted={:.4}", common.rrf_score, common.boosted_score);
+
+        assert!(unique.boosted_score > unique.rrf_score, "Unique should get boost");
+        assert_eq!(common.boosted_score, common.rrf_score, "Common should not get boost");
+
+        // Verify 10% boost for unique
+        let expected_boost = unique.rrf_score * 1.1;
+        assert!((unique.boosted_score - expected_boost).abs() < 0.0001);
+
+        println!("[VERIFIED] Unique contributions get 10% boost");
+    }
+
+    #[test]
+    fn test_additive_rrf_primary_embedder() {
+        println!("=== TEST: Additive RRF Primary Embedder ===");
+
+        let id = Uuid::new_v4();
+
+        // id found by E1 at rank 5, E5 at rank 0, E7 at rank 3
+        // Primary should be E5 (best rank)
+        let ranked_lists = vec![
+            (0, vec![Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), id]), // E1 rank 5
+            (4, vec![id]),                                                                                 // E5 rank 0
+            (6, vec![Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), id]),                                 // E7 rank 3
+        ];
+
+        let results = AggregationStrategy::aggregate_rrf_additive(&ranked_lists, 60.0, 0.1);
+        let result = results.iter().find(|r| r.memory_id == id).unwrap();
+
+        assert_eq!(result.primary_embedder, 4, "Primary should be E5 (best rank)");
+        assert_eq!(result.best_rank, 0);
+        assert_eq!(result.primary_embedder_name(), "E5_Causal");
+
+        println!("[VERIFIED] Primary embedder is one with best rank");
+    }
+
+    #[test]
+    fn test_additive_rrf_sorted_by_score() {
+        println!("=== TEST: Additive RRF Sorted By Score ===");
+
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        let id3 = Uuid::new_v4();
+
+        let ranked_lists = vec![
+            (0, vec![id1, id2, id3]),   // E1: id1=rank0, id2=rank1, id3=rank2
+            (4, vec![id1, id2]),        // E5: id1=rank0, id2=rank1
+            (6, vec![id1]),             // E7: id1=rank0
+        ];
+
+        let results = AggregationStrategy::aggregate_rrf_additive(&ranked_lists, 60.0, 0.1);
+
+        // Results should be sorted by boosted_score descending
+        for i in 1..results.len() {
+            assert!(
+                results[i-1].boosted_score >= results[i].boosted_score,
+                "Results should be sorted by score descending"
+            );
+        }
+
+        // id1 should be first (highest score - found by all 3 at rank 0)
+        assert_eq!(results[0].memory_id, id1);
+
+        println!("[VERIFIED] Results sorted by boosted score");
     }
 }
