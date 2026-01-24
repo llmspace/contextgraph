@@ -986,22 +986,40 @@ impl E11EntityBenchmarkRunner {
             }
         }
 
-        // Find optimal threshold (KEPLER produces larger magnitude scores than MiniLM)
-        // KEPLER valid triples: typically > -5.0
-        // KEPLER invalid triples: typically < -10.0
-        // Search around the -7.5 midpoint
-        let mut best_threshold = -7.5f32;
+        // Find optimal threshold ADAPTIVELY based on actual score distributions
+        // This works for any document type, not just tech domain
+        let valid_avg = if valid_scores.is_empty() {
+            0.0f32
+        } else {
+            valid_scores.iter().sum::<f32>() / valid_scores.len() as f32
+        };
+
+        let invalid_avg = if invalid_scores.is_empty() {
+            0.0f32
+        } else {
+            invalid_scores.iter().sum::<f32>() / invalid_scores.len() as f32
+        };
+
+        // Start with midpoint of distributions as baseline threshold
+        let midpoint = (valid_avg + invalid_avg) / 2.0;
+
+        // Search around the midpoint with adaptive step sizes
+        let search_range = (valid_avg - invalid_avg).abs().max(0.1);
+        let step = search_range / 10.0;
+
+        let mut best_threshold = midpoint;
         let mut best_accuracy = 0.0f64;
 
-        for threshold in [-10.0, -9.0, -8.0, -7.5, -7.0, -6.0, -5.0].iter() {
+        for i in -10..=10 {
+            let threshold = midpoint + (i as f32) * step;
             let accuracy = TransEMetrics::compute_validation_accuracy(
                 &valid_scores,
                 &invalid_scores,
-                *threshold,
+                threshold,
             );
             if accuracy > best_accuracy {
                 best_accuracy = accuracy;
-                best_threshold = *threshold;
+                best_threshold = threshold;
             }
         }
 

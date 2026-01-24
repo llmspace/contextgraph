@@ -41,6 +41,19 @@ pub enum CudaError {
         /// FAISS error code
         code: i32,
     },
+
+    /// Tensor operation failed (candle-core).
+    #[error("Tensor operation failed: {0}")]
+    TensorError(String),
+
+    /// Batch size exceeds GPU memory budget.
+    #[error("Batch size {size} exceeds maximum {max}")]
+    BatchTooLarge {
+        /// Requested batch size
+        size: usize,
+        /// Maximum allowed batch size
+        max: usize,
+    },
 }
 
 /// Result type for CUDA operations.

@@ -1,7 +1,7 @@
 //! E11 Entity Embedder Benchmark CLI.
 //!
 //! This binary runs a comprehensive benchmark of the E11 entity embedder
-//! (all-MiniLM-L6-v2, 384D) for entity-based retrieval and TransE operations.
+//! (KEPLER: RoBERTa-base + TransE on Wikidata5M, 768D) for entity-based retrieval and TransE operations.
 //!
 //! ## Usage
 //!
@@ -25,12 +25,16 @@
 //!     --benchmark transe
 //! ```
 //!
-//! ## Targets (from CLAUDE.md)
+//! ## Targets (KEPLER-calibrated)
 //!
 //! - Entity extraction F1: >= 0.85
-//! - TransE valid triple score: > -0.5
-//! - TransE invalid triple score: < -1.5
-//! - E11 contribution (vs E1-only): >= +5%
+//! - Canonicalization accuracy: >= 0.90
+//! - TransE valid triple score: > -5.0
+//! - TransE invalid triple score: < -10.0
+//! - Score separation: > 5.0
+//! - Relation inference MRR: >= 0.40
+//! - Knowledge validation accuracy: >= 75%
+//! - E11 contribution (vs E1-only): >= +10%
 //! - Entity search latency: < 100ms
 //!
 //! ## Benchmark Phases
@@ -69,7 +73,7 @@ enum BenchmarkPhase {
 /// E11 Entity Embedder Benchmark CLI.
 #[derive(Parser, Debug)]
 #[command(name = "e11-entity-bench")]
-#[command(about = "Benchmark E11 entity embedder (all-MiniLM-L6-v2, 384D)")]
+#[command(about = "Benchmark E11 entity embedder (KEPLER: RoBERTa-base + TransE, 768D)")]
 struct Args {
     /// Data directory containing chunks.jsonl and metadata.json.
     #[arg(long, default_value = "data/hf_benchmark_diverse")]
@@ -117,7 +121,7 @@ fn main() -> Result<()> {
 
     println!("=======================================================================");
     println!("  E11 ENTITY EMBEDDER BENCHMARK");
-    println!("  Model: all-MiniLM-L6-v2 (384D)");
+    println!("  Model: KEPLER (RoBERTa-base + TransE on Wikidata5M, 768D)");
     println!("=======================================================================");
     println!();
     println!("ARCH-12: E1 is THE semantic foundation, E11 enhances with entity facts");

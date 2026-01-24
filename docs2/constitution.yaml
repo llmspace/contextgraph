@@ -1,6 +1,18 @@
-# Context Graph Constitution v6.3.0
-# 13-Perspectives Collaboration | E1 Foundation | Native Hooks
+# Context Graph Constitution v6.4.0
+# 13-Perspectives Collaboration | E1 Foundation | GPU-First Architecture
 # ═══════════════════════════════════════════════════════════════
+
+# GPU-FIRST ARCHITECTURE
+# This is a GPU-first system. All compute-intensive operations use GPU over CPU.
+# All 13 embedders are warm-loaded into GPU memory at MCP server startup.
+# Target Hardware: RTX 5090 32GB (Blackwell GB202) + CUDA 13.1
+#
+# Key GPU Capabilities:
+#   - 32GB GDDR7 VRAM: All 13 embedder models resident simultaneously
+#   - 1,792 GB/s bandwidth: Sub-millisecond embedding generation
+#   - 680 5th-gen Tensor Cores: FP16/BF16/FP8 inference
+#   - 170 SMs with Green Contexts: Isolated inference partitions
+#   - CUDA Tile: Portable, auto-optimized kernels
 
 # CORE PHILOSOPHY: 13 embedders = 13 unique perspectives on every memory
 # Each finds what OTHERS MISS. Combined = superior answers.
@@ -12,36 +24,51 @@
 # - Combined: Better answer than any single embedder
 
 # ═══════════════════════════════════════════════════════════════
-# EMBEDDERS (13 Perspectives)
+# EMBEDDERS (13 Perspectives) - ALL GPU-RESIDENT
 # ═══════════════════════════════════════════════════════════════
+# All 13 embedders are warm-loaded into GPU VRAM at startup.
+# Total VRAM footprint: ~8-12GB (leaves 20GB+ for batch processing)
+# Inference precision: FP16/BF16 (Tensor Core accelerated)
+# No CPU fallback - GPU is mandatory for this system.
+
 embedders:
-  # FOUNDATION
-  E1: { name: V_meaning, dim: 1024, finds: "Semantic similarity", misses: "Entities, code patterns, causal links" }
+  # FOUNDATION (GPU: ~2GB VRAM)
+  E1: { name: V_meaning, dim: 1024, finds: "Semantic similarity", misses: "Entities, code patterns, causal links", gpu: "warm-loaded" }
 
-  # SEMANTIC ENHANCERS (topic_weight: 1.0)
-  E5: { name: V_causality, dim: 768, finds: "Causal chains (why X caused Y)", misses_by_E1: "Direction lost" }
-  E6: { name: V_selectivity, sparse: true, finds: "Exact keyword matches", misses_by_E1: "Diluted by averaging" }
-  E7: { name: V_correctness, dim: 1536, finds: "Code patterns, function signatures", misses_by_E1: "Treats code as NL" }
-  E10: { name: V_multimodality, dim: 768, finds: "Same-goal work (different words)", integration: "Multiplicative boost on E1" }
-  E12: { name: V_precision, per_token: true, finds: "Exact phrase matches", use: "Reranking only" }
-  E13: { name: V_keyword_precision, sparse: true, finds: "Term expansions (fast→quick)", use: "Stage 1 recall" }
+  # SEMANTIC ENHANCERS (topic_weight: 1.0, GPU: ~4GB total)
+  E5: { name: V_causality, dim: 768, finds: "Causal chains (why X caused Y)", misses_by_E1: "Direction lost", gpu: "warm-loaded" }
+  E6: { name: V_selectivity, sparse: true, finds: "Exact keyword matches", misses_by_E1: "Diluted by averaging", gpu: "warm-loaded" }
+  E7: { name: V_correctness, dim: 1536, finds: "Code patterns, function signatures", misses_by_E1: "Treats code as NL", gpu: "warm-loaded" }
+  E10: { name: V_multimodality, dim: 768, finds: "Same-goal work (different words)", integration: "Multiplicative boost on E1", gpu: "warm-loaded" }
+  E12: { name: V_precision, per_token: true, finds: "Exact phrase matches", use: "Reranking only", gpu: "warm-loaded" }
+  E13: { name: V_keyword_precision, sparse: true, finds: "Term expansions (fast→quick)", use: "Stage 1 recall", gpu: "warm-loaded" }
 
-  # RELATIONAL ENHANCERS (topic_weight: 0.5)
-  E8: { name: V_connectivity, dim: 384, finds: "Graph structure (X imports Y)" }
-  E11: { name: V_factuality, dim: 768, finds: "Entity knowledge (Diesel=database ORM)", model: "KEPLER (RoBERTa-base + TransE)" }
+  # RELATIONAL ENHANCERS (topic_weight: 0.5, GPU: ~2GB total)
+  E8: { name: V_connectivity, dim: 384, finds: "Graph structure (X imports Y)", gpu: "warm-loaded" }
+  E11: { name: V_factuality, dim: 768, finds: "Entity knowledge (Diesel=database ORM)", model: "KEPLER (RoBERTa-base + TransE)", gpu: "warm-loaded" }
 
-  # TEMPORAL CONTEXT (topic_weight: 0.0, POST-RETRIEVAL ONLY)
-  E2: { name: V_freshness, dim: 512, finds: "Recency" }
-  E3: { name: V_periodicity, dim: 512, finds: "Time-of-day patterns" }
-  E4: { name: V_ordering, dim: 512, finds: "Sequence (before/after)" }
+  # TEMPORAL CONTEXT (topic_weight: 0.0, POST-RETRIEVAL ONLY, GPU: ~1.5GB total)
+  E2: { name: V_freshness, dim: 512, finds: "Recency", gpu: "warm-loaded" }
+  E3: { name: V_periodicity, dim: 512, finds: "Time-of-day patterns", gpu: "warm-loaded" }
+  E4: { name: V_ordering, dim: 512, finds: "Sequence (before/after)", gpu: "warm-loaded" }
 
-  # STRUCTURAL (topic_weight: 0.5)
-  E9: { name: V_robustness, dim: 1024, finds: "Noise-robust structure" }
+  # STRUCTURAL (topic_weight: 0.5, GPU: ~1GB)
+  E9: { name: V_robustness, dim: 1024, finds: "Noise-robust structure", gpu: "warm-loaded" }
 
 # ═══════════════════════════════════════════════════════════════
 # ARCHITECTURAL RULES (MUST follow)
 # ═══════════════════════════════════════════════════════════════
 arch_rules:
+  # GPU-First (MANDATORY)
+  ARCH-GPU-01: "GPU is mandatory - no CPU fallback for embeddings"
+  ARCH-GPU-02: "All 13 embedders warm-loaded into VRAM at MCP server startup"
+  ARCH-GPU-03: "Embedding inference uses FP16/BF16 Tensor Cores"
+  ARCH-GPU-04: "FAISS indexes use GPU (faiss-gpu) not CPU"
+  ARCH-GPU-05: "HDBSCAN clustering runs on GPU via cuML"
+  ARCH-GPU-06: "Batch operations preferred - minimize kernel launches"
+  ARCH-GPU-07: "Green Contexts partition SMs: 70% inference, 30% indexing"
+  ARCH-GPU-08: "CUDA streams for async embedding + indexing overlap"
+
   # Core
   ARCH-01: "TeleologicalArray is atomic - all 13 embeddings or nothing"
   ARCH-02: "Apples-to-apples only - compare E1↔E1, never E1↔E5"
@@ -71,6 +98,17 @@ arch_rules:
 # ANTI-PATTERNS (FORBIDDEN)
 # ═══════════════════════════════════════════════════════════════
 forbidden:
+  # GPU Anti-Patterns
+  AP-GPU-01: "NEVER use CPU for embedding inference when GPU available"
+  AP-GPU-02: "NEVER cold-load embedders per-request - warm-load at startup"
+  AP-GPU-03: "NEVER use CPU FAISS when GPU FAISS available"
+  AP-GPU-04: "NEVER use sklearn HDBSCAN - use cuML GPU implementation"
+  AP-GPU-05: "NEVER transfer embeddings GPU→CPU→GPU - keep on GPU"
+  AP-GPU-06: "NEVER use FP32 for inference - use FP16/BF16 Tensor Cores"
+  AP-GPU-07: "NEVER serialize embeddings per-item - batch for GPU efficiency"
+  AP-GPU-08: "NEVER block on sync - use CUDA streams for async ops"
+
+  # Core Anti-Patterns
   AP-02: "No cross-embedder comparison (E1↔E5)"
   AP-04: "No partial TeleologicalArray"
   AP-05: "No embedding fusion into single vector"
@@ -170,9 +208,60 @@ thresholds:
 # ═══════════════════════════════════════════════════════════════
 hooks:
   config: ".claude/settings.json"
-  SessionStart: "Load topic portfolio, warm indexes"
-  UserPromptSubmit: "Embed prompt, search, detect divergence, inject context"
+  SessionStart: "Load topic portfolio, warm GPU indexes"
+  UserPromptSubmit: "GPU embed prompt, search, detect divergence, inject context"
   PreToolUse: "Inject brief relevant context"
-  PostToolUse: "Capture + embed as HookDescription"
+  PostToolUse: "Capture + GPU embed as HookDescription"
   Stop: "Capture response summary"
-  SessionEnd: "Persist state, run HDBSCAN, check dream triggers"
+  SessionEnd: "Persist state, GPU HDBSCAN, check dream triggers"
+
+# ═══════════════════════════════════════════════════════════════
+# GPU INFRASTRUCTURE (RTX 5090 32GB + CUDA 13.1)
+# ═══════════════════════════════════════════════════════════════
+gpu:
+  hardware:
+    device: "NVIDIA GeForce RTX 5090"
+    architecture: "Blackwell (GB202)"
+    vram: "32GB GDDR7"
+    bandwidth: "1,792 GB/s"
+    cuda_cores: 21760
+    tensor_cores: 680
+    sms: 170
+    compute_capability: "12.0"
+    driver: "R580+ (CUDA 13.1)"
+
+  host:
+    cpu: "AMD Ryzen 9 9950X3D"
+    cores: "16 cores / 32 threads"
+    ram: "128GB DDR5"
+    l3_cache: "192MB (96MB x2)"
+
+  vram_allocation:
+    embedders: "~10GB (all 13 warm-loaded)"
+    faiss_indexes: "~8GB (HNSW per-space)"
+    batch_buffers: "~4GB (inference batches)"
+    cuml_workspace: "~2GB (HDBSCAN, clustering)"
+    reserved: "~8GB (headroom for spikes)"
+    total_budget: "32GB"
+
+  performance_targets:
+    all_13_embed: "<200ms (GPU batch)"
+    per_space_hnsw: "<1ms (faiss-gpu)"
+    inject_context_p95: "<500ms"
+    store_memory_p95: "<800ms"
+    any_tool_p99: "<1000ms"
+    topic_detection: "<20ms (cuML HDBSCAN)"
+    warm_load_startup: "<30s (all 13 models)"
+
+  cuda_features:
+    green_contexts: true  # SM partitioning for QoS
+    cuda_tile: true       # Portable kernel programming
+    cuda_streams: true    # Async overlap
+    tensor_cores: "FP16/BF16/FP8"
+    mps_clients: 60       # Multi-Process Service
+
+  testing:
+    all_tests_use_gpu: true
+    benchmarks_require_gpu: true
+    no_cpu_fallback_tests: true
+    gpu_memory_profiling: true

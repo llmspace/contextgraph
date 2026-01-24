@@ -62,6 +62,7 @@
 
 mod encoding;
 mod forward;
+mod forward_batch;
 mod model;
 mod pooling;
 mod trait_impl;

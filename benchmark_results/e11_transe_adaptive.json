@@ -1,0 +1,1348 @@
+{
+  "metrics": {
+    "extraction": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "canonicalization_accuracy": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "documents_evaluated": 0,
+      "by_entity_type": {}
+    },
+    "retrieval": {
+      "mrr_e1_only": 0.0,
+      "mrr_e11_only": 0.0,
+      "mrr_e1_e11_hybrid": 0.0,
+      "e11_contribution_pct": 0.0,
+      "entity_overlap_correlation": 0.0,
+      "precision_at_k": {},
+      "recall_at_k": {},
+      "queries_evaluated": 0
+    },
+    "transe": {
+      "valid_triple_avg_score": -1.0303289,
+      "invalid_triple_avg_score": -1.0327531,
+      "separation_score": 0.00242424,
+      "separation_ratio": 0.1546058,
+      "relationship_inference_mrr": 1.0,
+      "knowledge_validation_accuracy": 0.0,
+      "valid_triples_evaluated": 28,
+      "invalid_triples_evaluated": 100,
+      "valid_score_distribution": {
+        "mean": -1.0303289,
+        "std_dev": 0.012049551,
+        "min": -1.0603551,
+        "max": -1.0108441,
+        "median": -1.0322485,
+        "p25": -1.0361153,
+        "p75": -1.0202584
+      },
+      "invalid_score_distribution": {
+        "mean": -1.0327531,
+        "std_dev": 0.015680136,
+        "min": -1.0902416,
+        "max": -1.0016075,
+        "median": -1.0322795,
+        "p25": -1.0414304,
+        "p75": -1.0223391
+      }
+    },
+    "graph": {
+      "nodes_discovered": 0,
+      "edges_inferred": 0,
+      "avg_edge_score": 0.0,
+      "edge_score_std_dev": 0.0,
+      "entity_type_distribution": {},
+      "relationship_type_distribution": {},
+      "graph_density": 0.0,
+      "connected_components": 0
+    },
+    "performance": {
+      "extract_entities_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "search_by_entities_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "infer_relationship_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "find_related_entities_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "validate_knowledge_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "get_entity_graph_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "e11_embedding_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      }
+    }
+  },
+  "timings": {
+    "total_ms": 359841,
+    "dataset_load_ms": 1,
+    "embedding_ms": 5355,
+    "extraction_benchmark_ms": 0,
+    "retrieval_benchmark_ms": 0,
+    "transe_benchmark_ms": 354484,
+    "validation_benchmark_ms": 0,
+    "graph_benchmark_ms": 0
+  },
+  "dataset_stats": {
+    "num_documents": 50,
+    "docs_with_entities": 50,
+    "total_entities": 815,
+    "unique_entities": 696,
+    "avg_entities_per_doc": 16.3,
+    "num_valid_triples": 28,
+    "num_invalid_triples": 100,
+    "num_entity_pairs": 30,
+    "entity_type_distribution": {
+      "Unknown": 815
+    }
+  },
+  "extraction_results": null,
+  "retrieval_results": null,
+  "transe_results": {
+    "metrics": {
+      "valid_triple_avg_score": -1.0303289,
+      "invalid_triple_avg_score": -1.0327531,
+      "separation_score": 0.00242424,
+      "separation_ratio": 0.1546058,
+      "relationship_inference_mrr": 1.0,
+      "knowledge_validation_accuracy": 0.0,
+      "valid_triples_evaluated": 28,
+      "invalid_triples_evaluated": 100,
+      "valid_score_distribution": {
+        "mean": -1.0303289,
+        "std_dev": 0.012049551,
+        "min": -1.0603551,
+        "max": -1.0108441,
+        "median": -1.0322485,
+        "p25": -1.0361153,
+        "p75": -1.0202584
+      },
+      "invalid_score_distribution": {
+        "mean": -1.0327531,
+        "std_dev": 0.015680136,
+        "min": -1.0902416,
+        "max": -1.0016075,
+        "median": -1.0322795,
+        "p25": -1.0414304,
+        "p75": -1.0223391
+      }
+    },
+    "valid_triple_scores": [
+      {
+        "subject": "Tokio",
+        "predicate": "depends_on",
+        "object": "Rust",
+        "score": -1.0330037,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Axum",
+        "predicate": "depends_on",
+        "object": "Tokio",
+        "score": -1.0361153,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Actix",
+        "predicate": "depends_on",
+        "object": "Tokio",
+        "score": -1.0343057,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Django",
+        "predicate": "uses",
+        "object": "Python",
+        "score": -1.0126797,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "FastAPI",
+        "predicate": "uses",
+        "object": "Python",
+        "score": -1.0118505,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Flask",
+        "predicate": "uses",
+        "object": "Python",
+        "score": -1.017867,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "React",
+        "predicate": "uses",
+        "object": "JavaScript",
+        "score": -1.0347376,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Vue.js",
+        "predicate": "uses",
+        "object": "JavaScript",
+        "score": -1.0108441,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Angular",
+        "predicate": "uses",
+        "object": "TypeScript",
+        "score": -1.0409551,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Next.js",
+        "predicate": "extends",
+        "object": "React",
+        "score": -1.0268533,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "PostgreSQL",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.02528,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "MySQL",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.0283558,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "MongoDB",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.0358329,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Redis",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.0322485,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "RocksDB",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.0335245,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "S3",
+        "predicate": "part_of",
+        "object": "AWS",
+        "score": -1.0176411,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "EC2",
+        "predicate": "part_of",
+        "object": "AWS",
+        "score": -1.0230842,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Lambda",
+        "predicate": "part_of",
+        "object": "AWS",
+        "score": -1.0443773,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "BigQuery",
+        "predicate": "part_of",
+        "object": "GCP",
+        "score": -1.0202584,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Kubernetes",
+        "predicate": "alternative_to",
+        "object": "Docker",
+        "score": -1.0355462,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Claude",
+        "predicate": "created_by",
+        "object": "Anthropic",
+        "score": -1.0473808,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "GPT",
+        "predicate": "created_by",
+        "object": "OpenAI",
+        "score": -1.023631,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "GitHub",
+        "predicate": "owned_by",
+        "object": "Microsoft",
+        "score": -1.0603551,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "GraphQL",
+        "predicate": "alternative_to",
+        "object": "REST",
+        "score": -1.0129039,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "gRPC",
+        "predicate": "alternative_to",
+        "object": "REST",
+        "score": -1.0229062,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "ColBERT",
+        "predicate": "is_type",
+        "object": "TechnicalTerm",
+        "score": -1.0468255,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "SPLADE",
+        "predicate": "is_type",
+        "object": "TechnicalTerm",
+        "score": -1.0423081,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "HNSW",
+        "predicate": "is_type",
+        "object": "TechnicalTerm",
+        "score": -1.0375385,
+        "is_valid_ground_truth": true
+      }
+    ],
+    "invalid_triple_scores": [
+      {
+        "subject": "Rust",
+        "predicate": "depends_on",
+        "object": "Tokio",
+        "score": -1.0223764,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Tokio",
+        "predicate": "depends_on",
+        "object": "Axum",
+        "score": -1.0127202,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Tokio",
+        "predicate": "depends_on",
+        "object": "Actix",
+        "score": -1.0250093,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Python",
+        "predicate": "uses",
+        "object": "Django",
+        "score": -1.0498053,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Python",
+        "predicate": "uses",
+        "object": "FastAPI",
+        "score": -1.0465503,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Python",
+        "predicate": "uses",
+        "object": "Flask",
+        "score": -1.0406835,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "JavaScript",
+        "predicate": "uses",
+        "object": "React",
+        "score": -1.0207447,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "JavaScript",
+        "predicate": "uses",
+        "object": "Vue.js",
+        "score": -1.0522845,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "TypeScript",
+        "predicate": "uses",
+        "object": "Angular",
+        "score": -1.0157775,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "React",
+        "predicate": "extends",
+        "object": "Next.js",
+        "score": -1.044451,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Database",
+        "predicate": "is_type",
+        "object": "PostgreSQL",
+        "score": -1.0073147,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Database",
+        "predicate": "is_type",
+        "object": "MySQL",
+        "score": -1.0077469,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Database",
+        "predicate": "is_type",
+        "object": "MongoDB",
+        "score": -1.0378793,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Database",
+        "predicate": "is_type",
+        "object": "Redis",
+        "score": -1.0224625,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Database",
+        "predicate": "is_type",
+        "object": "RocksDB",
+        "score": -1.019409,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "AWS",
+        "predicate": "part_of",
+        "object": "S3",
+        "score": -1.0238711,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "AWS",
+        "predicate": "part_of",
+        "object": "EC2",
+        "score": -1.024525,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "AWS",
+        "predicate": "part_of",
+        "object": "Lambda",
+        "score": -1.0558052,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "GCP",
+        "predicate": "part_of",
+        "object": "BigQuery",
+        "score": -1.029858,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Docker",
+        "predicate": "alternative_to",
+        "object": "Kubernetes",
+        "score": -1.0799913,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Anthropic",
+        "predicate": "created_by",
+        "object": "Claude",
+        "score": -1.0344483,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "OpenAI",
+        "predicate": "created_by",
+        "object": "GPT",
+        "score": -1.0344193,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Microsoft",
+        "predicate": "owned_by",
+        "object": "GitHub",
+        "score": -1.050439,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "REST",
+        "predicate": "alternative_to",
+        "object": "GraphQL",
+        "score": -1.0319334,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "REST",
+        "predicate": "alternative_to",
+        "object": "gRPC",
+        "score": -1.0579442,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "TechnicalTerm",
+        "predicate": "is_type",
+        "object": "ColBERT",
+        "score": -1.0471447,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "TechnicalTerm",
+        "predicate": "is_type",
+        "object": "SPLADE",
+        "score": -1.0489566,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "TechnicalTerm",
+        "predicate": "is_type",
+        "object": "HNSW",
+        "score": -1.0322795,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Tokio",
+        "predicate": "uses",
+        "object": "Rust",
+        "score": -1.0040833,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Axum",
+        "predicate": "uses",
+        "object": "Tokio",
+        "score": -1.0337585,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Actix",
+        "predicate": "uses",
+        "object": "Tokio",
+        "score": -1.0339836,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Django",
+        "predicate": "depends_on",
+        "object": "Python",
+        "score": -1.0503405,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "FastAPI",
+        "predicate": "depends_on",
+        "object": "Python",
+        "score": -1.0368084,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Flask",
+        "predicate": "depends_on",
+        "object": "Python",
+        "score": -1.0408765,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "React",
+        "predicate": "depends_on",
+        "object": "JavaScript",
+        "score": -1.0388526,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Vue.js",
+        "predicate": "depends_on",
+        "object": "JavaScript",
+        "score": -1.0338447,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Angular",
+        "predicate": "depends_on",
+        "object": "TypeScript",
+        "score": -1.0294459,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Next.js",
+        "predicate": "depends_on",
+        "object": "React",
+        "score": -1.0306901,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "PostgreSQL",
+        "predicate": "depends_on",
+        "object": "Database",
+        "score": -1.0220884,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "MySQL",
+        "predicate": "depends_on",
+        "object": "Database",
+        "score": -1.0274166,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "MongoDB",
+        "predicate": "depends_on",
+        "object": "Database",
+        "score": -1.0369139,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Redis",
+        "predicate": "depends_on",
+        "object": "Database",
+        "score": -1.0384294,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "RocksDB",
+        "predicate": "depends_on",
+        "object": "Database",
+        "score": -1.0405052,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "S3",
+        "predicate": "depends_on",
+        "object": "AWS",
+        "score": -1.0151142,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "EC2",
+        "predicate": "depends_on",
+        "object": "AWS",
+        "score": -1.0213895,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Lambda",
+        "predicate": "depends_on",
+        "object": "AWS",
+        "score": -1.0508871,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "BigQuery",
+        "predicate": "depends_on",
+        "object": "GCP",
+        "score": -1.0165236,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Kubernetes",
+        "predicate": "depends_on",
+        "object": "Docker",
+        "score": -1.0433829,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Claude",
+        "predicate": "depends_on",
+        "object": "Anthropic",
+        "score": -1.0388334,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "GPT",
+        "predicate": "depends_on",
+        "object": "OpenAI",
+        "score": -1.0294946,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "GitHub",
+        "predicate": "depends_on",
+        "object": "Microsoft",
+        "score": -1.0575113,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "GraphQL",
+        "predicate": "depends_on",
+        "object": "REST",
+        "score": -1.0116318,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "gRPC",
+        "predicate": "depends_on",
+        "object": "REST",
+        "score": -1.0277376,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "ColBERT",
+        "predicate": "depends_on",
+        "object": "TechnicalTerm",
+        "score": -1.0477031,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "SPLADE",
+        "predicate": "depends_on",
+        "object": "TechnicalTerm",
+        "score": -1.0469773,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "HNSW",
+        "predicate": "depends_on",
+        "object": "TechnicalTerm",
+        "score": -1.0408516,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Axum",
+        "predicate": "depends_on",
+        "object": "TechnicalTerm",
+        "score": -1.0419439,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Rust",
+        "predicate": "uses",
+        "object": "S3",
+        "score": -1.0393645,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "S3",
+        "predicate": "extends",
+        "object": "REST",
+        "score": -1.0070168,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Microsoft",
+        "predicate": "part_of",
+        "object": "GCP",
+        "score": -1.0159041,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "HNSW",
+        "predicate": "created_by",
+        "object": "Lambda",
+        "score": -1.0500494,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "ColBERT",
+        "predicate": "alternative_to",
+        "object": "Vue.js",
+        "score": -1.0537078,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Flask",
+        "predicate": "works_at",
+        "object": "HNSW",
+        "score": -1.0325406,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "PostgreSQL",
+        "predicate": "implements",
+        "object": "Angular",
+        "score": -1.0309336,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "GPT",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.031718,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "GraphQL",
+        "predicate": "depends_on",
+        "object": "Django",
+        "score": -1.021561,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Redis",
+        "predicate": "uses",
+        "object": "Actix",
+        "score": -1.0248902,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "GCP",
+        "predicate": "extends",
+        "object": "Flask",
+        "score": -1.0264735,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "MongoDB",
+        "predicate": "part_of",
+        "object": "Anthropic",
+        "score": -1.0347477,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Database",
+        "predicate": "created_by",
+        "object": "RocksDB",
+        "score": -1.0182048,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Docker",
+        "predicate": "alternative_to",
+        "object": "TypeScript",
+        "score": -1.0347881,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "RocksDB",
+        "predicate": "works_at",
+        "object": "OpenAI",
+        "score": -1.0224501,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "gRPC",
+        "predicate": "implements",
+        "object": "GPT",
+        "score": -1.0271198,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "React",
+        "predicate": "is_type",
+        "object": "BigQuery",
+        "score": -1.033285,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "TechnicalTerm",
+        "predicate": "depends_on",
+        "object": "React",
+        "score": -1.0200806,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "AWS",
+        "predicate": "uses",
+        "object": "Rust",
+        "score": -1.003108,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "e3-14.7k",
+        "predicate": "uses",
+        "object": "multi-drug",
+        "score": -1.0037024,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "moreover",
+        "predicate": "extends",
+        "object": "fr",
+        "score": -1.0351504,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "self-renewing",
+        "predicate": "alternative_to",
+        "object": "caspase-2",
+        "score": -1.038033,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "wuxi",
+        "predicate": "alternative_to",
+        "object": "zfns",
+        "score": -1.0298738,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "24.7-fold",
+        "predicate": "uses",
+        "object": "phospho-s6",
+        "score": -1.0641652,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "forty",
+        "predicate": "depends_on",
+        "object": "β-cells",
+        "score": -1.0419666,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "probable",
+        "predicate": "works_at",
+        "object": "acute",
+        "score": -1.0350804,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "streptococcus",
+        "predicate": "works_at",
+        "object": "u-rich",
+        "score": -1.0245321,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "type",
+        "predicate": "implements",
+        "object": "spa",
+        "score": -1.0294435,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "markov",
+        "predicate": "is_type",
+        "object": "zfn)–mediated",
+        "score": -1.0414304,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "14.7-kilodalton",
+        "predicate": "alternative_to",
+        "object": "ifn-inducible",
+        "score": -1.0492438,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "once",
+        "predicate": "part_of",
+        "object": "importantly",
+        "score": -1.0164522,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "chk1",
+        "predicate": "implements",
+        "object": "patients",
+        "score": -1.0117513,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "chip",
+        "predicate": "alternative_to",
+        "object": "tracking",
+        "score": -1.0016075,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "deletion",
+        "predicate": "created_by",
+        "object": "agm",
+        "score": -1.0440096,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "preterm",
+        "predicate": "alternative_to",
+        "object": "well-known",
+        "score": -1.0348048,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "pitx3",
+        "predicate": "is_type",
+        "object": "glial-",
+        "score": -1.0303167,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "survival",
+        "predicate": "extends",
+        "object": "rdrp",
+        "score": -1.0565174,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "chip-seq",
+        "predicate": "created_by",
+        "object": "apb-dependent",
+        "score": -1.0195118,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "31",
+        "predicate": "implements",
+        "object": "july",
+        "score": -1.0134169,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "p<0.001",
+        "predicate": "part_of",
+        "object": "28",
+        "score": -1.0902416,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "hypoxia-induced",
+        "predicate": "created_by",
+        "object": "multi-drug",
+        "score": -1.0223391,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "ctcf",
+        "predicate": "created_by",
+        "object": "library",
+        "score": -1.0238606,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "trf2",
+        "predicate": "is_type",
+        "object": "hscs",
+        "score": -1.0250896,
+        "is_valid_ground_truth": false
+      }
+    ],
+    "relationship_inferences": [
+      {
+        "head": "diffusion-weighted",
+        "tail": "17",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0295342,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "diffusion-weighted",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0488367,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "full-term",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0388708,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "mri",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0253824,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "28",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0181746,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "three-dimensional",
+        "predicted_relation": "is_type",
+        "expected_relation": null,
+        "score": -1.0499998,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "preterm",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.00505,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "nonmyelinated",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0251254,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "full-term",
+        "predicted_relation": "alternative_to",
+        "expected_relation": null,
+        "score": -1.0367095,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "28",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0172125,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "full-term",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0227975,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "17",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0287092,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "alterations",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0208575,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "10",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0392914,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "preterm",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0094986,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "relative",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0032345,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "three-dimensional",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0403097,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "28",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0241214,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "relative",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0022422,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "nonmyelinated",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0388136,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "10",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0416433,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "diffusion-weighted",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0360354,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "10",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0359598,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "17",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.029996,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "three-dimensional",
+        "predicted_relation": "is_type",
+        "expected_relation": null,
+        "score": -1.057075,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "preterm",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0151887,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "mri",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0084122,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "relative",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0018463,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "mri",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0114701,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "nonmyelinated",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0362072,
+        "rank": 1
+      }
+    ]
+  },
+  "validation_results": null,
+  "graph_results": null,
+  "config": {
+    "dataset": {
+      "max_chunks": 0,
+      "seed": 42,
+      "min_entities_per_doc": 1,
+      "num_valid_triples": 100,
+      "num_invalid_triples": 100,
+      "num_entity_pairs": 100
+    },
+    "max_chunks": 50,
+    "num_queries": 30,
+    "seed": 42,
+    "run_all": false,
+    "run_extraction": false,
+    "run_retrieval": false,
+    "run_transe": true,
+    "run_validation": false,
+    "run_graph": false,
+    "output_path": "benchmark_results/e11_transe_adaptive.json"
+  },
+  "all_targets_met": false
+}

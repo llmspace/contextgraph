@@ -63,6 +63,44 @@ use crate::teleological::serialization::{
 use super::store::RocksDbTeleologicalStore;
 use super::types::TeleologicalStoreError;
 
+use context_graph_core::code::CodeQueryType;
+use context_graph_core::types::fingerprint::TeleologicalFingerprint;
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/// Sequential CPU computation of embedder scores for candidates.
+/// Used when GPU batching is not available or for small candidate counts.
+fn compute_scores_sequential(
+    store: &RocksDbTeleologicalStore,
+    query: &SemanticFingerprint,
+    candidates: Vec<(Uuid, TeleologicalFingerprint)>,
+    code_query_type: Option<CodeQueryType>,
+    causal_direction: CausalDirection,
+) -> Vec<(Uuid, [f32; 13], SemanticFingerprint)> {
+    candidates
+        .into_iter()
+        .map(|(id, fp)| {
+            let embedder_scores = if causal_direction != CausalDirection::Unknown {
+                store.compute_embedder_scores_with_direction(
+                    query,
+                    &fp.semantic,
+                    code_query_type,
+                    causal_direction,
+                )
+            } else {
+                store.compute_embedder_scores_with_code_query_type(
+                    query,
+                    &fp.semantic,
+                    code_query_type,
+                )
+            };
+            (id, embedder_scores, fp.semantic)
+        })
+        .collect()
+}
+
 // =============================================================================
 // SEMANTIC EMBEDDER INDICES (for multi-space scoring)
 // Per constitution: Temporal (E2-E4) have weight 0.0 in semantic search
@@ -584,12 +622,13 @@ impl RocksDbTeleologicalStore {
         // Per AP-73: Temporal (E2-E4) MUST NOT be used in similarity scoring
         // Per ARCH-16: E7 Code uses query-type-aware similarity
         // Per ARCH-18: Supports both WeightedSum and WeightedRRF fusion strategies
+        // Per ARCH-GPU-06: Use GPU batch similarity when candidate count is high
         // =========================================================================
         let weights = self.resolve_weights(options);
         let code_query_type = options.effective_code_query_type();
 
-        // First, compute embedder scores for all candidates
-        let mut candidate_data: Vec<(Uuid, [f32; 13], SemanticFingerprint)> =
+        // First, fetch all fingerprints for valid candidates
+        let mut valid_candidates: Vec<(Uuid, TeleologicalFingerprint)> =
             Vec::with_capacity(candidate_ids.len());
 
         for id in candidate_ids {
@@ -601,27 +640,62 @@ impl RocksDbTeleologicalStore {
             // Fetch full fingerprint from RocksDB
             if let Some(data) = self.get_fingerprint_raw(id)? {
                 let fp = deserialize_teleological_fingerprint(&data);
-
-                // Compute all 13 embedder scores with E7 query-type awareness (ARCH-16)
-                // and direction-aware E5 similarity (ARCH-15, AP-77)
-                let embedder_scores = if options.causal_direction != CausalDirection::Unknown {
-                    self.compute_embedder_scores_with_direction(
-                        query,
-                        &fp.semantic,
-                        code_query_type,
-                        options.causal_direction,
-                    )
-                } else {
-                    self.compute_embedder_scores_with_code_query_type(
-                        query,
-                        &fp.semantic,
-                        code_query_type,
-                    )
-                };
-
-                candidate_data.push((id, embedder_scores, fp.semantic.clone()));
+                valid_candidates.push((id, fp));
             }
         }
+
+        // Compute embedder scores - use GPU batch when available and beneficial
+        let candidate_data: Vec<(Uuid, [f32; 13], SemanticFingerprint)> = {
+            #[cfg(feature = "cuda")]
+            {
+                use context_graph_cuda::GPU_BATCH_THRESHOLD;
+
+                if valid_candidates.len() >= GPU_BATCH_THRESHOLD {
+                    // GPU batch path (ARCH-GPU-06)
+                    debug!(
+                        "Stage 2: Using GPU batch similarity for {} candidates",
+                        valid_candidates.len()
+                    );
+
+                    // Collect references to semantic fingerprints
+                    let semantic_refs: Vec<&SemanticFingerprint> = valid_candidates
+                        .iter()
+                        .map(|(_, fp)| &fp.semantic)
+                        .collect();
+
+                    // Compute all scores in batch on GPU
+                    let all_scores = if options.causal_direction != CausalDirection::Unknown {
+                        self.compute_embedder_scores_batch_with_direction(
+                            query,
+                            &semantic_refs,
+                            code_query_type,
+                            options.causal_direction,
+                        )
+                    } else {
+                        self.compute_embedder_scores_batch(
+                            query,
+                            &semantic_refs,
+                            code_query_type,
+                        )
+                    };
+
+                    // Combine with fingerprint data
+                    valid_candidates
+                        .into_iter()
+                        .zip(all_scores.into_iter())
+                        .map(|((id, fp), scores)| (id, scores, fp.semantic))
+                        .collect()
+                } else {
+                    // Fall through to CPU path for small batches
+                    compute_scores_sequential(self, query, valid_candidates, code_query_type, options.causal_direction)
+                }
+            }
+
+            #[cfg(not(feature = "cuda"))]
+            {
+                compute_scores_sequential(self, query, valid_candidates, code_query_type, options.causal_direction)
+            }
+        };
 
         // Build scored candidates based on fusion strategy (ARCH-18)
         let mut scored_candidates: Vec<(Uuid, f32, [f32; 13], SemanticFingerprint)> =

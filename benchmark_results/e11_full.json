@@ -1,0 +1,3552 @@
+{
+  "metrics": {
+    "extraction": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "canonicalization_accuracy": 1.0,
+      "true_positives": 815,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "documents_evaluated": 50,
+      "by_entity_type": {}
+    },
+    "retrieval": {
+      "mrr_e1_only": 0.6029042624042623,
+      "mrr_e11_only": 0.48190372493004047,
+      "mrr_e1_e11_hybrid": 0.7520238095238096,
+      "e11_contribution_pct": 24.733536718564274,
+      "entity_overlap_correlation": 0.0,
+      "precision_at_k": {},
+      "recall_at_k": {},
+      "queries_evaluated": 50
+    },
+    "transe": {
+      "valid_triple_avg_score": -1.0303289,
+      "invalid_triple_avg_score": -1.0450025,
+      "separation_score": 0.014673591,
+      "relationship_inference_mrr": 1.0,
+      "knowledge_validation_accuracy": 0.21875,
+      "valid_triples_evaluated": 28,
+      "invalid_triples_evaluated": 100,
+      "valid_score_distribution": {
+        "mean": -1.0303289,
+        "std_dev": 0.012049551,
+        "min": -1.0603551,
+        "max": -1.0108441,
+        "median": -1.0322485,
+        "p25": -1.0361153,
+        "p75": -1.0202584
+      },
+      "invalid_score_distribution": {
+        "mean": -1.0450025,
+        "std_dev": 0.024166698,
+        "min": -1.1338943,
+        "max": -0.9955343,
+        "median": -1.0416485,
+        "p25": -1.0613986,
+        "p75": -1.0281891
+      }
+    },
+    "graph": {
+      "nodes_discovered": 50,
+      "edges_inferred": 236,
+      "avg_edge_score": 0.2005652,
+      "edge_score_std_dev": 0.09957406,
+      "entity_type_distribution": {
+        "Unknown": 50
+      },
+      "relationship_type_distribution": {
+        "strongly_related_to": 2,
+        "related_to": 33,
+        "co_occurs_with": 201
+      },
+      "graph_density": 0.0963265306122449,
+      "connected_components": 0
+    },
+    "performance": {
+      "extract_entities_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "search_by_entities_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "infer_relationship_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "find_related_entities_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "validate_knowledge_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "get_entity_graph_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "e11_embedding_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      }
+    }
+  },
+  "timings": {
+    "total_ms": 710071,
+    "dataset_load_ms": 1,
+    "embedding_ms": 4989,
+    "extraction_benchmark_ms": 1,
+    "retrieval_benchmark_ms": 81052,
+    "transe_benchmark_ms": 581339,
+    "validation_benchmark_ms": 42684,
+    "graph_benchmark_ms": 2
+  },
+  "dataset_stats": {
+    "num_documents": 50,
+    "docs_with_entities": 50,
+    "total_entities": 815,
+    "unique_entities": 696,
+    "avg_entities_per_doc": 16.3,
+    "num_valid_triples": 28,
+    "num_invalid_triples": 100,
+    "num_entity_pairs": 100,
+    "entity_type_distribution": {
+      "Unknown": 815
+    }
+  },
+  "extraction_results": {
+    "metrics": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "canonicalization_accuracy": 1.0,
+      "true_positives": 815,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "documents_evaluated": 50,
+      "by_entity_type": {}
+    },
+    "sample_extractions": [
+      {
+        "doc_id": "00000000-0000-0000-0000-000000000000",
+        "text_snippet": "Microstructural development of human newborn cerebral white matter assessed in vivo by diffusion ten...",
+        "predicted_entities": [
+          "microstructural",
+          "alterations",
+          "diffusion-weighted",
+          "mri",
+          "three-dimensional",
+          "17",
+          "full-term",
+          "10",
+          "28",
+          "relative",
+          "preterm",
+          "nonmyelinated"
+        ],
+        "ground_truth_entities": [
+          "microstructural",
+          "alterations",
+          "diffusion-weighted",
+          "mri",
+          "three-dimensional",
+          "17",
+          "full-term",
+          "10",
+          "28",
+          "relative",
+          "preterm",
+          "nonmyelinated"
+        ],
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      {
+        "doc_id": "00000001-0000-0000-0000-000000000000",
+        "text_snippet": "Induction of myelodysplasia by myeloid-derived suppressor cells. Myelodysplastic syndromes (MDS) are...",
+        "predicted_entities": [
+          "induction",
+          "myeloid-derived",
+          "myelodysplastic",
+          "mds",
+          "age-dependent",
+          "mdsc",
+          "s100a9",
+          "cd33",
+          "cd33’s",
+          "tyrosine-based",
+          "itim",
+          "il-10",
+          "tgf-β",
+          "importantly",
+          "all-trans-retinoic",
+          "itam-bearing",
+          "dap12",
+          "s100a9/cd33"
+        ],
+        "ground_truth_entities": [
+          "induction",
+          "myeloid-derived",
+          "myelodysplastic",
+          "mds",
+          "age-dependent",
+          "mdsc",
+          "s100a9",
+          "cd33",
+          "cd33’s",
+          "tyrosine-based",
+          "itim",
+          "il-10",
+          "tgf-β",
+          "importantly",
+          "all-trans-retinoic",
+          "itam-bearing",
+          "dap12",
+          "s100a9/cd33"
+        ],
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      {
+        "doc_id": "00000002-0000-0000-0000-000000000000",
+        "text_snippet": "BC1 RNA, the transcript from a master gene for ID element amplification, is able to prime its own re...",
+        "predicted_entities": [
+          "bc1",
+          "rna",
+          "id",
+          "sines",
+          "id-related",
+          "site-specific",
+          "self-priming",
+          "3'-unique",
+          "self-primed"
+        ],
+        "ground_truth_entities": [
+          "bc1",
+          "rna",
+          "id",
+          "sines",
+          "id-related",
+          "site-specific",
+          "self-priming",
+          "3'-unique",
+          "self-primed"
+        ],
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      {
+        "doc_id": "00000003-0000-0000-0000-000000000000",
+        "text_snippet": "The DNA Methylome of Human Peripheral Blood Mononuclear Cells DNA methylation plays an important rol...",
+        "predicted_entities": [
+          "dna",
+          "methylome",
+          "human",
+          "peripheral",
+          "blood",
+          "mononuclear",
+          "cells",
+          "recent",
+          "whole-genome",
+          "24.7-fold",
+          "12.3-fold",
+          "pbmc",
+          "asian",
+          "yh",
+          "world-wide",
+          "cpg",
+          "non-cpg",
+          "analysis",
+          "20",
+          "protein-coding",
+          "non-coding",
+          "rna-coding",
+          "integration",
+          "allele-specific",
+          "asm",
+          "599",
+          "287",
+          "76",
+          "80",
+          "ase",
+          "pbmcs",
+          "together",
+          "large-scale"
+        ],
+        "ground_truth_entities": [
+          "dna",
+          "methylome",
+          "human",
+          "peripheral",
+          "blood",
+          "mononuclear",
+          "cells",
+          "recent",
+          "whole-genome",
+          "24.7-fold",
+          "12.3-fold",
+          "pbmc",
+          "asian",
+          "yh",
+          "world-wide",
+          "cpg",
+          "non-cpg",
+          "analysis",
+          "20",
+          "protein-coding",
+          "non-coding",
+          "rna-coding",
+          "integration",
+          "allele-specific",
+          "asm",
+          "599",
+          "287",
+          "76",
+          "80",
+          "ase",
+          "pbmcs",
+          "together",
+          "large-scale"
+        ],
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      {
+        "doc_id": "00000004-0000-0000-0000-000000000000",
+        "text_snippet": "The human myelin basic protein gene is included within a 179-kilobase transcription unit: expression...",
+        "predicted_entities": [
+          "179-kilobase",
+          "two",
+          "golli",
+          "lineage)-mbp",
+          "analysis",
+          "golli-mbp",
+          "mbp",
+          "179",
+          "10",
+          "well-known",
+          "mbps",
+          "rna",
+          "b-cell"
+        ],
+        "ground_truth_entities": [
+          "179-kilobase",
+          "two",
+          "golli",
+          "lineage)-mbp",
+          "analysis",
+          "golli-mbp",
+          "mbp",
+          "179",
+          "10",
+          "well-known",
+          "mbps",
+          "rna",
+          "b-cell"
+        ],
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      {
+        "doc_id": "00000005-0000-0000-0000-000000000000",
+        "text_snippet": "Targeting A20 Decreases Glioma Stem Cell Survival and Tumor Growth Glioblastomas are deadly cancers ...",
+        "predicted_entities": [
+          "targeting",
+          "a20",
+          "decreases",
+          "glioma",
+          "stem",
+          "cell",
+          "survival",
+          "tumor",
+          "growth",
+          "glioblastomas",
+          "self-renewing",
+          "gscs",
+          "tnfaip3",
+          "nf-kappab",
+          "non-stem",
+          "lentiviral-mediated",
+          "rna",
+          "inhibiting",
+          "gsc",
+          "cell-cycle",
+          "elevated",
+          "tnfalpha-induced",
+          "tnfalpha-mediated",
+          "self-renew",
+          "together",
+          "although"
+        ],
+        "ground_truth_entities": [
+          "targeting",
+          "a20",
+          "decreases",
+          "glioma",
+          "stem",
+          "cell",
+          "survival",
+          "tumor",
+          "growth",
+          "glioblastomas",
+          "self-renewing",
+          "gscs",
+          "tnfaip3",
+          "nf-kappab",
+          "non-stem",
+          "lentiviral-mediated",
+          "rna",
+          "inhibiting",
+          "gsc",
+          "cell-cycle",
+          "elevated",
+          "tnfalpha-induced",
+          "tnfalpha-mediated",
+          "self-renew",
+          "together",
+          "although"
+        ],
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      {
+        "doc_id": "00000006-0000-0000-0000-000000000000",
+        "text_snippet": "Efficient targeting of expressed and silent genes in human ESCs and iPSCs using zinc-finger nuclease...",
+        "predicted_entities": [
+          "efficient",
+          "escs",
+          "zinc-finger",
+          "realizing",
+          "however",
+          "zfn)–mediated",
+          "first",
+          "zfns",
+          "oct4",
+          "pou5f1",
+          "oct4-egfp",
+          "second",
+          "aavs1",
+          "drug-inducible",
+          "finally",
+          "pitx3",
+          "non-expressed"
+        ],
+        "ground_truth_entities": [
+          "efficient",
+          "escs",
+          "zinc-finger",
+          "realizing",
+          "however",
+          "zfn)–mediated",
+          "first",
+          "zfns",
+          "oct4",
+          "pou5f1",
+          "oct4-egfp",
+          "second",
+          "aavs1",
+          "drug-inducible",
+          "finally",
+          "pitx3",
+          "non-expressed"
+        ],
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      {
+        "doc_id": "00000007-0000-0000-0000-000000000000",
+        "text_snippet": "Empirical Bayesian models for analysing molecular serotyping microarrays BACKGROUND Microarrays offe...",
+        "predicted_entities": [
+          "empirical",
+          "bayesian",
+          "background",
+          "microarrays",
+          "streptococcus",
+          "91",
+          "dna",
+          "results",
+          "conclusions",
+          "serotypes"
+        ],
+        "ground_truth_entities": [
+          "empirical",
+          "bayesian",
+          "background",
+          "microarrays",
+          "streptococcus",
+          "91",
+          "dna",
+          "results",
+          "conclusions",
+          "serotypes"
+        ],
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      {
+        "doc_id": "00000008-0000-0000-0000-000000000000",
+        "text_snippet": "Bayesian measures of model complexity and fit Summary. We consider the problem of comparing complex ...",
+        "predicted_entities": [
+          "bayesian",
+          "summary",
+          "fisher's",
+          "adding",
+          "throughout",
+          "markov",
+          "monte",
+          "carlo"
+        ],
+        "ground_truth_entities": [
+          "bayesian",
+          "summary",
+          "fisher's",
+          "adding",
+          "throughout",
+          "markov",
+          "monte",
+          "carlo"
+        ],
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      {
+        "doc_id": "00000009-0000-0000-0000-000000000000",
+        "text_snippet": "Simplifying likelihood ratios Likelihood ratios are one of the best measures of diagnostic accuracy,...",
+        "predicted_entities": [
+          "simplifying",
+          "likelihood",
+          "several"
+        ],
+        "ground_truth_entities": [
+          "simplifying",
+          "likelihood",
+          "several"
+        ],
+        "precision": 1.0,
+        "recall": 1.0
+      }
+    ]
+  },
+  "retrieval_results": {
+    "metrics": {
+      "mrr_e1_only": 0.6029042624042623,
+      "mrr_e11_only": 0.48190372493004047,
+      "mrr_e1_e11_hybrid": 0.7520238095238096,
+      "e11_contribution_pct": 24.733536718564274,
+      "entity_overlap_correlation": 0.0,
+      "precision_at_k": {},
+      "recall_at_k": {},
+      "queries_evaluated": 50
+    },
+    "query_results": [
+      {
+        "query_id": "00000000-0000-0000-0000-000000000000",
+        "query_text": "Microstructural development of human newborn cereb...",
+        "query_entities": [
+          "microstructural",
+          "alterations",
+          "diffusion-weighted",
+          "mri",
+          "three-dimensional",
+          "17",
+          "full-term",
+          "10",
+          "28",
+          "relative",
+          "preterm",
+          "nonmyelinated"
+        ],
+        "e1_mrr": 0.3333333333333333,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000001-0000-0000-0000-000000000000",
+        "query_text": "Induction of myelodysplasia by myeloid-derived sup...",
+        "query_entities": [
+          "induction",
+          "myeloid-derived",
+          "myelodysplastic",
+          "mds",
+          "age-dependent",
+          "mdsc",
+          "s100a9",
+          "cd33",
+          "cd33’s",
+          "tyrosine-based",
+          "itim",
+          "il-10",
+          "tgf-β",
+          "importantly",
+          "all-trans-retinoic",
+          "itam-bearing",
+          "dap12",
+          "s100a9/cd33"
+        ],
+        "e1_mrr": 0.041666666666666664,
+        "e11_mrr": 0.05,
+        "hybrid_mrr": 0.07142857142857142
+      },
+      {
+        "query_id": "00000002-0000-0000-0000-000000000000",
+        "query_text": "BC1 RNA, the transcript from a master gene for ID ...",
+        "query_entities": [
+          "bc1",
+          "rna",
+          "id",
+          "sines",
+          "id-related",
+          "site-specific",
+          "self-priming",
+          "3'-unique",
+          "self-primed"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 0.3333333333333333,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000003-0000-0000-0000-000000000000",
+        "query_text": "The DNA Methylome of Human Peripheral Blood Mononu...",
+        "query_entities": [
+          "dna",
+          "methylome",
+          "human",
+          "peripheral",
+          "blood",
+          "mononuclear",
+          "cells",
+          "recent",
+          "whole-genome",
+          "24.7-fold",
+          "12.3-fold",
+          "pbmc",
+          "asian",
+          "yh",
+          "world-wide",
+          "cpg",
+          "non-cpg",
+          "analysis",
+          "20",
+          "protein-coding",
+          "non-coding",
+          "rna-coding",
+          "integration",
+          "allele-specific",
+          "asm",
+          "599",
+          "287",
+          "76",
+          "80",
+          "ase",
+          "pbmcs",
+          "together",
+          "large-scale"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000004-0000-0000-0000-000000000000",
+        "query_text": "The human myelin basic protein gene is included wi...",
+        "query_entities": [
+          "179-kilobase",
+          "two",
+          "golli",
+          "lineage)-mbp",
+          "analysis",
+          "golli-mbp",
+          "mbp",
+          "179",
+          "10",
+          "well-known",
+          "mbps",
+          "rna",
+          "b-cell"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000005-0000-0000-0000-000000000000",
+        "query_text": "Targeting A20 Decreases Glioma Stem Cell Survival ...",
+        "query_entities": [
+          "targeting",
+          "a20",
+          "decreases",
+          "glioma",
+          "stem",
+          "cell",
+          "survival",
+          "tumor",
+          "growth",
+          "glioblastomas",
+          "self-renewing",
+          "gscs",
+          "tnfaip3",
+          "nf-kappab",
+          "non-stem",
+          "lentiviral-mediated",
+          "rna",
+          "inhibiting",
+          "gsc",
+          "cell-cycle",
+          "elevated",
+          "tnfalpha-induced",
+          "tnfalpha-mediated",
+          "self-renew",
+          "together",
+          "although"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 0.16666666666666666,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000006-0000-0000-0000-000000000000",
+        "query_text": "Efficient targeting of expressed and silent genes ...",
+        "query_entities": [
+          "efficient",
+          "escs",
+          "zinc-finger",
+          "realizing",
+          "however",
+          "zfn)–mediated",
+          "first",
+          "zfns",
+          "oct4",
+          "pou5f1",
+          "oct4-egfp",
+          "second",
+          "aavs1",
+          "drug-inducible",
+          "finally",
+          "pitx3",
+          "non-expressed"
+        ],
+        "e1_mrr": 0.5,
+        "e11_mrr": 0.25,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000007-0000-0000-0000-000000000000",
+        "query_text": "Empirical Bayesian models for analysing molecular ...",
+        "query_entities": [
+          "empirical",
+          "bayesian",
+          "background",
+          "microarrays",
+          "streptococcus",
+          "91",
+          "dna",
+          "results",
+          "conclusions",
+          "serotypes"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000008-0000-0000-0000-000000000000",
+        "query_text": "Bayesian measures of model complexity and fit Summ...",
+        "query_entities": [
+          "bayesian",
+          "summary",
+          "fisher's",
+          "adding",
+          "throughout",
+          "markov",
+          "monte",
+          "carlo"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 0.07142857142857142,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000009-0000-0000-0000-000000000000",
+        "query_text": "Simplifying likelihood ratios Likelihood ratios ar...",
+        "query_entities": [
+          "simplifying",
+          "likelihood",
+          "several"
+        ],
+        "e1_mrr": 0.07142857142857142,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "0000000a-0000-0000-0000-000000000000",
+        "query_text": "induction of early IFN-inducible genes in the abse...",
+        "query_entities": [
+          "ifn-inducible",
+          "flu",
+          "tlr7",
+          "ifn",
+          "synthetic",
+          "low-level",
+          "ifn-alpha",
+          "cl097",
+          "blood-isolated",
+          "gen2.2",
+          "type",
+          "irf7",
+          "surprisingly",
+          "stat1",
+          "pi3k-p38mapk",
+          "thus"
+        ],
+        "e1_mrr": 0.3333333333333333,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "0000000b-0000-0000-0000-000000000000",
+        "query_text": "Arteriolar function in visceral adipose tissue is ...",
+        "query_entities": [
+          "arteriolar",
+          "objective",
+          "depot-specific",
+          "methods",
+          "results",
+          "30",
+          "75-250",
+          "endothelium-dependent",
+          "acetylcholine-mediated",
+          "p<0.001",
+          "anova",
+          "nonendothelium",
+          "endothelial",
+          "n(ω)-nitro-l-arginine",
+          "visceral",
+          "stress-related",
+          "hypoxia-induced",
+          "conclusions"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "0000000c-0000-0000-0000-000000000000",
+        "query_text": "Common Carotid Intima Media Thickness and Ankle-Br...",
+        "query_entities": [
+          "common",
+          "carotid",
+          "intima",
+          "media",
+          "thickness",
+          "ankle-brachial",
+          "pressure",
+          "index",
+          "correlate",
+          "local",
+          "global",
+          "atheroma",
+          "burden",
+          "cross",
+          "sectional",
+          "study",
+          "whole",
+          "body",
+          "magnetic",
+          "resonance",
+          "angiography",
+          "background",
+          "cimt",
+          "abpi",
+          "wb-mra",
+          "methods",
+          "50",
+          "mri",
+          "dotarem",
+          "guerbet",
+          "fr",
+          "31",
+          "50-70",
+          "70-99",
+          "results",
+          "-0.39",
+          "ilio-femoral",
+          "-0.45",
+          "conclusion",
+          "however"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "0000000d-0000-0000-0000-000000000000",
+        "query_text": "Loss of immune escape mutations during persistent ...",
+        "query_entities": [
+          "loss",
+          "hcv",
+          "globally",
+          "mother-to-child",
+          "3-5",
+          "hcv-specific",
+          "cd8",
+          "ctls",
+          "60-80",
+          "increased",
+          "hla",
+          "ctl",
+          "importantly"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 0.038461538461538464,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "0000000e-0000-0000-0000-000000000000",
+        "query_text": "The journey of developing hematopoietic stem cells...",
+        "query_entities": [
+          "hematopoietic",
+          "hscs",
+          "once",
+          "hsc",
+          "self-renewing",
+          "during",
+          "self-renewal",
+          "elucidating"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "0000000f-0000-0000-0000-000000000000",
+        "query_text": "The sacroiliac joint in the spondyloarthropathies....",
+        "query_entities": [
+          "spa",
+          "hla-b27",
+          "five",
+          "overcoming",
+          "biopsy",
+          "intra-articular",
+          "further",
+          "dna",
+          "arthritis-associated"
+        ],
+        "e1_mrr": 0.1111111111111111,
+        "e11_mrr": 0.1111111111111111,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000010-0000-0000-0000-000000000000",
+        "query_text": "A rapid method for extraction of cotton (Gossypium...",
+        "query_entities": [
+          "gossypium",
+          "dna",
+          "rflp",
+          "pcr",
+          "extraction",
+          "high-quality",
+          "several",
+          "phenol-binding"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 0.25,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000011-0000-0000-0000-000000000000",
+        "query_text": "Cross sectional stature and weight reference curve...",
+        "query_entities": [
+          "cross",
+          "uk",
+          "1990",
+          "1966",
+          "british",
+          "20",
+          "cole's",
+          "lms"
+        ],
+        "e1_mrr": 0.5,
+        "e11_mrr": 0.045454545454545456,
+        "hybrid_mrr": 0.25
+      },
+      {
+        "query_id": "00000012-0000-0000-0000-000000000000",
+        "query_text": "The suture provides a niche for mesenchymal stem c...",
+        "query_entities": [
+          "bone",
+          "recent",
+          "mscs",
+          "craniofacial",
+          "craniofacial-bone",
+          "gli1",
+          "msc",
+          "ablation",
+          "twist1(+/-"
+        ],
+        "e1_mrr": 0.07142857142857142,
+        "e11_mrr": 0.05263157894736842,
+        "hybrid_mrr": 0.16666666666666666
+      },
+      {
+        "query_id": "00000013-0000-0000-0000-000000000000",
+        "query_text": "Cardiac neural crest cells contribute to the dorma...",
+        "query_entities": [
+          "cardiac",
+          "arodent",
+          "serum-free",
+          "musashi-1",
+          "multi-drug",
+          "neuron-",
+          "glial-",
+          "cardiomyocyte-specific",
+          "cardiosphere-derived",
+          "lineage",
+          "0–cre/floxed-egfp",
+          "crest-derived",
+          "undifferentiated",
+          "gata-binding"
+        ],
+        "e1_mrr": 0.0,
+        "e11_mrr": 0.0,
+        "hybrid_mrr": 0.0
+      },
+      {
+        "query_id": "00000014-0000-0000-0000-000000000000",
+        "query_text": "The mammalian target of rapamycin signaling pathwa...",
+        "query_entities": [
+          "understanding",
+          "acute",
+          "kainate-induced",
+          "phospho-s6",
+          "p-s6",
+          "3-6",
+          "24",
+          "5-10",
+          "seizure-induced",
+          "late"
+        ],
+        "e1_mrr": 0.2,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 0.5
+      },
+      {
+        "query_id": "00000015-0000-0000-0000-000000000000",
+        "query_text": "Acute administration of recombinant Angiopoietin-1...",
+        "query_entities": [
+          "acute",
+          "angiopoietin-1",
+          "multiple-organ",
+          "introduction",
+          "endothelial",
+          "mods",
+          "increasing",
+          "vessel-protective",
+          "ang-1",
+          "endothelial-specific",
+          "tie2",
+          "angiopoietin-2",
+          "ang-2",
+          "sepsis-induced",
+          "methods",
+          "polymicrobiological",
+          "clp",
+          "mice",
+          "rhang-1",
+          "sham-operated",
+          "time-matched",
+          "results",
+          "compared",
+          "buffer-treated",
+          "moreover",
+          "histological",
+          "finally",
+          "conclusions",
+          "sepsis-associated",
+          "further"
+        ],
+        "e1_mrr": 0.3333333333333333,
+        "e11_mrr": 0.5,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000016-0000-0000-0000-000000000000",
+        "query_text": "Mechanisms linking obesity to insulin resistance a...",
+        "query_entities": [
+          "mechanisms",
+          "obesity",
+          "non-esterified",
+          "pro-inflammatory",
+          "β-cells",
+          "abnormalities",
+          "β-cell"
+        ],
+        "e1_mrr": 0.05555555555555555,
+        "e11_mrr": 0.038461538461538464,
+        "hybrid_mrr": 0.07142857142857142
+      },
+      {
+        "query_id": "00000017-0000-0000-0000-000000000000",
+        "query_text": "Tracking the fate of glomerular epithelial cells i...",
+        "query_entities": [
+          "tracking",
+          "podocytes",
+          "mpm",
+          "pecs",
+          "podocin-gfp",
+          "bowman's",
+          "podocin-confetti",
+          "cell-specific",
+          "cfp",
+          "gfp",
+          "yfp",
+          "rfp",
+          "pepck)-gfp",
+          "pec-to-podocyte",
+          "future"
+        ],
+        "e1_mrr": 0.0,
+        "e11_mrr": 0.0,
+        "hybrid_mrr": 0.0
+      },
+      {
+        "query_id": "00000018-0000-0000-0000-000000000000",
+        "query_text": "CTCF binding at the H19 imprinting control region ...",
+        "query_entities": [
+          "ctcf",
+          "h19",
+          "higher-order",
+          "igf2",
+          "icr",
+          "ctcf-dependent",
+          "dmr)1",
+          "igf2/h19",
+          "160",
+          "mar)3",
+          "dmr1",
+          "mutation"
+        ],
+        "e1_mrr": 0.0,
+        "e11_mrr": 0.0,
+        "hybrid_mrr": 0.0
+      },
+      {
+        "query_id": "00000019-0000-0000-0000-000000000000",
+        "query_text": "De novo assembly of a PML nuclear subcompartment o...",
+        "query_entities": [
+          "de",
+          "pml",
+          "telomerase-negative",
+          "alt",
+          "dna",
+          "alt-associated",
+          "apbs",
+          "apb",
+          "self-organizing",
+          "self-propagating",
+          "sp100",
+          "trf1",
+          "trf2",
+          "nbs1",
+          "sumo",
+          "e3",
+          "mms21",
+          "sumo1",
+          "rad9",
+          "rad17",
+          "rad51",
+          "non-replicative",
+          "h2a.x"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "0000001a-0000-0000-0000-000000000000",
+        "query_text": "Effects of an opal termination codon preceding the...",
+        "query_entities": [
+          "effects",
+          "o'nyong-nyong",
+          "anopheles",
+          "rna",
+          "p123",
+          "p1234",
+          "evolutionary",
+          "onnv",
+          "alternate",
+          "onnvs",
+          "however",
+          "full-length",
+          "although",
+          "10",
+          "taken"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 0.3333333333333333,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "0000001b-0000-0000-0000-000000000000",
+        "query_text": "Down-regulation of a host microRNA by a Herpesviru...",
+        "query_entities": [
+          "down-regulation",
+          "herpesvirus",
+          "rna",
+          "u-rich",
+          "rnas",
+          "hsurs",
+          "host-cell",
+          "coimmunoprecipitation",
+          "mir-27",
+          "transient",
+          "hsur",
+          "sequence-specific",
+          "binding-dependent"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 0.3333333333333333,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "0000001c-0000-0000-0000-000000000000",
+        "query_text": "HTRF: A Technology Tailored for Drug Discovery –...",
+        "query_entities": [
+          "htrf",
+          "technology",
+          "tailored",
+          "drug",
+          "discovery",
+          "review",
+          "theoretical",
+          "aspects",
+          "recent",
+          "applications",
+          "homogeneous",
+          "resolved",
+          "fluorescence",
+          "high-throughput",
+          "hts",
+          "fret",
+          "time-resolved",
+          "tr",
+          "tr-fret",
+          "buffer",
+          "dual-wavelength",
+          "384",
+          "1536-well",
+          "antibody-based",
+          "gpcr",
+          "ip-one",
+          "protein-protein",
+          "protein-dna/rna",
+          "since",
+          "drug-screening",
+          "gpcrs",
+          "first-generation",
+          "europium",
+          "2008",
+          "second-generation",
+          "terbium",
+          "tb",
+          "green-emitting",
+          "490",
+          "moreover",
+          "htrf-compatible",
+          "overall"
+        ],
+        "e1_mrr": 0.08333333333333333,
+        "e11_mrr": 0.5,
+        "hybrid_mrr": 0.16666666666666666
+      },
+      {
+        "query_id": "0000001d-0000-0000-0000-000000000000",
+        "query_text": "Chk1 inhibits replication factory activation but a...",
+        "query_entities": [
+          "chk1",
+          "replication",
+          "mcm2-7",
+          "however",
+          "10",
+          "dna",
+          "rad-3-related",
+          "atr",
+          "atr/chk1"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 0.5,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "0000001e-0000-0000-0000-000000000000",
+        "query_text": "Fra-1 protooncogene regulates IL-6 expression in m...",
+        "query_entities": [
+          "fra-1",
+          "il-6",
+          "m2d",
+          "tme",
+          "protein-1",
+          "jun",
+          "however",
+          "4t1",
+          "co-cultured",
+          "raw264.7",
+          "macrophage-induced"
+        ],
+        "e1_mrr": 0.25,
+        "e11_mrr": 0.2,
+        "hybrid_mrr": 0.5
+      },
+      {
+        "query_id": "0000001f-0000-0000-0000-000000000000",
+        "query_text": "Analysis of SiO2 nanoparticles binding proteins in...",
+        "query_entities": [
+          "analysis",
+          "sio2",
+          "tio2",
+          "recently",
+          "hence",
+          "therefore",
+          "four",
+          "chromatography-tandem",
+          "115",
+          "48",
+          "20",
+          "100",
+          "50",
+          "36",
+          "arginine-coated",
+          "higher",
+          "cluego",
+          "cytoscape",
+          "proteins"
+        ],
+        "e1_mrr": 0.07692307692307693,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 0.125
+      },
+      {
+        "query_id": "00000020-0000-0000-0000-000000000000",
+        "query_text": "Inferring nucleosome positions with their histone ...",
+        "query_entities": [
+          "inferring",
+          "chip",
+          "motivation",
+          "h2a",
+          "h2b",
+          "h3",
+          "h4",
+          "147",
+          "dna",
+          "post-translational",
+          "chromatin",
+          "chip-seq",
+          "genome-wide",
+          "results",
+          "nuchunter",
+          "chromatin-related",
+          "rna",
+          "ii",
+          "chromatin-mediated",
+          "thus",
+          "availability"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000021-0000-0000-0000-000000000000",
+        "query_text": "Generation of large numbers of dendritic cells fro...",
+        "query_entities": [
+          "generation",
+          "colony-stimulating",
+          "antigen-presenting",
+          "mhc",
+          "ii-rich",
+          "however",
+          "less-mature",
+          "ii-negative",
+          "2-4",
+          "4-6",
+          "1-g",
+          "ii",
+          "neither",
+          "gm-csf",
+          "therefore",
+          "since"
+        ],
+        "e1_mrr": 0.25,
+        "e11_mrr": 0.07692307692307693,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000022-0000-0000-0000-000000000000",
+        "query_text": "Insulin action and resistance in obesity and type ...",
+        "query_entities": [
+          "insulin",
+          "nutritional",
+          "however",
+          "perspective",
+          "although",
+          "cross-talk"
+        ],
+        "e1_mrr": 0.2,
+        "e11_mrr": 0.14285714285714285,
+        "hybrid_mrr": 0.25
+      },
+      {
+        "query_id": "00000023-0000-0000-0000-000000000000",
+        "query_text": "Effect of lowering blood pressure on cardiovascula...",
+        "query_entities": [
+          "effect",
+          "meta-analysis",
+          "background",
+          "patients",
+          "although",
+          "methods",
+          "medline",
+          "embase",
+          "cochrane",
+          "library",
+          "1950",
+          "november",
+          "2008",
+          "findings",
+          "1679",
+          "495",
+          "weighted",
+          "hg",
+          "blood",
+          "rr",
+          "95",
+          "ci",
+          "0.55-0.92",
+          "all-cause",
+          "0.66-0.96",
+          "0.50-0.99",
+          "interpretation",
+          "treatment"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 0.3333333333333333,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000024-0000-0000-0000-000000000000",
+        "query_text": "Interaction of an adenovirus E3 14.7-kilodalton pr...",
+        "query_entities": [
+          "interaction",
+          "e3",
+          "14.7-kilodalton",
+          "alpha-inducible",
+          "early",
+          "ad",
+          "tnf-alpha",
+          "14.7-kda",
+          "e3-14.7k",
+          "hela",
+          "two-hybrid",
+          "fip-2",
+          "14.7k-interacting",
+          "55-kda",
+          "tnf",
+          "rip",
+          "fas",
+          "deletion",
+          "three",
+          "time-dependent"
+        ],
+        "e1_mrr": 0.14285714285714285,
+        "e11_mrr": 0.125,
+        "hybrid_mrr": 0.25
+      },
+      {
+        "query_id": "00000025-0000-0000-0000-000000000000",
+        "query_text": "PML induces compaction, TRF2 depletion and DNA dam...",
+        "query_entities": [
+          "pml",
+          "trf2",
+          "dna",
+          "alt",
+          "alt-associated",
+          "apbs",
+          "rna",
+          "3d",
+          "29",
+          "apb",
+          "terf2",
+          "apb-dependent",
+          "atm",
+          "accordingly",
+          "alt-positive"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000026-0000-0000-0000-000000000000",
+        "query_text": "Gr-1+CD11b+ myeloid cells tip the balance of immun...",
+        "query_entities": [
+          "gr-1+cd11b",
+          "ifn-gamma",
+          "mmp9",
+          "deletion",
+          "thus"
+        ],
+        "e1_mrr": 0.25,
+        "e11_mrr": 0.14285714285714285,
+        "hybrid_mrr": 0.5
+      },
+      {
+        "query_id": "00000027-0000-0000-0000-000000000000",
+        "query_text": "Activin/Nodal signalling in stem cells. Activin/No...",
+        "query_entities": [
+          "activin/nodal",
+          "moreover",
+          "self-renewal"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000028-0000-0000-0000-000000000000",
+        "query_text": "Distinct RNA-dependent RNA polymerases are require...",
+        "query_entities": [
+          "distinct",
+          "rna-dependent",
+          "rna",
+          "rnai",
+          "double-stranded",
+          "paramecium",
+          "rdrps",
+          "rdrp",
+          "high-copy",
+          "surprisingly",
+          "dsrna-induced",
+          "rdr1",
+          "rdr2",
+          "rnas",
+          "rdr3",
+          "co-expression"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 0.5,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000029-0000-0000-0000-000000000000",
+        "query_text": "Mechanisms of Renal Cell Apoptosis Induced by Cycl...",
+        "query_entities": [
+          "mechanisms",
+          "renal",
+          "cell",
+          "apoptosis",
+          "induced",
+          "cyclosporine",
+          "systematic",
+          "review",
+          "studies",
+          "background:chronic",
+          "csa",
+          "ccn",
+          "objective",
+          "methods",
+          "medline",
+          "1966",
+          "july",
+          "2010",
+          "embase",
+          "1980",
+          "isi",
+          "1986",
+          "picos",
+          "results",
+          "first,csa",
+          "fas",
+          "fas-l",
+          "fadd",
+          "caspase-2",
+          "-3",
+          "-4",
+          "-7",
+          "-8",
+          "-9",
+          "-10",
+          "bcl-2",
+          "bcl-xl",
+          "second",
+          "third",
+          "herp",
+          "grp78",
+          "chop",
+          "fourth",
+          "conclusions",
+          "caspases"
+        ],
+        "e1_mrr": 0.5,
+        "e11_mrr": 0.3333333333333333,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "0000002a-0000-0000-0000-000000000000",
+        "query_text": "Blood stem cells emerge from aortic endothelium by...",
+        "query_entities": [
+          "blood",
+          "hscs",
+          "long-term",
+          "hsc",
+          "aorta-gonad-mesonephros",
+          "agm",
+          "non-invasive",
+          "high-resolution",
+          "sub-aortic",
+          "dorso-ventral",
+          "rostro-caudal",
+          "medio-lateral",
+          "runx1",
+          "runx1-deficient"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 0.08333333333333333,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "0000002b-0000-0000-0000-000000000000",
+        "query_text": "Probable person to person transmission of novel av...",
+        "query_entities": [
+          "probable",
+          "h7n9",
+          "eastern",
+          "china",
+          "2013",
+          "objective",
+          "design",
+          "epidemiological",
+          "march",
+          "setting",
+          "wuxi",
+          "participants",
+          "two",
+          "samples",
+          "transcriptase-polymerase",
+          "rrt-pcr",
+          "any",
+          "paired",
+          "main",
+          "outcomes",
+          "measures",
+          "clinical",
+          "results",
+          "32",
+          "genome",
+          "forty",
+          "one",
+          "43",
+          "conclusions",
+          "non-sustainable"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "0000002c-0000-0000-0000-000000000000",
+        "query_text": "Genetic Variation in the Interleukin-28B Gene Is A...",
+        "query_entities": [
+          "genetic",
+          "variation",
+          "interleukin-28b",
+          "gene",
+          "associated",
+          "spontaneous",
+          "clearance",
+          "progression",
+          "hepatitis",
+          "virus",
+          "moroccan",
+          "patients",
+          "background",
+          "il28b",
+          "hcv",
+          "methods",
+          "438",
+          "232",
+          "115",
+          "117",
+          "68",
+          "138",
+          "snps",
+          "taqman",
+          "results",
+          "rs12979860-c",
+          "rs8099917-t",
+          "individuals",
+          "95",
+          "ci",
+          "1.99-11.07",
+          "c/c",
+          "0.19-66.89",
+          "t/t",
+          "rs12979860-t/t",
+          "0.99-3.61",
+          "2.08-8.76",
+          "rs8099917-g",
+          "1.40-3.93",
+          "conclusions"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "0000002d-0000-0000-0000-000000000000",
+        "query_text": "CD127 expression inversely correlates with FoxP3 a...",
+        "query_entities": [
+          "cd127",
+          "foxp3",
+          "cd4",
+          "regulatory",
+          "cd25",
+          "however",
+          "il-7",
+          "down-regulated",
+          "cd25+cd4",
+          "cd25−cd4",
+          "cd4+cd25hi",
+          "finally"
+        ],
+        "e1_mrr": 0.25,
+        "e11_mrr": 0.3333333333333333,
+        "hybrid_mrr": 0.5
+      },
+      {
+        "query_id": "0000002e-0000-0000-0000-000000000000",
+        "query_text": "Environmental factors that influence the cutaneous...",
+        "query_entities": [
+          "environmental",
+          "during",
+          "290-315",
+          "7-dehydrocholesterol",
+          "once",
+          "latitude",
+          "boston",
+          "november",
+          "february",
+          "sunlight-mediated",
+          "vitamin",
+          "10",
+          "400",
+          "iu"
+        ],
+        "e1_mrr": 0.09090909090909091,
+        "e11_mrr": 0.08333333333333333,
+        "hybrid_mrr": 0.25
+      },
+      {
+        "query_id": "0000002f-0000-0000-0000-000000000000",
+        "query_text": "Genomic imprinting in development, growth, behavio...",
+        "query_entities": [
+          "genomic",
+          "genes",
+          "recent",
+          "finally"
+        ],
+        "e1_mrr": 0.5,
+        "e11_mrr": 0.08333333333333333,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000030-0000-0000-0000-000000000000",
+        "query_text": "Quantitative Detection of Hepatitis C Virus RNA by...",
+        "query_entities": [
+          "quantitative",
+          "detection",
+          "hepatitis",
+          "virus",
+          "rna",
+          "light",
+          "cycler",
+          "pcr",
+          "comparison",
+          "two",
+          "different",
+          "assays",
+          "hcv",
+          "sera",
+          "81",
+          "amplicor",
+          "monitor",
+          "in-house"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 1.0,
+        "hybrid_mrr": 1.0
+      },
+      {
+        "query_id": "00000031-0000-0000-0000-000000000000",
+        "query_text": "Targeting arginine metabolism pathway to treat arg...",
+        "query_entities": [
+          "targeting",
+          "arginine-dependent",
+          "metabolism-based",
+          "anti-tumor",
+          "arginine",
+          "semi-essential",
+          "several",
+          "taking",
+          "adi",
+          "arginine-auxotrophic"
+        ],
+        "e1_mrr": 1.0,
+        "e11_mrr": 0.08333333333333333,
+        "hybrid_mrr": 1.0
+      }
+    ]
+  },
+  "transe_results": {
+    "metrics": {
+      "valid_triple_avg_score": -1.0303289,
+      "invalid_triple_avg_score": -1.0450025,
+      "separation_score": 0.014673591,
+      "relationship_inference_mrr": 1.0,
+      "knowledge_validation_accuracy": 0.0,
+      "valid_triples_evaluated": 28,
+      "invalid_triples_evaluated": 100,
+      "valid_score_distribution": {
+        "mean": -1.0303289,
+        "std_dev": 0.012049551,
+        "min": -1.0603551,
+        "max": -1.0108441,
+        "median": -1.0322485,
+        "p25": -1.0361153,
+        "p75": -1.0202584
+      },
+      "invalid_score_distribution": {
+        "mean": -1.0450025,
+        "std_dev": 0.024166698,
+        "min": -1.1338943,
+        "max": -0.9955343,
+        "median": -1.0416485,
+        "p25": -1.0613986,
+        "p75": -1.0281891
+      }
+    },
+    "valid_triple_scores": [
+      {
+        "subject": "Tokio",
+        "predicate": "depends_on",
+        "object": "Rust",
+        "score": -1.0330037,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Axum",
+        "predicate": "depends_on",
+        "object": "Tokio",
+        "score": -1.0361153,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Actix",
+        "predicate": "depends_on",
+        "object": "Tokio",
+        "score": -1.0343057,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Django",
+        "predicate": "uses",
+        "object": "Python",
+        "score": -1.0126797,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "FastAPI",
+        "predicate": "uses",
+        "object": "Python",
+        "score": -1.0118505,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Flask",
+        "predicate": "uses",
+        "object": "Python",
+        "score": -1.017867,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "React",
+        "predicate": "uses",
+        "object": "JavaScript",
+        "score": -1.0347376,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Vue.js",
+        "predicate": "uses",
+        "object": "JavaScript",
+        "score": -1.0108441,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Angular",
+        "predicate": "uses",
+        "object": "TypeScript",
+        "score": -1.0409551,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Next.js",
+        "predicate": "extends",
+        "object": "React",
+        "score": -1.0268533,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "PostgreSQL",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.02528,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "MySQL",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.0283558,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "MongoDB",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.0358329,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Redis",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.0322485,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "RocksDB",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.0335245,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "S3",
+        "predicate": "part_of",
+        "object": "AWS",
+        "score": -1.0176411,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "EC2",
+        "predicate": "part_of",
+        "object": "AWS",
+        "score": -1.0230842,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Lambda",
+        "predicate": "part_of",
+        "object": "AWS",
+        "score": -1.0443773,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "BigQuery",
+        "predicate": "part_of",
+        "object": "GCP",
+        "score": -1.0202584,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Kubernetes",
+        "predicate": "alternative_to",
+        "object": "Docker",
+        "score": -1.0355462,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Claude",
+        "predicate": "created_by",
+        "object": "Anthropic",
+        "score": -1.0473808,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "GPT",
+        "predicate": "created_by",
+        "object": "OpenAI",
+        "score": -1.023631,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "GitHub",
+        "predicate": "owned_by",
+        "object": "Microsoft",
+        "score": -1.0603551,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "GraphQL",
+        "predicate": "alternative_to",
+        "object": "REST",
+        "score": -1.0129039,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "gRPC",
+        "predicate": "alternative_to",
+        "object": "REST",
+        "score": -1.0229062,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "ColBERT",
+        "predicate": "is_type",
+        "object": "TechnicalTerm",
+        "score": -1.0468255,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "SPLADE",
+        "predicate": "is_type",
+        "object": "TechnicalTerm",
+        "score": -1.0423081,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "HNSW",
+        "predicate": "is_type",
+        "object": "TechnicalTerm",
+        "score": -1.0375385,
+        "is_valid_ground_truth": true
+      }
+    ],
+    "invalid_triple_scores": [
+      {
+        "subject": "PostgreSQL",
+        "predicate": "works_at",
+        "object": "Google",
+        "score": -1.0263636,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Rust",
+        "predicate": "created_by",
+        "object": "JavaScript",
+        "score": -1.0195689,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "AWS",
+        "predicate": "extends",
+        "object": "Python",
+        "score": -1.0273005,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Django",
+        "predicate": "depends_on",
+        "object": "React",
+        "score": -1.0202516,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "MongoDB",
+        "predicate": "uses",
+        "object": "PostgreSQL",
+        "score": -1.0018147,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Redis",
+        "predicate": "alternative_to",
+        "object": "Rust",
+        "score": -1.0327115,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Tokio",
+        "predicate": "part_of",
+        "object": "Python",
+        "score": -1.0368197,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "GPT",
+        "predicate": "created_by",
+        "object": "Anthropic",
+        "score": -1.0475167,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Claude",
+        "predicate": "created_by",
+        "object": "OpenAI",
+        "score": -1.0245764,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Kubernetes",
+        "predicate": "depends_on",
+        "object": "FastAPI",
+        "score": -1.0690353,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "iu",
+        "predicate": "part_of",
+        "object": "rs8099917-g",
+        "score": -1.0818807,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "world-wide",
+        "predicate": "extends",
+        "object": "design",
+        "score": -1.0472665,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "rs12979860-t/t",
+        "predicate": "created_by",
+        "object": "rs12979860-c",
+        "score": -1.0209302,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "bcl-2",
+        "predicate": "uses",
+        "object": "atr/chk1",
+        "score": -1.0652828,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "nutritional",
+        "predicate": "uses",
+        "object": "synthetic",
+        "score": -1.0691181,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "12.3-fold",
+        "predicate": "depends_on",
+        "object": "id-related",
+        "score": -1.030039,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "cpg",
+        "predicate": "works_at",
+        "object": "second-generation",
+        "score": -1.0484625,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "transcriptase-polymerase",
+        "predicate": "works_at",
+        "object": "h2a.x",
+        "score": -1.038068,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "phenol-binding",
+        "predicate": "implements",
+        "object": "magnetic",
+        "score": -1.0193366,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "24.7-fold",
+        "predicate": "depends_on",
+        "object": "490",
+        "score": -1.073719,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "protein-1",
+        "predicate": "uses",
+        "object": "common",
+        "score": -1.0059862,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "genes",
+        "predicate": "depends_on",
+        "object": "diffusion-weighted",
+        "score": -1.0485355,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "70-99",
+        "predicate": "created_by",
+        "object": "foxp3",
+        "score": -1.0328305,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "grp78",
+        "predicate": "part_of",
+        "object": "light",
+        "score": -1.046651,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "apbs",
+        "predicate": "part_of",
+        "object": "overall",
+        "score": -1.0416485,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "phospho-s6",
+        "predicate": "implements",
+        "object": "mpm",
+        "score": -1.0459467,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "technology",
+        "predicate": "created_by",
+        "object": "applications",
+        "score": -1.0670289,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "since",
+        "predicate": "works_at",
+        "object": "higher-order",
+        "score": -1.0626119,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "bc1",
+        "predicate": "part_of",
+        "object": "0.99-3.61",
+        "score": -1.1338943,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "sera",
+        "predicate": "implements",
+        "object": "rs8099917-g",
+        "score": -1.067841,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "cell-specific",
+        "predicate": "uses",
+        "object": "24",
+        "score": -1.0257032,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "late",
+        "predicate": "implements",
+        "object": "rdrps",
+        "score": -1.0532506,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "cimt",
+        "predicate": "extends",
+        "object": "assays",
+        "score": -1.037179,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "zinc-finger",
+        "predicate": "uses",
+        "object": "ang-2",
+        "score": -1.0203855,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "12.3-fold",
+        "predicate": "works_at",
+        "object": "msc",
+        "score": -1.034267,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "visceral",
+        "predicate": "part_of",
+        "object": "chromatin",
+        "score": -1.0445573,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "t/t",
+        "predicate": "uses",
+        "object": "cycler",
+        "score": -1.0079881,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "sera",
+        "predicate": "depends_on",
+        "object": "nonmyelinated",
+        "score": -1.041945,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "mods",
+        "predicate": "created_by",
+        "object": "12.3-fold",
+        "score": -1.0625404,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "higher",
+        "predicate": "alternative_to",
+        "object": "pml",
+        "score": -1.0132221,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "moroccan",
+        "predicate": "uses",
+        "object": "msc",
+        "score": -1.0178733,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "two-hybrid",
+        "predicate": "implements",
+        "object": "likelihood",
+        "score": -1.0346409,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "mods",
+        "predicate": "created_by",
+        "object": "htrf-compatible",
+        "score": -1.0553422,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "golli",
+        "predicate": "implements",
+        "object": "sepsis-associated",
+        "score": -1.0606686,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "interleukin-28b",
+        "predicate": "alternative_to",
+        "object": "4-6",
+        "score": -1.0628858,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "c/c",
+        "predicate": "extends",
+        "object": "tr",
+        "score": -1.0466608,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "surprisingly",
+        "predicate": "uses",
+        "object": "cardiosphere-derived",
+        "score": -1.0985914,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "technology",
+        "predicate": "created_by",
+        "object": "elevated",
+        "score": -1.0281891,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "2.08-8.76",
+        "predicate": "extends",
+        "object": "treatment",
+        "score": -1.0518928,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "cardiomyocyte-specific",
+        "predicate": "extends",
+        "object": "podocytes",
+        "score": -1.0138552,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "rr",
+        "predicate": "part_of",
+        "object": "accordingly",
+        "score": -1.014952,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "empirical",
+        "predicate": "depends_on",
+        "object": "232",
+        "score": -1.0803882,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "carotid",
+        "predicate": "alternative_to",
+        "object": "fret",
+        "score": -1.0383959,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "pecs",
+        "predicate": "created_by",
+        "object": "first",
+        "score": -1.0451759,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "cd33",
+        "predicate": "alternative_to",
+        "object": "290-315",
+        "score": -1.0535778,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "measures",
+        "predicate": "depends_on",
+        "object": "transcriptase-polymerase",
+        "score": -1.0799211,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "tr-fret",
+        "predicate": "extends",
+        "object": "asian",
+        "score": -1.0309597,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "ang-2",
+        "predicate": "works_at",
+        "object": "2013",
+        "score": -1.0732484,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "crest-derived",
+        "predicate": "created_by",
+        "object": "recently",
+        "score": -1.0328193,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "loss",
+        "predicate": "extends",
+        "object": "methylome",
+        "score": -1.036854,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "moroccan",
+        "predicate": "created_by",
+        "object": "higher-order",
+        "score": -1.0542747,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "snps",
+        "predicate": "implements",
+        "object": "msc",
+        "score": -1.0179509,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "drug-inducible",
+        "predicate": "depends_on",
+        "object": "recently",
+        "score": -1.0582534,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "28",
+        "predicate": "uses",
+        "object": "arteriolar",
+        "score": -1.0990582,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "gfp",
+        "predicate": "alternative_to",
+        "object": "medline",
+        "score": -1.0422368,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "m2d",
+        "predicate": "implements",
+        "object": "acetylcholine-mediated",
+        "score": -1.096266,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "arginine-auxotrophic",
+        "predicate": "uses",
+        "object": "wb-mra",
+        "score": -1.0184214,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "atm",
+        "predicate": "depends_on",
+        "object": "pepck)-gfp",
+        "score": -1.0308039,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "sio2",
+        "predicate": "uses",
+        "object": "-4",
+        "score": -1.0319549,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "atm",
+        "predicate": "alternative_to",
+        "object": "dual-wavelength",
+        "score": -1.0692362,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "rad51",
+        "predicate": "works_at",
+        "object": "-7",
+        "score": -1.0370095,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "taqman",
+        "predicate": "extends",
+        "object": "dual-wavelength",
+        "score": -1.0706534,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "14.7-kilodalton",
+        "predicate": "extends",
+        "object": "cells",
+        "score": -1.0613986,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "1.99-11.07",
+        "predicate": "extends",
+        "object": "gpcrs",
+        "score": -1.0243753,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "atr/chk1",
+        "predicate": "uses",
+        "object": "craniofacial",
+        "score": -1.0595038,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "self-propagating",
+        "predicate": "works_at",
+        "object": "craniofacial-bone",
+        "score": -1.0476906,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "protein-protein",
+        "predicate": "implements",
+        "object": "fas-l",
+        "score": -1.0283237,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "throughout",
+        "predicate": "depends_on",
+        "object": "type",
+        "score": -1.0387522,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "homogeneous",
+        "predicate": "implements",
+        "object": "picos",
+        "score": -1.0421017,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "384",
+        "predicate": "part_of",
+        "object": "taking",
+        "score": -1.0104765,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "sunlight-mediated",
+        "predicate": "extends",
+        "object": "elevated",
+        "score": -1.0266029,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "time-matched",
+        "predicate": "part_of",
+        "object": "regulatory",
+        "score": -1.0308186,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "genome-wide",
+        "predicate": "depends_on",
+        "object": "70-99",
+        "score": -1.0515784,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "well-known",
+        "predicate": "depends_on",
+        "object": "boston",
+        "score": -1.0291533,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "hcv",
+        "predicate": "works_at",
+        "object": "cells",
+        "score": -1.0379685,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "ip-one",
+        "predicate": "created_by",
+        "object": "acute",
+        "score": -1.0451859,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "rs8099917-g",
+        "predicate": "part_of",
+        "object": "moreover",
+        "score": -1.0508435,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "further",
+        "predicate": "alternative_to",
+        "object": "kainate-induced",
+        "score": -1.0652307,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "hsurs",
+        "predicate": "alternative_to",
+        "object": "2.08-8.76",
+        "score": -1.1169387,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "lineage",
+        "predicate": "part_of",
+        "object": "cell",
+        "score": -1.0390844,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "non-invasive",
+        "predicate": "works_at",
+        "object": "pcr",
+        "score": -1.029242,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "methylome",
+        "predicate": "alternative_to",
+        "object": "b-cell",
+        "score": -1.0317355,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "depot-specific",
+        "predicate": "created_by",
+        "object": "craniofacial",
+        "score": -1.0667243,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "empirical",
+        "predicate": "implements",
+        "object": "measures",
+        "score": -1.0706835,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "hsur",
+        "predicate": "works_at",
+        "object": "non-stem",
+        "score": -1.0370047,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "nbs1",
+        "predicate": "created_by",
+        "object": "csa",
+        "score": -1.0279552,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "sepsis-induced",
+        "predicate": "uses",
+        "object": "binding-dependent",
+        "score": -0.9955343,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "zinc-finger",
+        "predicate": "depends_on",
+        "object": "epidemiological",
+        "score": -1.0661759,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "peripheral",
+        "predicate": "created_by",
+        "object": "empirical",
+        "score": -1.0266411,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "1980",
+        "predicate": "alternative_to",
+        "object": "h2b",
+        "score": -1.0654327,
+        "is_valid_ground_truth": false
+      }
+    ],
+    "relationship_inferences": [
+      {
+        "head": "28",
+        "tail": "preterm",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0052625,
+        "rank": 1
+      },
+      {
+        "head": "three-dimensional",
+        "tail": "17",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0284426,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "mri",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0084122,
+        "rank": 1
+      },
+      {
+        "head": "relative",
+        "tail": "nonmyelinated",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0363504,
+        "rank": 1
+      },
+      {
+        "head": "mri",
+        "tail": "10",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0436412,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "mri",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0114701,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "17",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0295342,
+        "rank": 1
+      },
+      {
+        "head": "myeloid-derived",
+        "tail": "itam-bearing",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0048698,
+        "rank": 1
+      },
+      {
+        "head": "myeloid-derived",
+        "tail": "all-trans-retinoic",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0288923,
+        "rank": 1
+      },
+      {
+        "head": "induction",
+        "tail": "tyrosine-based",
+        "predicted_relation": "alternative_to",
+        "expected_relation": null,
+        "score": -1.0452667,
+        "rank": 1
+      },
+      {
+        "head": "myeloid-derived",
+        "tail": "mdsc",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0035472,
+        "rank": 1
+      },
+      {
+        "head": "three-dimensional",
+        "tail": "preterm",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0131062,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "10",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0416433,
+        "rank": 1
+      },
+      {
+        "head": "induction",
+        "tail": "myeloid-derived",
+        "predicted_relation": "is_type",
+        "expected_relation": null,
+        "score": -1.0500361,
+        "rank": 1
+      },
+      {
+        "head": "mri",
+        "tail": "28",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0201232,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "relative",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0032345,
+        "rank": 1
+      },
+      {
+        "head": "myeloid-derived",
+        "tail": "itim",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0137993,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "diffusion-weighted",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0488367,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "28",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0172125,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "three-dimensional",
+        "predicted_relation": "is_type",
+        "expected_relation": null,
+        "score": -1.057075,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "preterm",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.00505,
+        "rank": 1
+      },
+      {
+        "head": "mri",
+        "tail": "preterm",
+        "predicted_relation": "alternative_to",
+        "expected_relation": null,
+        "score": -1.0122184,
+        "rank": 1
+      },
+      {
+        "head": "three-dimensional",
+        "tail": "10",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.036434,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "relative",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0018463,
+        "rank": 1
+      },
+      {
+        "head": "mri",
+        "tail": "17",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.031085,
+        "rank": 1
+      },
+      {
+        "head": "induction",
+        "tail": "age-dependent",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0223616,
+        "rank": 1
+      },
+      {
+        "head": "17",
+        "tail": "relative",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0033962,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "17",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0287092,
+        "rank": 1
+      },
+      {
+        "head": "10",
+        "tail": "relative",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0027452,
+        "rank": 1
+      },
+      {
+        "head": "full-term",
+        "tail": "28",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0215591,
+        "rank": 1
+      },
+      {
+        "head": "three-dimensional",
+        "tail": "28",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0174941,
+        "rank": 1
+      },
+      {
+        "head": "28",
+        "tail": "nonmyelinated",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0387619,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "nonmyelinated",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0388136,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "10",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0392914,
+        "rank": 1
+      },
+      {
+        "head": "myeloid-derived",
+        "tail": "age-dependent",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0038435,
+        "rank": 1
+      },
+      {
+        "head": "three-dimensional",
+        "tail": "full-term",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0290781,
+        "rank": 1
+      },
+      {
+        "head": "10",
+        "tail": "nonmyelinated",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0414226,
+        "rank": 1
+      },
+      {
+        "head": "17",
+        "tail": "full-term",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0294738,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "diffusion-weighted",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0360354,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "28",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0241214,
+        "rank": 1
+      },
+      {
+        "head": "induction",
+        "tail": "dap12",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0230857,
+        "rank": 1
+      },
+      {
+        "head": "myeloid-derived",
+        "tail": "dap12",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0185502,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "nonmyelinated",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0251254,
+        "rank": 1
+      },
+      {
+        "head": "full-term",
+        "tail": "relative",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0007461,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "preterm",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0094986,
+        "rank": 1
+      },
+      {
+        "head": "17",
+        "tail": "10",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0199299,
+        "rank": 1
+      },
+      {
+        "head": "myeloid-derived",
+        "tail": "il-10",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0197567,
+        "rank": 1
+      },
+      {
+        "head": "10",
+        "tail": "preterm",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0090369,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "alterations",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0208575,
+        "rank": 1
+      },
+      {
+        "head": "induction",
+        "tail": "s100a9",
+        "predicted_relation": "part_of",
+        "expected_relation": null,
+        "score": -1.0620526,
+        "rank": 1
+      }
+    ]
+  },
+  "validation_results": {
+    "accuracy": 0.21875,
+    "optimal_threshold": -10.0,
+    "confusion_matrix": {
+      "true_positives": 28,
+      "true_negatives": 0,
+      "false_positives": 100,
+      "false_negatives": 0
+    }
+  },
+  "graph_results": {
+    "metrics": {
+      "nodes_discovered": 50,
+      "edges_inferred": 236,
+      "avg_edge_score": 0.2005652,
+      "edge_score_std_dev": 0.09957406,
+      "entity_type_distribution": {
+        "Unknown": 50
+      },
+      "relationship_type_distribution": {
+        "strongly_related_to": 2,
+        "related_to": 33,
+        "co_occurs_with": 201
+      },
+      "graph_density": 0.0963265306122449,
+      "connected_components": 0
+    },
+    "top_entities": [
+      [
+        "rna",
+        9
+      ],
+      [
+        "however",
+        8
+      ],
+      [
+        "results",
+        8
+      ],
+      [
+        "dna",
+        8
+      ],
+      [
+        "methods",
+        6
+      ],
+      [
+        "conclusions",
+        6
+      ],
+      [
+        "10",
+        5
+      ],
+      [
+        "background",
+        4
+      ],
+      [
+        "recent",
+        4
+      ],
+      [
+        "finally",
+        4
+      ],
+      [
+        "although",
+        4
+      ],
+      [
+        "20",
+        3
+      ],
+      [
+        "analysis",
+        3
+      ],
+      [
+        "blood",
+        3
+      ],
+      [
+        "hcv",
+        3
+      ],
+      [
+        "objective",
+        3
+      ],
+      [
+        "several",
+        3
+      ],
+      [
+        "two",
+        3
+      ],
+      [
+        "thus",
+        3
+      ],
+      [
+        "moreover",
+        3
+      ],
+      [
+        "trf2",
+        2
+      ],
+      [
+        "november",
+        2
+      ],
+      [
+        "together",
+        2
+      ],
+      [
+        "95",
+        2
+      ],
+      [
+        "fas",
+        2
+      ],
+      [
+        "ci",
+        2
+      ],
+      [
+        "during",
+        2
+      ],
+      [
+        "pml",
+        2
+      ],
+      [
+        "hscs",
+        2
+      ],
+      [
+        "endothelial",
+        2
+      ],
+      [
+        "ii",
+        2
+      ],
+      [
+        "1966",
+        2
+      ],
+      [
+        "once",
+        2
+      ],
+      [
+        "second",
+        2
+      ],
+      [
+        "deletion",
+        2
+      ],
+      [
+        "targeting",
+        2
+      ],
+      [
+        "rnas",
+        2
+      ],
+      [
+        "e3",
+        2
+      ],
+      [
+        "importantly",
+        2
+      ],
+      [
+        "mechanisms",
+        2
+      ],
+      [
+        "hepatitis",
+        2
+      ],
+      [
+        "bayesian",
+        2
+      ],
+      [
+        "surprisingly",
+        2
+      ],
+      [
+        "since",
+        2
+      ],
+      [
+        "115",
+        2
+      ],
+      [
+        "embase",
+        2
+      ],
+      [
+        "medline",
+        2
+      ],
+      [
+        "pcr",
+        2
+      ],
+      [
+        "self-renewal",
+        2
+      ],
+      [
+        "self-renewing",
+        2
+      ]
+    ],
+    "top_relationships": [
+      [
+        "conclusions",
+        "results",
+        "strongly_related_to",
+        1.0
+      ],
+      [
+        "methods",
+        "results",
+        "strongly_related_to",
+        0.8333333
+      ],
+      [
+        "conclusions",
+        "methods",
+        "related_to",
+        0.6666667
+      ],
+      [
+        "background",
+        "methods",
+        "related_to",
+        0.5
+      ],
+      [
+        "objective",
+        "results",
+        "related_to",
+        0.5
+      ],
+      [
+        "conclusions",
+        "objective",
+        "related_to",
+        0.5
+      ],
+      [
+        "background",
+        "results",
+        "related_to",
+        0.5
+      ],
+      [
+        "95",
+        "background",
+        "related_to",
+        0.33333334
+      ],
+      [
+        "dna",
+        "results",
+        "related_to",
+        0.33333334
+      ],
+      [
+        "endothelial",
+        "results",
+        "related_to",
+        0.33333334
+      ],
+      [
+        "10",
+        "rna",
+        "related_to",
+        0.33333334
+      ],
+      [
+        "embase",
+        "medline",
+        "related_to",
+        0.33333334
+      ],
+      [
+        "endothelial",
+        "methods",
+        "related_to",
+        0.33333334
+      ],
+      [
+        "background",
+        "ci",
+        "related_to",
+        0.33333334
+      ],
+      [
+        "embase",
+        "methods",
+        "related_to",
+        0.33333334
+      ],
+      [
+        "10",
+        "however",
+        "related_to",
+        0.33333334
+      ],
+      [
+        "dna",
+        "pml",
+        "related_to",
+        0.33333334
+      ],
+      [
+        "pml",
+        "trf2",
+        "related_to",
+        0.33333334
+      ],
+      [
+        "hcv",
+        "hepatitis",
+        "related_to",
+        0.33333334
+      ],
+      [
+        "during",
+        "once",
+        "related_to",
+        0.33333334
+      ]
+    ]
+  },
+  "config": {
+    "dataset": {
+      "max_chunks": 0,
+      "seed": 42,
+      "min_entities_per_doc": 1,
+      "num_valid_triples": 100,
+      "num_invalid_triples": 100,
+      "num_entity_pairs": 100
+    },
+    "max_chunks": 50,
+    "num_queries": 100,
+    "seed": 42,
+    "run_all": true,
+    "run_extraction": true,
+    "run_retrieval": true,
+    "run_transe": true,
+    "run_validation": true,
+    "run_graph": true,
+    "output_path": "benchmark_results/e11_full.json"
+  },
+  "all_targets_met": false
+}

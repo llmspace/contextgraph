@@ -1,0 +1,1506 @@
+{
+  "metrics": {
+    "extraction": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "canonicalization_accuracy": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "documents_evaluated": 0,
+      "by_entity_type": {}
+    },
+    "retrieval": {
+      "mrr_e1_only": 0.0,
+      "mrr_e11_only": 0.0,
+      "mrr_e1_e11_hybrid": 0.0,
+      "e11_contribution_pct": 0.0,
+      "entity_overlap_correlation": 0.0,
+      "precision_at_k": {},
+      "recall_at_k": {},
+      "queries_evaluated": 0
+    },
+    "transe": {
+      "valid_triple_avg_score": -1.0303289,
+      "invalid_triple_avg_score": -1.040785,
+      "separation_score": 0.010456085,
+      "relationship_inference_mrr": 1.0,
+      "knowledge_validation_accuracy": 0.0,
+      "valid_triples_evaluated": 28,
+      "invalid_triples_evaluated": 100,
+      "valid_score_distribution": {
+        "mean": -1.0303289,
+        "std_dev": 0.012049551,
+        "min": -1.0603551,
+        "max": -1.0108441,
+        "median": -1.0322485,
+        "p25": -1.0361153,
+        "p75": -1.0202584
+      },
+      "invalid_score_distribution": {
+        "mean": -1.040785,
+        "std_dev": 0.024494609,
+        "min": -1.1379943,
+        "max": -0.99462086,
+        "median": -1.0332057,
+        "p25": -1.0528527,
+        "p75": -1.026177
+      }
+    },
+    "graph": {
+      "nodes_discovered": 0,
+      "edges_inferred": 0,
+      "avg_edge_score": 0.0,
+      "edge_score_std_dev": 0.0,
+      "entity_type_distribution": {},
+      "relationship_type_distribution": {},
+      "graph_density": 0.0,
+      "connected_components": 0
+    },
+    "performance": {
+      "extract_entities_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "search_by_entities_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "infer_relationship_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "find_related_entities_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "validate_knowledge_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "get_entity_graph_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      },
+      "e11_embedding_latency_ms": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "samples": 0
+      }
+    }
+  },
+  "timings": {
+    "total_ms": 777717,
+    "dataset_load_ms": 2,
+    "embedding_ms": 7957,
+    "extraction_benchmark_ms": 0,
+    "retrieval_benchmark_ms": 0,
+    "transe_benchmark_ms": 769757,
+    "validation_benchmark_ms": 0,
+    "graph_benchmark_ms": 0
+  },
+  "dataset_stats": {
+    "num_documents": 50,
+    "docs_with_entities": 50,
+    "total_entities": 815,
+    "unique_entities": 696,
+    "avg_entities_per_doc": 16.3,
+    "num_valid_triples": 28,
+    "num_invalid_triples": 100,
+    "num_entity_pairs": 100,
+    "entity_type_distribution": {
+      "Unknown": 815
+    }
+  },
+  "extraction_results": null,
+  "retrieval_results": null,
+  "transe_results": {
+    "metrics": {
+      "valid_triple_avg_score": -1.0303289,
+      "invalid_triple_avg_score": -1.040785,
+      "separation_score": 0.010456085,
+      "relationship_inference_mrr": 1.0,
+      "knowledge_validation_accuracy": 0.0,
+      "valid_triples_evaluated": 28,
+      "invalid_triples_evaluated": 100,
+      "valid_score_distribution": {
+        "mean": -1.0303289,
+        "std_dev": 0.012049551,
+        "min": -1.0603551,
+        "max": -1.0108441,
+        "median": -1.0322485,
+        "p25": -1.0361153,
+        "p75": -1.0202584
+      },
+      "invalid_score_distribution": {
+        "mean": -1.040785,
+        "std_dev": 0.024494609,
+        "min": -1.1379943,
+        "max": -0.99462086,
+        "median": -1.0332057,
+        "p25": -1.0528527,
+        "p75": -1.026177
+      }
+    },
+    "valid_triple_scores": [
+      {
+        "subject": "Tokio",
+        "predicate": "depends_on",
+        "object": "Rust",
+        "score": -1.0330037,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Axum",
+        "predicate": "depends_on",
+        "object": "Tokio",
+        "score": -1.0361153,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Actix",
+        "predicate": "depends_on",
+        "object": "Tokio",
+        "score": -1.0343057,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Django",
+        "predicate": "uses",
+        "object": "Python",
+        "score": -1.0126797,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "FastAPI",
+        "predicate": "uses",
+        "object": "Python",
+        "score": -1.0118505,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Flask",
+        "predicate": "uses",
+        "object": "Python",
+        "score": -1.017867,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "React",
+        "predicate": "uses",
+        "object": "JavaScript",
+        "score": -1.0347376,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Vue.js",
+        "predicate": "uses",
+        "object": "JavaScript",
+        "score": -1.0108441,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Angular",
+        "predicate": "uses",
+        "object": "TypeScript",
+        "score": -1.0409551,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Next.js",
+        "predicate": "extends",
+        "object": "React",
+        "score": -1.0268533,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "PostgreSQL",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.02528,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "MySQL",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.0283558,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "MongoDB",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.0358329,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Redis",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.0322485,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "RocksDB",
+        "predicate": "is_type",
+        "object": "Database",
+        "score": -1.0335245,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "S3",
+        "predicate": "part_of",
+        "object": "AWS",
+        "score": -1.0176411,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "EC2",
+        "predicate": "part_of",
+        "object": "AWS",
+        "score": -1.0230842,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Lambda",
+        "predicate": "part_of",
+        "object": "AWS",
+        "score": -1.0443773,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "BigQuery",
+        "predicate": "part_of",
+        "object": "GCP",
+        "score": -1.0202584,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Kubernetes",
+        "predicate": "alternative_to",
+        "object": "Docker",
+        "score": -1.0355462,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "Claude",
+        "predicate": "created_by",
+        "object": "Anthropic",
+        "score": -1.0473808,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "GPT",
+        "predicate": "created_by",
+        "object": "OpenAI",
+        "score": -1.023631,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "GitHub",
+        "predicate": "owned_by",
+        "object": "Microsoft",
+        "score": -1.0603551,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "GraphQL",
+        "predicate": "alternative_to",
+        "object": "REST",
+        "score": -1.0129039,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "gRPC",
+        "predicate": "alternative_to",
+        "object": "REST",
+        "score": -1.0229062,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "ColBERT",
+        "predicate": "is_type",
+        "object": "TechnicalTerm",
+        "score": -1.0468255,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "SPLADE",
+        "predicate": "is_type",
+        "object": "TechnicalTerm",
+        "score": -1.0423081,
+        "is_valid_ground_truth": true
+      },
+      {
+        "subject": "HNSW",
+        "predicate": "is_type",
+        "object": "TechnicalTerm",
+        "score": -1.0375385,
+        "is_valid_ground_truth": true
+      }
+    ],
+    "invalid_triple_scores": [
+      {
+        "subject": "PostgreSQL",
+        "predicate": "works_at",
+        "object": "Google",
+        "score": -1.0263636,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Rust",
+        "predicate": "created_by",
+        "object": "JavaScript",
+        "score": -1.0195689,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "AWS",
+        "predicate": "extends",
+        "object": "Python",
+        "score": -1.0273005,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Django",
+        "predicate": "depends_on",
+        "object": "React",
+        "score": -1.0202516,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "MongoDB",
+        "predicate": "uses",
+        "object": "PostgreSQL",
+        "score": -1.0018147,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Redis",
+        "predicate": "alternative_to",
+        "object": "Rust",
+        "score": -1.0327115,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Tokio",
+        "predicate": "part_of",
+        "object": "Python",
+        "score": -1.0368197,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "GPT",
+        "predicate": "created_by",
+        "object": "Anthropic",
+        "score": -1.0475167,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Claude",
+        "predicate": "created_by",
+        "object": "OpenAI",
+        "score": -1.0245764,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "Kubernetes",
+        "predicate": "depends_on",
+        "object": "FastAPI",
+        "score": -1.0690353,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "nutritional",
+        "predicate": "part_of",
+        "object": "glioma",
+        "score": -1.0528527,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "rad9",
+        "predicate": "extends",
+        "object": "glioblastomas",
+        "score": -1.1217926,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "mice",
+        "predicate": "created_by",
+        "object": "further",
+        "score": -1.0217009,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "theoretical",
+        "predicate": "uses",
+        "object": "68",
+        "score": -1.0155561,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "medio-lateral",
+        "predicate": "uses",
+        "object": "lineage)-mbp",
+        "score": -1.0276561,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "global",
+        "predicate": "depends_on",
+        "object": "visceral",
+        "score": -1.0475119,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "mechanisms",
+        "predicate": "works_at",
+        "object": "low-level",
+        "score": -1.0354129,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "well-known",
+        "predicate": "works_at",
+        "object": "cd33",
+        "score": -1.0303563,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "ankle-brachial",
+        "predicate": "implements",
+        "object": "acetylcholine-mediated",
+        "score": -1.0614295,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "81",
+        "predicate": "depends_on",
+        "object": "hla",
+        "score": -1.0138382,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "snps",
+        "predicate": "uses",
+        "object": "paramecium",
+        "score": -1.0853952,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "ci",
+        "predicate": "depends_on",
+        "object": "taking",
+        "score": -1.0129597,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "gpcrs",
+        "predicate": "created_by",
+        "object": "non-coding",
+        "score": -1.0357351,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "microstructural",
+        "predicate": "part_of",
+        "object": "ccn",
+        "score": -1.0414078,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "pbmc",
+        "predicate": "part_of",
+        "object": "sio2",
+        "score": -1.0260271,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "conclusions",
+        "predicate": "implements",
+        "object": "blood-isolated",
+        "score": -1.0390424,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "mmp9",
+        "predicate": "created_by",
+        "object": "bc1",
+        "score": -1.0297987,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "tracking",
+        "predicate": "works_at",
+        "object": "anti-tumor",
+        "score": -1.0793043,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "p1234",
+        "predicate": "part_of",
+        "object": "rflp",
+        "score": -1.025217,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "systematic",
+        "predicate": "implements",
+        "object": "glioma",
+        "score": -1.0520192,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "quantitative",
+        "predicate": "uses",
+        "object": "several",
+        "score": -1.0313145,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "semi-essential",
+        "predicate": "implements",
+        "object": "hcv-specific",
+        "score": -1.0303844,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "decreases",
+        "predicate": "extends",
+        "object": "h19",
+        "score": -1.0548344,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "antigen-presenting",
+        "predicate": "uses",
+        "object": "mir-27",
+        "score": -1.024028,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "global",
+        "predicate": "works_at",
+        "object": "importantly",
+        "score": -1.0131819,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "chop",
+        "predicate": "part_of",
+        "object": "id-related",
+        "score": -1.0287105,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "31",
+        "predicate": "uses",
+        "object": "although",
+        "score": -1.0072118,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "systematic",
+        "predicate": "depends_on",
+        "object": "290-315",
+        "score": -1.0586033,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "mpm",
+        "predicate": "created_by",
+        "object": "global",
+        "score": -1.0403149,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "cross",
+        "predicate": "alternative_to",
+        "object": "bcl-2",
+        "score": -1.0309316,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "intra-articular",
+        "predicate": "uses",
+        "object": "importantly",
+        "score": -1.0008107,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "sumo1",
+        "predicate": "implements",
+        "object": "magnetic",
+        "score": -1.0217279,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "mpm",
+        "predicate": "created_by",
+        "object": "undifferentiated",
+        "score": -1.0454966,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "burden",
+        "predicate": "implements",
+        "object": "cd25+cd4",
+        "score": -1.0778033,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "mar)3",
+        "predicate": "alternative_to",
+        "object": "time-resolved",
+        "score": -1.057008,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "clp",
+        "predicate": "extends",
+        "object": "rdrp",
+        "score": -1.0355027,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "ctcf-dependent",
+        "predicate": "uses",
+        "object": "green-emitting",
+        "score": -1.064398,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "mmp9",
+        "predicate": "created_by",
+        "object": "itam-bearing",
+        "score": -1.0336123,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "91",
+        "predicate": "extends",
+        "object": "all-trans-retinoic",
+        "score": -1.0951872,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "intima",
+        "predicate": "extends",
+        "object": "distinct",
+        "score": -1.0269796,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "aavs1",
+        "predicate": "part_of",
+        "object": "hscs",
+        "score": -1.0233169,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "fas-l",
+        "predicate": "depends_on",
+        "object": "medline",
+        "score": -1.053064,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "sectional",
+        "predicate": "alternative_to",
+        "object": "rnas",
+        "score": -1.0128505,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "arodent",
+        "predicate": "created_by",
+        "object": "hypoxia-induced",
+        "score": -1.0537747,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "understanding",
+        "predicate": "alternative_to",
+        "object": "individuals",
+        "score": -1.0211785,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "onnvs",
+        "predicate": "depends_on",
+        "object": "well-known",
+        "score": -1.0497129,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "clearance",
+        "predicate": "extends",
+        "object": "compared",
+        "score": -1.0307624,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "mir-27",
+        "predicate": "works_at",
+        "object": "forty",
+        "score": -1.0275853,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "preterm",
+        "predicate": "created_by",
+        "object": "design",
+        "score": -1.038783,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "golli",
+        "predicate": "extends",
+        "object": "flu",
+        "score": -1.037694,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "intra-articular",
+        "predicate": "created_by",
+        "object": "anti-tumor",
+        "score": -1.0362643,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "drug-inducible",
+        "predicate": "implements",
+        "object": "importantly",
+        "score": -1.0276015,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "95",
+        "predicate": "depends_on",
+        "object": "design",
+        "score": -1.0123972,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "two-hybrid",
+        "predicate": "uses",
+        "object": "increased",
+        "score": -1.0233798,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "pressure",
+        "predicate": "alternative_to",
+        "object": "tailored",
+        "score": -1.0194238,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "0–cre/floxed-egfp",
+        "predicate": "implements",
+        "object": "interaction",
+        "score": -1.0332057,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "review",
+        "predicate": "uses",
+        "object": "tio2",
+        "score": -1.0530416,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "full-length",
+        "predicate": "depends_on",
+        "object": "self-renew",
+        "score": -1.0220028,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "h7n9",
+        "predicate": "uses",
+        "object": "pml",
+        "score": -0.99462086,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "full-length",
+        "predicate": "alternative_to",
+        "object": "light",
+        "score": -1.062627,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "accordingly",
+        "predicate": "works_at",
+        "object": "dotarem",
+        "score": -1.0316337,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "homogeneous",
+        "predicate": "extends",
+        "object": "light",
+        "score": -1.0295537,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "55-kda",
+        "predicate": "extends",
+        "object": "sera",
+        "score": -1.026177,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "80",
+        "predicate": "extends",
+        "object": "angiopoietin-1",
+        "score": -1.118229,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "68",
+        "predicate": "uses",
+        "object": "17",
+        "score": -1.0292215,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "assays",
+        "predicate": "works_at",
+        "object": "outcomes",
+        "score": -1.0441024,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "synthetic",
+        "predicate": "implements",
+        "object": "anopheles",
+        "score": -1.0428342,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "insulin",
+        "predicate": "depends_on",
+        "object": "july",
+        "score": -1.0325962,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "targeting",
+        "predicate": "implements",
+        "object": "cell",
+        "score": -1.0480444,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "14.7-kilodalton",
+        "predicate": "part_of",
+        "object": "coimmunoprecipitation",
+        "score": -1.0595214,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "resolved",
+        "predicate": "extends",
+        "object": "itam-bearing",
+        "score": -1.0382956,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "long-term",
+        "predicate": "part_of",
+        "object": "craniofacial",
+        "score": -1.0702544,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "chk1",
+        "predicate": "depends_on",
+        "object": "gpcrs",
+        "score": -1.022285,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "gscs",
+        "predicate": "depends_on",
+        "object": "-7",
+        "score": -1.0434873,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "multi-drug",
+        "predicate": "works_at",
+        "object": "sera",
+        "score": -1.0306233,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "itim",
+        "predicate": "created_by",
+        "object": "virus",
+        "score": -1.0331484,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "glioma",
+        "predicate": "part_of",
+        "object": "24",
+        "score": -1.0688667,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "treatment",
+        "predicate": "alternative_to",
+        "object": "buffer-treated",
+        "score": -1.0270809,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "serum-free",
+        "predicate": "alternative_to",
+        "object": "91",
+        "score": -1.0800575,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "tnfaip3",
+        "predicate": "part_of",
+        "object": "cd127",
+        "score": -1.0314205,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "yfp",
+        "predicate": "works_at",
+        "object": "stress-related",
+        "score": -1.0278888,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "flu",
+        "predicate": "alternative_to",
+        "object": "1.40-3.93",
+        "score": -1.1379943,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "gsc",
+        "predicate": "created_by",
+        "object": "17",
+        "score": -1.0548214,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "fas-l",
+        "predicate": "implements",
+        "object": "onnvs",
+        "score": -1.0433097,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "antibody-based",
+        "predicate": "works_at",
+        "object": "fluorescence",
+        "score": -1.0297456,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "inferring",
+        "predicate": "created_by",
+        "object": "29",
+        "score": -1.0633585,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "vitamin",
+        "predicate": "uses",
+        "object": "perspective",
+        "score": -1.0715371,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "antigen-presenting",
+        "predicate": "depends_on",
+        "object": "renal",
+        "score": -1.048857,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "p123",
+        "predicate": "created_by",
+        "object": "fas-l",
+        "score": -1.0389879,
+        "is_valid_ground_truth": false
+      },
+      {
+        "subject": "technology",
+        "predicate": "alternative_to",
+        "object": "cd4+cd25hi",
+        "score": -1.0822397,
+        "is_valid_ground_truth": false
+      }
+    ],
+    "relationship_inferences": [
+      {
+        "head": "28",
+        "tail": "preterm",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0052625,
+        "rank": 1
+      },
+      {
+        "head": "three-dimensional",
+        "tail": "17",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0284426,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "mri",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0084122,
+        "rank": 1
+      },
+      {
+        "head": "relative",
+        "tail": "nonmyelinated",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0363504,
+        "rank": 1
+      },
+      {
+        "head": "mri",
+        "tail": "10",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0436412,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "mri",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0114701,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "17",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0295342,
+        "rank": 1
+      },
+      {
+        "head": "myeloid-derived",
+        "tail": "itam-bearing",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0048698,
+        "rank": 1
+      },
+      {
+        "head": "myeloid-derived",
+        "tail": "all-trans-retinoic",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0288923,
+        "rank": 1
+      },
+      {
+        "head": "induction",
+        "tail": "tyrosine-based",
+        "predicted_relation": "alternative_to",
+        "expected_relation": null,
+        "score": -1.0452667,
+        "rank": 1
+      },
+      {
+        "head": "myeloid-derived",
+        "tail": "mdsc",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0035472,
+        "rank": 1
+      },
+      {
+        "head": "three-dimensional",
+        "tail": "preterm",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0131062,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "10",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0416433,
+        "rank": 1
+      },
+      {
+        "head": "induction",
+        "tail": "myeloid-derived",
+        "predicted_relation": "is_type",
+        "expected_relation": null,
+        "score": -1.0500361,
+        "rank": 1
+      },
+      {
+        "head": "mri",
+        "tail": "28",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0201232,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "relative",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0032345,
+        "rank": 1
+      },
+      {
+        "head": "myeloid-derived",
+        "tail": "itim",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0137993,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "diffusion-weighted",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0488367,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "28",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0172125,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "three-dimensional",
+        "predicted_relation": "is_type",
+        "expected_relation": null,
+        "score": -1.057075,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "preterm",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.00505,
+        "rank": 1
+      },
+      {
+        "head": "mri",
+        "tail": "preterm",
+        "predicted_relation": "alternative_to",
+        "expected_relation": null,
+        "score": -1.0122184,
+        "rank": 1
+      },
+      {
+        "head": "three-dimensional",
+        "tail": "10",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.036434,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "relative",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0018463,
+        "rank": 1
+      },
+      {
+        "head": "mri",
+        "tail": "17",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.031085,
+        "rank": 1
+      },
+      {
+        "head": "induction",
+        "tail": "age-dependent",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0223616,
+        "rank": 1
+      },
+      {
+        "head": "17",
+        "tail": "relative",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0033962,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "17",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0287092,
+        "rank": 1
+      },
+      {
+        "head": "10",
+        "tail": "relative",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0027452,
+        "rank": 1
+      },
+      {
+        "head": "full-term",
+        "tail": "28",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0215591,
+        "rank": 1
+      },
+      {
+        "head": "three-dimensional",
+        "tail": "28",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0174941,
+        "rank": 1
+      },
+      {
+        "head": "28",
+        "tail": "nonmyelinated",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0387619,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "nonmyelinated",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0388136,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "10",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0392914,
+        "rank": 1
+      },
+      {
+        "head": "myeloid-derived",
+        "tail": "age-dependent",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0038435,
+        "rank": 1
+      },
+      {
+        "head": "three-dimensional",
+        "tail": "full-term",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0290781,
+        "rank": 1
+      },
+      {
+        "head": "10",
+        "tail": "nonmyelinated",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0414226,
+        "rank": 1
+      },
+      {
+        "head": "17",
+        "tail": "full-term",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0294738,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "diffusion-weighted",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0360354,
+        "rank": 1
+      },
+      {
+        "head": "alterations",
+        "tail": "28",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0241214,
+        "rank": 1
+      },
+      {
+        "head": "induction",
+        "tail": "dap12",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0230857,
+        "rank": 1
+      },
+      {
+        "head": "myeloid-derived",
+        "tail": "dap12",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0185502,
+        "rank": 1
+      },
+      {
+        "head": "diffusion-weighted",
+        "tail": "nonmyelinated",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0251254,
+        "rank": 1
+      },
+      {
+        "head": "full-term",
+        "tail": "relative",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0007461,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "preterm",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0094986,
+        "rank": 1
+      },
+      {
+        "head": "17",
+        "tail": "10",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0199299,
+        "rank": 1
+      },
+      {
+        "head": "myeloid-derived",
+        "tail": "il-10",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0197567,
+        "rank": 1
+      },
+      {
+        "head": "10",
+        "tail": "preterm",
+        "predicted_relation": "depends_on",
+        "expected_relation": null,
+        "score": -1.0090369,
+        "rank": 1
+      },
+      {
+        "head": "microstructural",
+        "tail": "alterations",
+        "predicted_relation": "uses",
+        "expected_relation": null,
+        "score": -1.0208575,
+        "rank": 1
+      },
+      {
+        "head": "induction",
+        "tail": "s100a9",
+        "predicted_relation": "part_of",
+        "expected_relation": null,
+        "score": -1.0620526,
+        "rank": 1
+      }
+    ]
+  },
+  "validation_results": null,
+  "graph_results": null,
+  "config": {
+    "dataset": {
+      "max_chunks": 0,
+      "seed": 42,
+      "min_entities_per_doc": 1,
+      "num_valid_triples": 100,
+      "num_invalid_triples": 100,
+      "num_entity_pairs": 100
+    },
+    "max_chunks": 50,
+    "num_queries": 100,
+    "seed": 42,
+    "run_all": false,
+    "run_extraction": false,
+    "run_retrieval": false,
+    "run_transe": true,
+    "run_validation": false,
+    "run_graph": false,
+    "output_path": "benchmark_results/e11_transe.json"
+  },
+  "all_targets_met": false
+}

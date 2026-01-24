@@ -1,6 +1,43 @@
-# Context Graph PRD v6.1 (13-Perspectives Multi-Space System)
+# Context Graph PRD v6.2 (GPU-First 13-Perspectives Multi-Space System)
 
-**Platform**: Claude Code CLI | **Core Insight**: 13 embedders = 13 unique perspectives on every memory
+**Platform**: Claude Code CLI | **Architecture**: GPU-First | **Hardware**: RTX 5090 32GB + CUDA 13.1
+
+**Core Insight**: 13 embedders = 13 unique perspectives on every memory, all warm-loaded on GPU
+
+---
+
+## 0. GPU-FIRST ARCHITECTURE
+
+This is a **GPU-first system**. All compute-intensive operations use GPU over CPU. No CPU fallback.
+
+### Hardware Platform
+| Component | Specification |
+|-----------|---------------|
+| GPU | NVIDIA GeForce RTX 5090 (Blackwell GB202) |
+| VRAM | 32GB GDDR7 @ 1,792 GB/s |
+| Tensor Cores | 680 (5th gen, FP16/BF16/FP8/FP4) |
+| CUDA Cores | 21,760 across 170 SMs |
+| Compute Cap | 12.0 (CUDA 13.1) |
+| CPU | AMD Ryzen 9 9950X3D (16C/32T) |
+| RAM | 128GB DDR5 |
+
+### GPU Utilization
+| Workload | GPU Component | Benefit |
+|----------|---------------|---------|
+| Embedding Inference | Tensor Cores (FP16/BF16) | 3-5x vs CPU |
+| Vector Search | faiss-gpu HNSW | Sub-millisecond ANN |
+| Topic Clustering | cuML HDBSCAN | 10-50x vs sklearn |
+| Batch Operations | CUDA Streams | Async overlap |
+| QoS Isolation | Green Contexts | Deterministic latency |
+
+### VRAM Budget (32GB)
+| Allocation | Size | Purpose |
+|------------|------|---------|
+| 13 Embedders | ~10GB | Warm-loaded, FP16 weights |
+| FAISS Indexes | ~8GB | Per-space HNSW |
+| Batch Buffers | ~4GB | Inference batches |
+| cuML Workspace | ~2GB | Clustering, analytics |
+| Reserved | ~8GB | Spike headroom |
 
 ---
 
@@ -41,33 +78,37 @@ Each embedder finds what OTHERS MISS. Combined = superior answers.
 | **E3** | V_periodicity | Time-of-day patterns | *POST-RETRIEVAL ONLY* | Temporal | 0.0 |
 | **E4** | V_ordering | Sequence (before/after) | *POST-RETRIEVAL ONLY* | Temporal | 0.0 |
 
-### 2.2 Technical Specs
+### 2.2 Technical Specs (All GPU-Accelerated)
 
-| ID | Dim | Distance | Special Notes |
-|----|-----|----------|---------------|
-| E1 | 1024 | Cosine | Matryoshka (truncatable) |
-| E2-E4 | 512 | Cosine | Never in similarity fusion |
-| E5 | 768 | Asymmetric KNN | Direction matters (cause→effect 1.2x) |
-| E6 | ~30K sparse | Jaccard | 5% active dimensions |
-| E7 | 1536 | Cosine | AST-aware |
-| E8 | 384 | TransE | ||h + r - t|| |
-| E11 | 768 | TransE | KEPLER (RoBERTa-base + TransE on Wikidata5M) |
-| E9 | 1024 | Hamming | HDC (10K→1024) |
-| E10 | 768 | Cosine | Multiplicative boost on E1 |
-| E12 | 128D/token | MaxSim | Reranking ONLY |
-| E13 | ~30K sparse | Jaccard | Stage 1 recall ONLY |
+| ID | Dim | Distance | GPU Notes |
+|----|-----|----------|-----------|
+| E1 | 1024 | Cosine | Matryoshka, FP16 Tensor Core inference |
+| E2-E4 | 512 | Cosine | Never in similarity fusion, GPU warm |
+| E5 | 768 | Asymmetric KNN | Direction matters, faiss-gpu IVF |
+| E6 | ~30K sparse | Jaccard | cuSPARSE operations |
+| E7 | 1536 | Cosine | AST-aware, largest model (~3GB) |
+| E8 | 384 | TransE | GPU TransE distance ||h + r - t|| |
+| E11 | 768 | TransE | KEPLER GPU, RoBERTa-base + TransE |
+| E9 | 1024 | Hamming | GPU bitwise ops (10K→1024) |
+| E10 | 768 | Cosine | Multiplicative boost, same GPU batch |
+| E12 | 128D/token | MaxSim | GPU reranking ONLY |
+| E13 | ~30K sparse | Jaccard | GPU Stage 1 recall ONLY |
+
+**All 13 embedders are warm-loaded into GPU VRAM at MCP server startup. No cold-loading, no CPU fallback.**
 
 ---
 
-## 3. RETRIEVAL PIPELINE
+## 3. RETRIEVAL PIPELINE (GPU-Accelerated)
 
 ### 3.1 How Perspectives Combine
 
 ```
-Query → E13 sparse recall (10K) → E1 dense ANN (1K) → RRF fusion (100) → Topic filter (50) → E12 rerank (10)
+Query → E13 GPU sparse (10K) → E1 GPU dense (1K) → GPU RRF (100) → cuML filter (50) → E12 GPU rerank (10)
                 ↓                       ↓                    ↓
-        "fast" finds "quick"    Semantic core       E5,E7,E10,E11 contribute
+        cuSPARSE Jaccard      faiss-gpu HNSW        Tensor Core inference
 ```
+
+**All pipeline stages execute on GPU. No CPU roundtrips for core retrieval path.**
 
 **Strategy Selection**:
 | Strategy | When to Use | Pipeline |
@@ -184,18 +225,20 @@ Recency factor: <1h=1.3x, <1d=1.2x, <7d=1.1x, <30d=1.0x, >90d=0.8x
 
 ---
 
-## 7. HOOK INTEGRATION
+## 7. HOOK INTEGRATION (GPU-Accelerated)
 
 Native Claude Code hooks via `.claude/settings.json`:
 
-| Hook | Action | Budget |
-|------|--------|--------|
-| SessionStart | Load portfolio, warm indexes | 5000ms |
-| UserPromptSubmit | Embed → search → inject context | 2000ms |
-| PreToolUse | Inject brief relevant context | 500ms |
-| PostToolUse | Capture + embed as HookDescription | 3000ms |
-| Stop | Capture response summary | 3000ms |
-| SessionEnd | Persist, cluster, consolidate | 30000ms |
+| Hook | Action | GPU Budget |
+|------|--------|------------|
+| SessionStart | Warm-load 13 models to GPU, load indexes | 30000ms |
+| UserPromptSubmit | GPU embed → faiss-gpu search → inject | 500ms |
+| PreToolUse | GPU inject brief relevant context | 100ms |
+| PostToolUse | Capture + GPU embed as HookDescription | 300ms |
+| Stop | Capture response summary | 500ms |
+| SessionEnd | Persist, cuML HDBSCAN, consolidate | 5000ms |
+
+**GPU enables aggressive budgets:** SessionStart is longer (warm-loading), but all runtime hooks are 3-6x faster.
 
 ---
 
@@ -227,16 +270,25 @@ Native Claude Code hooks via `.claude/settings.json`:
 
 ---
 
-## 9. PERFORMANCE BUDGETS
+## 9. PERFORMANCE BUDGETS (GPU-Accelerated)
 
-| Operation | Target | Notes |
-|-----------|--------|-------|
-| All 13 embed | <1000ms | Sequential on single GPU |
-| Per-space HNSW | <5ms | FAISS lookup |
-| inject_context P95 | <2000ms | Full pipeline |
-| store_memory P95 | <2500ms | Embed + store + index |
-| Any tool P99 | <3000ms | Worst case |
-| Topic detection | <100ms | HDBSCAN batch |
+| Operation | Target | GPU Acceleration |
+|-----------|--------|------------------|
+| All 13 embed | <200ms | Batched Tensor Core FP16 |
+| Per-space HNSW | <1ms | faiss-gpu IVF/HNSW |
+| inject_context P95 | <500ms | Full GPU pipeline |
+| store_memory P95 | <800ms | GPU embed + index |
+| Any tool P99 | <1000ms | Worst case with GPU |
+| Topic detection | <20ms | cuML HDBSCAN |
+| Warm-load startup | <30s | All 13 models to VRAM |
+
+**Comparison vs CPU-based system:**
+| Operation | GPU (RTX 5090) | CPU (baseline) | Speedup |
+|-----------|----------------|----------------|---------|
+| All 13 embed | <200ms | ~2000ms | 10x |
+| HNSW search | <1ms | ~5ms | 5x |
+| HDBSCAN | <20ms | ~500ms | 25x |
+| Full pipeline | <500ms | ~3000ms | 6x |
 
 ---
 
@@ -257,6 +309,19 @@ Native Claude Code hooks via `.claude/settings.json`:
 
 ## 11. ARCHITECTURAL RULES
 
+### GPU-First Rules (Mandatory)
+| Rule | Description |
+|------|-------------|
+| ARCH-GPU-01 | GPU is mandatory - no CPU fallback for embeddings |
+| ARCH-GPU-02 | All 13 embedders warm-loaded into VRAM at startup |
+| ARCH-GPU-03 | Embedding inference uses FP16/BF16 Tensor Cores |
+| ARCH-GPU-04 | FAISS indexes use GPU (faiss-gpu) not CPU |
+| ARCH-GPU-05 | HDBSCAN clustering runs on GPU via cuML |
+| ARCH-GPU-06 | Batch operations preferred - minimize kernel launches |
+| ARCH-GPU-07 | Green Contexts partition SMs: 70% inference, 30% indexing |
+| ARCH-GPU-08 | CUDA streams for async embedding + indexing overlap |
+
+### Core Rules
 | Rule | Description |
 |------|-------------|
 | ARCH-01 | TeleologicalArray is atomic (all 13 or nothing) |
@@ -267,10 +332,66 @@ Native Claude Code hooks via `.claude/settings.json`:
 | ARCH-21 | Multi-space fusion uses Weighted RRF, not weighted sum |
 | ARCH-25 | Temporal boosts POST-retrieval only |
 
-**Forbidden**:
+**Forbidden (GPU)**:
+- CPU embedding inference when GPU available
+- Cold-loading embedders per-request
+- CPU FAISS when GPU FAISS available
+- sklearn HDBSCAN (use cuML)
+- GPU→CPU→GPU transfers
+- FP32 inference (use FP16/BF16)
+- Per-item serialization (batch for GPU)
+- Blocking sync (use CUDA streams)
+
+**Forbidden (Core)**:
 - Cross-embedder comparison (E1↔E5)
 - Partial TeleologicalArray
 - Temporal in similarity fusion
 - E12 for initial retrieval (rerank only)
 - E13 for final ranking (recall only)
 - Simple weighted sum (use RRF)
+
+---
+
+## 12. GPU TESTING REQUIREMENTS
+
+All tests and benchmarks MUST execute on GPU. No CPU fallback is acceptable.
+
+### Testing Rules
+| Rule | Requirement |
+|------|-------------|
+| Unit Tests | All embedder tests use GPU inference |
+| Integration Tests | Full pipeline tests require GPU |
+| Benchmarks | GPU-only, report VRAM usage + latency |
+| CI/CD | Requires GPU runner (RTX 5090 or compatible) |
+| Memory Profiling | Track VRAM allocation per embedder |
+
+### Benchmark Requirements
+```
+cargo bench --features gpu
+# MUST report:
+# - GPU utilization %
+# - VRAM peak usage (GB)
+# - Tensor Core utilization %
+# - Latency P50/P95/P99
+# - Throughput (embeddings/sec)
+```
+
+### GPU Health Checks
+- Startup: Verify CUDA 13.1, compute cap 12.0
+- Warm-load: Confirm all 13 embedders in VRAM
+- Runtime: Monitor VRAM fragmentation
+- Shutdown: Clean VRAM deallocation
+
+---
+
+## 13. CUDA 13.1 FEATURE UTILIZATION
+
+| Feature | Usage in Context Graph |
+|---------|----------------------|
+| CUDA Tile | Portable kernels for custom ops |
+| Green Contexts | 70/30 SM split (inference/index) |
+| Tensor Cores | FP16/BF16 embedder inference |
+| CUDA Streams | Async embed + index overlap |
+| cuBLAS | Batched GEMM for attention |
+| cuSPARSE | E6/E13 sparse operations |
+| MPS (60 clients) | Multi-session support |

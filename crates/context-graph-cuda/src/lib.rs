@@ -42,6 +42,7 @@ pub mod ffi;
 pub mod ops;
 pub mod poincare;
 pub mod safe;
+pub mod similarity;
 
 // AP-007: StubVectorOps is TEST ONLY - not available in production builds
 #[cfg(test)]
@@ -124,6 +125,13 @@ pub use ops::VectorOps;
 pub use poincare::{poincare_distance_batch_cpu, poincare_distance_cpu, PoincareCudaConfig};
 #[cfg(feature = "cuda")]
 pub use poincare::{poincare_distance_batch_gpu, poincare_distance_single_gpu};
+// GPU-batched similarity (ARCH-GPU-06: batch operations preferred)
+// Note: Currently using optimized CPU implementation until candle-core supports CUDA 13.1
+pub use similarity::{
+    compute_batch_cosine_similarity, compute_batch_cosine_similarity_chunked,
+    embedder_to_group, should_use_gpu_batch, BatchedQueryContext, DimensionGroup,
+    DENSE_EMBEDDER_INDICES, GPU_BATCH_THRESHOLD,
+};
 // AP-007: StubVectorOps export is gated to test-only builds
 // Allow deprecated usage in tests - the deprecation warning is intentional for production
 #[cfg(test)]

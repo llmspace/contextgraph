@@ -530,24 +530,79 @@ impl E11EntityDatasetLoader {
             KnowledgeTriple::valid("HNSW", "is_type", "TechnicalTerm", "KB"),
         ];
 
-        // Invalid relations (semantically incorrect)
-        let known_invalid_triples = vec![
-            KnowledgeTriple::invalid("PostgreSQL", "works_at", "Google", "synthetic"),
-            KnowledgeTriple::invalid("Rust", "created_by", "JavaScript", "synthetic"),
-            KnowledgeTriple::invalid("AWS", "extends", "Python", "synthetic"),
-            KnowledgeTriple::invalid("Django", "depends_on", "React", "synthetic"),
-            KnowledgeTriple::invalid("MongoDB", "uses", "PostgreSQL", "synthetic"),
-            KnowledgeTriple::invalid("Redis", "alternative_to", "Rust", "synthetic"),
-            KnowledgeTriple::invalid("Tokio", "part_of", "Python", "synthetic"),
-            KnowledgeTriple::invalid("GPT", "created_by", "Anthropic", "synthetic"),
-            KnowledgeTriple::invalid("Claude", "created_by", "OpenAI", "synthetic"),
-            KnowledgeTriple::invalid("Kubernetes", "depends_on", "FastAPI", "synthetic"),
+        // Generate invalid triples by CORRUPTING valid triples
+        // This ensures we test with entities that exist in the valid set
+        // Three corruption strategies:
+        // 1. Swap head and tail (reverses the relationship)
+        // 2. Wrong relation (same entities, different predicate)
+        // 3. Cross-triple corruption (mix entities from different valid triples)
+        let mut known_invalid_triples = Vec::new();
+
+        // Strategy 1: Swap head/tail of valid triples
+        for triple in &known_valid_triples {
+            known_invalid_triples.push(KnowledgeTriple::invalid(
+                &triple.object,
+                &triple.predicate,
+                &triple.subject,
+                "swapped",
+            ));
+        }
+
+        // Strategy 2: Wrong relations - use different predicates
+        let relations = vec![
+            "depends_on", "uses", "extends", "part_of", "created_by",
+            "alternative_to", "works_at", "implements", "is_type",
         ];
+        for triple in &known_valid_triples {
+            for relation in &relations {
+                if *relation != triple.predicate {
+                    known_invalid_triples.push(KnowledgeTriple::invalid(
+                        &triple.subject,
+                        *relation,
+                        &triple.object,
+                        "wrong_relation",
+                    ));
+                    break; // Only add one wrong relation per valid triple
+                }
+            }
+        }
+
+        // Strategy 3: Cross-triple corruption - mix entities from different triples
+        let entities: Vec<&str> = known_valid_triples
+            .iter()
+            .flat_map(|t| vec![t.subject.as_str(), t.object.as_str()])
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        for i in 0..entities.len().min(20) {
+            let head_idx = (i * 7) % entities.len();
+            let tail_idx = (i * 11 + 3) % entities.len();
+            let rel_idx = i % relations.len();
+
+            if head_idx != tail_idx {
+                let triple = KnowledgeTriple::invalid(
+                    entities[head_idx],
+                    relations[rel_idx],
+                    entities[tail_idx],
+                    "cross_triple",
+                );
+
+                // Avoid duplicates with valid triples
+                let is_valid = known_valid_triples.iter().any(|t| {
+                    t.subject == triple.subject && t.predicate == triple.predicate && t.object == triple.object
+                });
+                if !is_valid {
+                    known_invalid_triples.push(triple);
+                }
+            }
+        }
 
         ground_truth.valid_triples.extend(known_valid_triples);
         ground_truth.invalid_triples.extend(known_invalid_triples);
 
-        // Generate additional triples from document co-occurrences
+        // Optionally add random invalid triples from document entities
+        // These test generalization to unknown entities
         let all_entities: Vec<String> = documents
             .iter()
             .flat_map(|d| d.entities.iter().map(|e| e.canonical_id.clone()))
@@ -555,14 +610,9 @@ impl E11EntityDatasetLoader {
             .into_iter()
             .collect();
 
-        // Generate more invalid triples by random pairing
-        let relations = vec![
-            "depends_on", "uses", "extends", "part_of", "created_by",
-            "alternative_to", "works_at", "implements",
-        ];
-
         let mut invalid_count = ground_truth.invalid_triples.len();
-        while invalid_count < self.config.num_invalid_triples && all_entities.len() >= 2 {
+        let target_invalid = self.config.num_invalid_triples.min(invalid_count + 50);
+        while invalid_count < target_invalid && all_entities.len() >= 2 {
             let head_idx = rng.gen_range(0..all_entities.len());
             let tail_idx = rng.gen_range(0..all_entities.len());
             let rel_idx = rng.gen_range(0..relations.len());
@@ -572,7 +622,7 @@ impl E11EntityDatasetLoader {
                     &all_entities[head_idx],
                     relations[rel_idx],
                     &all_entities[tail_idx],
-                    "random",
+                    "document_random",
                 );
 
                 // Check it's not accidentally valid

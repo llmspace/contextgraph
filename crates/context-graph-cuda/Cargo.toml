@@ -24,6 +24,14 @@ async-trait = { workspace = true }
 # Logging
 tracing = { workspace = true }
 
+# Float utilities for numerical stability
+half = { version = "2.4", features = ["num-traits"] }
+
+# GPU tensor operations for batched similarity (planned)
+# TODO: Re-enable when candle-core supports CUDA 13.1 / compute capability 12.0
+# candle-core = { version = "0.8", optional = true }
+# candle-nn = { version = "0.8", optional = true }
+
 [dev-dependencies]
 tokio-test = "0.4"
 # Enable test-utils for stubs access in tests (AP-007 compliant)
@@ -31,7 +39,7 @@ context-graph-core = { path = "../context-graph-core", features = ["test-utils"]
 
 [features]
 default = ["cuda"]
-cuda = []  # REQUIRED: RTX 5090 Blackwell CUDA support
+cuda = []  # REQUIRED: RTX 5090 Blackwell CUDA support (candle integration pending CUDA 13.1 support)
 cudnn = ["cuda"]  # Future: cuDNN support (requires cuda)
 
 [build-dependencies]
