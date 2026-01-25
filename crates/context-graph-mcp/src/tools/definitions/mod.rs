@@ -1,4 +1,4 @@
-//! Tool definitions per PRD v6 Section 10 (40 tools total).
+//! Tool definitions per PRD v6 Section 10 (41 tools total).
 //!
 //! Includes 18 original tools plus 4 sequence tools for E4 integration
 //! plus 2 causal tools for E5 Priority 1 enhancement
@@ -7,7 +7,8 @@
 //! plus 2 graph tools for E8 upgrade (Phase 4)
 //! plus 2 intent tools for E10 upgrade (search_by_intent, find_contextual_matches)
 //! plus 6 entity tools for E11 integration (extract, search, infer, find, validate, graph)
-//! plus 4 embedder-first search tools for Constitution v6.3.
+//! plus 4 embedder-first search tools for Constitution v6.3
+//! plus 1 temporal tool for E2 recency search (search_recent).
 
 pub(crate) mod causal;
 pub(crate) mod code;
@@ -22,13 +23,14 @@ pub(crate) mod intent;
 pub(crate) mod keyword;
 pub(crate) mod merge;
 pub(crate) mod sequence;
+pub(crate) mod temporal;
 pub(crate) mod topic;
 
 use crate::tools::types::ToolDefinition;
 
 /// Get all tool definitions for the `tools/list` response.
 pub fn get_tool_definitions() -> Vec<ToolDefinition> {
-    let mut tools = Vec::with_capacity(40);
+    let mut tools = Vec::with_capacity(41);
 
     // Core tools (5)
     tools.extend(core::definitions());
@@ -72,6 +74,9 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
     // Embedder-first search tools (4) - Constitution v6.3
     tools.extend(embedder::definitions());
 
+    // Temporal tools (1) - E2 recency search
+    tools.extend(temporal::definitions());
+
     tools
 }
 
@@ -81,8 +86,8 @@ mod tests {
 
     #[test]
     fn test_total_tool_count() {
-        // 40 tools: 36 base + 4 embedder-first search tools
-        assert_eq!(get_tool_definitions().len(), 40);
+        // 41 tools: 36 base + 4 embedder-first search tools + 1 temporal tool
+        assert_eq!(get_tool_definitions().len(), 41);
     }
 
     #[test]
@@ -145,6 +150,8 @@ mod tests {
             "get_embedder_clusters",
             "compare_embedder_views",
             "list_embedder_indexes",
+            // Temporal tools (1) - E2 recency search
+            "search_recent",
         ];
 
         for name in expected {
@@ -194,5 +201,6 @@ mod tests {
         assert_eq!(intent::definitions().len(), 2);
         assert_eq!(entity::definitions().len(), 6);
         assert_eq!(embedder::definitions().len(), 4); // Constitution v6.3 embedder-first search
+        assert_eq!(temporal::definitions().len(), 1); // E2 recency search
     }
 }

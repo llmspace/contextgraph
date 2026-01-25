@@ -31,7 +31,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use context_graph_core::traits::{
-    TeleologicalMemoryStore, TeleologicalSearchOptions, TeleologicalSearchResult,
+    DecayFunction, TeleologicalMemoryStore, TeleologicalSearchOptions, TeleologicalSearchResult,
 };
 use context_graph_core::types::fingerprint::SemanticFingerprint;
 
@@ -164,7 +164,7 @@ impl EnrichmentPipeline {
 
         // Phase 3: Weighted RRF Fusion
         let rrf_start = Instant::now();
-        let fused_results = self.compute_weighted_rrf(
+        let mut fused_results = self.compute_weighted_rrf(
             &e1_results,
             &enhancer_results,
             &effective_embedders,
@@ -177,6 +177,23 @@ impl EnrichmentPipeline {
             time_ms = rrf_time,
             "Phase 3: Weighted RRF fusion complete"
         );
+
+        // Phase 3.5: Temporal Boost (POST-RETRIEVAL per ARCH-25)
+        // Apply E2 recency boost when temporal query type is detected
+        if config.temporal_boost_enabled && config.temporal_weight > 0.0 {
+            self.apply_temporal_boost_to_fused(
+                &mut fused_results,
+                &e1_results,
+                config.temporal_weight,
+                config.decay_function,
+            );
+
+            debug!(
+                temporal_weight = config.temporal_weight,
+                decay_function = ?config.decay_function,
+                "Phase 3.5: Temporal boost applied (POST-retrieval per ARCH-25)"
+            );
+        }
 
         // Phase 4: Agreement Calculation
         let agreement_start = Instant::now();
@@ -590,6 +607,99 @@ impl EnrichmentPipeline {
         }
 
         Ok(())
+    }
+
+    /// Apply temporal boost to fused results (POST-RETRIEVAL per ARCH-25).
+    ///
+    /// Applies E2 recency decay to modify RRF scores based on memory age.
+    /// Then re-sorts results by boosted score.
+    ///
+    /// # Arguments
+    /// * `fused_results` - Mutable fused results from RRF
+    /// * `e1_results` - Original E1 results (to get timestamps)
+    /// * `temporal_weight` - Weight for temporal boost [0.0, 1.0]
+    /// * `decay_function` - Decay function (Linear, Exponential, Step, NoDecay)
+    fn apply_temporal_boost_to_fused(
+        &self,
+        fused_results: &mut Vec<FusedResult>,
+        e1_results: &[TeleologicalSearchResult],
+        temporal_weight: f32,
+        decay_function: DecayFunction,
+    ) {
+        if fused_results.is_empty() || temporal_weight <= 0.0 {
+            return;
+        }
+
+        let now_ms = chrono::Utc::now().timestamp_millis();
+
+        // Build timestamp map from E1 results (using created_at)
+        let timestamps: HashMap<Uuid, i64> = e1_results
+            .iter()
+            .map(|r| {
+                (r.fingerprint.id, r.fingerprint.created_at.timestamp_millis())
+            })
+            .collect();
+
+        // Apply temporal boost to each result
+        for result in fused_results.iter_mut() {
+            if let Some(&memory_ts) = timestamps.get(&result.id) {
+                let recency_score = compute_recency_score(memory_ts, now_ms, decay_function);
+
+                // Per ARCH-25: Temporal boost is multiplicative POST-retrieval
+                // boosted_score = rrf_score * (1 + temporal_weight * (recency_score - 0.5))
+                // This gives neutral at 0.5 recency, boost for recent, penalty for old
+                let boost_factor = 1.0 + temporal_weight * (recency_score - 0.5);
+                let boost_factor = boost_factor.clamp(0.8, 1.2); // Per ARCH-33 style clamping
+
+                result.rrf_score *= boost_factor;
+            }
+        }
+
+        // Re-sort by boosted RRF score
+        fused_results.sort_by(|a, b| {
+            b.rrf_score
+                .partial_cmp(&a.rrf_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+    }
+}
+
+/// Compute recency score using the specified decay function.
+///
+/// Returns [0.0, 1.0] where 1.0 is most recent.
+fn compute_recency_score(memory_ts_ms: i64, now_ms: i64, decay: DecayFunction) -> f32 {
+    let age_secs = ((now_ms - memory_ts_ms).max(0) / 1000) as f64;
+
+    match decay {
+        DecayFunction::Linear => {
+            // Linear decay over 1 day horizon
+            let max_age_secs = 86400.0; // 1 day
+            let normalized = age_secs / max_age_secs;
+            (1.0 - normalized.min(1.0)) as f32
+        }
+        DecayFunction::Exponential => {
+            // Exponential decay with 6-hour half-life
+            let half_life_secs = 21600.0; // 6 hours
+            let lambda = 0.693 / half_life_secs; // ln(2) / half_life
+            (-lambda * age_secs).exp() as f32
+        }
+        DecayFunction::Step => {
+            // Step function decay
+            let age_minutes = age_secs / 60.0;
+            if age_minutes < 5.0 {
+                1.0 // Fresh: < 5 minutes
+            } else if age_minutes < 60.0 {
+                0.8 // Recent: < 1 hour
+            } else if age_minutes < 1440.0 {
+                0.5 // Today: < 1 day
+            } else {
+                0.1 // Older: >= 1 day
+            }
+        }
+        DecayFunction::NoDecay => {
+            // No decay - all memories equal
+            0.5 // Neutral
+        }
     }
 }
 

@@ -511,6 +511,8 @@ pub fn select_embedders_for_types(types: &[QueryType], mode: EnrichmentMode) -> 
 /// # Returns
 /// EnrichmentConfig ready for the enrichment pipeline.
 pub fn build_enrichment_config(query: &str, mode: EnrichmentMode) -> EnrichmentConfig {
+    use context_graph_core::traits::DecayFunction;
+
     if mode == EnrichmentMode::Off {
         return EnrichmentConfig::off();
     }
@@ -519,12 +521,17 @@ pub fn build_enrichment_config(query: &str, mode: EnrichmentMode) -> EnrichmentC
     let selected_embedders = select_embedders_for_types(&detected_types, mode);
     let detect_blind_spots = mode.enables_blind_spots();
 
+    // Enable temporal boost when Temporal query type is detected
+    // Per ARCH-25: Temporal boosts POST-retrieval only, NOT in similarity fusion
+    let has_temporal = detected_types.contains(&QueryType::Temporal);
+
     debug!(
         query_preview = %query.chars().take(50).collect::<String>(),
         mode = ?mode,
         detected_types = ?detected_types,
         selected_embedders = ?selected_embedders,
         detect_blind_spots = detect_blind_spots,
+        temporal_boost_enabled = has_temporal,
         "Enrichment config built"
     );
 
@@ -533,6 +540,13 @@ pub fn build_enrichment_config(query: &str, mode: EnrichmentMode) -> EnrichmentC
         detected_types,
         selected_embedders,
         detect_blind_spots,
+        temporal_boost_enabled: has_temporal,
+        temporal_weight: if has_temporal { 0.3 } else { 0.0 },
+        decay_function: if has_temporal {
+            DecayFunction::Exponential
+        } else {
+            DecayFunction::default()
+        },
     }
 }
 

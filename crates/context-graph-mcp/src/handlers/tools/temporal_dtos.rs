@@ -1,0 +1,172 @@
+//! DTOs for temporal search tools (E2 V_freshness).
+//!
+//! Per Constitution v6.5 and ARCH-25:
+//! - E2 (V_freshness) finds recency patterns
+//! - Temporal boost is POST-RETRIEVAL only, NOT in similarity fusion
+
+use serde::{Deserialize, Serialize};
+
+use context_graph_core::traits::DecayFunction;
+
+/// Temporal scale for decay calculation.
+///
+/// Controls the time horizon over which decay is computed.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TemporalScale {
+    /// Micro scale: 1 hour horizon
+    /// Use for: very recent activity, fast-moving contexts
+    Micro,
+
+    /// Meso scale: 1 day horizon (default)
+    /// Use for: typical recency queries
+    #[default]
+    Meso,
+
+    /// Macro scale: 1 week horizon
+    /// Use for: broader time range queries
+    Macro,
+
+    /// Long scale: 1 month horizon
+    /// Use for: extended time range queries
+    Long,
+}
+
+impl TemporalScale {
+    /// Get the time horizon in seconds for this scale.
+    pub fn horizon_seconds(&self) -> i64 {
+        match self {
+            TemporalScale::Micro => 3600,       // 1 hour
+            TemporalScale::Meso => 86400,       // 1 day
+            TemporalScale::Macro => 604800,     // 1 week
+            TemporalScale::Long => 2592000,     // 30 days
+        }
+    }
+}
+
+/// Parameters for search_recent tool.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchRecentParams {
+    /// The search query text.
+    pub query: String,
+
+    /// Maximum number of results (default: 10).
+    #[serde(default = "default_top_k")]
+    pub top_k: usize,
+
+    /// Temporal boost weight [0.1, 1.0] (default: 0.3).
+    #[serde(default = "default_temporal_weight")]
+    pub temporal_weight: f32,
+
+    /// Decay function (default: exponential).
+    #[serde(default)]
+    pub decay_function: DecayFunctionParam,
+
+    /// Temporal scale (default: meso).
+    #[serde(default)]
+    pub temporal_scale: TemporalScale,
+
+    /// Include content in results (default: true).
+    #[serde(default = "default_true")]
+    pub include_content: bool,
+
+    /// Minimum semantic similarity threshold (default: 0.1).
+    #[serde(default = "default_min_similarity")]
+    pub min_similarity: f32,
+}
+
+/// Decay function parameter with string parsing.
+#[derive(Debug, Clone, Copy, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DecayFunctionParam {
+    Linear,
+    #[default]
+    Exponential,
+    Step,
+}
+
+impl From<DecayFunctionParam> for DecayFunction {
+    fn from(param: DecayFunctionParam) -> Self {
+        match param {
+            DecayFunctionParam::Linear => DecayFunction::Linear,
+            DecayFunctionParam::Exponential => DecayFunction::Exponential,
+            DecayFunctionParam::Step => DecayFunction::Step,
+        }
+    }
+}
+
+/// Result entry for search_recent.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TemporalSearchResultEntry {
+    /// Memory ID.
+    pub id: String,
+
+    /// Original semantic similarity score.
+    pub semantic_score: f32,
+
+    /// Recency score [0.0, 1.0].
+    pub recency_score: f32,
+
+    /// Final boosted score.
+    pub final_score: f32,
+
+    /// Age in a human-readable format.
+    pub age_description: String,
+
+    /// Content text (if requested).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+
+    /// Created at timestamp (ISO 8601).
+    pub created_at: String,
+}
+
+/// Response for search_recent.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchRecentResponse {
+    /// Query that was executed.
+    pub query: String,
+
+    /// Results sorted by final score.
+    pub results: Vec<TemporalSearchResultEntry>,
+
+    /// Number of results.
+    pub count: usize,
+
+    /// Temporal boost configuration used.
+    pub temporal_config: TemporalConfigSummary,
+}
+
+/// Summary of temporal configuration used.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TemporalConfigSummary {
+    /// Temporal weight used.
+    pub temporal_weight: f32,
+
+    /// Decay function used.
+    pub decay_function: String,
+
+    /// Temporal scale used.
+    pub temporal_scale: String,
+}
+
+// Default value functions
+fn default_top_k() -> usize {
+    10
+}
+
+fn default_temporal_weight() -> f32 {
+    0.3
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_min_similarity() -> f32 {
+    0.1
+}

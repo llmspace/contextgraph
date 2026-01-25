@@ -21,6 +21,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+use context_graph_core::traits::DecayFunction;
+
 use super::embedder_dtos::EmbedderId;
 
 // =============================================================================
@@ -191,6 +193,29 @@ pub struct EnrichmentConfig {
 
     /// Whether to compute blind spot detection.
     pub detect_blind_spots: bool,
+
+    /// Enable temporal (E2) post-retrieval boost.
+    /// Set automatically for temporal queries, defaults to false.
+    /// Per ARCH-25: Temporal boosts POST-retrieval only, NOT in similarity fusion.
+    #[serde(default)]
+    pub temporal_boost_enabled: bool,
+
+    /// Temporal weight for boost calculation [0.0, 1.0].
+    /// Only used when temporal_boost_enabled is true.
+    /// Default: 0.3 (balanced recency preference).
+    #[serde(default = "default_temporal_weight")]
+    pub temporal_weight: f32,
+
+    /// Decay function for temporal boost.
+    /// Per E2 (V_freshness): Linear, Exponential, Step, or NoDecay.
+    /// Default: Exponential (natural forgetting curve).
+    #[serde(default)]
+    pub decay_function: DecayFunction,
+}
+
+/// Default temporal weight when temporal boost is enabled.
+fn default_temporal_weight() -> f32 {
+    0.3
 }
 
 impl EnrichmentConfig {
@@ -201,12 +226,17 @@ impl EnrichmentConfig {
             detected_types: vec![QueryType::General],
             selected_embedders: vec![],
             detect_blind_spots: false,
+            temporal_boost_enabled: false,
+            temporal_weight: 0.0,
+            decay_function: DecayFunction::default(),
         }
     }
 
     /// Create a new config for Light mode with given detected types.
     pub fn light(detected_types: Vec<QueryType>) -> Self {
         let mut embedders = Vec::new();
+        let has_temporal = detected_types.contains(&QueryType::Temporal);
+
         for qt in &detected_types {
             embedders.extend(qt.primary_enhancers());
         }
@@ -220,12 +250,22 @@ impl EnrichmentConfig {
             detected_types,
             selected_embedders: embedders,
             detect_blind_spots: false,
+            // Enable temporal boost when Temporal query type is detected
+            temporal_boost_enabled: has_temporal,
+            temporal_weight: if has_temporal { 0.3 } else { 0.0 },
+            decay_function: if has_temporal {
+                DecayFunction::Exponential
+            } else {
+                DecayFunction::default()
+            },
         }
     }
 
     /// Create a new config for Full mode with given detected types.
     pub fn full(detected_types: Vec<QueryType>) -> Self {
         let mut embedders = Vec::new();
+        let has_temporal = detected_types.contains(&QueryType::Temporal);
+
         for qt in &detected_types {
             embedders.extend(qt.primary_enhancers());
             embedders.extend(qt.secondary_enhancers());
@@ -240,7 +280,38 @@ impl EnrichmentConfig {
             detected_types,
             selected_embedders: embedders,
             detect_blind_spots: true,
+            // Enable temporal boost when Temporal query type is detected
+            temporal_boost_enabled: has_temporal,
+            temporal_weight: if has_temporal { 0.3 } else { 0.0 },
+            decay_function: if has_temporal {
+                DecayFunction::Exponential
+            } else {
+                DecayFunction::default()
+            },
         }
+    }
+
+    /// Create a config specifically for temporal queries.
+    /// Sets temporal_boost_enabled=true with sensible defaults.
+    pub fn temporal(base_types: Vec<QueryType>) -> Self {
+        let mut types = base_types;
+        if !types.contains(&QueryType::Temporal) {
+            types.push(QueryType::Temporal);
+        }
+
+        let mut config = Self::light(types);
+        config.temporal_boost_enabled = true;
+        config.temporal_weight = 0.3;
+        config.decay_function = DecayFunction::Exponential;
+        config
+    }
+
+    /// Enable temporal boost on an existing config.
+    pub fn with_temporal_boost(mut self, weight: f32, decay: DecayFunction) -> Self {
+        self.temporal_boost_enabled = true;
+        self.temporal_weight = weight.clamp(0.0, 1.0);
+        self.decay_function = decay;
+        self
     }
 
     /// Get the number of selected enhancers.
