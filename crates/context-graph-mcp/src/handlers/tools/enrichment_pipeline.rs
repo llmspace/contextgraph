@@ -38,9 +38,9 @@ use context_graph_core::types::fingerprint::SemanticFingerprint;
 use super::embedder_dtos::EmbedderId;
 use super::enrichment_dtos::{
     AgreementMetrics, BlindSpotAlert, EnrichedSearchResponse, EnrichedSearchResult,
-    EnrichmentConfig, EnrichmentMode, EnrichmentSummary, ScoringBreakdown,
-    TimeBreakdown,
+    EnrichmentConfig, EnrichmentMode, EnrichmentSummary, ScoringBreakdown, TimeBreakdown,
 };
+use super::temporal_dtos::compute_recency_score;
 
 // =============================================================================
 // CONSTANTS
@@ -641,15 +641,19 @@ impl EnrichmentPipeline {
             .collect();
 
         // Apply temporal boost to each result
+        // Use default 1-day (86400s) horizon for enrichment pipeline temporal boost
+        const DEFAULT_HORIZON_SECS: i64 = 86400;
+
         for result in fused_results.iter_mut() {
             if let Some(&memory_ts) = timestamps.get(&result.id) {
-                let recency_score = compute_recency_score(memory_ts, now_ms, decay_function);
+                let recency_score =
+                    compute_recency_score(memory_ts, now_ms, decay_function, DEFAULT_HORIZON_SECS);
 
                 // Per ARCH-25: Temporal boost is multiplicative POST-retrieval
                 // boosted_score = rrf_score * (1 + temporal_weight * (recency_score - 0.5))
                 // This gives neutral at 0.5 recency, boost for recent, penalty for old
-                let boost_factor = 1.0 + temporal_weight * (recency_score - 0.5);
-                let boost_factor = boost_factor.clamp(0.8, 1.2); // Per ARCH-33 style clamping
+                let boost_factor =
+                    (1.0 + temporal_weight * (recency_score - 0.5)).clamp(0.8, 1.2);
 
                 result.rrf_score *= boost_factor;
             }
@@ -661,45 +665,6 @@ impl EnrichmentPipeline {
                 .partial_cmp(&a.rrf_score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-    }
-}
-
-/// Compute recency score using the specified decay function.
-///
-/// Returns [0.0, 1.0] where 1.0 is most recent.
-fn compute_recency_score(memory_ts_ms: i64, now_ms: i64, decay: DecayFunction) -> f32 {
-    let age_secs = ((now_ms - memory_ts_ms).max(0) / 1000) as f64;
-
-    match decay {
-        DecayFunction::Linear => {
-            // Linear decay over 1 day horizon
-            let max_age_secs = 86400.0; // 1 day
-            let normalized = age_secs / max_age_secs;
-            (1.0 - normalized.min(1.0)) as f32
-        }
-        DecayFunction::Exponential => {
-            // Exponential decay with 6-hour half-life
-            let half_life_secs = 21600.0; // 6 hours
-            let lambda = 0.693 / half_life_secs; // ln(2) / half_life
-            (-lambda * age_secs).exp() as f32
-        }
-        DecayFunction::Step => {
-            // Step function decay
-            let age_minutes = age_secs / 60.0;
-            if age_minutes < 5.0 {
-                1.0 // Fresh: < 5 minutes
-            } else if age_minutes < 60.0 {
-                0.8 // Recent: < 1 hour
-            } else if age_minutes < 1440.0 {
-                0.5 // Today: < 1 day
-            } else {
-                0.1 // Older: >= 1 day
-            }
-        }
-        DecayFunction::NoDecay => {
-            // No decay - all memories equal
-            0.5 // Neutral
-        }
     }
 }
 

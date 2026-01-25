@@ -291,29 +291,6 @@ impl EnrichmentConfig {
         }
     }
 
-    /// Create a config specifically for temporal queries.
-    /// Sets temporal_boost_enabled=true with sensible defaults.
-    pub fn temporal(base_types: Vec<QueryType>) -> Self {
-        let mut types = base_types;
-        if !types.contains(&QueryType::Temporal) {
-            types.push(QueryType::Temporal);
-        }
-
-        let mut config = Self::light(types);
-        config.temporal_boost_enabled = true;
-        config.temporal_weight = 0.3;
-        config.decay_function = DecayFunction::Exponential;
-        config
-    }
-
-    /// Enable temporal boost on an existing config.
-    pub fn with_temporal_boost(mut self, weight: f32, decay: DecayFunction) -> Self {
-        self.temporal_boost_enabled = true;
-        self.temporal_weight = weight.clamp(0.0, 1.0);
-        self.decay_function = decay;
-        self
-    }
-
     /// Get the number of selected enhancers.
     pub fn enhancer_count(&self) -> usize {
         self.selected_embedders.len()

@@ -170,3 +170,68 @@ fn default_true() -> bool {
 fn default_min_similarity() -> f32 {
     0.1
 }
+
+/// Compute recency score using the specified decay function and horizon.
+///
+/// Returns [0.0, 1.0] where 1.0 is most recent.
+///
+/// # Arguments
+/// * `memory_ts_ms` - Memory timestamp in milliseconds since epoch
+/// * `now_ms` - Current timestamp in milliseconds since epoch
+/// * `decay` - Decay function to use
+/// * `horizon_secs` - Time horizon in seconds for decay calculation
+pub fn compute_recency_score(
+    memory_ts_ms: i64,
+    now_ms: i64,
+    decay: DecayFunction,
+    horizon_secs: i64,
+) -> f32 {
+    let age_secs = ((now_ms - memory_ts_ms).max(0) / 1000) as f64;
+    let horizon = horizon_secs as f64;
+
+    match decay {
+        DecayFunction::Linear => {
+            let normalized = age_secs / horizon;
+            (1.0 - normalized.min(1.0)) as f32
+        }
+        DecayFunction::Exponential => {
+            // Half-life = horizon / 4 (gives reasonable decay curve)
+            let half_life = horizon / 4.0;
+            let lambda = 0.693 / half_life; // ln(2) / half_life
+            (-lambda * age_secs).exp() as f32
+        }
+        DecayFunction::Step => {
+            let fraction = age_secs / horizon;
+            if fraction < 0.05 {
+                1.0 // Very fresh
+            } else if fraction < 0.25 {
+                0.8 // Recent
+            } else if fraction < 0.75 {
+                0.5 // Middle
+            } else {
+                0.1 // Older
+            }
+        }
+        DecayFunction::NoDecay => 0.5, // Neutral
+    }
+}
+
+/// Format age as human-readable string.
+pub fn format_age(memory_ts_ms: i64, now_ms: i64) -> String {
+    let age_secs = (now_ms - memory_ts_ms).max(0) / 1000;
+    let age_mins = age_secs / 60;
+    let age_hours = age_mins / 60;
+    let age_days = age_hours / 24;
+
+    if age_secs < 60 {
+        format!("{} seconds ago", age_secs)
+    } else if age_mins < 60 {
+        format!("{} minutes ago", age_mins)
+    } else if age_hours < 24 {
+        format!("{} hours ago", age_hours)
+    } else if age_days < 7 {
+        format!("{} days ago", age_days)
+    } else {
+        format!("{} weeks ago", age_days / 7)
+    }
+}

@@ -13,7 +13,8 @@ use tracing::{debug, error};
 use context_graph_core::traits::{DecayFunction, SearchStrategy, TeleologicalSearchOptions};
 
 use super::temporal_dtos::{
-    SearchRecentParams, SearchRecentResponse, TemporalConfigSummary, TemporalSearchResultEntry,
+    compute_recency_score, format_age, SearchRecentParams, SearchRecentResponse,
+    TemporalConfigSummary, TemporalSearchResultEntry,
 };
 use crate::handlers::core::Handlers;
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
@@ -108,17 +109,12 @@ impl Handlers {
             .into_iter()
             .map(|r| {
                 let memory_ts = r.fingerprint.created_at.timestamp_millis();
-                let recency_score = compute_recency_score_with_scale(
-                    memory_ts,
-                    now_ms,
-                    decay_function,
-                    horizon_secs,
-                );
+                let recency_score =
+                    compute_recency_score(memory_ts, now_ms, decay_function, horizon_secs);
 
                 // Per ARCH-25: Temporal boost is multiplicative POST-retrieval
                 // boosted_score = semantic_score * (1 + temporal_weight * (recency_score - 0.5))
-                let boost_factor = 1.0 + temporal_weight * (recency_score - 0.5);
-                let boost_factor = boost_factor.clamp(0.8, 1.2);
+                let boost_factor = (1.0 + temporal_weight * (recency_score - 0.5)).clamp(0.8, 1.2);
                 let final_score = r.similarity * boost_factor;
 
                 let age_description = format_age(memory_ts, now_ms);
@@ -171,67 +167,5 @@ impl Handlers {
                 self.tool_error_with_pulse(id, &format!("Response serialization failed: {}", e))
             }
         }
-    }
-}
-
-/// Compute recency score with configurable horizon.
-fn compute_recency_score_with_scale(
-    memory_ts_ms: i64,
-    now_ms: i64,
-    decay: DecayFunction,
-    horizon_secs: i64,
-) -> f32 {
-    let age_secs = ((now_ms - memory_ts_ms).max(0) / 1000) as f64;
-
-    match decay {
-        DecayFunction::Linear => {
-            // Linear decay over configured horizon
-            let max_age_secs = horizon_secs as f64;
-            let normalized = age_secs / max_age_secs;
-            (1.0 - normalized.min(1.0)) as f32
-        }
-        DecayFunction::Exponential => {
-            // Exponential decay with half-life = horizon / 4
-            let half_life_secs = (horizon_secs / 4) as f64;
-            let lambda = 0.693 / half_life_secs; // ln(2) / half_life
-            (-lambda * age_secs).exp() as f32
-        }
-        DecayFunction::Step => {
-            // Step function decay based on horizon
-            let fraction = age_secs / (horizon_secs as f64);
-            if fraction < 0.05 {
-                1.0 // Very fresh
-            } else if fraction < 0.25 {
-                0.8 // Recent
-            } else if fraction < 0.75 {
-                0.5 // Middle
-            } else {
-                0.1 // Older
-            }
-        }
-        DecayFunction::NoDecay => {
-            // No decay - all memories equal
-            0.5 // Neutral
-        }
-    }
-}
-
-/// Format age as human-readable string.
-fn format_age(memory_ts_ms: i64, now_ms: i64) -> String {
-    let age_secs = (now_ms - memory_ts_ms).max(0) / 1000;
-    let age_mins = age_secs / 60;
-    let age_hours = age_mins / 60;
-    let age_days = age_hours / 24;
-
-    if age_secs < 60 {
-        format!("{} seconds ago", age_secs)
-    } else if age_mins < 60 {
-        format!("{} minutes ago", age_mins)
-    } else if age_hours < 24 {
-        format!("{} hours ago", age_hours)
-    } else if age_days < 7 {
-        format!("{} days ago", age_days)
-    } else {
-        format!("{} weeks ago", age_days / 7)
     }
 }
