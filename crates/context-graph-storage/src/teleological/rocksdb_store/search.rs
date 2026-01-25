@@ -418,8 +418,9 @@ impl RocksDbTeleologicalStore {
         }
 
         // E10 Multimodal (if available)
+        // FIX: Use e10_active_vector() instead of legacy e10_multimodal field
         if let Some(e10_index) = self.index_registry.get(EmbedderIndex::E10Multimodal) {
-            if let Ok(e10_candidates) = e10_index.search(&query.e10_multimodal, k, None) {
+            if let Ok(e10_candidates) = e10_index.search(query.e10_active_vector(), k, None) {
                 let e10_ranked: Vec<(Uuid, f32)> = e10_candidates
                     .into_iter()
                     .filter(|(id, _)| options.include_deleted || !self.is_soft_deleted(id))

@@ -183,9 +183,10 @@ impl RocksDbTeleologicalStore {
             // E7: Code embedder with query-type awareness (ARCH-16)
             e7_score,
             // E8-E11: Dense embedders - cosine similarity
-            compute_cosine_similarity(&query.e8_graph, &stored.e8_graph),
+            // Use active vectors for E8/E10 (support both legacy and dual formats)
+            compute_cosine_similarity(query.e8_active_vector(), stored.e8_active_vector()),
             compute_cosine_similarity(&query.e9_hdc, &stored.e9_hdc),
-            compute_cosine_similarity(&query.e10_multimodal, &stored.e10_multimodal),
+            compute_cosine_similarity(query.e10_active_vector(), stored.e10_active_vector()),
             compute_cosine_similarity(&query.e11_entity, &stored.e11_entity),
             // E12: Late-interaction - MaxSim over token embeddings
             compute_maxsim_direct(&query.e12_late_interaction, &stored.e12_late_interaction),
@@ -255,9 +256,10 @@ impl RocksDbTeleologicalStore {
             // E7: Code embedder with query-type awareness (ARCH-16)
             e7_score,
             // E8-E11: Dense embedders - cosine similarity
-            compute_cosine_similarity(&query.e8_graph, &stored.e8_graph),
+            // Use active vectors for E8/E10 (support both legacy and dual formats)
+            compute_cosine_similarity(query.e8_active_vector(), stored.e8_active_vector()),
             compute_cosine_similarity(&query.e9_hdc, &stored.e9_hdc),
-            compute_cosine_similarity(&query.e10_multimodal, &stored.e10_multimodal),
+            compute_cosine_similarity(query.e10_active_vector(), stored.e10_active_vector()),
             compute_cosine_similarity(&query.e11_entity, &stored.e11_entity),
             // E12: Late-interaction - MaxSim over token embeddings
             compute_maxsim_direct(&query.e12_late_interaction, &stored.e12_late_interaction),

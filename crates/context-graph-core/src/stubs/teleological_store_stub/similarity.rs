@@ -60,14 +60,14 @@ pub(crate) fn compute_semantic_scores(
     // E7: Code
     scores[6] = cosine_similarity(&query.e7_code, &target.e7_code);
 
-    // E8: Graph
-    scores[7] = cosine_similarity(&query.e8_graph, &target.e8_graph);
+    // E8: Graph - use active vector (supports both legacy and dual format)
+    scores[7] = cosine_similarity(query.e8_active_vector(), target.e8_active_vector());
 
     // E9: HDC
     scores[8] = cosine_similarity(&query.e9_hdc, &target.e9_hdc);
 
-    // E10: Multimodal
-    scores[9] = cosine_similarity(&query.e10_multimodal, &target.e10_multimodal);
+    // E10: Multimodal - use active vector (supports both legacy and dual format)
+    scores[9] = cosine_similarity(query.e10_active_vector(), target.e10_active_vector());
 
     // E11: Entity
     scores[10] = cosine_similarity(&query.e11_entity, &target.e11_entity);

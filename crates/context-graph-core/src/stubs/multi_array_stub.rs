@@ -284,11 +284,23 @@ impl MultiArrayEmbeddingProvider for StubMultiArrayProvider {
         fingerprint.e2_temporal_recent = Self::fill_dense_embedding(content, 512, 1);
         fingerprint.e3_temporal_periodic = Self::fill_dense_embedding(content, 512, 2);
         fingerprint.e4_temporal_positional = Self::fill_dense_embedding(content, 512, 3);
-        fingerprint.e5_causal = Self::fill_dense_embedding(content, 768, 4);
+        // E5: Fill both dual format fields (new) and legacy field for compatibility
+        let e5_vec = Self::fill_dense_embedding(content, 768, 4);
+        fingerprint.e5_causal_as_cause = e5_vec.clone();
+        fingerprint.e5_causal_as_effect = e5_vec.clone();
+        fingerprint.e5_causal = e5_vec; // Legacy field for backward compatibility
         fingerprint.e7_code = Self::fill_dense_embedding(content, 1536, 6);
-        fingerprint.e8_graph = Self::fill_dense_embedding(content, 384, 7);
+        // E8: Fill both dual format fields (new) and legacy field for compatibility
+        let e8_vec = Self::fill_dense_embedding(content, 384, 7);
+        fingerprint.e8_graph_as_source = e8_vec.clone();
+        fingerprint.e8_graph_as_target = e8_vec.clone();
+        fingerprint.e8_graph = e8_vec; // Legacy field for backward compatibility
         fingerprint.e9_hdc = Self::fill_dense_embedding(content, 1024, 8); // HDC projected
-        fingerprint.e10_multimodal = Self::fill_dense_embedding(content, 768, 9);
+        // E10: Fill both dual format fields (new) and legacy field for compatibility
+        let e10_vec = Self::fill_dense_embedding(content, 768, 9);
+        fingerprint.e10_multimodal_as_intent = e10_vec.clone();
+        fingerprint.e10_multimodal_as_context = e10_vec.clone();
+        fingerprint.e10_multimodal = e10_vec; // Legacy field for backward compatibility
         fingerprint.e11_entity = Self::fill_dense_embedding(content, 768, 10); // KEPLER
 
         // Fill sparse embeddings
