@@ -1,0 +1,231 @@
+{
+  "version": "1.0",
+  "description": "Test memories to seed for E9 benchmarking",
+  "memories": [
+    {
+      "id": "mem-auth-001",
+      "content": "Authentication failed for user john_doe after 3 attempts",
+      "tags": ["authentication", "error", "user"]
+    },
+    {
+      "id": "mem-auth-002",
+      "content": "Authentication successful - session created for admin",
+      "tags": ["authentication", "success", "session"]
+    },
+    {
+      "id": "mem-auth-003",
+      "content": "Authorization check passed for resource /api/users",
+      "tags": ["authorization", "api", "access"]
+    },
+    {
+      "id": "mem-config-001",
+      "content": "Configuration loaded from config.yaml successfully",
+      "tags": ["configuration", "yaml", "settings"]
+    },
+    {
+      "id": "mem-config-002",
+      "content": "parse_config function handles JSON parsing with validation",
+      "tags": ["configuration", "json", "parsing"]
+    },
+    {
+      "id": "mem-config-003",
+      "content": "ParseConfig class definition in config.rs module",
+      "tags": ["configuration", "rust", "class"]
+    },
+    {
+      "id": "mem-impl-001",
+      "content": "Implementation of the core algorithm completed",
+      "tags": ["implementation", "algorithm", "core"]
+    },
+    {
+      "id": "mem-impl-002",
+      "content": "The implementation uses async/await patterns",
+      "tags": ["implementation", "async", "patterns"]
+    },
+    {
+      "id": "mem-init-001",
+      "content": "Initialization of database connection pool",
+      "tags": ["initialization", "database", "pool"]
+    },
+    {
+      "id": "mem-init-002",
+      "content": "System initialization completed in 2.3 seconds",
+      "tags": ["initialization", "startup", "performance"]
+    },
+    {
+      "id": "mem-sync-001",
+      "content": "Synchronization between nodes completed successfully",
+      "tags": ["synchronization", "distributed", "nodes"]
+    },
+    {
+      "id": "mem-sync-002",
+      "content": "Data synchronization with remote server",
+      "tags": ["synchronization", "remote", "data"]
+    },
+    {
+      "id": "mem-env-001",
+      "content": "Environment variables loaded from .env file",
+      "tags": ["environment", "config", "dotenv"]
+    },
+    {
+      "id": "mem-env-002",
+      "content": "Development environment setup complete",
+      "tags": ["environment", "development", "setup"]
+    },
+    {
+      "id": "mem-dev-001",
+      "content": "Development workflow includes code review",
+      "tags": ["development", "workflow", "review"]
+    },
+    {
+      "id": "mem-maint-001",
+      "content": "Maintenance window scheduled for Sunday",
+      "tags": ["maintenance", "schedule", "downtime"]
+    },
+    {
+      "id": "mem-code-001",
+      "content": "get_user_profile retrieves user data from database",
+      "tags": ["function", "user", "database"]
+    },
+    {
+      "id": "mem-code-002",
+      "content": "getUserProfile method returns UserProfile struct",
+      "tags": ["method", "user", "struct"]
+    },
+    {
+      "id": "mem-code-003",
+      "content": "handleError function logs and returns error response",
+      "tags": ["function", "error", "logging"]
+    },
+    {
+      "id": "mem-code-004",
+      "content": "handle_error catches panics and converts to Result",
+      "tags": ["function", "error", "rust"]
+    },
+    {
+      "id": "mem-code-005",
+      "content": "processData transforms input into output format",
+      "tags": ["function", "transform", "data"]
+    },
+    {
+      "id": "mem-code-006",
+      "content": "process_data function with streaming support",
+      "tags": ["function", "streaming", "data"]
+    },
+    {
+      "id": "mem-code-007",
+      "content": "validate_input checks for required fields",
+      "tags": ["function", "validation", "input"]
+    },
+    {
+      "id": "mem-code-008",
+      "content": "validateInput returns ValidationResult enum",
+      "tags": ["function", "validation", "enum"]
+    },
+    {
+      "id": "mem-code-009",
+      "content": "serializeJson converts struct to JSON string",
+      "tags": ["function", "json", "serialization"]
+    },
+    {
+      "id": "mem-code-010",
+      "content": "serialize_json with custom date formatting",
+      "tags": ["function", "json", "date"]
+    },
+    {
+      "id": "mem-code-011",
+      "content": "create_connection establishes TCP socket",
+      "tags": ["function", "connection", "tcp"]
+    },
+    {
+      "id": "mem-code-012",
+      "content": "createConnection with retry logic and backoff",
+      "tags": ["function", "connection", "retry"]
+    },
+    {
+      "id": "mem-code-013",
+      "content": "buildQuery constructs SQL from parameters",
+      "tags": ["function", "sql", "query"]
+    },
+    {
+      "id": "mem-code-014",
+      "content": "build_query with parameterized statements",
+      "tags": ["function", "sql", "prepared"]
+    },
+    {
+      "id": "mem-code-015",
+      "content": "fetch_results from paginated API endpoint",
+      "tags": ["function", "api", "pagination"]
+    },
+    {
+      "id": "mem-code-016",
+      "content": "fetchResults with caching layer",
+      "tags": ["function", "cache", "results"]
+    },
+    {
+      "id": "mem-code-017",
+      "content": "updateCache invalidates stale entries",
+      "tags": ["function", "cache", "invalidation"]
+    },
+    {
+      "id": "mem-code-018",
+      "content": "update_cache with TTL expiration",
+      "tags": ["function", "cache", "ttl"]
+    },
+    {
+      "id": "mem-db-001",
+      "content": "Database connection pool with max 10 connections",
+      "tags": ["database", "connection", "pool"]
+    },
+    {
+      "id": "mem-db-002",
+      "content": "PostgreSQL database cluster configuration",
+      "tags": ["database", "postgresql", "cluster"]
+    },
+    {
+      "id": "mem-error-001",
+      "content": "Error handling uses Result type throughout",
+      "tags": ["error", "handling", "result"]
+    },
+    {
+      "id": "mem-error-002",
+      "content": "Exception handling with try-catch blocks",
+      "tags": ["error", "exception", "catch"]
+    },
+    {
+      "id": "mem-session-001",
+      "content": "User session management with JWT tokens",
+      "tags": ["user", "session", "jwt"]
+    },
+    {
+      "id": "mem-api-001",
+      "content": "REST API endpoint for user registration",
+      "tags": ["api", "endpoint", "registration"]
+    },
+    {
+      "id": "mem-mem-001",
+      "content": "Memory allocation optimized with arena allocator",
+      "tags": ["memory", "allocation", "arena"]
+    },
+    {
+      "id": "mem-thread-001",
+      "content": "Thread safety ensured with mutex locks",
+      "tags": ["thread", "safety", "mutex"]
+    },
+    {
+      "id": "mem-perf-001",
+      "content": "Performance optimization reduced latency by 40%",
+      "tags": ["performance", "optimization", "latency"]
+    },
+    {
+      "id": "mem-test-001",
+      "content": "Unit testing coverage at 85% for core module",
+      "tags": ["testing", "coverage", "unit"]
+    },
+    {
+      "id": "mem-di-001",
+      "content": "Dependency injection using constructor parameters",
+      "tags": ["dependency", "injection", "constructor"]
+    }
+  ]
+}

@@ -126,6 +126,9 @@ impl Handlers {
             // ========== CODE TOOLS (E7 Code Search Enhancement) ==========
             tool_names::SEARCH_CODE => self.call_search_code(id, arguments).await,
 
+            // ========== ROBUSTNESS TOOLS (E9 HDC Blind-Spot Detection) ==========
+            tool_names::SEARCH_ROBUST => self.call_search_robust(id, arguments).await,
+
             // ========== ENTITY TOOLS (E11 Entity Integration) ==========
             tool_names::EXTRACT_ENTITIES => self.call_extract_entities(id, arguments).await,
             tool_names::SEARCH_BY_ENTITIES => self.call_search_by_entities(id, arguments).await,

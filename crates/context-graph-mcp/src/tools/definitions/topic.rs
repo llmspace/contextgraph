@@ -177,14 +177,14 @@ mod tests {
             "Should mention threshold"
         );
 
-        // get_topic_stability mentions AP-70
+        // get_topic_stability mentions stability metrics
         let stability = tools
             .iter()
             .find(|t| t.name == "get_topic_stability")
             .unwrap();
         assert!(
-            stability.description.contains("AP-70"),
-            "Should reference AP-70"
+            stability.description.contains("entropy"),
+            "Should reference entropy metric"
         );
 
         // get_divergence_alerts mentions AP-62

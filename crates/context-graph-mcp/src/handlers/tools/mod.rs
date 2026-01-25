@@ -13,6 +13,7 @@
 //! - search_by_keywords (keyword_tools.rs) - E6 Keyword Search Enhancement
 //! - search_code (code_tools.rs) - E7 Code Search Enhancement
 //! - search_connections, get_graph_path (graph_tools.rs) - E8 Upgrade Phase 4
+//! - search_robust (robustness_tools.rs) - E9 HDC Blind-Spot Detection
 //! - search_by_intent, find_contextual_matches (intent_tools.rs) - E10 Intent/Context Upgrade
 //! - extract_entities, search_by_entities, infer_relationship, find_related_entities, validate_knowledge, get_entity_graph (entity_tools.rs) - E11 Entity Integration
 //! - search_by_embedder, get_embedder_clusters, compare_embedder_views, list_embedder_indexes (embedder_tools.rs) - Constitution v6.3 Embedder-First Search
@@ -33,6 +34,7 @@ mod intent_tools;
 mod keyword_tools;
 mod memory_tools;
 mod query_type_detector;
+mod robustness_tools;
 mod sequence_tools;
 mod status_tools;
 mod temporal_tools;
@@ -48,5 +50,6 @@ pub mod entity_dtos;
 pub mod graph_dtos;
 pub mod intent_dtos;
 pub mod keyword_dtos;
+pub mod robustness_dtos;
 pub mod temporal_dtos;
 pub mod topic_dtos;

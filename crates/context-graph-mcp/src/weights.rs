@@ -64,10 +64,11 @@ pub const WEIGHT_PROFILES: &[(&str, [f32; NUM_EMBEDDERS])] = &[
 
     // Semantic Search: General queries - E1 primary, E5/E7/E10 supporting
     // Sum of weights = 1.0 (excluding temporal which are 0.0)
+    // E9 has minimal backup weight (0.02) for typo tolerance
     (
         "semantic_search",
         [
-            0.35, // E1_Semantic (primary)
+            0.33, // E1_Semantic (primary, reduced from 0.35 to make room for E9)
             0.0,  // E2_Temporal_Recent - NOT for semantic search
             0.0,  // E3_Temporal_Periodic - NOT for semantic search
             0.0,  // E4_Temporal_Positional - NOT for semantic search
@@ -75,7 +76,7 @@ pub const WEIGHT_PROFILES: &[(&str, [f32; NUM_EMBEDDERS])] = &[
             0.05, // E6_Sparse (keyword backup)
             0.20, // E7_Code
             0.05, // E8_Graph (relational)
-            0.0,  // E9_HDC (noise-robust backup, not in fusion)
+            0.02, // E9_HDC (noise-robust backup for typo tolerance)
             0.15, // E10_Multimodal
             0.05, // E11_Entity (relational)
             0.0,  // E12_Late_Interaction (Stage 3 rerank only)
@@ -293,6 +294,33 @@ pub const WEIGHT_PROFILES: &[(&str, [f32; NUM_EMBEDDERS])] = &[
             0.5 / 6.5,   // E11_Entity (RELATIONAL)
             0.0,         // E12_Late_Interaction (PIPELINE-STAGE - rerank only per AP-73)
             0.0,         // E13_SPLADE (PIPELINE-STAGE - recall only per AP-74)
+        ],
+    ),
+
+    // =========================================================================
+    // TYPO-TOLERANT PROFILE - E9 primary for noisy queries
+    // =========================================================================
+
+    // Typo Tolerant: For queries with potential spelling errors or variations
+    // Use when input may contain typos, misspellings, or character-level variations.
+    // E9 (HDC) uses character trigrams which preserve similarity despite spelling errors.
+    // Example: "authetication" matches "authentication" via character overlap.
+    (
+        "typo_tolerant",
+        [
+            0.30, // E1_Semantic (reduced - query might be noisy)
+            0.0,  // E2_Temporal_Recent - NOT for semantic search
+            0.0,  // E3_Temporal_Periodic - NOT for semantic search
+            0.0,  // E4_Temporal_Positional - NOT for semantic search
+            0.10, // E5_Causal
+            0.05, // E6_Sparse (keyword backup for exact matches)
+            0.15, // E7_Code (reduced to make room for E9)
+            0.03, // E8_Graph (relational)
+            0.15, // E9_HDC (PRIMARY for typo tolerance)
+            0.12, // E10_Multimodal
+            0.05, // E11_Entity (relational)
+            0.03, // E12_Late_Interaction (can help with phrase matching)
+            0.02, // E13_SPLADE (term expansion helps with variations)
         ],
     ),
 
@@ -549,8 +577,8 @@ mod tests {
         let semantic = get_weight_profile("semantic_search");
         assert!(semantic.is_some(), "semantic_search profile should exist");
         assert!(
-            (semantic.unwrap()[0] - 0.35).abs() < 0.001,
-            "E1 should be 0.35 in semantic_search profile"
+            (semantic.unwrap()[0] - 0.33).abs() < 0.001,
+            "E1 should be 0.33 in semantic_search profile"
         );
 
         let missing = get_weight_profile("nonexistent");
@@ -560,11 +588,88 @@ mod tests {
     }
 
     #[test]
+    fn test_typo_tolerant_profile_exists() {
+        let weights = get_weight_profile("typo_tolerant");
+        assert!(weights.is_some(), "typo_tolerant profile should exist");
+        println!("[VERIFIED] typo_tolerant profile exists");
+    }
+
+    #[test]
+    fn test_typo_tolerant_e9_is_primary() {
+        // E9 should have significant weight in typo_tolerant profile
+        let weights = get_weight_profile("typo_tolerant").unwrap();
+
+        // E9 should be >= 0.10 (substantial contribution)
+        assert!(
+            weights[8] >= 0.10,
+            "E9 should be >= 0.10 in typo_tolerant (got {})",
+            weights[8]
+        );
+
+        // E9 should be one of the highest weighted (top 3)
+        let mut indexed_weights: Vec<(usize, f32)> = weights.iter().cloned().enumerate().collect();
+        indexed_weights.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        let top_3_indices: Vec<usize> = indexed_weights.iter().take(3).map(|(i, _)| *i).collect();
+        assert!(
+            top_3_indices.contains(&8),
+            "E9 (index 8) should be in top 3 weights for typo_tolerant. Top 3: {:?}",
+            top_3_indices
+        );
+
+        println!(
+            "[VERIFIED] typo_tolerant has E9={:.2} as primary structural embedder",
+            weights[8]
+        );
+    }
+
+    #[test]
+    fn test_typo_tolerant_temporal_excluded() {
+        // Temporal embedders should still be excluded per AP-71
+        let weights = get_weight_profile("typo_tolerant").unwrap();
+
+        assert_eq!(
+            weights[1], 0.0,
+            "E2 should be 0.0 in typo_tolerant per AP-71"
+        );
+        assert_eq!(
+            weights[2], 0.0,
+            "E3 should be 0.0 in typo_tolerant per AP-71"
+        );
+        assert_eq!(
+            weights[3], 0.0,
+            "E4 should be 0.0 in typo_tolerant per AP-71"
+        );
+
+        println!("[VERIFIED] typo_tolerant excludes temporal embedders (E2-E4)");
+    }
+
+    #[test]
+    fn test_semantic_search_has_e9_backup() {
+        // semantic_search should have minimal E9 weight for typo backup
+        let weights = get_weight_profile("semantic_search").unwrap();
+
+        assert!(
+            weights[8] > 0.0,
+            "E9 should have non-zero weight in semantic_search for typo backup"
+        );
+        assert!(
+            weights[8] <= 0.05,
+            "E9 should have minimal weight (<=0.05) in semantic_search, got {}",
+            weights[8]
+        );
+
+        println!(
+            "[VERIFIED] semantic_search has E9={:.2} as backup",
+            weights[8]
+        );
+    }
+
+    #[test]
     fn test_temporal_embedders_excluded_from_semantic_profiles() {
         // Per AP-71: Temporal embedders (E2-E4) MUST NOT be used in similarity scoring
         // All semantic search profiles should have E2-E4 = 0.0
 
-        let semantic_profiles = ["semantic_search", "causal_reasoning", "code_search", "fact_checking", "category_weighted", "intent_search", "intent_enhanced"];
+        let semantic_profiles = ["semantic_search", "causal_reasoning", "code_search", "fact_checking", "category_weighted", "intent_search", "intent_enhanced", "typo_tolerant"];
 
         for profile_name in semantic_profiles {
             let weights = get_weight_profile(profile_name).expect(&format!(

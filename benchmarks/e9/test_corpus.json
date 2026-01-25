@@ -1,0 +1,284 @@
+{
+  "version": "1.0",
+  "description": "E9 HDC benchmark corpus for blind-spot detection testing",
+  "metadata": {
+    "created": "2026-01-25",
+    "purpose": "Measure E9 contribution to search quality via typo tolerance and cross-tokenization discovery"
+  },
+  "categories": {
+    "typo": {
+      "description": "Queries with common typos - E9 should find correct memories via character trigrams",
+      "expected_e9_contribution": ">=20%"
+    },
+    "code_id": {
+      "description": "Code identifiers with different naming conventions - E9 should bridge camelCase/snake_case",
+      "expected_e9_contribution": ">=15%"
+    },
+    "baseline": {
+      "description": "Clean queries - E9 should NOT add false discoveries",
+      "expected_false_positive_rate": "<=5%"
+    }
+  },
+  "queries": [
+    {
+      "id": "typo-001",
+      "category": "typo",
+      "query": "authetication",
+      "correct_form": "authentication",
+      "ground_truth_keywords": ["authentication", "auth failed", "auth error"],
+      "expected_e9_discovery": true,
+      "notes": "Missing 'n' - common typo"
+    },
+    {
+      "id": "typo-002",
+      "category": "typo",
+      "query": "configration",
+      "correct_form": "configuration",
+      "ground_truth_keywords": ["configuration", "config", "settings"],
+      "expected_e9_discovery": true,
+      "notes": "Missing 'u' - common typo"
+    },
+    {
+      "id": "typo-003",
+      "category": "typo",
+      "query": "implmentation",
+      "correct_form": "implementation",
+      "ground_truth_keywords": ["implementation", "implement", "impl"],
+      "expected_e9_discovery": true,
+      "notes": "Missing 'e' - common typo"
+    },
+    {
+      "id": "typo-004",
+      "category": "typo",
+      "query": "initalization",
+      "correct_form": "initialization",
+      "ground_truth_keywords": ["initialization", "init", "initialize"],
+      "expected_e9_discovery": true,
+      "notes": "Missing 'i' - common typo"
+    },
+    {
+      "id": "typo-005",
+      "category": "typo",
+      "query": "syncronization",
+      "correct_form": "synchronization",
+      "ground_truth_keywords": ["synchronization", "sync", "synchronize"],
+      "expected_e9_discovery": true,
+      "notes": "Missing 'h' - common typo"
+    },
+    {
+      "id": "typo-006",
+      "category": "typo",
+      "query": "enviroment",
+      "correct_form": "environment",
+      "ground_truth_keywords": ["environment", "env", "environ"],
+      "expected_e9_discovery": true,
+      "notes": "Missing 'n' - very common typo"
+    },
+    {
+      "id": "typo-007",
+      "category": "typo",
+      "query": "developement",
+      "correct_form": "development",
+      "ground_truth_keywords": ["development", "dev", "develop"],
+      "expected_e9_discovery": true,
+      "notes": "Extra 'e' - common typo"
+    },
+    {
+      "id": "typo-008",
+      "category": "typo",
+      "query": "maintainance",
+      "correct_form": "maintenance",
+      "ground_truth_keywords": ["maintenance", "maintain"],
+      "expected_e9_discovery": true,
+      "notes": "Common misspelling"
+    },
+    {
+      "id": "typo-009",
+      "category": "typo",
+      "query": "occured",
+      "correct_form": "occurred",
+      "ground_truth_keywords": ["occurred", "occur", "occurrence"],
+      "expected_e9_discovery": true,
+      "notes": "Missing 'r' - very common typo"
+    },
+    {
+      "id": "typo-010",
+      "category": "typo",
+      "query": "recieve",
+      "correct_form": "receive",
+      "ground_truth_keywords": ["receive", "received", "receiver"],
+      "expected_e9_discovery": true,
+      "notes": "i/e swap - classic misspelling"
+    },
+    {
+      "id": "code-001",
+      "category": "code_id",
+      "query": "parseConfig",
+      "target_conventions": ["parse_config", "ParseConfig", "PARSE_CONFIG"],
+      "ground_truth_keywords": ["parse_config", "ParseConfig", "config parser"],
+      "expected_e9_discovery": true,
+      "notes": "camelCase query should find snake_case"
+    },
+    {
+      "id": "code-002",
+      "category": "code_id",
+      "query": "getUserProfile",
+      "target_conventions": ["get_user_profile", "GetUserProfile"],
+      "ground_truth_keywords": ["get_user_profile", "user profile", "GetUserProfile"],
+      "expected_e9_discovery": true,
+      "notes": "camelCase query should find snake_case"
+    },
+    {
+      "id": "code-003",
+      "category": "code_id",
+      "query": "handle_error",
+      "target_conventions": ["handleError", "HandleError"],
+      "ground_truth_keywords": ["handleError", "HandleError", "error handler"],
+      "expected_e9_discovery": true,
+      "notes": "snake_case query should find camelCase"
+    },
+    {
+      "id": "code-004",
+      "category": "code_id",
+      "query": "process_data",
+      "target_conventions": ["processData", "ProcessData"],
+      "ground_truth_keywords": ["processData", "ProcessData", "data processor"],
+      "expected_e9_discovery": true,
+      "notes": "snake_case query should find camelCase"
+    },
+    {
+      "id": "code-005",
+      "category": "code_id",
+      "query": "validateInput",
+      "target_conventions": ["validate_input", "ValidateInput"],
+      "ground_truth_keywords": ["validate_input", "input validation"],
+      "expected_e9_discovery": true,
+      "notes": "camelCase query should find snake_case"
+    },
+    {
+      "id": "code-006",
+      "category": "code_id",
+      "query": "serialize_json",
+      "target_conventions": ["serializeJson", "SerializeJson"],
+      "ground_truth_keywords": ["serializeJson", "json serializer"],
+      "expected_e9_discovery": true,
+      "notes": "snake_case query should find camelCase"
+    },
+    {
+      "id": "code-007",
+      "category": "code_id",
+      "query": "createConnection",
+      "target_conventions": ["create_connection", "CreateConnection"],
+      "ground_truth_keywords": ["create_connection", "connection factory"],
+      "expected_e9_discovery": true,
+      "notes": "camelCase query should find snake_case"
+    },
+    {
+      "id": "code-008",
+      "category": "code_id",
+      "query": "build_query",
+      "target_conventions": ["buildQuery", "BuildQuery"],
+      "ground_truth_keywords": ["buildQuery", "query builder"],
+      "expected_e9_discovery": true,
+      "notes": "snake_case query should find camelCase"
+    },
+    {
+      "id": "code-009",
+      "category": "code_id",
+      "query": "fetchResults",
+      "target_conventions": ["fetch_results", "FetchResults"],
+      "ground_truth_keywords": ["fetch_results", "result fetcher"],
+      "expected_e9_discovery": true,
+      "notes": "camelCase query should find snake_case"
+    },
+    {
+      "id": "code-010",
+      "category": "code_id",
+      "query": "update_cache",
+      "target_conventions": ["updateCache", "UpdateCache"],
+      "ground_truth_keywords": ["updateCache", "cache updater"],
+      "expected_e9_discovery": true,
+      "notes": "snake_case query should find camelCase"
+    },
+    {
+      "id": "baseline-001",
+      "category": "baseline",
+      "query": "authentication",
+      "ground_truth_keywords": ["authentication", "auth"],
+      "expected_e9_discovery": false,
+      "notes": "Clean query - E1 should find it, E9 should NOT add false discoveries"
+    },
+    {
+      "id": "baseline-002",
+      "category": "baseline",
+      "query": "database connection",
+      "ground_truth_keywords": ["database", "connection", "db"],
+      "expected_e9_discovery": false,
+      "notes": "Clean query - E1 should handle semantic matching"
+    },
+    {
+      "id": "baseline-003",
+      "category": "baseline",
+      "query": "error handling",
+      "ground_truth_keywords": ["error", "handling", "exception"],
+      "expected_e9_discovery": false,
+      "notes": "Clean query - E1 should find it"
+    },
+    {
+      "id": "baseline-004",
+      "category": "baseline",
+      "query": "user session",
+      "ground_truth_keywords": ["user", "session", "login"],
+      "expected_e9_discovery": false,
+      "notes": "Clean query - E1 should find it"
+    },
+    {
+      "id": "baseline-005",
+      "category": "baseline",
+      "query": "API endpoint",
+      "ground_truth_keywords": ["API", "endpoint", "REST"],
+      "expected_e9_discovery": false,
+      "notes": "Clean query - E1 should find it"
+    },
+    {
+      "id": "baseline-006",
+      "category": "baseline",
+      "query": "memory allocation",
+      "ground_truth_keywords": ["memory", "allocation", "heap"],
+      "expected_e9_discovery": false,
+      "notes": "Clean query - E1 should find it"
+    },
+    {
+      "id": "baseline-007",
+      "category": "baseline",
+      "query": "thread safety",
+      "ground_truth_keywords": ["thread", "safety", "concurrent"],
+      "expected_e9_discovery": false,
+      "notes": "Clean query - E1 should find it"
+    },
+    {
+      "id": "baseline-008",
+      "category": "baseline",
+      "query": "performance optimization",
+      "ground_truth_keywords": ["performance", "optimization", "speed"],
+      "expected_e9_discovery": false,
+      "notes": "Clean query - E1 should find it"
+    },
+    {
+      "id": "baseline-009",
+      "category": "baseline",
+      "query": "unit testing",
+      "ground_truth_keywords": ["unit", "testing", "test"],
+      "expected_e9_discovery": false,
+      "notes": "Clean query - E1 should find it"
+    },
+    {
+      "id": "baseline-010",
+      "category": "baseline",
+      "query": "dependency injection",
+      "ground_truth_keywords": ["dependency", "injection", "DI"],
+      "expected_e9_discovery": false,
+      "notes": "Clean query - E1 should find it"
+    }
+  ]
+}

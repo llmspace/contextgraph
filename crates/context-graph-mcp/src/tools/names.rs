@@ -60,6 +60,11 @@ pub const SEARCH_BY_KEYWORDS: &str = "search_by_keywords";
 // ========== CODE TOOLS (E7 Code Search Enhancement) ==========
 pub const SEARCH_CODE: &str = "search_code";
 
+// ========== ROBUSTNESS TOOLS (E9 HDC Blind-Spot Detection) ==========
+// E9 finds what E1 misses: typos, code identifiers, character-level variations.
+// Uses blind-spot detection: surfaces results with high E9 + low E1 scores.
+pub const SEARCH_ROBUST: &str = "search_robust";
+
 // ========== ENTITY TOOLS (E11 Entity Integration) ==========
 pub const EXTRACT_ENTITIES: &str = "extract_entities";
 pub const SEARCH_BY_ENTITIES: &str = "search_by_entities";

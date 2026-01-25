@@ -48,6 +48,7 @@ mod initialize;
 mod manual_fsv_verification;
 #[cfg(feature = "cuda")]
 mod mcp_protocol_e2e_test;
+mod robustness_fsv;
 #[cfg(feature = "cuda")]
 mod search_periodic_test;
 mod semantic_search_skill_verification;

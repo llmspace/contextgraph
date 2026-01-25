@@ -1,10 +1,11 @@
-//! Tool definitions per PRD v6 Section 10 (40 tools total).
+//! Tool definitions per PRD v6 Section 10 (41 tools total).
 //!
 //! Includes 18 original tools plus 4 sequence tools for E4 integration
 //! plus 2 causal tools for E5 Priority 1 enhancement
 //! plus 1 keyword tool for E6 keyword search enhancement
 //! plus 1 code tool for E7 code search enhancement
 //! plus 2 graph tools for E8 upgrade (Phase 4)
+//! plus 1 robustness tool for E9 typo-tolerant search
 //! plus 2 intent tools for E10 upgrade (search_by_intent, find_contextual_matches)
 //! plus 6 entity tools for E11 integration (extract, search, infer, find, validate, graph)
 //! plus 4 embedder-first search tools for Constitution v6.3
@@ -21,6 +22,7 @@ pub(crate) mod graph;
 pub(crate) mod intent;
 pub(crate) mod keyword;
 pub(crate) mod merge;
+pub(crate) mod robustness;
 pub(crate) mod sequence;
 pub(crate) mod temporal;
 pub(crate) mod topic;
@@ -29,7 +31,7 @@ use crate::tools::types::ToolDefinition;
 
 /// Get all tool definitions for the `tools/list` response.
 pub fn get_tool_definitions() -> Vec<ToolDefinition> {
-    let mut tools = Vec::with_capacity(40);
+    let mut tools = Vec::with_capacity(41);
 
     // Core tools (5)
     tools.extend(core::definitions());
@@ -61,6 +63,9 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
     // Graph tools (2) - E8 upgrade (Phase 4)
     tools.extend(graph::definitions());
 
+    // Robustness tools (1) - E9 typo-tolerant search
+    tools.extend(robustness::definitions());
+
     // Intent tools (2) - E10 upgrade (search_by_intent, find_contextual_matches)
     tools.extend(intent::definitions());
 
@@ -82,8 +87,8 @@ mod tests {
 
     #[test]
     fn test_total_tool_count() {
-        // 40 tools: 34 base + 4 embedder-first search tools + 2 temporal tools
-        assert_eq!(get_tool_definitions().len(), 40);
+        // 41 tools: 34 base + 4 embedder-first + 2 temporal + 1 robustness
+        assert_eq!(get_tool_definitions().len(), 41);
     }
 
     #[test]
@@ -128,6 +133,8 @@ mod tests {
             // Graph tools (2) - E8 upgrade (Phase 4)
             "search_connections",
             "get_graph_path",
+            // Robustness tools (1) - E9 typo-tolerant search
+            "search_robust",
             // Intent tools (2) - E10 upgrade
             "search_by_intent",
             "find_contextual_matches",
@@ -191,6 +198,7 @@ mod tests {
         assert_eq!(keyword::definitions().len(), 1);
         assert_eq!(code::definitions().len(), 1);
         assert_eq!(graph::definitions().len(), 2);
+        assert_eq!(robustness::definitions().len(), 1); // E9 typo-tolerant search
         assert_eq!(intent::definitions().len(), 2);
         assert_eq!(entity::definitions().len(), 6);
         assert_eq!(embedder::definitions().len(), 4); // Constitution v6.3 embedder-first search
