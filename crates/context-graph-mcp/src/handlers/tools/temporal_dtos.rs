@@ -1,7 +1,8 @@
-//! DTOs for temporal search tools (E2 V_freshness).
+//! DTOs for temporal search tools (E2 V_freshness, E3 V_periodicity).
 //!
 //! Per Constitution v6.5 and ARCH-25:
 //! - E2 (V_freshness) finds recency patterns
+//! - E3 (V_periodicity) finds time-of-day and day-of-week patterns
 //! - Temporal boost is POST-RETRIEVAL only, NOT in similarity fusion
 
 use serde::{Deserialize, Serialize};
@@ -233,5 +234,130 @@ pub fn format_age(memory_ts_ms: i64, now_ms: i64) -> String {
         format!("{} days ago", age_days)
     } else {
         format!("{} weeks ago", age_days / 7)
+    }
+}
+
+// =============================================================================
+// E3 V_PERIODICITY - search_periodic DTOs
+// =============================================================================
+
+/// Parameters for search_periodic tool.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchPeriodicParams {
+    /// The search query text.
+    pub query: String,
+
+    /// Maximum number of results (default: 10).
+    #[serde(default = "default_top_k")]
+    pub top_k: usize,
+
+    /// Target hour of day (0-23).
+    /// If omitted and auto_detect=true, uses current hour.
+    pub target_hour: Option<u8>,
+
+    /// Target day of week (0=Sunday, 6=Saturday).
+    /// If omitted and auto_detect=true, uses current day.
+    pub target_day_of_week: Option<u8>,
+
+    /// Auto-detect target from current time.
+    #[serde(default)]
+    pub auto_detect: bool,
+
+    /// Periodic boost weight [0.1, 1.0] (default: 0.3).
+    #[serde(default = "default_periodic_weight")]
+    pub periodic_weight: f32,
+
+    /// Include content in results (default: true).
+    #[serde(default = "default_true")]
+    pub include_content: bool,
+
+    /// Minimum semantic similarity threshold (default: 0.1).
+    #[serde(default = "default_min_similarity")]
+    pub min_similarity: f32,
+}
+
+fn default_periodic_weight() -> f32 {
+    0.3
+}
+
+/// Result entry for search_periodic.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PeriodicSearchResultEntry {
+    /// Memory ID.
+    pub id: String,
+
+    /// Original semantic similarity score.
+    pub semantic_score: f32,
+
+    /// Periodic pattern match score [0.0, 1.0].
+    pub periodic_score: f32,
+
+    /// Final boosted score.
+    pub final_score: f32,
+
+    /// Memory's hour of creation (0-23).
+    pub memory_hour: u8,
+
+    /// Memory's day of week (0=Sunday, 6=Saturday).
+    pub memory_day_of_week: u8,
+
+    /// Day name for readability.
+    pub day_name: String,
+
+    /// Content text (if requested).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+
+    /// Created at timestamp (ISO 8601).
+    pub created_at: String,
+}
+
+/// Response for search_periodic.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchPeriodicResponse {
+    /// Query that was executed.
+    pub query: String,
+
+    /// Results sorted by final score.
+    pub results: Vec<PeriodicSearchResultEntry>,
+
+    /// Number of results.
+    pub count: usize,
+
+    /// Periodic configuration used.
+    pub periodic_config: PeriodicConfigSummary,
+}
+
+/// Summary of periodic configuration used.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PeriodicConfigSummary {
+    /// Target hour used (if any).
+    pub target_hour: Option<u8>,
+
+    /// Target day of week used (if any).
+    pub target_day_of_week: Option<u8>,
+
+    /// Periodic boost weight used.
+    pub periodic_weight: f32,
+
+    /// Whether auto-detect was used.
+    pub auto_detected: bool,
+}
+
+/// Convert day-of-week number to name.
+pub fn day_name(dow: u8) -> &'static str {
+    match dow {
+        0 => "Sunday",
+        1 => "Monday",
+        2 => "Tuesday",
+        3 => "Wednesday",
+        4 => "Thursday",
+        5 => "Friday",
+        6 => "Saturday",
+        _ => "Unknown",
     }
 }

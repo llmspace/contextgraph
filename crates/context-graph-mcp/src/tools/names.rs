@@ -81,6 +81,7 @@ pub const GET_EMBEDDER_CLUSTERS: &str = "get_embedder_clusters";
 pub const COMPARE_EMBEDDER_VIEWS: &str = "compare_embedder_views";
 pub const LIST_EMBEDDER_INDEXES: &str = "list_embedder_indexes";
 
-// ========== TEMPORAL TOOLS (E2 V_freshness Integration) ==========
-// Temporal search with E2 recency boost applied POST-retrieval per ARCH-25.
+// ========== TEMPORAL TOOLS (E2/E3 Integration) ==========
+// Temporal search with E2/E3 boost applied POST-retrieval per ARCH-25.
 pub const SEARCH_RECENT: &str = "search_recent";
+pub const SEARCH_PERIODIC: &str = "search_periodic";

@@ -178,9 +178,13 @@ impl Handlers {
                     None
                 };
 
+                // Use the selected embedder's score from embedder_scores array
+                // instead of cand.similarity (which is always E1's score)
+                let selected_score = cand.embedder_scores[embedder_index];
+
                 EmbedderSearchResult {
                     memory_id: cand.fingerprint.id,
-                    similarity: cand.similarity,
+                    similarity: selected_score,
                     content,
                     all_scores,
                 }
@@ -460,15 +464,21 @@ impl Handlers {
             let mut results_list: Vec<(Uuid, f32)> = Vec::new();
             let mut ranked_memories: Vec<RankedMemory> = Vec::new();
 
+            // Get the embedder index for extracting the correct score
+            let embedder_index = embedder_id.to_index();
+
             for (rank, cand) in candidates.iter().enumerate() {
                 let memory_id = cand.fingerprint.id;
+                // Use the selected embedder's score from embedder_scores array
+                // instead of cand.similarity (which is always E1's score)
+                let selected_score = cand.embedder_scores[embedder_index];
                 memory_set.insert(memory_id);
-                results_list.push((memory_id, cand.similarity));
+                results_list.push((memory_id, selected_score));
 
                 ranked_memories.push(RankedMemory {
                     memory_id,
                     rank: rank + 1,
-                    similarity: cand.similarity,
+                    similarity: selected_score,
                     content: None, // Content would be fetched if include_content=true
                 });
             }

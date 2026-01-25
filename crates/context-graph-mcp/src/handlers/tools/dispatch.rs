@@ -152,8 +152,9 @@ impl Handlers {
                 self.call_list_embedder_indexes(id, arguments).await
             }
 
-            // ========== TEMPORAL TOOLS (E2 V_freshness Integration) ==========
+            // ========== TEMPORAL TOOLS (E2/E3 Integration) ==========
             tool_names::SEARCH_RECENT => self.call_search_recent(id, arguments).await,
+            tool_names::SEARCH_PERIODIC => self.call_search_periodic(id, arguments).await,
 
             // Unknown tool
             _ => JsonRpcResponse::error(
