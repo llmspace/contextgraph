@@ -28,13 +28,14 @@ mod embedder_edge;
 mod error;
 mod knn_graph;
 mod nn_descent;
+pub mod service;
 mod storage_keys;
 mod thresholds;
 mod typed_edge;
 
 // Re-exports
 pub use direction::DirectedRelation;
-pub use edge_builder::{EdgeBuilder, EdgeBuilderConfig, EdgeBuilderStats};
+pub use edge_builder::{EdgeBuilder, EdgeBuilderConfig, EdgeBuilderStats, DEFAULT_EMBEDDER_THRESHOLDS};
 pub use edge_type::GraphLinkEdgeType;
 pub use embedder_edge::EmbedderEdge;
 pub use error::{EdgeError, EdgeResult};

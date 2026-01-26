@@ -114,9 +114,8 @@ async fn test_e2e_tools_list_all_12_tools() {
         .as_array()
         .expect("tools must be array");
 
-    // Expected 12 tools per CLAUDE.md
+    // Expected 11 tools per CLAUDE.md (inject_context merged into store_memory)
     let expected_tools: HashSet<&str> = [
-        "inject_context",
         "store_memory",
         "get_memetic_status",
         "search_graph",
@@ -158,8 +157,8 @@ async fn test_e2e_tools_list_all_12_tools() {
     }
 
     assert!(
-        tools.len() >= 12,
-        "Expected at least 12 tools, found {}",
+        tools.len() >= 11,
+        "Expected at least 11 tools, found {}",
         tools.len()
     );
 
@@ -175,10 +174,12 @@ async fn test_e2e_core_tools_workflow() {
     let (handlers, store, _tempdir) =
         create_test_handlers_with_real_embeddings_store_access().await;
 
-    // STEP 1: inject_context - Store first memory with GPU embeddings
-    println!("\n--- STEP 1: inject_context ---");
+    // STEP 1: store_memory (with rationale) - Store first memory with GPU embeddings
+    // Note: inject_context was merged into store_memory. When rationale is provided,
+    // the same validation and response format is used.
+    println!("\n--- STEP 1: store_memory (with rationale) ---");
     let inject_params = json!({
-        "name": "inject_context",
+        "name": "store_memory",
         "arguments": {
             "content": "Rust programming language features async/await patterns",
             "rationale": "Testing end-to-end MCP protocol with real GPU embeddings",
@@ -194,13 +195,13 @@ async fn test_e2e_core_tools_workflow() {
 
     assert!(
         inject_response.error.is_none(),
-        "inject_context must not return JSON-RPC error: {:?}",
+        "store_memory must not return JSON-RPC error: {:?}",
         inject_response.error
     );
 
     let inject_result = inject_response
         .result
-        .expect("inject_context must return result");
+        .expect("store_memory must return result");
     let inject_data = extract_mcp_tool_data(&inject_result);
 
     let fingerprint_id1 = inject_data
@@ -650,10 +651,11 @@ async fn test_e2e_curation_tools_workflow() {
 }
 
 /// Complete E2E test covering all tools.
+/// Note: 11 tools now (inject_context merged into store_memory)
 #[tokio::test]
 #[cfg(feature = "cuda")]
-async fn test_e2e_all_12_tools_callable() {
-    println!("\n=== E2E TEST: All 12 Tools Callable with GPU ===");
+async fn test_e2e_all_11_tools_callable() {
+    println!("\n=== E2E TEST: All 11 Tools Callable with GPU ===");
 
     let (handlers, _store, _tempdir) =
         create_test_handlers_with_real_embeddings_store_access().await;
@@ -738,11 +740,11 @@ async fn test_e2e_all_12_tools_callable() {
         .and_then(|id| id.as_str().map(String::from))
         .unwrap_or_else(|| "00000000-0000-0000-0000-000000000000".to_string());
 
-    // Core tools (5)
+    // Core tools (4 - inject_context merged into store_memory)
     println!("\n--- Core Tools ---");
     if call_tool(
         &handlers,
-        "inject_context",
+        "store_memory",
         json!({
             "content": "E2E test content",
             "rationale": "Testing all tools"
@@ -750,7 +752,7 @@ async fn test_e2e_all_12_tools_callable() {
     )
     .await
     {
-        successful_tools.insert("inject_context");
+        successful_tools.insert("store_memory");
     }
     if call_tool(&handlers, "get_memetic_status", json!({})).await {
         successful_tools.insert("get_memetic_status");
@@ -857,12 +859,12 @@ async fn test_e2e_all_12_tools_callable() {
 
     // Summary
     println!("\n=== SUMMARY ===");
-    println!("Successful tools: {}/12", successful_tools.len());
+    println!("Successful tools: {}/11", successful_tools.len());
     for tool in &successful_tools {
         println!("  ✓ {}", tool);
     }
 
-    let expected = 12;
+    let expected = 11;
     let actual = successful_tools.len();
     assert!(
         actual >= expected,
@@ -871,7 +873,7 @@ async fn test_e2e_all_12_tools_callable() {
         actual
     );
 
-    println!("\n=== ALL 12 TOOLS CALLABLE ===\n");
+    println!("\n=== ALL 11 TOOLS CALLABLE ===\n");
 }
 
 // =============================================================================
@@ -891,14 +893,14 @@ fn evidence_of_e2e_test_coverage() {
     println!("===============================================================================");
     println!("Tests Implemented:");
     println!("  1. test_e2e_mcp_handshake_with_gpu - Full MCP handshake verification");
-    println!("  2. test_e2e_tools_list_all_12_tools - Verify all 12 tools listed");
+    println!("  2. test_e2e_tools_list_all_12_tools - Verify all 11 tools listed");
     println!("  3. test_e2e_core_tools_workflow - Core tools with FSV");
     println!("  4. test_e2e_topic_tools_workflow - Topic detection tools");
     println!("  5. test_e2e_curation_tools_workflow - Memory curation tools");
     println!("  6. test_e2e_all_12_tools_callable - Complete tool coverage");
     println!("===============================================================================");
-    println!("12 MCP Tools Covered:");
-    println!("  Core (5): inject_context, store_memory, get_memetic_status,");
+    println!("11 MCP Tools Covered (inject_context merged into store_memory):");
+    println!("  Core (4): store_memory, get_memetic_status,");
     println!("            search_graph, trigger_consolidation");
     println!("  Topic (4): get_topic_portfolio, get_topic_stability,");
     println!("             detect_topics, get_divergence_alerts");

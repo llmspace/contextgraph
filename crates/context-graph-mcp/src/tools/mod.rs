@@ -9,9 +9,12 @@
 //! - `names`: Tool name constants for dispatch matching
 //! - `registry`: Centralized tool registry with O(1) lookup
 //! - `definitions`: Tool definitions organized by category
-//!   - `core`: Core tools (inject_context, store_memory, search_graph, get_memetic_status)
+//!   - `core`: Core tools (store_memory, search_graph, get_memetic_status)
 //!   - `topic`: Topic tools (get_topic_portfolio, get_topic_stability, detect_topics, get_divergence_alerts)
 //!   - `curation`: Curation tools (merge_concepts, forget_concept, boost_importance)
+//!
+//! Note: inject_context was merged into store_memory. When rationale is provided,
+//! the same validation (1-1024 chars) and response format is used.
 
 pub mod aliases;
 pub mod definitions;
@@ -30,18 +33,20 @@ mod tests {
     fn test_tool_definition_serialization() {
         let tools = get_tool_definitions();
         let json = serde_json::to_string(&tools).unwrap();
-        assert!(json.contains("inject_context"));
+        assert!(json.contains("store_memory"));
         assert!(json.contains("inputSchema"));
     }
 
     #[test]
-    fn test_inject_context_schema() {
+    fn test_store_memory_schema() {
         let tools = get_tool_definitions();
-        let inject = tools.iter().find(|t| t.name == "inject_context").unwrap();
+        let store = tools.iter().find(|t| t.name == "store_memory").unwrap();
 
-        let schema = &inject.input_schema;
+        let schema = &store.input_schema;
         let required = schema.get("required").unwrap().as_array().unwrap();
         assert!(required.iter().any(|v| v.as_str() == Some("content")));
-        assert!(required.iter().any(|v| v.as_str() == Some("rationale")));
+        // rationale is optional now (merged from inject_context)
+        let props = schema.get("properties").unwrap().as_object().unwrap();
+        assert!(props.contains_key("rationale"));
     }
 }

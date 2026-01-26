@@ -277,9 +277,24 @@ impl Handlers {
             .map(String::from)
             .or_else(|| self.get_session_id());
 
+        // Handle missing session ID gracefully - return empty timeline with explanation
         let session_id = match session_id {
             Some(sid) => sid,
-            None => return self.tool_error(id, "No session ID available"),
+            None => {
+                debug!("get_session_timeline: No session ID available, returning empty timeline");
+                return self.tool_result(
+                    id,
+                    json!({
+                        "sessionId": null,
+                        "timeline": [],
+                        "count": 0,
+                        "currentSequence": self.current_sequence(),
+                        "offset": 0,
+                        "limit": 50,
+                        "message": "No session ID available. Set CLAUDE_SESSION_ID environment variable or pass sessionId parameter."
+                    }),
+                );
+            }
         };
 
         // Parse and validate limit (FAIL FAST)
@@ -620,9 +635,35 @@ impl Handlers {
             .map(String::from)
             .or_else(|| self.get_session_id());
 
+        // Handle missing session ID gracefully - return empty comparison with explanation
         let session_id = match session_id {
             Some(sid) => sid,
-            None => return self.tool_error(id, "No session ID available"),
+            None => {
+                let current_seq = self.current_sequence();
+                debug!("compare_session_states: No session ID available, returning empty comparison");
+                return self.tool_result(
+                    id,
+                    json!({
+                        "sessionId": null,
+                        "beforeState": {
+                            "sequenceRange": [0, 0],
+                            "memoryCount": 0,
+                            "sourceTypeCounts": {}
+                        },
+                        "afterState": {
+                            "sequenceRange": [0, 0],
+                            "memoryCount": 0,
+                            "sourceTypeCounts": {}
+                        },
+                        "difference": {
+                            "addedMemories": 0,
+                            "sequenceSpan": 0
+                        },
+                        "currentSequence": current_seq,
+                        "message": "No session ID available. Set CLAUDE_SESSION_ID environment variable or pass sessionId parameter."
+                    }),
+                );
+            }
         };
 
         // Parse beforeSequence

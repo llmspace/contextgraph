@@ -93,11 +93,11 @@ impl Default for ToolRegistry {
 ///
 /// Uses existing definitions from tools/definitions/ modules.
 ///
-/// 20 tools are exposed:
+/// 19 tools are exposed (inject_context merged into store_memory):
 ///
 /// | Category | Count | Source |
 /// |----------|-------|--------|
-/// | Core | 5 | definitions/core.rs |
+/// | Core | 4 | definitions/core.rs |
 /// | Merge | 1 | definitions/merge.rs |
 /// | Curation | 2 | definitions/curation.rs |
 /// | Topic | 4 | definitions/topic.rs |
@@ -108,7 +108,8 @@ pub fn register_all_tools() -> ToolRegistry {
 
     let mut registry = ToolRegistry::new();
 
-    // Register core tools (5): inject_context, store_memory, get_memetic_status, search_graph, trigger_consolidation
+    // Register core tools (4): store_memory, get_memetic_status, search_graph, trigger_consolidation
+    // Note: inject_context was merged into store_memory
     for tool in definitions::core::definitions() {
         registry.register(tool);
     }
@@ -138,11 +139,12 @@ pub fn register_all_tools() -> ToolRegistry {
         registry.register(tool);
     }
 
-    // Verify expected tool count (16 original + 4 sequence = 20 total)
+    // Verify expected tool count (15 original + 4 sequence = 19 total)
+    // Note: inject_context merged into store_memory, reducing count by 1
     let actual_count = registry.len();
     assert_eq!(
-        actual_count, 20,
-        "Expected 20 tools (16 original + 4 sequence), got {}. Check definitions modules.",
+        actual_count, 19,
+        "Expected 19 tools (15 original + 4 sequence), got {}. Check definitions modules.",
         actual_count
     );
 
@@ -164,8 +166,8 @@ mod tests {
     #[test]
     fn test_register_all_tools_count() {
         let registry = register_all_tools();
-        // 16 original tools + 4 sequence tools = 20 total
-        assert_eq!(registry.len(), 20, "Must have exactly 20 tools (16 original + 4 sequence)");
+        // 15 original tools + 4 sequence tools = 19 total (inject_context merged into store_memory)
+        assert_eq!(registry.len(), 19, "Must have exactly 19 tools (15 original + 4 sequence)");
     }
 
     #[test]
@@ -180,8 +182,8 @@ mod tests {
     #[test]
     fn test_get_returns_tool_definition() {
         let registry = register_all_tools();
-        let tool = registry.get("inject_context").expect("Must exist");
-        assert_eq!(tool.name, "inject_context");
+        let tool = registry.get("store_memory").expect("Must exist");
+        assert_eq!(tool.name, "store_memory");
     }
 
     #[test]
@@ -194,8 +196,8 @@ mod tests {
     fn test_list_returns_all_tools_sorted() {
         let registry = register_all_tools();
         let tools = registry.list();
-        // 16 original tools + 4 sequence tools = 20 total
-        assert_eq!(tools.len(), 20);
+        // 15 original tools + 4 sequence tools = 19 total (inject_context merged into store_memory)
+        assert_eq!(tools.len(), 19);
 
         for i in 1..tools.len() {
             assert!(tools[i - 1].name <= tools[i].name);
@@ -203,11 +205,10 @@ mod tests {
     }
 
     #[test]
-    fn test_all_20_tools_registered() {
+    fn test_all_19_tools_registered() {
         let registry = register_all_tools();
         let expected_tools = [
-            // Core (5)
-            "inject_context",
+            // Core (4 - inject_context merged into store_memory)
             "store_memory",
             "get_memetic_status",
             "search_graph",

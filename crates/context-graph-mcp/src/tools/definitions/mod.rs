@@ -1,15 +1,17 @@
-//! Tool definitions per PRD v6 Section 10 (41 tools total).
+//! Tool definitions per PRD v6 Section 10 (43 tools total).
 //!
-//! Includes 18 original tools plus 4 sequence tools for E4 integration
+//! Includes 17 original tools (inject_context merged into store_memory)
+//! plus 4 sequence tools for E4 integration
 //! plus 2 causal tools for E5 Priority 1 enhancement
 //! plus 1 keyword tool for E6 keyword search enhancement
 //! plus 1 code tool for E7 code search enhancement
 //! plus 2 graph tools for E8 upgrade (Phase 4)
 //! plus 1 robustness tool for E9 typo-tolerant search
-//! plus 2 intent tools for E10 upgrade (search_by_intent, find_contextual_matches)
+//! plus 1 intent tool for E10 upgrade (search_by_intent - merged with find_contextual_matches)
 //! plus 6 entity tools for E11 integration (extract, search, infer, find, validate, graph)
 //! plus 4 embedder-first search tools for Constitution v6.3
-//! plus 2 temporal tools for E2/E3 (search_recent, search_periodic).
+//! plus 2 temporal tools for E2/E3 (search_recent, search_periodic)
+//! plus 4 graph linking tools (get_memory_neighbors, get_typed_edges, traverse_graph, get_unified_neighbors).
 
 pub(crate) mod causal;
 pub(crate) mod code;
@@ -19,6 +21,7 @@ pub(crate) mod embedder;
 pub(crate) mod entity;
 pub(crate) mod file_watcher;
 pub(crate) mod graph;
+pub(crate) mod graph_link;
 pub(crate) mod intent;
 pub(crate) mod keyword;
 pub(crate) mod merge;
@@ -31,9 +34,9 @@ use crate::tools::types::ToolDefinition;
 
 /// Get all tool definitions for the `tools/list` response.
 pub fn get_tool_definitions() -> Vec<ToolDefinition> {
-    let mut tools = Vec::with_capacity(41);
+    let mut tools = Vec::with_capacity(43);
 
-    // Core tools (5)
+    // Core tools (4 - inject_context merged into store_memory)
     tools.extend(core::definitions());
 
     // Merge tool (1 - part of curation)
@@ -66,7 +69,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
     // Robustness tools (1) - E9 typo-tolerant search
     tools.extend(robustness::definitions());
 
-    // Intent tools (2) - E10 upgrade (search_by_intent, find_contextual_matches)
+    // Intent tools (1) - E10 upgrade (search_by_intent - merged with find_contextual_matches)
     tools.extend(intent::definitions());
 
     // Entity tools (6) - E11 integration
@@ -78,6 +81,9 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
     // Temporal tools (2) - E2 recency search, E3 periodic search
     tools.extend(temporal::definitions());
 
+    // Graph linking tools (3) - K-NN navigation and typed edges
+    tools.extend(graph_link::definitions());
+
     tools
 }
 
@@ -87,8 +93,9 @@ mod tests {
 
     #[test]
     fn test_total_tool_count() {
-        // 41 tools: 34 base + 4 embedder-first + 2 temporal + 1 robustness
-        assert_eq!(get_tool_definitions().len(), 41);
+        // 43 tools: 32 base + 4 embedder-first + 2 temporal + 1 robustness + 4 graph linking
+        // (Note: find_contextual_matches merged into search_by_intent, inject_context merged into store_memory)
+        assert_eq!(get_tool_definitions().len(), 43);
     }
 
     #[test]
@@ -97,8 +104,7 @@ mod tests {
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
 
         let expected = [
-            // Core tools (5)
-            "inject_context",
+            // Core tools (4 - inject_context merged into store_memory)
             "store_memory",
             "get_memetic_status",
             "search_graph",
@@ -135,9 +141,8 @@ mod tests {
             "get_graph_path",
             // Robustness tools (1) - E9 typo-tolerant search
             "search_robust",
-            // Intent tools (2) - E10 upgrade
+            // Intent tools (1) - E10 upgrade (find_contextual_matches merged into search_by_intent)
             "search_by_intent",
-            "find_contextual_matches",
             // Entity tools (6) - E11 integration
             "extract_entities",
             "search_by_entities",
@@ -153,6 +158,11 @@ mod tests {
             // Temporal tools (2) - E2 recency search, E3 periodic search
             "search_recent",
             "search_periodic",
+            // Graph linking tools (4) - K-NN navigation and typed edges
+            "get_memory_neighbors",
+            "get_typed_edges",
+            "traverse_graph",
+            "get_unified_neighbors",
         ];
 
         for name in expected {
@@ -188,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_submodule_counts() {
-        assert_eq!(core::definitions().len(), 5);
+        assert_eq!(core::definitions().len(), 4); // inject_context merged into store_memory
         assert_eq!(merge::definitions().len(), 1);
         assert_eq!(curation::definitions().len(), 2);
         assert_eq!(topic::definitions().len(), 4);
@@ -199,9 +209,10 @@ mod tests {
         assert_eq!(code::definitions().len(), 1);
         assert_eq!(graph::definitions().len(), 2);
         assert_eq!(robustness::definitions().len(), 1); // E9 typo-tolerant search
-        assert_eq!(intent::definitions().len(), 2);
+        assert_eq!(intent::definitions().len(), 1); // find_contextual_matches merged into search_by_intent
         assert_eq!(entity::definitions().len(), 6);
         assert_eq!(embedder::definitions().len(), 4); // Constitution v6.3 embedder-first search
         assert_eq!(temporal::definitions().len(), 2); // E2 recency search, E3 periodic search
+        assert_eq!(graph_link::definitions().len(), 4); // K-NN navigation, typed edges, unified neighbors
     }
 }

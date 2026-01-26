@@ -1,4 +1,7 @@
-//! Memory operation tool implementations (inject_context, store_memory, search_graph).
+//! Memory operation tool implementations (store_memory, search_graph).
+//!
+//! Note: inject_context was merged into store_memory. When `rationale` is provided,
+//! the same validation (1-1024 chars) and response format is used.
 //!
 //! # Multi-Space Search (ARCH-12, ARCH-21)
 //!
@@ -41,8 +44,8 @@ use crate::protocol::JsonRpcResponse;
 
 use super::super::Handlers;
 
-// Validation constants for inject_context (BUG-002)
-// Per PRD 0.3 and constitution: rationale is REQUIRED (1-1024 chars)
+// Validation constants for store_memory rationale (merged from inject_context)
+// When rationale is provided, validate: 1-1024 chars
 const MIN_RATIONALE_LEN: usize = 1;
 const MAX_RATIONALE_LEN: usize = 1024;
 
@@ -170,221 +173,15 @@ fn infer_causal_direction_from_fingerprint(fingerprint: &SemanticFingerprint) ->
 }
 
 impl Handlers {
-    /// inject_context tool implementation.
-    ///
-    /// TASK-S001: Updated to use TeleologicalMemoryStore with 13-embedding fingerprint.
-    ///
-    /// Injects context into the memory graph. Generates all 13 embeddings for the content
-    /// and stores the resulting TeleologicalFingerprint.
-    pub(crate) async fn call_inject_context(
-        &self,
-        id: Option<JsonRpcId>,
-        args: serde_json::Value,
-    ) -> JsonRpcResponse {
-        let content = match args.get("content").and_then(|v| v.as_str()) {
-            Some(c) if !c.is_empty() => c.to_string(),
-            Some(_) => return self.tool_error(id, "Content cannot be empty"),
-            None => return self.tool_error(id, "Missing 'content' parameter"),
-        };
-
-        let rationale = args.get("rationale").and_then(|v| v.as_str()).unwrap_or("");
-
-        if rationale.len() < MIN_RATIONALE_LEN {
-            error!(
-                rationale_len = rationale.len(),
-                min_required = MIN_RATIONALE_LEN,
-                "inject_context: rationale validation FAILED - empty or missing"
-            );
-            return self.tool_error(id, "rationale is REQUIRED (min 1 char)");
-        }
-        if rationale.len() > MAX_RATIONALE_LEN {
-            error!(
-                rationale_len = rationale.len(),
-                max_allowed = MAX_RATIONALE_LEN,
-                "inject_context: rationale validation FAILED - exceeds maximum"
-            );
-            return self.tool_error(
-                id,
-                &format!(
-                    "rationale must be at most {} characters, got {}",
-                    MAX_RATIONALE_LEN,
-                    rationale.len()
-                ),
-            );
-        }
-
-        let importance = args
-            .get("importance")
-            .and_then(|v| v.as_f64())
-            .map(|v| v as f32)
-            .unwrap_or(TeleologicalFingerprint::DEFAULT_IMPORTANCE);
-
-        // E4-FIX: Get session sequence for E4 (V_ordering) embedding
-        let session_sequence = self.get_next_sequence();
-        // SESSION-ID-FIX: Priority: tool argument > env var > stored session_id
-        let session_id = args
-            .get("sessionId")
-            .and_then(|v| v.as_str())
-            .map(String::from)
-            .or_else(|| self.get_session_id());
-
-        let metadata = EmbeddingMetadata {
-            session_id: session_id.clone(),
-            session_sequence: Some(session_sequence),
-            timestamp: Some(chrono::Utc::now()),
-        };
-
-        debug!(
-            session_sequence = session_sequence,
-            session_id = ?session_id,
-            "inject_context: Using session sequence for E4 embedding"
-        );
-
-        // Generate all 13 embeddings
-        // E4-FIX: Use embed_all_with_metadata to pass sequence number to E4
-        let embedding_output = match self
-            .multi_array_provider
-            .embed_all_with_metadata(&content, metadata)
-            .await
-        {
-            Ok(output) => output,
-            Err(e) => {
-                error!(error = %e, "inject_context: Multi-array embedding FAILED");
-                return self.tool_error(id, &format!("Embedding failed: {}", e));
-            }
-        };
-
-        // Compute content hash
-        let mut hasher = Sha256::new();
-        hasher.update(content.as_bytes());
-        let content_hash: [u8; 32] = hasher.finalize().into();
-
-        // TASK-FIX-CLUSTERING: Compute cluster array BEFORE fingerprint is consumed
-        // This must be done before TeleologicalFingerprint::new() moves the semantic fingerprint.
-        let cluster_array = embedding_output.fingerprint.to_cluster_array();
-
-        // E5 Phase 5: Infer causal direction BEFORE fingerprint is consumed
-        // This is used later for source metadata storage
-        let causal_direction = infer_causal_direction_from_fingerprint(&embedding_output.fingerprint);
-
-        // E6-FIX: Extract e6_sparse BEFORE creating TeleologicalFingerprint
-        // The SemanticFingerprint.e6_sparse is a SparseVector that must be copied
-        // to TeleologicalFingerprint.e6_sparse (Option<SparseVector>) for inverted index storage.
-        // This enables Stage 1 E6 recall and keyword tie-breaking.
-        let e6_sparse = embedding_output.fingerprint.e6_sparse.clone();
-
-        // Create TeleologicalFingerprint from embeddings with user-specified importance
-        // E6-FIX: Chain .with_e6_sparse() to propagate the E6 sparse vector
-        let fingerprint =
-            TeleologicalFingerprint::with_importance(embedding_output.fingerprint, content_hash, importance)
-                .with_e6_sparse(e6_sparse);
-        let fingerprint_id = fingerprint.id;
-
-        // Store in TeleologicalMemoryStore
-        if let Err(e) = self.teleological_store.store(fingerprint).await {
-            error!(error = %e, "inject_context: Storage FAILED");
-            return self.tool_error(id, &format!("Storage failed: {}", e));
-        }
-
-        // TASK-FIX-CLUSTERING: Insert into cluster_manager for topic detection
-        // This enables MultiSpaceClusterManager to track this memory for HDBSCAN/BIRCH clustering.
-        // Per PRD Section 5: Topics emerge from multi-space clustering with weighted_agreement >= 2.5.
-        {
-            let mut cluster_mgr = self.cluster_manager.write();
-            if let Err(e) = cluster_mgr.insert(fingerprint_id, &cluster_array) {
-                // Non-fatal: fingerprint is stored, clustering can be retried via detect_topics
-                warn!(
-                    fingerprint_id = %fingerprint_id,
-                    error = %e,
-                    "inject_context: Failed to insert into cluster_manager. \
-                     Topic detection may not include this memory until next recluster."
-                );
-            } else {
-                debug!(
-                    fingerprint_id = %fingerprint_id,
-                    "inject_context: Inserted into cluster_manager for topic detection"
-                );
-            }
-        }
-
-        // TASK-CONTENT-001: Store content text alongside fingerprint
-        // Content storage failure is non-fatal - fingerprint is primary data
-        // Pattern matches store_memory implementation for API consistency
-        if let Err(e) = self
-            .teleological_store
-            .store_content(fingerprint_id, &content)
-            .await
-        {
-            warn!(
-                fingerprint_id = %fingerprint_id,
-                error = %e,
-                content_size = content.len(),
-                "inject_context: Failed to store content text (fingerprint saved successfully). \
-                 Content retrieval will return None for this fingerprint."
-            );
-        } else {
-            debug!(
-                fingerprint_id = %fingerprint_id,
-                content_size = content.len(),
-                "inject_context: Content text stored successfully"
-            );
-        }
-
-        // E4-FIX Phase 1: Persist session metadata for E4 sequence retrieval
-        // This enables proper before/after queries by storing session_sequence
-        let source_metadata = SourceMetadata {
-            source_type: SourceType::Manual,
-            session_id: session_id.clone(),
-            session_sequence: Some(session_sequence),
-            file_path: None,
-            chunk_index: None,
-            total_chunks: None,
-            start_line: None,
-            end_line: None,
-            hook_type: None,
-            tool_name: None,
-            causal_direction: Some(causal_direction.clone()),
-        };
-
-        if let Err(e) = self
-            .teleological_store
-            .store_source_metadata(fingerprint_id, &source_metadata)
-            .await
-        {
-            warn!(
-                fingerprint_id = %fingerprint_id,
-                error = %e,
-                session_sequence = session_sequence,
-                causal_direction = %causal_direction,
-                "inject_context: Failed to store source metadata (fingerprint saved successfully). \
-                 E4 sequence retrieval may fall back to timestamp-based ordering."
-            );
-        } else {
-            debug!(
-                fingerprint_id = %fingerprint_id,
-                session_sequence = session_sequence,
-                causal_direction = %causal_direction,
-                "inject_context: Source metadata stored for E4 sequence retrieval"
-            );
-        }
-
-        self.tool_result(
-            id,
-            json!({
-                "fingerprintId": fingerprint_id.to_string(),
-                "rationale": rationale,
-                "embedderCount": NUM_EMBEDDERS,
-                "embeddingLatencyMs": embedding_output.total_latency.as_millis()
-            }),
-        )
-    }
-
     /// store_memory tool implementation.
     ///
     /// TASK-S001: Updated to use TeleologicalMemoryStore with 13-embedding fingerprint.
     ///
     /// Stores content in the memory graph. Generates all 13 embeddings for the content
     /// and stores the resulting TeleologicalFingerprint.
+    ///
+    /// Note: inject_context was merged into this tool. When `rationale` is provided,
+    /// the same validation (1-1024 chars) and response format is used.
     pub(crate) async fn call_store_memory(
         &self,
         id: Option<JsonRpcId>,
@@ -395,6 +192,35 @@ impl Handlers {
             Some(_) => return self.tool_error(id, "Content cannot be empty"),
             None => return self.tool_error(id, "Missing 'content' parameter"),
         };
+
+        // Handle optional rationale (merged from inject_context)
+        // When provided, validate 1-1024 chars and include in response
+        let rationale = args.get("rationale").and_then(|v| v.as_str());
+        if let Some(r) = rationale {
+            if r.len() < MIN_RATIONALE_LEN {
+                error!(
+                    rationale_len = r.len(),
+                    min_required = MIN_RATIONALE_LEN,
+                    "store_memory: rationale validation FAILED - empty"
+                );
+                return self.tool_error(id, "rationale must be at least 1 character");
+            }
+            if r.len() > MAX_RATIONALE_LEN {
+                error!(
+                    rationale_len = r.len(),
+                    max_allowed = MAX_RATIONALE_LEN,
+                    "store_memory: rationale validation FAILED - exceeds maximum"
+                );
+                return self.tool_error(
+                    id,
+                    &format!(
+                        "rationale must be at most {} characters, got {}",
+                        MAX_RATIONALE_LEN,
+                        r.len()
+                    ),
+                );
+            }
+        }
 
         let importance = args
             .get("importance")
@@ -546,14 +372,19 @@ impl Handlers {
                     );
                 }
 
-                self.tool_result(
-                    id,
-                    json!({
-                        "fingerprintId": fingerprint_id.to_string(),
-                        "embedderCount": NUM_EMBEDDERS,
-                        "embeddingLatencyMs": embedding_output.total_latency.as_millis()
-                    }),
-                )
+                // Build response, including rationale if provided
+                let mut response = json!({
+                    "fingerprintId": fingerprint_id.to_string(),
+                    "embedderCount": NUM_EMBEDDERS,
+                    "embeddingLatencyMs": embedding_output.total_latency.as_millis()
+                });
+
+                // Include rationale in response when provided (merged from inject_context)
+                if let Some(r) = rationale {
+                    response["rationale"] = json!(r);
+                }
+
+                self.tool_result(id, response)
             }
             Err(e) => {
                 error!(error = %e, "store_memory: Storage FAILED");

@@ -1,53 +1,19 @@
 //! Core tool definitions per PRD v6 Section 10.
 //!
-//! Tools: inject_context, store_memory, get_memetic_status, search_graph, trigger_consolidation
+//! Tools: store_memory, get_memetic_status, search_graph, trigger_consolidation
+//!
+//! Note: inject_context was merged into store_memory. When `rationale` is provided,
+//! the same validation (1-1024 chars) and response format is used.
 
 use crate::tools::types::ToolDefinition;
 use serde_json::json;
 
-/// Returns core tool definitions (5 tools per PRD).
+/// Returns core tool definitions (4 tools - inject_context merged into store_memory).
 pub fn definitions() -> Vec<ToolDefinition> {
     vec![
-        // inject_context - primary context injection tool
-        ToolDefinition::new(
-            "inject_context",
-            "Inject context into the knowledge graph with UTL processing. \
-             Analyzes content for learning potential and stores with computed metrics.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "content": {
-                        "type": "string",
-                        "description": "The content to inject into the knowledge graph"
-                    },
-                    "rationale": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 1024,
-                        "description": "Why this context is relevant and should be stored (REQUIRED, 1-1024 chars)"
-                    },
-                    "modality": {
-                        "type": "string",
-                        "enum": ["text", "code", "image", "audio", "structured", "mixed"],
-                        "default": "text",
-                        "description": "The type/modality of the content"
-                    },
-                    "importance": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1,
-                        "default": 0.5,
-                        "description": "Importance score for the memory [0.0, 1.0]"
-                    },
-                    "sessionId": {
-                        "type": "string",
-                        "description": "Session ID for session-scoped storage. If omitted, uses CLAUDE_SESSION_ID env var."
-                    }
-                },
-                "required": ["content", "rationale"]
-            }),
-        ),
         // store_memory - store a memory node directly
+        // Note: inject_context merged into this tool. When rationale is provided,
+        // the same validation and response format is used.
         ToolDefinition::new(
             "store_memory",
             "Store a memory node directly in the knowledge graph without UTL processing.",
@@ -57,6 +23,12 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     "content": {
                         "type": "string",
                         "description": "The content to store"
+                    },
+                    "rationale": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024,
+                        "description": "Why this context is relevant and should be stored (OPTIONAL, 1-1024 chars). When provided, included in response."
                     },
                     "importance": {
                         "type": "number",

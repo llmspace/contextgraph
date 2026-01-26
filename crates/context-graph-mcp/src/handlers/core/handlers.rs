@@ -17,6 +17,7 @@ use context_graph_core::clustering::{MultiSpaceClusterManager, TopicStabilityTra
 use context_graph_core::memory::{CodeEmbeddingProvider, CodeStorage};
 use context_graph_core::monitoring::LayerStatusProvider;
 use context_graph_core::traits::{MultiArrayEmbeddingProvider, TeleologicalMemoryStore};
+use context_graph_storage::EdgeRepository;
 
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
 
@@ -66,6 +67,15 @@ pub struct Handlers {
     /// Optional - only present if code embedding is enabled.
     /// E7-WIRING: Added for generating E7 embeddings for code queries.
     pub(in crate::handlers) code_embedding_provider: Option<Arc<dyn CodeEmbeddingProvider>>,
+
+    // =========================================================================
+    // Graph Linking Pipeline (TASK-GRAPHLINK)
+    // =========================================================================
+
+    /// Edge repository for K-NN graph edges and typed edges.
+    /// Optional - only present if graph linking is enabled.
+    /// TASK-GRAPHLINK: Added for get_memory_neighbors, get_typed_edges, traverse_graph tools.
+    pub(in crate::handlers) edge_repository: Option<EdgeRepository>,
 }
 
 impl Handlers {
@@ -97,6 +107,8 @@ impl Handlers {
             // E7-WIRING: Code pipeline disabled by default in with_all
             code_store: None,
             code_embedding_provider: None,
+            // TASK-GRAPHLINK: Graph linking disabled by default
+            edge_repository: None,
         }
     }
 
@@ -132,6 +144,8 @@ impl Handlers {
             current_session_id: Arc::new(RwLock::new(None)),
             code_store: Some(code_store),
             code_embedding_provider: Some(code_embedding_provider),
+            // TASK-GRAPHLINK: Graph linking disabled by default in with_code_pipeline
+            edge_repository: None,
         }
     }
 
@@ -163,6 +177,8 @@ impl Handlers {
             // E7-WIRING: Code pipeline disabled by default
             code_store: None,
             code_embedding_provider: None,
+            // TASK-GRAPHLINK: Graph linking disabled by default
+            edge_repository: None,
         }
     }
 
@@ -185,6 +201,22 @@ impl Handlers {
     /// Get the code embedding provider if available.
     pub fn code_embedding_provider(&self) -> Option<&Arc<dyn CodeEmbeddingProvider>> {
         self.code_embedding_provider.as_ref()
+    }
+
+    // =========================================================================
+    // Graph Linking Pipeline Accessors (TASK-GRAPHLINK)
+    // =========================================================================
+
+    /// Check if the graph linking pipeline is available.
+    ///
+    /// Returns true if edge_repository is configured.
+    pub fn has_graph_linking(&self) -> bool {
+        self.edge_repository.is_some()
+    }
+
+    /// Get the edge repository if available.
+    pub fn edge_repository(&self) -> Option<&EdgeRepository> {
+        self.edge_repository.as_ref()
     }
 
     // =========================================================================

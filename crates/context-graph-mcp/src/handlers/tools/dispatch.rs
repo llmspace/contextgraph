@@ -1,7 +1,7 @@
 //! Tool dispatch logic for MCP tool calls.
 //!
 //! Per PRD v6 Section 10, only these MCP tools are exposed:
-//! - Core: inject_context, search_graph, store_memory, get_memetic_status
+//! - Core: store_memory, search_graph, get_memetic_status (inject_context merged into store_memory)
 //! - Consolidation: trigger_consolidation
 //! - Curation: merge_concepts
 
@@ -63,7 +63,8 @@ impl Handlers {
 
         match tool_name {
             // ========== CORE TOOLS (PRD Section 10.1) ==========
-            tool_names::INJECT_CONTEXT => self.call_inject_context(id, arguments).await,
+            // Note: inject_context was merged into store_memory. When rationale is provided,
+            // the same validation (1-1024 chars) and response format is used.
             tool_names::STORE_MEMORY => self.call_store_memory(id, arguments).await,
             tool_names::GET_MEMETIC_STATUS => self.call_get_memetic_status(id).await,
             tool_names::SEARCH_GRAPH => self.call_search_graph(id, arguments).await,
@@ -115,10 +116,9 @@ impl Handlers {
             tool_names::GET_GRAPH_PATH => self.call_get_graph_path(id, arguments).await,
 
             // ========== INTENT TOOLS (E10 Intent/Context Upgrade) ==========
+            // Note: search_by_intent now handles both query-based and context-based searches
+            // (formerly separate find_contextual_matches tool was merged)
             tool_names::SEARCH_BY_INTENT => self.call_search_by_intent(id, arguments).await,
-            tool_names::FIND_CONTEXTUAL_MATCHES => {
-                self.call_find_contextual_matches(id, arguments).await
-            }
 
             // ========== KEYWORD TOOLS (E6 Keyword Search Enhancement) ==========
             tool_names::SEARCH_BY_KEYWORDS => self.call_search_by_keywords(id, arguments).await,
@@ -154,6 +154,16 @@ impl Handlers {
             // ========== TEMPORAL TOOLS (E2/E3 Integration) ==========
             tool_names::SEARCH_RECENT => self.call_search_recent(id, arguments).await,
             tool_names::SEARCH_PERIODIC => self.call_search_periodic(id, arguments).await,
+
+            // ========== GRAPH LINKING TOOLS (K-NN Navigation and Typed Edges) ==========
+            tool_names::GET_MEMORY_NEIGHBORS => {
+                self.call_get_memory_neighbors(id, arguments).await
+            }
+            tool_names::GET_TYPED_EDGES => self.call_get_typed_edges(id, arguments).await,
+            tool_names::TRAVERSE_GRAPH => self.call_traverse_graph(id, arguments).await,
+            tool_names::GET_UNIFIED_NEIGHBORS => {
+                self.call_get_unified_neighbors(id, arguments).await
+            }
 
             // Unknown tool
             _ => JsonRpcResponse::error(

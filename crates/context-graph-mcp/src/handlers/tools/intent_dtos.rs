@@ -311,11 +311,28 @@ impl DirectionModifiers {
 ///   "includeContent": true
 /// }
 /// ```
+///
+/// # Alternative: Context-based search
+/// ```json
+/// {
+///   "context": "Working on database optimization for production system",
+///   "weightProfile": "balanced",
+///   "topK": 10
+/// }
+/// ```
 #[derive(Debug, Clone, Deserialize)]
 pub struct SearchByIntentRequest {
-    /// The intent or goal to search for (required).
+    /// The intent or goal to search for.
     /// Describe what you're trying to accomplish.
-    pub query: String,
+    /// Either `query` or `context` must be provided (not both).
+    #[serde(default)]
+    pub query: Option<String>,
+
+    /// The context or situation to find relevant memories for.
+    /// Alternative to `query` - describe the current situation.
+    /// Either `query` or `context` must be provided (not both).
+    #[serde(default)]
+    pub context: Option<String>,
 
     /// Maximum number of results to return (1-50, default: 10).
     #[serde(rename = "topK", default = "default_top_k")]
@@ -341,6 +358,13 @@ pub struct SearchByIntentRequest {
     /// When "pipeline" is selected, E12 reranking is automatically enabled.
     #[serde(default)]
     pub strategy: Option<String>,
+
+    /// Weight profile for retrieval.
+    /// - "intent_search": E10=0.25, E1=0.40 (default for query-based)
+    /// - "balanced": Balanced weights across embedders (default for context-based)
+    /// - Other profiles: semantic_search, code_search, causal_reasoning, etc.
+    #[serde(rename = "weightProfile", default)]
+    pub weight_profile: Option<String>,
 }
 
 fn default_top_k() -> usize {
@@ -358,17 +382,46 @@ fn default_blend() -> f32 {
 impl Default for SearchByIntentRequest {
     fn default() -> Self {
         Self {
-            query: String::new(),
+            query: None,
+            context: None,
             top_k: DEFAULT_INTENT_SEARCH_TOP_K,
             min_score: DEFAULT_MIN_INTENT_SCORE,
             blend_with_semantic: DEFAULT_BLEND_WITH_SEMANTIC,
             include_content: false,
             strategy: None,
+            weight_profile: None,
         }
     }
 }
 
 impl SearchByIntentRequest {
+    /// Get the effective query text (from `query` or `context`).
+    ///
+    /// Returns the query text, preferring `query` over `context` if both are provided.
+    pub fn get_query_text(&self) -> Option<&str> {
+        self.query.as_deref().or(self.context.as_deref())
+    }
+
+    /// Check if this is a context-based search (using `context` parameter).
+    pub fn is_context_based(&self) -> bool {
+        self.query.is_none() && self.context.is_some()
+    }
+
+    /// Get the effective weight profile.
+    ///
+    /// Returns the user-specified profile, or a default based on query type:
+    /// - "intent_search" for query-based searches
+    /// - "balanced" for context-based searches
+    pub fn get_weight_profile(&self) -> &str {
+        self.weight_profile.as_deref().unwrap_or_else(|| {
+            if self.is_context_based() {
+                "balanced"
+            } else {
+                "intent_search"
+            }
+        })
+    }
+
     /// Parse the strategy parameter into SearchStrategy enum.
     ///
     /// Strategy selection priority:
@@ -388,13 +441,28 @@ impl SearchByIntentRequest {
     ///
     /// # Errors
     /// Returns an error message if:
-    /// - query is empty
+    /// - neither query nor context is provided
+    /// - both query and context are provided (ambiguous)
+    /// - the provided query/context is empty
     /// - topK is outside [1, 50]
     /// - minScore is outside [0, 1] or NaN/infinite
     /// - blendWithSemantic is outside [0, 1] or NaN/infinite
     pub fn validate(&self) -> Result<(), String> {
-        if self.query.is_empty() {
-            return Err("query is required and cannot be empty".to_string());
+        // Validate query/context - exactly one must be provided
+        match (&self.query, &self.context) {
+            (None, None) => {
+                return Err("Either 'query' or 'context' must be provided".to_string());
+            }
+            (Some(q), None) if q.is_empty() => {
+                return Err("query cannot be empty".to_string());
+            }
+            (None, Some(c)) if c.is_empty() => {
+                return Err("context cannot be empty".to_string());
+            }
+            (Some(q), Some(c)) if !q.is_empty() && !c.is_empty() => {
+                return Err("Provide either 'query' or 'context', not both".to_string());
+            }
+            _ => {} // Valid: one non-empty parameter provided
         }
 
         if self.top_k < 1 || self.top_k > MAX_INTENT_SEARCH_TOP_K {
@@ -437,125 +505,17 @@ impl SearchByIntentRequest {
             }
         }
 
-        Ok(())
-    }
-}
-
-/// Request parameters for find_contextual_matches tool.
-///
-/// # Example JSON
-/// ```json
-/// {
-///   "context": "Working on database optimization for production system",
-///   "topK": 10,
-///   "minScore": 0.2,
-///   "blendWithSemantic": 0.3,
-///   "includeContent": true
-/// }
-/// ```
-#[derive(Debug, Clone, Deserialize)]
-pub struct FindContextualMatchesRequest {
-    /// The context or situation to find relevant memories for (required).
-    /// Describe the current situation.
-    pub context: String,
-
-    /// Maximum number of results to return (1-50, default: 10).
-    #[serde(rename = "topK", default = "default_top_k")]
-    pub top_k: usize,
-
-    /// Minimum similarity score threshold (0-1, default: 0.2).
-    #[serde(rename = "minScore", default = "default_min_score")]
-    pub min_score: f32,
-
-    /// Blend weight for E10 context vs E1 semantic (0-1, default: 0.3).
-    /// 0.0 = pure E1 semantic, 1.0 = pure E10 context.
-    #[serde(rename = "blendWithSemantic", default = "default_blend")]
-    pub blend_with_semantic: f32,
-
-    /// Whether to include full content text in results (default: false).
-    #[serde(rename = "includeContent", default)]
-    pub include_content: bool,
-
-    /// Search strategy for retrieval.
-    /// - "multi_space": Default multi-embedder fusion
-    /// - "pipeline": E13 SPLADE recall → E1 → E12 ColBERT rerank (maximum precision)
-    ///
-    /// When "pipeline" is selected, E12 reranking is automatically enabled.
-    #[serde(default)]
-    pub strategy: Option<String>,
-}
-
-impl Default for FindContextualMatchesRequest {
-    fn default() -> Self {
-        Self {
-            context: String::new(),
-            top_k: DEFAULT_INTENT_SEARCH_TOP_K,
-            min_score: DEFAULT_MIN_INTENT_SCORE,
-            blend_with_semantic: DEFAULT_BLEND_WITH_SEMANTIC,
-            include_content: false,
-            strategy: None,
-        }
-    }
-}
-
-impl FindContextualMatchesRequest {
-    /// Parse the strategy parameter into SearchStrategy enum.
-    ///
-    /// Strategy selection priority:
-    /// 1. User-specified strategy takes precedence
-    /// 2. Auto-upgrade to Pipeline if context is a precision query (quoted terms, keyword patterns)
-    /// 3. Default to MultiSpace
-    pub fn parse_strategy(&self) -> SearchStrategy {
-        // User-specified strategy takes precedence
-        match self.strategy.as_deref() {
-            Some("pipeline") => SearchStrategy::Pipeline,
-            Some("e1_only") => SearchStrategy::E1Only,
-            _ => SearchStrategy::MultiSpace, // Default to multi-space for E10 enhancement
-        }
-    }
-
-    /// Validate the request parameters.
-    pub fn validate(&self) -> Result<(), String> {
-        if self.context.is_empty() {
-            return Err("context is required and cannot be empty".to_string());
-        }
-
-        if self.top_k < 1 || self.top_k > MAX_INTENT_SEARCH_TOP_K {
-            return Err(format!(
-                "topK must be between 1 and {}, got {}",
-                MAX_INTENT_SEARCH_TOP_K, self.top_k
-            ));
-        }
-
-        if self.min_score.is_nan() || self.min_score.is_infinite() {
-            return Err("minScore must be a finite number".to_string());
-        }
-
-        if self.min_score < 0.0 || self.min_score > 1.0 {
-            return Err(format!(
-                "minScore must be between 0.0 and 1.0, got {}",
-                self.min_score
-            ));
-        }
-
-        if self.blend_with_semantic.is_nan() || self.blend_with_semantic.is_infinite() {
-            return Err("blendWithSemantic must be a finite number".to_string());
-        }
-
-        if self.blend_with_semantic < 0.0 || self.blend_with_semantic > 1.0 {
-            return Err(format!(
-                "blendWithSemantic must be between 0.0 and 1.0, got {}",
-                self.blend_with_semantic
-            ));
-        }
-
-        // Validate strategy if provided
-        if let Some(ref strat) = self.strategy {
-            let valid = ["multi_space", "pipeline"];
-            if !valid.contains(&strat.as_str()) {
+        // Validate weight profile if provided
+        if let Some(ref profile) = self.weight_profile {
+            let valid = [
+                "intent_search", "intent_enhanced", "balanced", "semantic_search",
+                "code_search", "causal_reasoning", "fact_checking", "temporal_navigation",
+                "category_weighted", "sequence_navigation", "conversation_history",
+            ];
+            if !valid.contains(&profile.as_str()) {
                 return Err(format!(
-                    "strategy must be one of {:?}, got '{}'",
-                    valid, strat
+                    "weightProfile must be one of {:?}, got '{}'",
+                    valid, profile
                 ));
             }
         }
@@ -642,7 +602,7 @@ pub struct IntentSearchMetadata {
 /// Response for search_by_intent tool.
 #[derive(Debug, Clone, Serialize)]
 pub struct SearchByIntentResponse {
-    /// Original query.
+    /// Original query (or context if context-based search).
     pub query: String,
 
     /// Matched results with blended scores.
@@ -653,22 +613,14 @@ pub struct SearchByIntentResponse {
 
     /// Metadata about the search.
     pub metadata: IntentSearchMetadata,
-}
 
-/// Response for find_contextual_matches tool.
-#[derive(Debug, Clone, Serialize)]
-pub struct FindContextualMatchesResponse {
-    /// Original context query.
-    pub context: String,
+    /// Whether this was a context-based search.
+    #[serde(rename = "isContextBased", skip_serializing_if = "std::ops::Not::not")]
+    pub is_context_based: bool,
 
-    /// Matched results with blended scores.
-    pub results: Vec<IntentSearchResult>,
-
-    /// Number of results returned.
-    pub count: usize,
-
-    /// Metadata about the search.
-    pub metadata: IntentSearchMetadata,
+    /// Weight profile used for search.
+    #[serde(rename = "weightProfile")]
+    pub weight_profile: String,
 }
 
 #[cfg(test)]
@@ -676,24 +628,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_search_by_intent_validation_success() {
+    fn test_search_by_intent_validation_success_with_query() {
         let req = SearchByIntentRequest {
-            query: "Find performance optimizations".to_string(),
+            query: Some("Find performance optimizations".to_string()),
             ..Default::default()
         };
         assert!(req.validate().is_ok());
     }
 
     #[test]
-    fn test_search_by_intent_empty_query() {
+    fn test_search_by_intent_validation_success_with_context() {
+        let req = SearchByIntentRequest {
+            context: Some("Working on database optimization".to_string()),
+            ..Default::default()
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_search_by_intent_empty_query_and_context() {
         let req = SearchByIntentRequest::default();
-        assert!(req.validate().is_err());
+        let err = req.validate().unwrap_err();
+        assert!(err.contains("query") || err.contains("context"));
     }
 
     #[test]
     fn test_search_by_intent_invalid_blend() {
         let req = SearchByIntentRequest {
-            query: "test".to_string(),
+            query: Some("test".to_string()),
             blend_with_semantic: 1.5,
             ..Default::default()
         };
@@ -701,18 +663,79 @@ mod tests {
     }
 
     #[test]
-    fn test_find_contextual_matches_validation_success() {
-        let req = FindContextualMatchesRequest {
-            context: "Working on database optimization".to_string(),
+    fn test_search_by_intent_both_query_and_context_error() {
+        let req = SearchByIntentRequest {
+            query: Some("find optimizations".to_string()),
+            context: Some("working on database".to_string()),
             ..Default::default()
         };
-        assert!(req.validate().is_ok());
+        let err = req.validate().unwrap_err();
+        assert!(err.contains("not both"));
     }
 
     #[test]
-    fn test_find_contextual_matches_empty_context() {
-        let req = FindContextualMatchesRequest::default();
-        assert!(req.validate().is_err());
+    fn test_search_by_intent_empty_query_string() {
+        let req = SearchByIntentRequest {
+            query: Some("".to_string()),
+            ..Default::default()
+        };
+        let err = req.validate().unwrap_err();
+        assert!(err.contains("empty"));
+    }
+
+    #[test]
+    fn test_search_by_intent_get_query_text() {
+        let req_query = SearchByIntentRequest {
+            query: Some("my query".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(req_query.get_query_text(), Some("my query"));
+
+        let req_context = SearchByIntentRequest {
+            context: Some("my context".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(req_context.get_query_text(), Some("my context"));
+    }
+
+    #[test]
+    fn test_search_by_intent_is_context_based() {
+        let req_query = SearchByIntentRequest {
+            query: Some("my query".to_string()),
+            ..Default::default()
+        };
+        assert!(!req_query.is_context_based());
+
+        let req_context = SearchByIntentRequest {
+            context: Some("my context".to_string()),
+            ..Default::default()
+        };
+        assert!(req_context.is_context_based());
+    }
+
+    #[test]
+    fn test_search_by_intent_weight_profile_defaults() {
+        // Query-based defaults to intent_search
+        let req_query = SearchByIntentRequest {
+            query: Some("my query".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(req_query.get_weight_profile(), "intent_search");
+
+        // Context-based defaults to balanced
+        let req_context = SearchByIntentRequest {
+            context: Some("my context".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(req_context.get_weight_profile(), "balanced");
+
+        // Explicit weight profile overrides default
+        let req_custom = SearchByIntentRequest {
+            query: Some("my query".to_string()),
+            weight_profile: Some("code_search".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(req_custom.get_weight_profile(), "code_search");
     }
 
     #[test]

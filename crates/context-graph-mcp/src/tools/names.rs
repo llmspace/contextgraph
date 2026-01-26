@@ -10,7 +10,8 @@
 //! implementations. See registry.rs for handler registration status.
 
 // ========== CORE TOOLS (PRD Section 10.1) ==========
-pub const INJECT_CONTEXT: &str = "inject_context";
+// Note: inject_context was merged into store_memory. When rationale is provided,
+// the same validation (1-1024 chars) and response format is used.
 pub const STORE_MEMORY: &str = "store_memory";
 pub const GET_MEMETIC_STATUS: &str = "get_memetic_status";
 pub const SEARCH_GRAPH: &str = "search_graph";
@@ -51,8 +52,9 @@ pub const SEARCH_CONNECTIONS: &str = "search_connections";
 pub const GET_GRAPH_PATH: &str = "get_graph_path";
 
 // ========== INTENT TOOLS (E10 Intent/Context Upgrade) ==========
+// Note: search_by_intent now handles both query-based and context-based searches
+// (formerly separate find_contextual_matches tool was merged into search_by_intent)
 pub const SEARCH_BY_INTENT: &str = "search_by_intent";
-pub const FIND_CONTEXTUAL_MATCHES: &str = "find_contextual_matches";
 
 // ========== KEYWORD TOOLS (E6 Keyword Search Enhancement) ==========
 pub const SEARCH_BY_KEYWORDS: &str = "search_by_keywords";
@@ -86,3 +88,14 @@ pub const LIST_EMBEDDER_INDEXES: &str = "list_embedder_indexes";
 // Temporal search with E2/E3 boost applied POST-retrieval per ARCH-25.
 pub const SEARCH_RECENT: &str = "search_recent";
 pub const SEARCH_PERIODIC: &str = "search_periodic";
+
+// ========== GRAPH LINKING TOOLS (K-NN Navigation and Typed Edges) ==========
+// Tools for navigating the K-NN graph and exploring typed edges derived from
+// embedder agreement patterns. Per ARCH-18, E5/E8 use asymmetric similarity.
+pub const GET_MEMORY_NEIGHBORS: &str = "get_memory_neighbors";
+pub const GET_TYPED_EDGES: &str = "get_typed_edges";
+pub const TRAVERSE_GRAPH: &str = "traverse_graph";
+/// Unified neighbors using Weighted RRF across all 13 embedders.
+/// Per ARCH-21: Multi-space fusion via RRF, not weighted sum.
+/// Per AP-60: Temporal embedders (E2-E4) excluded from semantic fusion.
+pub const GET_UNIFIED_NEIGHBORS: &str = "get_unified_neighbors";

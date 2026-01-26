@@ -185,3 +185,8 @@ pub use teleological::column_families::{
 pub use context_graph_core::types::{
     CodeEntity, CodeEntityType, CodeFileIndexEntry, CodeLanguage, CodeStats, Visibility,
 };
+
+// Re-export graph edges storage types (TASK-GRAPHLINK)
+pub use graph_edges::{
+    EdgeRepository, GraphEdgeStats, GraphEdgeStorageError, GraphEdgeStorageResult,
+};

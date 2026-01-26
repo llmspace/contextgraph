@@ -28,9 +28,8 @@ use crate::protocol::JsonRpcId;
 use crate::protocol::JsonRpcResponse;
 
 use super::intent_dtos::{
-    FindContextualMatchesRequest, FindContextualMatchesResponse, IntentBoostConfig,
-    IntentSearchMetadata, IntentSearchResult, SearchByIntentRequest, SearchByIntentResponse,
-    SourceInfo,
+    IntentBoostConfig, IntentSearchMetadata, IntentSearchResult, SearchByIntentRequest,
+    SearchByIntentResponse, SourceInfo,
 };
 
 use super::super::Handlers;
@@ -40,6 +39,10 @@ impl Handlers {
     ///
     /// Finds memories that share similar intent or purpose using E10 (E5-base-v2).
     /// ENHANCES E1 semantic search with intent awareness via blendWithSemantic parameter.
+    ///
+    /// Supports both query-based and context-based searches:
+    /// - `query`: Intent/goal to search for (uses "intent_search" weight profile)
+    /// - `context`: Situation/context to find relevant memories (uses "balanced" profile)
     ///
     /// # Algorithm
     ///
@@ -51,11 +54,13 @@ impl Handlers {
     ///
     /// # Parameters
     ///
-    /// - `query`: The intent or goal to search for (required)
+    /// - `query`: The intent or goal to search for (one of query/context required)
+    /// - `context`: The context or situation to find relevant memories for (alternative to query)
     /// - `topK`: Maximum results to return (1-50, default: 10)
     /// - `minScore`: Minimum blended score threshold (0-1, default: 0.2)
     /// - `blendWithSemantic`: E10 weight in blend (0-1, default: 0.1)
     /// - `includeContent`: Include full content text (default: false)
+    /// - `weightProfile`: Override the default weight profile
     pub(crate) async fn call_search_by_intent(
         &self,
         id: Option<JsonRpcId>,
@@ -75,7 +80,10 @@ impl Handlers {
             return self.tool_error(id, &e);
         }
 
-        let query = &request.query;
+        // Get the effective query text (either query or context)
+        let query_text = request.get_query_text().unwrap(); // Safe after validation
+        let is_context_based = request.is_context_based();
+        let weight_profile = request.get_weight_profile();
         let top_k = request.top_k;
         let min_score = request.min_score;
 
@@ -88,7 +96,9 @@ impl Handlers {
         let intent_boost_config = IntentBoostConfig::default();
 
         info!(
-            query_preview = %query.chars().take(50).collect::<String>(),
+            query_preview = %query_text.chars().take(50).collect::<String>(),
+            is_context_based = is_context_based,
+            weight_profile = weight_profile,
             top_k = top_k,
             min_score = min_score,
             strategy = ?strategy,
@@ -98,7 +108,7 @@ impl Handlers {
         );
 
         // Step 1: Embed the intent query
-        let query_embedding = match self.multi_array_provider.embed_all(query).await {
+        let query_embedding = match self.multi_array_provider.embed_all(query_text).await {
             Ok(output) => output.fingerprint,
             Err(e) => {
                 error!(error = %e, "search_by_intent: Query embedding FAILED");
@@ -110,10 +120,10 @@ impl Handlers {
         let fetch_multiplier = 3;
         let fetch_top_k = top_k * fetch_multiplier;
 
-        // Use intent_search weight profile for E10-enhanced retrieval
+        // Use the appropriate weight profile based on query type
         let options = TeleologicalSearchOptions::quick(fetch_top_k)
             .with_strategy(strategy)
-            .with_weight_profile("intent_search") // E10=0.25, E1=0.40 per E10 Upgrade
+            .with_weight_profile(weight_profile)
             .with_min_similarity(0.0) // Get all candidates, filter later
             .with_rerank(enable_rerank); // Auto-enable E12 for pipeline
 
@@ -224,7 +234,7 @@ impl Handlers {
         }
 
         let response = SearchByIntentResponse {
-            query: query.clone(),
+            query: query_text.to_string(),
             results: results.clone(),
             count: results.len(),
             metadata: IntentSearchMetadata {
@@ -236,228 +246,16 @@ impl Handlers {
                 e1_weight: 1.0,     // E1 is THE foundation (ARCH-12)
                 direction_modifier: 1.0, // No modifier - E5-base-v2 uses natural prefix asymmetry
             },
+            is_context_based,
+            weight_profile: weight_profile.to_string(),
         };
 
         info!(
             results_found = response.count,
             candidates_evaluated = candidates_evaluated,
             filtered = filtered_count,
+            is_context_based = is_context_based,
             "search_by_intent: Completed intent-aware search"
-        );
-
-        self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
-    }
-
-    /// find_contextual_matches tool implementation.
-    ///
-    /// Finds memories relevant to a given context or situation using E10 (E5-base-v2).
-    /// ENHANCES E1 semantic search with contextual awareness.
-    ///
-    /// # Algorithm
-    ///
-    /// 1. Embed the context query using all 13 embedders
-    /// 2. Search using E1 semantic as primary, E10 as enhancement
-    /// 3. Compute E10 similarity (query→document direction per E5-base-v2 training)
-    /// 4. Blend E1 and E10 scores using blendWithSemantic weight
-    /// 5. Filter by minScore and return top-K results
-    ///
-    /// # Note
-    ///
-    /// Uses the SAME direction as search_by_intent (query→document) because E5-base-v2
-    /// was trained for query→passage retrieval. The user's context description is treated
-    /// as a "query" to find relevant stored "passages" (memories).
-    ///
-    /// # Parameters
-    ///
-    /// - `context`: The context or situation to find relevant memories for (required)
-    /// - `topK`: Maximum results to return (1-50, default: 10)
-    /// - `minScore`: Minimum blended score threshold (0-1, default: 0.2)
-    /// - `blendWithSemantic`: E10 weight in blend (0-1, default: 0.1)
-    /// - `includeContent`: Include full content text (default: false)
-    pub(crate) async fn call_find_contextual_matches(
-        &self,
-        id: Option<JsonRpcId>,
-        args: serde_json::Value,
-    ) -> JsonRpcResponse {
-        // Parse and validate request
-        let request: FindContextualMatchesRequest = match serde_json::from_value(args.clone()) {
-            Ok(req) => req,
-            Err(e) => {
-                error!(error = %e, "find_contextual_matches: Failed to parse request");
-                return self.tool_error(id, &format!("Invalid request: {}", e));
-            }
-        };
-
-        if let Err(e) = request.validate() {
-            error!(error = %e, "find_contextual_matches: Validation failed");
-            return self.tool_error(id, &e);
-        }
-
-        let context = &request.context;
-        let top_k = request.top_k;
-        let min_score = request.min_score;
-
-        // Parse strategy from request - Pipeline enables E13 recall + E12 reranking
-        let strategy = request.parse_strategy();
-        let enable_rerank = matches!(strategy, SearchStrategy::Pipeline);
-
-        // Use multiplicative boost (ARCH-17) instead of linear blending
-        // E10 ENHANCES E1, it doesn't compete with it
-        let intent_boost_config = IntentBoostConfig::default();
-
-        info!(
-            context_preview = %context.chars().take(50).collect::<String>(),
-            top_k = top_k,
-            min_score = min_score,
-            strategy = ?strategy,
-            enable_rerank = enable_rerank,
-            boost_mode = "multiplicative",
-            "find_contextual_matches: Starting context-enhanced search (ARCH-17)"
-        );
-
-        // Step 1: Embed the context query
-        let query_embedding = match self.multi_array_provider.embed_all(context).await {
-            Ok(output) => output.fingerprint,
-            Err(e) => {
-                error!(error = %e, "find_contextual_matches: Query embedding FAILED");
-                return self.tool_error(id, &format!("Query embedding failed: {}", e));
-            }
-        };
-
-        // Step 2: Search for candidates
-        let fetch_multiplier = 3;
-        let fetch_top_k = top_k * fetch_multiplier;
-
-        let options = TeleologicalSearchOptions::quick(fetch_top_k)
-            .with_strategy(strategy)
-            .with_weight_profile("balanced")
-            .with_min_similarity(0.0)
-            .with_rerank(enable_rerank); // Auto-enable E12 for pipeline
-
-        let candidates = match self
-            .teleological_store
-            .search_semantic(&query_embedding, options)
-            .await
-        {
-            Ok(results) => results,
-            Err(e) => {
-                error!(error = %e, "find_contextual_matches: Candidate search FAILED");
-                return self.tool_error(id, &format!("Search failed: {}", e));
-            }
-        };
-
-        let candidates_evaluated = candidates.len();
-        debug!(
-            candidates_evaluated = candidates_evaluated,
-            "find_contextual_matches: Evaluating candidates for blended scoring"
-        );
-
-        // Step 3: Compute intent-enhanced scores using multiplicative boost (ARCH-17)
-        // E10 ENHANCES E1 - it doesn't compete via linear blending
-        // User context is treated as a "query" to find relevant stored "passages" (memories)
-        let query_e10_intent = query_embedding.get_e10_as_intent();
-        let query_e1 = &query_embedding.e1_semantic;
-
-        let mut scored_results: Vec<(Uuid, f32, f32, f32, f32)> = Vec::with_capacity(candidates.len());
-
-        for candidate in &candidates {
-            let cand_id = candidate.fingerprint.id;
-            let cand_e1 = &candidate.fingerprint.semantic.e1_semantic;
-            let cand_e10_context = candidate.fingerprint.semantic.get_e10_as_context();
-
-            // E1 cosine similarity (THE semantic foundation per ARCH-12)
-            let e1_sim = cosine_similarity(query_e1, cand_e1);
-
-            // E10 asymmetric similarity (query→document direction per E5-base-v2)
-            let e10_sim = cosine_similarity(query_e10_intent, cand_e10_context);
-
-            // Apply multiplicative boost (ARCH-17)
-            // E10 ENHANCES E1 based on intent alignment:
-            // - E10 > 0.5: Intent aligned → boost E1 up
-            // - E10 < 0.5: Intent misaligned → reduce E1
-            // - E10 ≈ 0.5: Neutral → no change
-            let enhanced_score = intent_boost_config.compute_enhanced_score(e1_sim, e10_sim);
-
-            if enhanced_score >= min_score {
-                scored_results.push((cand_id, enhanced_score, e1_sim, e10_sim, e10_sim));
-            }
-        }
-
-        // Step 4: Sort and truncate
-        scored_results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        scored_results.truncate(top_k);
-
-        let filtered_count = candidates_evaluated - scored_results.len();
-
-        // Step 5: Build results
-        let result_ids: Vec<Uuid> = scored_results.iter().map(|r| r.0).collect();
-
-        let contents: Vec<Option<String>> = if request.include_content && !result_ids.is_empty() {
-            match self.teleological_store.get_content_batch(&result_ids).await {
-                Ok(c) => c,
-                Err(e) => {
-                    warn!(error = %e, "find_contextual_matches: Content retrieval failed");
-                    vec![None; result_ids.len()]
-                }
-            }
-        } else {
-            vec![None; result_ids.len()]
-        };
-
-        let source_metadata = match self
-            .teleological_store
-            .get_source_metadata_batch(&result_ids)
-            .await
-        {
-            Ok(m) => m,
-            Err(e) => {
-                warn!(error = %e, "find_contextual_matches: Source metadata retrieval failed");
-                vec![None; result_ids.len()]
-            }
-        };
-
-        let mut results: Vec<IntentSearchResult> = Vec::with_capacity(scored_results.len());
-
-        for (i, (memory_id, score, e1_sim, e10_sim, _)) in scored_results.into_iter().enumerate() {
-            let source = source_metadata.get(i).and_then(|m| {
-                m.as_ref().map(|meta| SourceInfo {
-                    source_type: format!("{}", meta.source_type),
-                    file_path: meta.file_path.clone(),
-                    hook_type: meta.hook_type.clone(),
-                    tool_name: meta.tool_name.clone(),
-                })
-            });
-
-            results.push(IntentSearchResult {
-                memory_id,
-                score,
-                e1_similarity: e1_sim,
-                e10_similarity: e10_sim,
-                content: contents.get(i).and_then(|c| c.clone()),
-                source,
-            });
-        }
-
-        let response = FindContextualMatchesResponse {
-            context: context.clone(),
-            results: results.clone(),
-            count: results.len(),
-            metadata: IntentSearchMetadata {
-                candidates_evaluated,
-                filtered_by_score: filtered_count,
-                // Multiplicative boost mode: E10 enhances E1, weights are not applicable
-                // Keeping fields for backward compatibility, but values reflect new approach
-                blend_weight: 0.0,  // Not used in multiplicative boost mode
-                e1_weight: 1.0,     // E1 is THE foundation (ARCH-12)
-                direction_modifier: 1.0, // No modifier - E5-base-v2 uses natural prefix asymmetry
-            },
-        };
-
-        info!(
-            results_found = response.count,
-            candidates_evaluated = candidates_evaluated,
-            filtered = filtered_count,
-            "find_contextual_matches: Completed context-aware search"
         );
 
         self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
@@ -527,8 +325,8 @@ mod tests {
 
     #[test]
     fn test_e10_uses_query_document_direction() {
-        // Both search_by_intent and find_contextual_matches use the same direction:
-        // query→document (per E5-base-v2 training)
+        // search_by_intent uses query→document direction (per E5-base-v2 training)
+        // whether using the `query` or `context` parameter:
         // - User queries → "query:" prefix → get_e10_as_intent()
         // - Stored memories → "passage:" prefix → get_e10_as_context()
         // No artificial modifiers are applied - E5's prefix asymmetry is sufficient

@@ -14,6 +14,8 @@
 //! |-------------|----------------|
 //! | discover_goals | discover_sub_goals |
 //! | consolidate_memories | trigger_consolidation |
+//! | inject_context | store_memory |
+//! | find_contextual_matches | search_by_intent |
 
 /// Resolve a tool name to its canonical form.
 ///
@@ -32,6 +34,9 @@ pub fn resolve_alias(name: &str) -> &str {
     match name {
         "discover_goals" => "discover_sub_goals",
         "consolidate_memories" => "trigger_consolidation",
+        // Merged tools - backward compatibility
+        "inject_context" => "store_memory",
+        "find_contextual_matches" => "search_by_intent",
         other => other,
     }
 }
@@ -54,6 +59,18 @@ mod tests {
     }
 
     #[test]
+    fn test_inject_context_alias() {
+        // inject_context merged into store_memory
+        assert_eq!(resolve_alias("inject_context"), "store_memory");
+    }
+
+    #[test]
+    fn test_find_contextual_matches_alias() {
+        // find_contextual_matches merged into search_by_intent
+        assert_eq!(resolve_alias("find_contextual_matches"), "search_by_intent");
+    }
+
+    #[test]
     fn test_canonical_name_unchanged() {
         // Canonical names should pass through unchanged
         assert_eq!(resolve_alias("discover_sub_goals"), "discover_sub_goals");
@@ -61,7 +78,8 @@ mod tests {
             resolve_alias("trigger_consolidation"),
             "trigger_consolidation"
         );
-        assert_eq!(resolve_alias("inject_context"), "inject_context");
+        assert_eq!(resolve_alias("store_memory"), "store_memory");
+        assert_eq!(resolve_alias("search_by_intent"), "search_by_intent");
         assert_eq!(
             resolve_alias("get_workspace_status"),
             "get_workspace_status"
