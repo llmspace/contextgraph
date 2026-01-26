@@ -180,3 +180,7 @@ required-features = ["real-embeddings"]
 [[bin]]
 name = "weight-profile-bench"
 path = "src/bin/weight_profile_bench.rs"
+
+[[bin]]
+name = "graph-linking-bench"
+path = "src/bin/graph_linking_bench.rs"

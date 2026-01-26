@@ -312,6 +312,16 @@ impl Handlers {
                     }
                 }
 
+                // TASK-GRAPHLINK-PHASE1: Enqueue fingerprint for background K-NN graph building
+                // The BackgroundGraphBuilder will process this in batch every 60s (configurable)
+                if let Some(builder) = self.graph_builder() {
+                    builder.enqueue(fingerprint_id).await;
+                    debug!(
+                        fingerprint_id = %fingerprint_id,
+                        "store_memory: Enqueued for K-NN graph building"
+                    );
+                }
+
                 // TASK-CONTENT-010: Store content text alongside fingerprint
                 // Content storage failure is non-fatal - fingerprint is primary data
                 if let Err(e) = self

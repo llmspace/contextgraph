@@ -32,6 +32,7 @@ pub mod service;
 mod storage_keys;
 mod thresholds;
 mod typed_edge;
+mod weight_projector;
 
 // Re-exports
 pub use direction::DirectedRelation;
@@ -44,6 +45,7 @@ pub use nn_descent::{build_asymmetric_knn, NnDescent, NnDescentConfig, NnDescent
 pub use storage_keys::{EdgeStorageKey, TypedEdgeStorageKey};
 pub use thresholds::{EdgeThresholds, DEFAULT_THRESHOLDS};
 pub use typed_edge::TypedEdge;
+pub use weight_projector::{OptionalProjector, WeightProjector, NUM_EMBEDDERS};
 
 /// Number of neighbors per node in K-NN graph (k=20 per spec)
 pub const KNN_K: usize = 20;

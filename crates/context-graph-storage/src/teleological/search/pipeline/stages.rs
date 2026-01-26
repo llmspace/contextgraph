@@ -1,9 +1,11 @@
 //! Individual pipeline stage implementations.
 //!
-//! This module contains the implementation of each of the 4 pipeline stages:
+//! This module contains the implementation of each of the 6 pipeline stages:
 //! 1. SPLADE Filter (inverted index, NOT HNSW)
 //! 2. Matryoshka ANN (128D HNSW)
 //! 3. RRF Rerank (multi-space)
+//! 3.5. Graph Expansion (K-NN edges)
+//! 3.75. GNN Enhancement (R-GCN message passing)
 //! 4. MaxSim Rerank (ColBERT, NOT HNSW)
 
 use std::collections::{HashMap, HashSet};
@@ -11,6 +13,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use rayon::prelude::*;
+use tracing::debug;
 use uuid::Uuid;
 
 use super::super::super::indexes::EmbedderIndex;
@@ -18,8 +21,10 @@ use super::super::maxsim::compute_maxsim_direct;
 use super::super::single::SingleEmbedderSearch;
 use super::traits::{SpladeIndex, TokenStorage};
 use super::types::{
-    PipelineCandidate, PipelineConfig, PipelineError, PipelineStage, StageConfig, StageResult,
+    GnnEnhanceConfig, GraphExpansionConfig, PipelineCandidate, PipelineConfig, PipelineError,
+    PipelineStage, StageConfig, StageResult,
 };
+use crate::graph_edges::EdgeRepository;
 
 /// Stage execution helper that encapsulates stage logic.
 pub(crate) struct StageExecutor<'a> {
@@ -364,6 +369,361 @@ impl<'a> StageExecutor<'a> {
             candidates_in,
             candidates_out,
             stage: PipelineStage::MaxSimRerank,
+        })
+    }
+
+    // ========================================================================
+    // STAGE 3.5: GRAPH EXPANSION (K-NN Edges)
+    // ========================================================================
+
+    /// Stage 3.5: Expand candidates via pre-computed K-NN graph edges.
+    ///
+    /// This stage enriches the candidate set by adding neighbors from the
+    /// pre-computed graph edges. Neighbors receive a decayed score based on
+    /// their edge weight and the parent candidate's score.
+    ///
+    /// # Arguments
+    ///
+    /// * `candidates` - Current candidate list from Stage 3 (RRF)
+    /// * `edge_repository` - Repository for typed edges
+    /// * `config` - Graph expansion configuration
+    ///
+    /// # Returns
+    ///
+    /// Expanded candidate list with neighbors added.
+    pub fn stage_graph_expansion(
+        &self,
+        candidates: Vec<PipelineCandidate>,
+        edge_repository: &EdgeRepository,
+        config: &GraphExpansionConfig,
+    ) -> Result<StageResult, PipelineError> {
+        let stage_start = Instant::now();
+        let candidates_in = candidates.len();
+
+        if candidates.is_empty() || !config.enabled {
+            return Ok(StageResult {
+                candidates,
+                latency_us: stage_start.elapsed().as_micros() as u64,
+                candidates_in,
+                candidates_out: candidates_in,
+                stage: PipelineStage::GraphExpansion,
+            });
+        }
+
+        // Track which IDs we've already seen to avoid duplicates
+        let mut seen_ids: HashSet<Uuid> = candidates.iter().map(|c| c.id).collect();
+        let mut expanded_candidates = Vec::with_capacity(config.max_total_expanded);
+
+        // Keep original candidates
+        expanded_candidates.extend(candidates.iter().cloned());
+
+        // Track expansion stats for logging
+        let mut total_edges_checked = 0usize;
+        let mut total_edges_followed = 0usize;
+
+        // Expand each candidate
+        for candidate in &candidates {
+            // Check if we've hit the expansion limit
+            if expanded_candidates.len() >= config.max_total_expanded {
+                debug!(
+                    limit = config.max_total_expanded,
+                    "Graph expansion hit max_total_expanded limit"
+                );
+                break;
+            }
+
+            // Get typed edges from this candidate
+            let edges = match edge_repository.get_typed_edges_from(candidate.id) {
+                Ok(e) => e,
+                Err(err) => {
+                    // Log but don't fail - graph edges are enhancement, not critical
+                    debug!(
+                        source_id = %candidate.id,
+                        error = %err,
+                        "Failed to get typed edges, skipping expansion for this candidate"
+                    );
+                    continue;
+                }
+            };
+
+            let mut expansion_count = 0;
+
+            for edge in edges {
+                total_edges_checked += 1;
+
+                // Check edge type routing
+                if !config.edge_type_routing.should_expand(edge.edge_type()) {
+                    continue;
+                }
+
+                // Check edge weight threshold
+                if edge.weight() < config.min_edge_weight {
+                    continue;
+                }
+
+                // Check if we've already seen this target
+                if seen_ids.contains(&edge.target()) {
+                    continue;
+                }
+
+                // Check per-node expansion limit
+                if expansion_count >= config.max_expansion_per_node {
+                    break;
+                }
+
+                // Check total expansion limit
+                if expanded_candidates.len() >= config.max_total_expanded {
+                    break;
+                }
+
+                // Add the neighbor with decayed score
+                // score = parent_score * edge_weight * decay
+                let decayed_score = candidate.score * edge.weight() * config.expansion_decay;
+
+                let mut new_candidate = PipelineCandidate::new(edge.target(), decayed_score);
+                new_candidate.add_stage_score(PipelineStage::GraphExpansion, decayed_score);
+
+                seen_ids.insert(edge.target());
+                expanded_candidates.push(new_candidate);
+                expansion_count += 1;
+                total_edges_followed += 1;
+            }
+        }
+
+        // Sort by score descending
+        expanded_candidates.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        let latency_us = stage_start.elapsed().as_micros() as u64;
+        let latency_ms = latency_us / 1000;
+
+        debug!(
+            candidates_in,
+            candidates_out = expanded_candidates.len(),
+            edges_checked = total_edges_checked,
+            edges_followed = total_edges_followed,
+            latency_ms,
+            "Graph expansion completed"
+        );
+
+        // Check timeout - FAIL FAST
+        if latency_ms > config.max_latency_ms {
+            return Err(PipelineError::Timeout {
+                stage: PipelineStage::GraphExpansion,
+                elapsed_ms: latency_ms,
+                max_ms: config.max_latency_ms,
+            });
+        }
+
+        let candidates_out = expanded_candidates.len();
+
+        Ok(StageResult {
+            candidates: expanded_candidates,
+            latency_us,
+            candidates_in,
+            candidates_out,
+            stage: PipelineStage::GraphExpansion,
+        })
+    }
+
+    // ========================================================================
+    // STAGE 3.75: GNN ENHANCEMENT (R-GCN Message Passing)
+    // ========================================================================
+
+    /// Stage 3.75: GNN-enhanced node embeddings using R-GCN.
+    ///
+    /// This stage uses a pre-trained R-GCN model to propagate information
+    /// between candidates via their graph edges. The GNN computes contextual
+    /// node representations that incorporate neighborhood structure.
+    ///
+    /// # Arguments
+    ///
+    /// * `candidates` - Current candidate list from Stage 3.5 (Graph Expansion)
+    /// * `query_embedding` - Query embedding for computing GNN similarity
+    /// * `edge_repository` - Repository for typed edges
+    /// * `config` - GNN enhancement configuration
+    ///
+    /// # Returns
+    ///
+    /// Candidates with GNN-enhanced scores blended with original scores.
+    ///
+    /// # Note
+    ///
+    /// This stage is disabled by default and requires a trained R-GCN model.
+    /// When disabled, candidates pass through unchanged.
+    #[allow(dead_code)]
+    pub fn stage_gnn_enhance(
+        &self,
+        candidates: Vec<PipelineCandidate>,
+        _query_embedding: &[f32],
+        edge_repository: &EdgeRepository,
+        config: &GnnEnhanceConfig,
+    ) -> Result<StageResult, PipelineError> {
+        let stage_start = Instant::now();
+        let candidates_in = candidates.len();
+
+        // Skip if disabled or no candidates
+        if candidates.is_empty() || !config.enabled {
+            return Ok(StageResult {
+                candidates,
+                latency_us: stage_start.elapsed().as_micros() as u64,
+                candidates_in,
+                candidates_out: candidates_in,
+                stage: PipelineStage::GnnEnhance,
+            });
+        }
+
+        // Skip if no model path configured
+        if config.weights_path.is_none() {
+            debug!("GNN enhancement skipped: no model weights configured");
+            return Ok(StageResult {
+                candidates,
+                latency_us: stage_start.elapsed().as_micros() as u64,
+                candidates_in,
+                candidates_out: candidates_in,
+                stage: PipelineStage::GnnEnhance,
+            });
+        }
+
+        // Build local subgraph from candidates
+        let _candidate_ids: HashSet<_> = candidates.iter().map(|c| c.id).collect();
+        let mut node_to_idx: HashMap<Uuid, usize> = HashMap::with_capacity(candidates.len());
+        let mut idx_to_node: Vec<Uuid> = Vec::with_capacity(candidates.len());
+
+        for (idx, candidate) in candidates.iter().enumerate() {
+            node_to_idx.insert(candidate.id, idx);
+            idx_to_node.push(candidate.id);
+        }
+
+        // Collect edges between candidates (subgraph edges)
+        let mut edge_index: Vec<(usize, usize)> = Vec::new();
+        let mut edge_types: Vec<u8> = Vec::new();
+
+        for candidate in &candidates {
+            if let Ok(edges) = edge_repository.get_typed_edges_from(candidate.id) {
+                let src_idx = node_to_idx[&candidate.id];
+
+                for edge in edges {
+                    // Only include edges where both endpoints are in candidate set
+                    if let Some(&dst_idx) = node_to_idx.get(&edge.target()) {
+                        if edge_index.len() < config.max_subgraph_edges {
+                            edge_index.push((src_idx, dst_idx));
+                            edge_types.push(edge.edge_type() as u8);
+                        }
+                    }
+                }
+            }
+        }
+
+        debug!(
+            nodes = candidates.len(),
+            edges = edge_index.len(),
+            "Built subgraph for GNN enhancement"
+        );
+
+        // For now, we use a simplified GNN scoring approach since the full R-GCN
+        // inference requires candle integration. This approximates the GNN effect
+        // by computing a neighborhood-weighted score.
+        //
+        // In a full implementation, this would:
+        // 1. Load R-GCN model from config.weights_path
+        // 2. Build node feature matrix from reduced E1 embeddings
+        // 3. Run forward pass through R-GCN
+        // 4. Compute similarity between query and GNN-enhanced node embeddings
+        //
+        // For now, we approximate with edge-weighted neighborhood aggregation:
+        // gnn_score(i) = Σ_{j∈N(i)} edge_weight(i,j) * original_score(j)
+
+        let mut gnn_scores: HashMap<Uuid, f32> = HashMap::with_capacity(candidates.len());
+
+        // Initialize with original scores
+        for candidate in &candidates {
+            gnn_scores.insert(candidate.id, candidate.score);
+        }
+
+        // Aggregate neighborhood information
+        for (idx, candidate) in candidates.iter().enumerate() {
+            let mut neighbor_sum = 0.0f32;
+            let mut neighbor_count = 0usize;
+
+            // Find edges where this node is destination
+            for (edge_idx, &(src_idx, dst_idx)) in edge_index.iter().enumerate() {
+                if dst_idx == idx {
+                    let src_node = idx_to_node[src_idx];
+                    if let Some(&src_score) = gnn_scores.get(&src_node) {
+                        // Weight by edge type (semantic edges get higher weight)
+                        let edge_weight = match edge_types[edge_idx] {
+                            0 => 1.0,  // SemanticSimilar
+                            7 => 0.9,  // MultiAgreement
+                            _ => 0.7,  // Other types
+                        };
+                        neighbor_sum += src_score * edge_weight;
+                        neighbor_count += 1;
+                    }
+                }
+            }
+
+            // Compute aggregated GNN score
+            if neighbor_count > 0 {
+                let aggregated = neighbor_sum / neighbor_count as f32;
+                let original = candidate.score;
+                // Blend original and GNN scores
+                let blended = original * (1.0 - config.blend_weight)
+                    + aggregated * config.blend_weight;
+                gnn_scores.insert(candidate.id, blended);
+            }
+        }
+
+        // Apply GNN scores to candidates
+        let mut enhanced_candidates: Vec<PipelineCandidate> = candidates
+            .into_iter()
+            .map(|mut c| {
+                if let Some(&gnn_score) = gnn_scores.get(&c.id) {
+                    c.add_stage_score(PipelineStage::GnnEnhance, gnn_score);
+                }
+                c
+            })
+            .filter(|c| c.score >= config.min_similarity)
+            .collect();
+
+        // Sort by enhanced score
+        enhanced_candidates.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        let latency_us = stage_start.elapsed().as_micros() as u64;
+        let latency_ms = latency_us / 1000;
+
+        debug!(
+            candidates_in,
+            candidates_out = enhanced_candidates.len(),
+            subgraph_edges = edge_index.len(),
+            latency_ms,
+            "GNN enhancement completed"
+        );
+
+        // Check timeout - FAIL FAST
+        if latency_ms > config.max_latency_ms {
+            return Err(PipelineError::Timeout {
+                stage: PipelineStage::GnnEnhance,
+                elapsed_ms: latency_ms,
+                max_ms: config.max_latency_ms,
+            });
+        }
+
+        let candidates_out = enhanced_candidates.len();
+
+        Ok(StageResult {
+            candidates: enhanced_candidates,
+            latency_us,
+            candidates_in,
+            candidates_out,
+            stage: PipelineStage::GnnEnhance,
         })
     }
 }

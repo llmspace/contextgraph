@@ -5,6 +5,7 @@
 use uuid::Uuid;
 
 use super::super::super::indexes::EmbedderIndex;
+use context_graph_core::graph_linking::GraphLinkEdgeType;
 use super::super::error::SearchError;
 
 // ============================================================================
@@ -68,10 +69,235 @@ impl Default for StageConfig {
 }
 
 // ============================================================================
+// GRAPH EXPANSION CONFIGURATION
+// ============================================================================
+
+/// Query type for edge type routing during graph expansion.
+///
+/// Determines which edge types to follow based on query semantics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum QueryType {
+    /// General query - expand via all edge types.
+    #[default]
+    General,
+    /// Code query - prefer E7 CodeRelated edges.
+    Code,
+    /// Causal query - prefer E5 CausalChain edges.
+    Causal,
+    /// Entity query - prefer E11 EntityShared edges.
+    Entity,
+    /// Intent query - prefer E10 IntentAligned edges.
+    Intent,
+}
+
+impl QueryType {
+    /// Detect query type from query text and optional weight profile.
+    pub fn from_query(query: &str, weight_profile: Option<&str>) -> Self {
+        // Check weight profile first (explicit preference)
+        if let Some(profile) = weight_profile {
+            match profile {
+                "code_search" => return Self::Code,
+                "causal_reasoning" => return Self::Causal,
+                "fact_checking" => return Self::Entity,
+                "intent_search" | "intent_enhanced" => return Self::Intent,
+                _ => {}
+            }
+        }
+
+        // Heuristic detection from query text
+        let q = query.to_lowercase();
+        if q.contains("function") || q.contains("implement") || q.contains("code")
+            || q.contains("struct") || q.contains("class") || q.contains("method")
+        {
+            Self::Code
+        } else if q.contains("why") || q.contains("cause") || q.contains("because")
+            || q.contains("reason") || q.contains("led to")
+        {
+            Self::Causal
+        } else if q.contains("what is") || q.contains("entity") || q.contains("who is")
+            || q.contains("define")
+        {
+            Self::Entity
+        } else if q.contains("goal") || q.contains("intent") || q.contains("purpose")
+            || q.contains("trying to")
+        {
+            Self::Intent
+        } else {
+            Self::General
+        }
+    }
+}
+
+/// Edge type routing strategy for graph expansion.
+///
+/// Determines which edge types to follow during expansion.
+#[derive(Debug, Clone, Default)]
+pub enum EdgeTypeRouting {
+    /// Follow all edge types (default).
+    #[default]
+    All,
+    /// Route based on detected query type.
+    QuerySpecific {
+        /// The detected query type.
+        query_type: QueryType,
+    },
+    /// Follow only specific edge types.
+    Custom(Vec<GraphLinkEdgeType>),
+}
+
+impl EdgeTypeRouting {
+    /// Check if an edge type should be expanded.
+    pub fn should_expand(&self, edge_type: GraphLinkEdgeType) -> bool {
+        match self {
+            Self::All => true,
+            Self::QuerySpecific { query_type } => match query_type {
+                QueryType::Code => matches!(
+                    edge_type,
+                    GraphLinkEdgeType::CodeRelated | GraphLinkEdgeType::MultiAgreement
+                ),
+                QueryType::Causal => matches!(
+                    edge_type,
+                    GraphLinkEdgeType::CausalChain | GraphLinkEdgeType::MultiAgreement
+                ),
+                QueryType::Entity => matches!(
+                    edge_type,
+                    GraphLinkEdgeType::EntityShared | GraphLinkEdgeType::MultiAgreement
+                ),
+                QueryType::Intent => matches!(
+                    edge_type,
+                    GraphLinkEdgeType::IntentAligned | GraphLinkEdgeType::MultiAgreement
+                ),
+                QueryType::General => true,
+            },
+            Self::Custom(types) => types.contains(&edge_type),
+        }
+    }
+}
+
+/// Configuration for graph expansion stage (Stage 3.5).
+///
+/// Controls how candidates are expanded via pre-computed K-NN graph edges.
+#[derive(Debug, Clone)]
+pub struct GraphExpansionConfig {
+    /// Whether graph expansion is enabled.
+    pub enabled: bool,
+    /// Maximum neighbors to expand per candidate node.
+    pub max_expansion_per_node: usize,
+    /// Minimum edge weight threshold to follow an edge.
+    pub min_edge_weight: f32,
+    /// Decay factor applied to expanded node scores (0.0-1.0).
+    /// Expanded nodes get score = parent_score * edge_weight * expansion_decay.
+    pub expansion_decay: f32,
+    /// Edge type routing strategy.
+    pub edge_type_routing: EdgeTypeRouting,
+    /// Maximum total expanded candidates (to prevent explosion).
+    pub max_total_expanded: usize,
+    /// Maximum latency in milliseconds.
+    pub max_latency_ms: u64,
+}
+
+impl Default for GraphExpansionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_expansion_per_node: 5,
+            min_edge_weight: 0.4,
+            expansion_decay: 0.8,
+            edge_type_routing: EdgeTypeRouting::default(),
+            max_total_expanded: 150,
+            max_latency_ms: 10,
+        }
+    }
+}
+
+impl GraphExpansionConfig {
+    /// Create a disabled configuration.
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            ..Default::default()
+        }
+    }
+
+    /// Set edge type routing based on query.
+    pub fn with_query_routing(mut self, query: &str, weight_profile: Option<&str>) -> Self {
+        let query_type = QueryType::from_query(query, weight_profile);
+        self.edge_type_routing = EdgeTypeRouting::QuerySpecific { query_type };
+        self
+    }
+}
+
+// ============================================================================
+// GNN ENHANCEMENT CONFIGURATION
+// ============================================================================
+
+/// Configuration for GNN enhancement stage (Stage 3.75).
+///
+/// Controls R-GCN message passing for learned retrieval enhancement.
+/// Uses pre-computed graph edges to propagate information between nodes.
+#[derive(Debug, Clone)]
+pub struct GnnEnhanceConfig {
+    /// Whether GNN enhancement is enabled.
+    pub enabled: bool,
+    /// Path to the R-GCN model weights (SafeTensors).
+    pub weights_path: Option<String>,
+    /// Weight for blending GNN score with original score (0.0-1.0).
+    /// final_score = original * (1 - blend_weight) + gnn_score * blend_weight
+    pub blend_weight: f32,
+    /// Maximum subgraph nodes to include for GNN forward pass.
+    pub max_subgraph_nodes: usize,
+    /// Maximum subgraph edges to include.
+    pub max_subgraph_edges: usize,
+    /// Minimum similarity for GNN re-scoring (skip low-similarity candidates).
+    pub min_similarity: f32,
+    /// Maximum latency in milliseconds.
+    pub max_latency_ms: u64,
+}
+
+impl Default for GnnEnhanceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false, // Disabled by default (requires trained model)
+            weights_path: None,
+            blend_weight: 0.3,
+            max_subgraph_nodes: 200,
+            max_subgraph_edges: 1000,
+            min_similarity: 0.3,
+            max_latency_ms: 20,
+        }
+    }
+}
+
+impl GnnEnhanceConfig {
+    /// Create a disabled configuration.
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            ..Default::default()
+        }
+    }
+
+    /// Create an enabled configuration with model path.
+    pub fn with_model(weights_path: impl Into<String>) -> Self {
+        Self {
+            enabled: true,
+            weights_path: Some(weights_path.into()),
+            ..Default::default()
+        }
+    }
+
+    /// Set blend weight.
+    pub fn with_blend_weight(mut self, weight: f32) -> Self {
+        self.blend_weight = weight.clamp(0.0, 1.0);
+        self
+    }
+}
+
+// ============================================================================
 // PIPELINE STAGE ENUM
 // ============================================================================
 
-/// The 4 pipeline stages.
+/// The 6 pipeline stages (including optional graph expansion and GNN enhancement).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PipelineStage {
     /// Stage 1: SPLADE sparse pre-filter (inverted index).
@@ -80,24 +306,42 @@ pub enum PipelineStage {
     MatryoshkaAnn,
     /// Stage 3: Multi-space RRF rerank.
     RrfRerank,
+    /// Stage 3.5: Graph expansion via K-NN edges.
+    GraphExpansion,
+    /// Stage 3.75: GNN-enhanced node embeddings (R-GCN).
+    GnnEnhance,
     /// Stage 4: Late interaction MaxSim.
     MaxSimRerank,
 }
 
 impl PipelineStage {
-    /// Get the stage index (0-3).
+    /// Get the stage index (0-5).
     #[inline]
     pub fn index(&self) -> usize {
         match self {
             Self::SpladeFilter => 0,
             Self::MatryoshkaAnn => 1,
             Self::RrfRerank => 2,
-            Self::MaxSimRerank => 3,
+            Self::GraphExpansion => 3,
+            Self::GnnEnhance => 4,
+            Self::MaxSimRerank => 5,
         }
     }
 
     /// Get all stages in order.
-    pub fn all() -> [Self; 4] {
+    pub fn all() -> [Self; 6] {
+        [
+            Self::SpladeFilter,
+            Self::MatryoshkaAnn,
+            Self::RrfRerank,
+            Self::GraphExpansion,
+            Self::GnnEnhance,
+            Self::MaxSimRerank,
+        ]
+    }
+
+    /// Get core stages (excluding optional stages).
+    pub fn core() -> [Self; 4] {
         [
             Self::SpladeFilter,
             Self::MatryoshkaAnn,
@@ -167,8 +411,13 @@ pub struct StageResult {
 /// Configuration for the full pipeline.
 #[derive(Debug, Clone)]
 pub struct PipelineConfig {
-    /// Per-stage configurations (indexed by PipelineStage as usize).
+    /// Per-stage configurations (indexed 0-3 for core stages).
+    /// 0 = SPLADE, 1 = Matryoshka, 2 = RRF, 3 = MaxSim
     pub stages: [StageConfig; 4],
+    /// Graph expansion configuration (Stage 3.5, between RRF and MaxSim).
+    pub graph_expansion: GraphExpansionConfig,
+    /// GNN enhancement configuration (Stage 3.75, after graph expansion).
+    pub gnn_enhance: GnnEnhanceConfig,
     /// Final result limit.
     pub k: usize,
     /// RRF constant (default 60.0).
@@ -200,8 +449,10 @@ impl Default for PipelineConfig {
                     candidate_multiplier: 1.0,
                     max_latency_ms: 15,
                     ..Default::default()
-                }, // Stage 4: final
+                }, // Stage 4: MaxSim final
             ],
+            graph_expansion: GraphExpansionConfig::default(),
+            gnn_enhance: GnnEnhanceConfig::default(),
             k: 10,
             rrf_k: 60.0,
             rrf_embedders: vec![
@@ -210,6 +461,34 @@ impl Default for PipelineConfig {
                 EmbedderIndex::E5Causal,
             ],
         }
+    }
+}
+
+impl PipelineConfig {
+    /// Create configuration with graph expansion disabled.
+    pub fn without_graph_expansion() -> Self {
+        Self {
+            graph_expansion: GraphExpansionConfig::disabled(),
+            ..Default::default()
+        }
+    }
+
+    /// Set graph expansion config.
+    pub fn with_graph_expansion(mut self, config: GraphExpansionConfig) -> Self {
+        self.graph_expansion = config;
+        self
+    }
+
+    /// Set GNN enhancement config.
+    pub fn with_gnn_enhance(mut self, config: GnnEnhanceConfig) -> Self {
+        self.gnn_enhance = config;
+        self
+    }
+
+    /// Create configuration with GNN enhancement enabled.
+    pub fn with_gnn_model(mut self, weights_path: impl Into<String>) -> Self {
+        self.gnn_enhance = GnnEnhanceConfig::with_model(weights_path);
+        self
     }
 }
 

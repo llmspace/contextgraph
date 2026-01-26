@@ -19,6 +19,7 @@ pub mod e4_hybrid_session;
 pub mod e7_code;
 pub mod e7_iou;
 pub mod e11_entity;
+pub mod graph_linking;
 pub mod mcp_intent;
 pub mod multimodal;
 pub mod performance;
@@ -70,6 +71,11 @@ pub use e7_code::{
 pub use e7_iou::{
     CodeToken, IoUMetrics, IoUResult, TokenType,
     compute_iou_at_k, compute_iou_result, compute_token_iou, extract_token_strings, tokenize_code,
+};
+pub use graph_linking::{
+    BackgroundBuilderMetrics, EdgeBuilderMetrics, GraphExpansionMetrics,
+    GraphLinkingReport, LatencyStats as GraphLatencyStats, LatencyTracker, MemoryStats,
+    NNDescentMetrics, RGCNMetrics, WeightComparisonMetrics, WeightProjectionMetrics,
 };
 
 /// Combined metrics for a single benchmark run.

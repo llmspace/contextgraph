@@ -68,6 +68,8 @@ use context_graph_embeddings::{
 // REAL implementations - NO STUBS
 use crate::adapters::LazyMultiArrayProvider;
 use context_graph_storage::teleological::RocksDbTeleologicalStore;
+// TASK-GRAPHLINK: EdgeRepository and BackgroundGraphBuilder for K-NN graph linking
+use context_graph_storage::{BackgroundGraphBuilder, EdgeRepository, GraphBuilderConfig};
 
 use crate::handlers::Handlers;
 use crate::protocol::{JsonRpcRequest, JsonRpcResponse};
@@ -113,6 +115,11 @@ pub struct McpServer {
     code_watcher_task: Arc<RwLock<Option<JoinHandle<()>>>>,
     /// Flag to signal code watcher shutdown.
     code_watcher_running: Arc<AtomicBool>,
+    /// TASK-GRAPHLINK-PHASE1: Background graph builder for K-NN edge computation.
+    /// Builds typed edges from embedder agreement patterns.
+    graph_builder: Option<Arc<BackgroundGraphBuilder>>,
+    /// TASK-GRAPHLINK-PHASE1: Background graph builder worker task handle.
+    graph_builder_task: Arc<RwLock<Option<JoinHandle<()>>>>,
 }
 
 impl McpServer {
@@ -160,11 +167,26 @@ impl McpServer {
             db_path
         );
 
+        // TASK-GRAPHLINK: Extract Arc<DB> BEFORE wrapping in trait object
+        // EdgeRepository needs direct access to the RocksDB instance for graph edge storage
+        let db_arc = rocksdb_store.db_arc();
+        info!("Extracted Arc<DB> for EdgeRepository - graph linking enabled");
+
         // Note: EmbedderIndexRegistry is initialized in the constructor,
         // so no separate initialization step is needed.
         info!("Created store with EmbedderIndexRegistry (12 HNSW-capable embedders initialized)");
 
+        // Now wrap in Arc<dyn TeleologicalMemoryStore>
         let teleological_store: Arc<dyn TeleologicalMemoryStore> = Arc::new(rocksdb_store);
+
+        // Create EdgeRepository sharing the same RocksDB instance
+        // NO FALLBACKS - If this fails, the system errors so we can debug
+        let edge_repository = EdgeRepository::new(db_arc);
+        info!("Created EdgeRepository for K-NN graph linking - NO FALLBACKS enabled");
+
+        // TASK-GRAPHLINK-PHASE1: EdgeRepository clone for BackgroundGraphBuilder
+        // The builder will use this to persist K-NN edges computed from embedder agreement
+        let edge_repository_for_builder = edge_repository.clone();
 
         // ==========================================================================
         // 2. REAL MultiArrayEmbeddingProvider - 13 GPU-accelerated embedders
@@ -400,13 +422,32 @@ impl McpServer {
         // - AST-aware chunking (function/struct boundaries)
         // - Incremental updates without re-embedding entire files
 
-        // TASK-INTEG-TOPIC: Use with_defaults to automatically create clustering components
-        let handlers = Handlers::with_defaults(
+        // TASK-GRAPHLINK-PHASE1: Create BackgroundGraphBuilder for K-NN edge computation
+        // The builder queues fingerprints from store_memory and processes them in batches
+        // every 60 seconds (configurable via GraphBuilderConfig)
+        let graph_builder = Arc::new(BackgroundGraphBuilder::new(
+            edge_repository_for_builder,
+            Arc::clone(&teleological_store),
+            Arc::clone(&lazy_provider),
+            GraphBuilderConfig::default(),
+        ));
+        info!(
+            "Created BackgroundGraphBuilder - batch interval={}s, k={}, min_batch={}",
+            graph_builder.config().batch_interval_secs,
+            graph_builder.config().k,
+            graph_builder.config().min_batch_size,
+        );
+
+        // TASK-GRAPHLINK: Use with_full_graph_linking to enable K-NN graph operations
+        // with background builder support. NO FALLBACKS - EdgeRepository MUST work or tools will error
+        let handlers = Handlers::with_full_graph_linking(
             Arc::clone(&teleological_store),
             lazy_provider,
             layer_status_provider,
+            edge_repository,
+            Arc::clone(&graph_builder),
         );
-        info!("Created Handlers with 14 MCP tools including topic detection and clustering");
+        info!("Created Handlers with full graph linking enabled (K-NN edges + background builder, NO FALLBACKS)");
 
         info!(
             "MCP Server initialization complete - TeleologicalFingerprint mode with 13 embeddings"
@@ -434,6 +475,9 @@ impl McpServer {
             // E7-WIRING: Code watcher fields initialized as None/false
             code_watcher_task: Arc::new(RwLock::new(None)),
             code_watcher_running: Arc::new(AtomicBool::new(false)),
+            // TASK-GRAPHLINK-PHASE1: Graph builder for background K-NN edge computation
+            graph_builder: Some(graph_builder),
+            graph_builder_task: Arc::new(RwLock::new(None)),
         })
     }
 
@@ -459,6 +503,14 @@ impl McpServer {
         let mut line = String::new();
 
         info!("Server ready, waiting for requests (TeleologicalMemoryStore mode)...");
+
+        // TASK-GRAPHLINK-PHASE1: Start background graph builder worker
+        // This processes fingerprints from the queue and builds K-NN edges
+        match self.start_graph_builder().await {
+            Ok(true) => info!("Background graph builder started"),
+            Ok(false) => debug!("Background graph builder not configured or failed to start"),
+            Err(e) => warn!("Failed to start background graph builder: {}", e),
+        }
 
         loop {
             line.clear();
@@ -522,6 +574,13 @@ impl McpServer {
     /// - Safe to call multiple times (idempotent)
     pub async fn shutdown(&self) {
         info!("Initiating graceful shutdown...");
+
+        // TASK-GRAPHLINK-PHASE1: Stop graph builder worker
+        self.stop_graph_builder().await;
+
+        // Stop code watcher if running
+        self.stop_code_watcher().await;
+
         info!("Graceful shutdown complete");
     }
 
@@ -891,6 +950,94 @@ impl McpServer {
         }
     }
 
+    // =========================================================================
+    // TASK-GRAPHLINK-PHASE1: Background Graph Builder
+    // =========================================================================
+
+    /// Start the background graph builder worker.
+    ///
+    /// TASK-GRAPHLINK-PHASE1: The graph builder processes fingerprints from the queue
+    /// and builds K-NN graphs every batch_interval_secs (default: 60s).
+    ///
+    /// # Returns
+    ///
+    /// `Ok(true)` if the worker started successfully, `Ok(false)` if no graph builder
+    /// is configured, `Err` on failure.
+    pub async fn start_graph_builder(&self) -> Result<bool> {
+        let graph_builder = match &self.graph_builder {
+            Some(builder) => Arc::clone(builder),
+            None => {
+                debug!("No graph builder configured - skipping worker start");
+                return Ok(false);
+            }
+        };
+
+        // Wait for embedding models to be ready (needed for graph building)
+        if self.models_loading.load(Ordering::SeqCst) {
+            info!("Waiting for embedding models to load before starting graph builder...");
+            for _ in 0..120 {
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                if !self.models_loading.load(Ordering::SeqCst) {
+                    break;
+                }
+            }
+            if self.models_loading.load(Ordering::SeqCst) {
+                error!("Embedding models still loading after 60s - skipping graph builder");
+                return Ok(false);
+            }
+        }
+
+        // Check if model loading failed
+        {
+            let failed = self.models_failed.read().await;
+            if let Some(ref err) = *failed {
+                error!("Cannot start graph builder - embedding models failed: {}", err);
+                return Ok(false);
+            }
+        }
+
+        info!(
+            "TASK-GRAPHLINK-PHASE1: Starting background graph builder worker (interval={}s)",
+            graph_builder.config().batch_interval_secs
+        );
+
+        // Start the worker
+        let task = graph_builder.start_worker();
+
+        // Store the task handle
+        {
+            let mut task_guard = self.graph_builder_task.write().await;
+            *task_guard = Some(task);
+        }
+
+        info!("TASK-GRAPHLINK-PHASE1: Background graph builder started successfully");
+        Ok(true)
+    }
+
+    /// Stop the background graph builder worker.
+    ///
+    /// Signals the worker to stop and waits for it to complete.
+    #[allow(dead_code)]
+    pub async fn stop_graph_builder(&self) {
+        if let Some(ref builder) = self.graph_builder {
+            builder.stop();
+        }
+
+        // Wait for task to complete
+        let task = {
+            let mut guard = self.graph_builder_task.write().await;
+            guard.take()
+        };
+
+        if let Some(handle) = task {
+            if let Err(e) = handle.await {
+                error!(error = %e, "Graph builder task failed to join");
+            } else {
+                info!("Graph builder stopped");
+            }
+        }
+    }
+
     /// Handle a single JSON-RPC request.
     async fn handle_request(&self, input: &str) -> JsonRpcResponse {
         // Parse request
@@ -1085,6 +1232,14 @@ impl McpServer {
             "MCP Server listening on TCP {} (max_connections={})",
             bind_addr, self.config.mcp.max_connections
         );
+
+        // TASK-GRAPHLINK-PHASE1: Start background graph builder worker
+        // This processes fingerprints from the queue and builds K-NN edges
+        match self.start_graph_builder().await {
+            Ok(true) => info!("Background graph builder started"),
+            Ok(false) => debug!("Background graph builder not configured or failed to start"),
+            Err(e) => warn!("Failed to start background graph builder: {}", e),
+        }
 
         loop {
             // Accept new connections
@@ -1322,6 +1477,14 @@ impl McpServer {
             "MCP Server listening on SSE http://{}/events (max_connections={})",
             bind_addr, self.config.mcp.max_connections
         );
+
+        // TASK-GRAPHLINK-PHASE1: Start background graph builder worker
+        // This processes fingerprints from the queue and builds K-NN edges
+        match self.start_graph_builder().await {
+            Ok(true) => info!("Background graph builder started"),
+            Ok(false) => debug!("Background graph builder not configured or failed to start"),
+            Err(e) => warn!("Failed to start background graph builder: {}", e),
+        }
 
         // Run axum server with explicit type annotation
         axum::serve(listener, router.into_make_service())

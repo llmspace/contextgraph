@@ -1,8 +1,8 @@
-//! 4-Stage Retrieval Pipeline with Progressive Filtering.
+//! 5-Stage Retrieval Pipeline with Progressive Filtering and Graph Expansion.
 //!
 //! # Overview
 //!
-//! Implements a 4-stage retrieval pipeline optimizing latency by progressively
+//! Implements a 5-stage retrieval pipeline optimizing latency by progressively
 //! filtering candidates through stages of increasing precision but decreasing speed.
 //! Target: <60ms at 1M memories.
 //!
@@ -26,10 +26,16 @@
 //!    - Input: 1K -> Output: 100 candidates
 //!    - Latency: <20ms
 //!
+//! 3.5. **Stage 3.5: Graph Expansion** (Optional)
+//!    - Expands candidates via pre-computed K-NN graph edges
+//!    - Adds semantically connected neighbors with decayed scores
+//!    - Input: ~100 -> Output: ~150 candidates
+//!    - Latency: <10ms
+//!
 //! 4. **Stage 4: Late Interaction MaxSim** (E12)
 //!    - Uses ColBERT-style token-level matching, NOT HNSW
 //!    - Final precision reranking
-//!    - Input: 100 -> Output: k results (typically 10)
+//!    - Input: 100-150 -> Output: k results (typically 10)
 //!    - Latency: <15ms
 //!
 //! # Design Philosophy
@@ -85,8 +91,8 @@ pub use traits::{
     InMemorySpladeIndex, InMemoryTokenStorage, SpladeIndex, TokenStorage,
 };
 pub use types::{
-    PipelineCandidate, PipelineConfig, PipelineError, PipelineResult, PipelineStage, StageConfig,
-    StageResult,
+    EdgeTypeRouting, GraphExpansionConfig, PipelineCandidate, PipelineConfig, PipelineError,
+    PipelineResult, PipelineStage, QueryType, StageConfig, StageResult,
 };
 
 // Note: E6 sparse index types are test-only and accessed via traits module directly.

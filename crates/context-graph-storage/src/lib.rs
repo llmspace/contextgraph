@@ -188,5 +188,6 @@ pub use context_graph_core::types::{
 
 // Re-export graph edges storage types (TASK-GRAPHLINK)
 pub use graph_edges::{
-    EdgeRepository, GraphEdgeStats, GraphEdgeStorageError, GraphEdgeStorageResult,
+    BackgroundGraphBuilder, BatchBuildResult, BuilderStats, EdgeRepository, GraphBuilderConfig,
+    GraphEdgeStats, GraphEdgeStorageError, GraphEdgeStorageResult, RebuildResult,
 };

@@ -7,6 +7,7 @@ pub mod causal;
 pub mod e1_semantic;
 pub mod e11_entity;
 pub mod generator;
+pub mod graph_linking;
 pub mod ground_truth;
 pub mod mcp_intent;
 pub mod multimodal;
@@ -41,6 +42,10 @@ pub use e11_entity::{
     E11EntityBenchmarkDataset, E11EntityDatasetConfig, E11EntityDatasetLoader,
     E11EntityDatasetStats, EntityDocument, EntityGroundTruth, EntityLinkSerializable,
     EntityPair, KnowledgeTriple,
+};
+pub use graph_linking::{
+    CandidateData, ExpectedEdge, GraphLinkingDataset, GraphLinkingDatasetConfig,
+    MemoryData, MemoryPair, ScaleTier, SubgraphData,
 };
 
 use std::collections::{HashMap, HashSet};

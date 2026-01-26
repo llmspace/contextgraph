@@ -18,11 +18,12 @@
 //! - AP-77: E5 MUST NOT use symmetric cosine
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use uuid::Uuid;
 
 use super::{
     DirectedRelation, EdgeResult, EdgeThresholds, GraphLinkEdgeType, KnnGraph, TypedEdge,
-    DEFAULT_THRESHOLDS,
+    WeightProjector, DEFAULT_THRESHOLDS,
 };
 
 /// Per-embedder similarity thresholds for agreement calculation.
@@ -44,7 +45,6 @@ pub const DEFAULT_EMBEDDER_THRESHOLDS: [f32; 13] = [
 ];
 
 /// Configuration for the EdgeBuilder.
-#[derive(Debug, Clone)]
 pub struct EdgeBuilderConfig {
     /// Minimum weighted agreement for creating typed edges.
     /// Default: 2.5 (same as topic threshold per ARCH-09).
@@ -59,6 +59,12 @@ pub struct EdgeBuilderConfig {
     /// Whether to include temporal embedders in agreement calculation.
     /// Per AP-60, this should be false.
     pub include_temporal: bool,
+
+    /// Optional learned weight projection model.
+    ///
+    /// When set, edge weights are computed using a trained neural network
+    /// instead of the constitution-based weighted agreement.
+    pub learned_projection: Option<Arc<dyn WeightProjector>>,
 }
 
 impl Default for EdgeBuilderConfig {
@@ -68,6 +74,31 @@ impl Default for EdgeBuilderConfig {
             embedder_thresholds: DEFAULT_EMBEDDER_THRESHOLDS,
             edge_thresholds: DEFAULT_THRESHOLDS,
             include_temporal: false, // AP-60: Never include temporal
+            learned_projection: None,
+        }
+    }
+}
+
+impl std::fmt::Debug for EdgeBuilderConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EdgeBuilderConfig")
+            .field("min_weighted_agreement", &self.min_weighted_agreement)
+            .field("embedder_thresholds", &self.embedder_thresholds)
+            .field("edge_thresholds", &self.edge_thresholds)
+            .field("include_temporal", &self.include_temporal)
+            .field("learned_projection", &self.learned_projection.is_some())
+            .finish()
+    }
+}
+
+impl Clone for EdgeBuilderConfig {
+    fn clone(&self) -> Self {
+        Self {
+            min_weighted_agreement: self.min_weighted_agreement,
+            embedder_thresholds: self.embedder_thresholds,
+            edge_thresholds: self.edge_thresholds.clone(),
+            include_temporal: self.include_temporal,
+            learned_projection: self.learned_projection.clone(),
         }
     }
 }
@@ -88,6 +119,15 @@ impl EdgeBuilderConfig {
     /// Set edge type thresholds.
     pub fn with_edge_thresholds(mut self, thresholds: EdgeThresholds) -> Self {
         self.edge_thresholds = thresholds;
+        self
+    }
+
+    /// Set learned weight projection model.
+    ///
+    /// When set, edge weights are computed using the trained model instead
+    /// of constitution-based weighted agreement.
+    pub fn with_learned_projection(mut self, projector: Arc<dyn WeightProjector>) -> Self {
+        self.learned_projection = Some(projector);
         self
     }
 }
@@ -235,9 +275,14 @@ impl EdgeBuilder {
             direction = DirectedRelation::Symmetric;
         }
 
-        // Compute weight as normalized agreement
-        let max_agreement = 8.5; // 7×1.0 (semantic) + 2×0.5 (relational) + 1×0.5 (structural)
-        let weight = (weighted_agreement / max_agreement).min(1.0);
+        // Compute weight: use learned projection if available, else fallback to normalized agreement
+        let weight = if let Some(ref projector) = self.config.learned_projection {
+            projector.project(&embedder_scores)
+        } else {
+            // Fallback: normalize weighted agreement to [0, 1]
+            let max_agreement = 8.5; // 7×1.0 (semantic) + 2×0.5 (relational) + 1×0.5 (structural)
+            (weighted_agreement / max_agreement).min(1.0)
+        };
 
         let typed_edge = TypedEdge::new(
             source,

@@ -1,11 +1,13 @@
 //! Main pipeline execution logic.
 //!
 //! This module contains the `RetrievalPipeline` struct and the core
-//! execution logic for the 4-stage retrieval pipeline.
+//! execution logic for the 5-stage retrieval pipeline (including graph expansion).
 
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Instant;
+
+use tracing::debug;
 
 use super::super::super::indexes::{EmbedderIndex, EmbedderIndexRegistry};
 use super::super::error::SearchError;
@@ -16,12 +18,13 @@ use super::traits::{InMemorySpladeIndex, InMemoryTokenStorage, SpladeIndex, Toke
 use super::types::{
     PipelineCandidate, PipelineConfig, PipelineError, PipelineResult, PipelineStage, StageResult,
 };
+use crate::graph_edges::EdgeRepository;
 
 // ============================================================================
 // RETRIEVAL PIPELINE
 // ============================================================================
 
-/// The 4-stage retrieval pipeline.
+/// The 5-stage retrieval pipeline (including graph expansion).
 pub struct RetrievalPipeline {
     /// Single embedder search (for Stage 2).
     single_search: SingleEmbedderSearch,
@@ -33,6 +36,8 @@ pub struct RetrievalPipeline {
     splade_index: Arc<dyn SpladeIndex>,
     /// Token storage (for Stage 4 MaxSim).
     token_storage: Arc<dyn TokenStorage>,
+    /// Edge repository for graph expansion (Stage 3.5).
+    edge_repository: Option<Arc<EdgeRepository>>,
     /// Pipeline configuration.
     pub(crate) config: PipelineConfig,
 }
@@ -54,6 +59,7 @@ impl RetrievalPipeline {
             multi_search: MultiEmbedderSearch::new(registry),
             splade_index: splade_index.unwrap_or_else(|| Arc::new(InMemorySpladeIndex::new())),
             token_storage: token_storage.unwrap_or_else(|| Arc::new(InMemoryTokenStorage::new())),
+            edge_repository: None,
             config: PipelineConfig::default(),
         }
     }
@@ -70,8 +76,23 @@ impl RetrievalPipeline {
             multi_search: MultiEmbedderSearch::new(registry),
             splade_index: splade_index.unwrap_or_else(|| Arc::new(InMemorySpladeIndex::new())),
             token_storage: token_storage.unwrap_or_else(|| Arc::new(InMemoryTokenStorage::new())),
+            edge_repository: None,
             config,
         }
+    }
+
+    /// Set the edge repository for graph expansion.
+    ///
+    /// # Arguments
+    /// * `edge_repository` - Edge repository for typed edges
+    pub fn with_edge_repository(mut self, edge_repository: Arc<EdgeRepository>) -> Self {
+        self.edge_repository = Some(edge_repository);
+        self
+    }
+
+    /// Get the edge repository.
+    pub fn edge_repository(&self) -> Option<&Arc<EdgeRepository>> {
+        self.edge_repository.as_ref()
     }
 
     /// Get the current configuration.
@@ -80,7 +101,7 @@ impl RetrievalPipeline {
         &self.config
     }
 
-    /// Execute full 4-stage pipeline.
+    /// Execute full 5-stage pipeline (including graph expansion).
     ///
     /// # Arguments
     /// * `query_splade` - Sparse vector for Stage 1 as (term_id, weight) pairs
@@ -108,6 +129,23 @@ impl RetrievalPipeline {
         )
     }
 
+    /// Execute core stages only (without graph expansion).
+    pub fn execute_core(
+        &self,
+        query_splade: &[(usize, f32)],
+        query_matryoshka: &[f32],
+        query_semantic: &[f32],
+        query_tokens: &[Vec<f32>],
+    ) -> Result<PipelineResult, PipelineError> {
+        self.execute_stages(
+            query_splade,
+            query_matryoshka,
+            query_semantic,
+            query_tokens,
+            &PipelineStage::core(),
+        )
+    }
+
     /// Execute with stage selection.
     pub fn execute_stages(
         &self,
@@ -118,8 +156,8 @@ impl RetrievalPipeline {
         stages: &[PipelineStage],
     ) -> Result<PipelineResult, PipelineError> {
         let pipeline_start = Instant::now();
-        let mut stage_results = Vec::with_capacity(4);
-        let mut stages_executed = Vec::with_capacity(4);
+        let mut stage_results = Vec::with_capacity(5);
+        let mut stages_executed = Vec::with_capacity(5);
         let mut candidates: Vec<PipelineCandidate> = Vec::new();
 
         // Validate queries upfront - FAIL FAST
@@ -199,6 +237,43 @@ impl RetrievalPipeline {
             };
             stage_results.push(stage_result);
             stages_executed.push(PipelineStage::RrfRerank);
+        }
+
+        // Stage 3.5: Graph Expansion (optional)
+        if stage_set.contains(&PipelineStage::GraphExpansion)
+            && self.config.graph_expansion.enabled
+        {
+            if let Some(ref edge_repo) = self.edge_repository {
+                let result = executor.stage_graph_expansion(
+                    candidates,
+                    edge_repo.as_ref(),
+                    &self.config.graph_expansion,
+                )?;
+                // Extract Copy fields before moving Vec
+                let latency_us = result.latency_us;
+                let candidates_in = result.candidates_in;
+                let candidates_out = result.candidates_out;
+                let stage = result.stage;
+                candidates = result.candidates;
+                let stage_result = StageResult {
+                    candidates: Vec::new(),
+                    latency_us,
+                    candidates_in,
+                    candidates_out,
+                    stage,
+                };
+                stage_results.push(stage_result);
+                stages_executed.push(PipelineStage::GraphExpansion);
+
+                debug!(
+                    candidates_in,
+                    candidates_out,
+                    latency_us,
+                    "Graph expansion stage completed"
+                );
+            } else {
+                debug!("Graph expansion enabled but no edge_repository configured, skipping");
+            }
         }
 
         // Stage 4: MaxSim Rerank

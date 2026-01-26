@@ -17,7 +17,7 @@ use context_graph_core::clustering::{MultiSpaceClusterManager, TopicStabilityTra
 use context_graph_core::memory::{CodeEmbeddingProvider, CodeStorage};
 use context_graph_core::monitoring::LayerStatusProvider;
 use context_graph_core::traits::{MultiArrayEmbeddingProvider, TeleologicalMemoryStore};
-use context_graph_storage::EdgeRepository;
+use context_graph_storage::{BackgroundGraphBuilder, EdgeRepository};
 
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
 
@@ -76,6 +76,11 @@ pub struct Handlers {
     /// Optional - only present if graph linking is enabled.
     /// TASK-GRAPHLINK: Added for get_memory_neighbors, get_typed_edges, traverse_graph tools.
     pub(in crate::handlers) edge_repository: Option<EdgeRepository>,
+
+    /// Background graph builder for K-NN graph construction.
+    /// Optional - only present if graph linking is enabled.
+    /// Queues fingerprints on store_memory and builds edges in batches.
+    pub(in crate::handlers) graph_builder: Option<Arc<BackgroundGraphBuilder>>,
 }
 
 impl Handlers {
@@ -109,6 +114,7 @@ impl Handlers {
             code_embedding_provider: None,
             // TASK-GRAPHLINK: Graph linking disabled by default
             edge_repository: None,
+            graph_builder: None,
         }
     }
 
@@ -146,6 +152,87 @@ impl Handlers {
             code_embedding_provider: Some(code_embedding_provider),
             // TASK-GRAPHLINK: Graph linking disabled by default in with_code_pipeline
             edge_repository: None,
+            graph_builder: None,
+        }
+    }
+
+    /// Create handlers with graph linking enabled.
+    ///
+    /// TASK-GRAPHLINK: Constructor for graph linking support with K-NN edges.
+    /// NO FALLBACKS - If EdgeRepository is provided, it MUST work or tools will error.
+    ///
+    /// # Arguments
+    /// * `teleological_store` - Store for TeleologicalFingerprint
+    /// * `multi_array_provider` - 13-embedding generator
+    /// * `layer_status_provider` - Provider for layer status information
+    /// * `edge_repository` - Edge repository for K-NN graph edges and typed edges
+    ///
+    /// # Panics
+    ///
+    /// Panics if EdgeRepository column families are missing from the database.
+    pub fn with_graph_linking(
+        teleological_store: Arc<dyn TeleologicalMemoryStore>,
+        multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
+        layer_status_provider: Arc<dyn LayerStatusProvider>,
+        edge_repository: EdgeRepository,
+    ) -> Self {
+        info!("Creating Handlers with graph linking enabled - NO FALLBACKS");
+
+        let cluster_manager = MultiSpaceClusterManager::with_defaults()
+            .expect("Default cluster manager should always succeed");
+        let stability_tracker = TopicStabilityTracker::new();
+
+        Self {
+            teleological_store,
+            multi_array_provider,
+            layer_status_provider,
+            cluster_manager: Arc::new(RwLock::new(cluster_manager)),
+            stability_tracker: Arc::new(RwLock::new(stability_tracker)),
+            session_sequence_counter: Arc::new(AtomicU64::new(0)),
+            current_session_id: Arc::new(RwLock::new(None)),
+            code_store: None,
+            code_embedding_provider: None,
+            edge_repository: Some(edge_repository),
+            // Graph builder will be set separately via set_graph_builder
+            graph_builder: None,
+        }
+    }
+
+    /// Create handlers with full graph linking support including background builder.
+    ///
+    /// TASK-GRAPHLINK-BUILDER: Constructor for graph linking with background K-NN building.
+    ///
+    /// # Arguments
+    /// * `teleological_store` - Store for TeleologicalFingerprint
+    /// * `multi_array_provider` - 13-embedding generator
+    /// * `layer_status_provider` - Provider for layer status information
+    /// * `edge_repository` - Edge repository for K-NN graph edges and typed edges
+    /// * `graph_builder` - Background graph builder for K-NN construction
+    pub fn with_full_graph_linking(
+        teleological_store: Arc<dyn TeleologicalMemoryStore>,
+        multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
+        layer_status_provider: Arc<dyn LayerStatusProvider>,
+        edge_repository: EdgeRepository,
+        graph_builder: Arc<BackgroundGraphBuilder>,
+    ) -> Self {
+        info!("Creating Handlers with full graph linking enabled - NO FALLBACKS");
+
+        let cluster_manager = MultiSpaceClusterManager::with_defaults()
+            .expect("Default cluster manager should always succeed");
+        let stability_tracker = TopicStabilityTracker::new();
+
+        Self {
+            teleological_store,
+            multi_array_provider,
+            layer_status_provider,
+            cluster_manager: Arc::new(RwLock::new(cluster_manager)),
+            stability_tracker: Arc::new(RwLock::new(stability_tracker)),
+            session_sequence_counter: Arc::new(AtomicU64::new(0)),
+            current_session_id: Arc::new(RwLock::new(None)),
+            code_store: None,
+            code_embedding_provider: None,
+            edge_repository: Some(edge_repository),
+            graph_builder: Some(graph_builder),
         }
     }
 
@@ -179,6 +266,7 @@ impl Handlers {
             code_embedding_provider: None,
             // TASK-GRAPHLINK: Graph linking disabled by default
             edge_repository: None,
+            graph_builder: None,
         }
     }
 
@@ -217,6 +305,21 @@ impl Handlers {
     /// Get the edge repository if available.
     pub fn edge_repository(&self) -> Option<&EdgeRepository> {
         self.edge_repository.as_ref()
+    }
+
+    /// Get the background graph builder if available.
+    ///
+    /// The graph builder queues fingerprints on store_memory and builds K-NN edges in batches.
+    pub fn graph_builder(&self) -> Option<&Arc<BackgroundGraphBuilder>> {
+        self.graph_builder.as_ref()
+    }
+
+    /// Check if the background graph builder is available and running.
+    pub fn has_graph_builder(&self) -> bool {
+        self.graph_builder
+            .as_ref()
+            .map(|b| b.is_running())
+            .unwrap_or(false)
     }
 
     // =========================================================================

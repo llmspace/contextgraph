@@ -20,8 +20,10 @@ mod graph;
 pub mod kepler;
 mod late_interaction;
 mod multimodal;
+pub mod rgcn;
 mod semantic;
 mod sparse;
+pub mod weight_projection;
 
 pub use causal::{
     CausalModel, CAUSAL_DIMENSION, CAUSAL_LATENCY_BUDGET_MS, CAUSAL_MAX_TOKENS,
@@ -72,4 +74,12 @@ pub use semantic::{
 pub use sparse::{
     SparseModel, SparseVector, SPARSE_EXPECTED_SPARSITY, SPARSE_LATENCY_BUDGET_MS,
     SPARSE_MAX_TOKENS, SPARSE_MODEL_NAME, SPARSE_NATIVE_DIMENSION, SPARSE_PROJECTED_DIMENSION,
+};
+pub use weight_projection::{
+    LearnedWeightProjection, DEFAULT_CATEGORY_WEIGHTS, DEFAULT_WEIGHTS_PATH, HIDDEN_DIM_1,
+    HIDDEN_DIM_2, MAX_WEIGHTED_AGREEMENT, NUM_EMBEDDERS, OUTPUT_DIM, WEIGHTED_AGREEMENT_THRESHOLD,
+};
+pub use rgcn::{
+    RelationalGCN, DEFAULT_CONFIG_PATH, DEFAULT_WEIGHTS_PATH as RGCN_WEIGHTS_PATH, HIDDEN_DIM,
+    INPUT_DIM, NUM_BASES, NUM_RELATIONS, OUTPUT_DIM as RGCN_OUTPUT_DIM, RELATION_NAMES,
 };

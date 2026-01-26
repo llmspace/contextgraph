@@ -18,9 +18,10 @@ use uuid::Uuid;
 
 use context_graph_core::types::fingerprint::TeleologicalFingerprint;
 
+use crate::column_families::get_all_column_family_descriptors;
 use crate::teleological::column_families::{
-    get_all_teleological_cf_descriptors, CF_CONTENT, CF_E12_LATE_INTERACTION, CF_E1_MATRYOSHKA_128,
-    CF_FINGERPRINTS, CF_SOURCE_METADATA, QUANTIZED_EMBEDDER_CFS, TELEOLOGICAL_CFS,
+    CF_CONTENT, CF_E12_LATE_INTERACTION, CF_E1_MATRYOSHKA_128, CF_FINGERPRINTS, CF_SOURCE_METADATA,
+    QUANTIZED_EMBEDDER_CFS, TELEOLOGICAL_CFS,
 };
 use crate::teleological::indexes::EmbedderIndexRegistry;
 use crate::teleological::schema::{
@@ -143,8 +144,10 @@ impl RocksDbTeleologicalStore {
             db_opts.set_manual_wal_flush(true);
         }
 
-        // Get all 17 teleological column family descriptors
-        let cf_descriptors = get_all_teleological_cf_descriptors(&cache);
+        // TASK-GRAPHLINK: Get ALL column families (39 total: 11 base + 28 teleological)
+        // This includes the graph edge CFs (embedder_edges, typed_edges, typed_edges_by_type)
+        // required for K-NN graph-based retrieval. NO FALLBACKS - database must have all CFs.
+        let cf_descriptors = get_all_column_family_descriptors(&cache);
 
         debug!(
             "Opening database with {} column families",
@@ -860,6 +863,24 @@ impl RocksDbTeleologicalStore {
     #[doc(hidden)]
     pub fn db(&self) -> &DB {
         &self.db
+    }
+
+    /// Get an Arc reference to the underlying RocksDB instance.
+    ///
+    /// Use for creating EdgeRepository sharing the same database.
+    /// The EdgeRepository requires access to graph edge column families.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use context_graph_storage::graph_edges::EdgeRepository;
+    ///
+    /// let store = RocksDbTeleologicalStore::open("path/to/db")?;
+    /// let db_arc = store.db_arc();
+    /// let edge_repo = EdgeRepository::new(db_arc);
+    /// ```
+    pub fn db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.db)
     }
 
     /// Health check: verify all column families are accessible.

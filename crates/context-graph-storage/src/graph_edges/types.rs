@@ -70,6 +70,10 @@ pub enum GraphEdgeStorageError {
     /// Database not initialized.
     #[error("Database not initialized - call open() first")]
     NotInitialized,
+
+    /// Graph building error.
+    #[error("Graph build error: {message}")]
+    GraphBuildError { message: String },
 }
 
 impl GraphEdgeStorageError {

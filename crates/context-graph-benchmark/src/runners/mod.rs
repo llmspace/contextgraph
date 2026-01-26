@@ -9,6 +9,7 @@ pub mod e1_semantic;
 pub mod e4_hybrid_session;
 pub mod e11_entity;
 pub mod failfast;
+pub mod graph_linking;
 pub mod graph_realdata;
 pub mod mcp_intent;
 pub mod multimodal;
@@ -79,4 +80,9 @@ pub use e11_entity::{
     ExtractionBenchmarkResults, RetrievalBenchmarkResults, TransEBenchmarkResults,
     ValidationBenchmarkResults, GraphBenchmarkResults, QueryResult, TripleScoreResult,
     RelationshipInferenceResult, SampleExtraction, ConfusionMatrix,
+};
+pub use graph_linking::{
+    GraphLinkingBenchmarkConfig, GraphLinkingBenchmarkResults, GraphLinkingBenchmarkRunner,
+    GraphLinkingDatasetStats, ValidationCheck as GraphLinkingValidationCheck,
+    ValidationSummary as GraphLinkingValidationSummary, run_tier_benchmark, run_quick_benchmark,
 };

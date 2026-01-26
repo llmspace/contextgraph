@@ -46,11 +46,15 @@
 //! repo.store_typed_edge(&typed_edge)?;
 //! ```
 
+mod builder;
 mod repository;
 mod serialization;
 mod types;
 
 // Re-export public types
+pub use builder::{
+    BackgroundGraphBuilder, BatchBuildResult, BuilderStats, GraphBuilderConfig, RebuildResult,
+};
 pub use repository::EdgeRepository;
 pub use serialization::{
     deserialize_embedder_edges, deserialize_typed_edge, serialize_embedder_edges,
