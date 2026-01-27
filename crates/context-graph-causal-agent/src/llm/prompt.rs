@@ -2,12 +2,21 @@
 //!
 //! Uses Hermes 2 Pro Mistral's ChatML format for optimal function-calling performance.
 //! The model is specifically trained for structured output and JSON generation.
+//!
+//! # Single-Text Analysis
+//!
+//! The [`build_single_text_prompt`](CausalPromptBuilder::build_single_text_prompt) method
+//! generates prompts for analyzing a SINGLE text for causal nature, used during memory
+//! storage to provide hints to the E5 embedder.
 
 /// Builder for causal analysis prompts.
 #[derive(Debug, Clone)]
 pub struct CausalPromptBuilder {
     /// System prompt for the LLM.
     system_prompt: String,
+
+    /// System prompt for single-text analysis.
+    single_text_system_prompt: String,
 
     /// Maximum content length per memory (characters).
     max_content_length: usize,
@@ -24,6 +33,7 @@ impl CausalPromptBuilder {
     pub fn new() -> Self {
         Self {
             system_prompt: Self::default_system_prompt().to_string(),
+            single_text_system_prompt: Self::default_single_text_system_prompt().to_string(),
             max_content_length: 1500,
         }
     }
@@ -157,6 +167,65 @@ CONFIDENCE CALIBRATION:
 - 0.0-0.2: No causal link
 
 IMPORTANT: Correlation, semantic similarity, or topical overlap are NOT causation. Be conservative."#
+    }
+
+    /// Default system prompt for single-text causal analysis.
+    ///
+    /// Optimized for fast classification (~50ms target latency).
+    /// Returns simpler JSON format than pair analysis.
+    const fn default_single_text_system_prompt() -> &'static str {
+        r#"You analyze text for causal content.
+
+TASK: Determine if the text describes causes, effects, or is causal in nature.
+
+OUTPUT FORMAT (JSON):
+{"is_causal":true/false,"direction":"cause"/"effect"/"neutral","confidence":0.0-1.0,"key_phrases":[]}
+
+DIRECTION CLASSIFICATION:
+- "cause": Text describes something that CAUSES other things
+  Example: "High cortisol levels cause memory impairment"
+  Example: "Smoking increases cancer risk"
+
+- "effect": Text describes something that IS CAUSED by other things
+  Example: "Memory impairment results from chronic stress"
+  Example: "Cancer risk is elevated in smokers"
+
+- "neutral": Either non-causal OR equally describes both cause and effect
+
+KEY_PHRASES: Extract 1-3 causal markers (e.g., "causes", "leads to", "results from", "due to")
+
+CONFIDENCE:
+- 0.9-1.0: Clear causal language with explicit markers
+- 0.7-0.8: Implicit causation, strong language
+- 0.5-0.6: Possible causation, weaker indicators
+- 0.0-0.4: No clear causal content
+
+Be fast and concise. Focus on explicit causal language."#
+    }
+
+    /// Build prompt for analyzing a SINGLE text for causal nature.
+    ///
+    /// Used during memory storage to provide hints to the E5 embedder.
+    /// Optimized for fast classification (~50ms latency target).
+    ///
+    /// # Arguments
+    /// * `content` - The text content to analyze
+    ///
+    /// # Returns
+    /// A ChatML-formatted prompt for single-text causal analysis.
+    pub fn build_single_text_prompt(&self, content: &str) -> String {
+        let truncated = self.truncate_content(content);
+        format!(
+            r#"<|im_start|>system
+{}
+<|im_end|>
+<|im_start|>user
+Text: "{}"
+<|im_end|>
+<|im_start|>assistant
+{{"is_causal":"#,
+            self.single_text_system_prompt, truncated
+        )
     }
 }
 

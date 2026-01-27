@@ -53,8 +53,8 @@ use tokio::sync::RwLock;
 
 use context_graph_core::error::{CoreError, CoreResult};
 use context_graph_core::traits::{
-    EmbeddingMetadata, MultiArrayEmbeddingOutput, MultiArrayEmbeddingProvider, SingleEmbedder,
-    SparseEmbedder, TokenEmbedder,
+    CausalHint, EmbeddingMetadata, MultiArrayEmbeddingOutput, MultiArrayEmbeddingProvider,
+    SingleEmbedder, SparseEmbedder, TokenEmbedder,
 };
 use context_graph_core::types::fingerprint::{
     SemanticFingerprint, SparseVector, E11_DIM, E12_TOKEN_DIM, E1_DIM, E2_DIM, E3_DIM, E4_DIM,
@@ -375,6 +375,65 @@ impl CausalDualEmbedderAdapter {
     /// Check if the model is ready for embedding.
     fn is_ready(&self) -> bool {
         self.model.is_initialized()
+    }
+
+    /// Embed content with LLM-provided causal hint for enhanced direction awareness.
+    ///
+    /// If a useful hint is provided (is_causal && confidence >= 0.5), the embedding
+    /// vectors are biased based on the direction hint:
+    /// - `CausalDirectionHint::Cause`: Boost cause vector (1.3x), dampen effect (0.8x)
+    /// - `CausalDirectionHint::Effect`: Boost effect vector (1.3x), dampen cause (0.8x)
+    /// - `CausalDirectionHint::Neutral`: No bias applied
+    ///
+    /// If no hint is provided or hint is not useful, falls back to standard `embed_dual()`.
+    ///
+    /// # Arguments
+    ///
+    /// * `content` - The text content to embed
+    /// * `hint` - Optional LLM-generated causal hint
+    ///
+    /// # Returns
+    ///
+    /// (cause_vector, effect_vector) where each is 768D, with direction bias applied.
+    ///
+    /// # CAUSAL-HINT Phase 4: E5 Enhancement
+    ///
+    /// This method enables LLM-enhanced E5 embeddings per the Causal Discovery
+    /// LLM + E5 Integration Plan.
+    async fn embed_dual_with_hint(
+        &self,
+        content: &str,
+        hint: Option<&CausalHint>,
+    ) -> CoreResult<(Vec<f32>, Vec<f32>)> {
+        // Get base embeddings
+        let (mut cause_vec, mut effect_vec) = self.embed_dual(content).await?;
+
+        // Apply direction bias if hint is useful
+        if let Some(hint) = hint {
+            if hint.is_useful() {
+                let (cause_bias, effect_bias) = hint.bias_factors();
+
+                // Apply bias to cause vector
+                for val in cause_vec.iter_mut() {
+                    *val *= cause_bias;
+                }
+
+                // Apply bias to effect vector
+                for val in effect_vec.iter_mut() {
+                    *val *= effect_bias;
+                }
+
+                tracing::debug!(
+                    direction = ?hint.direction_hint,
+                    cause_bias = cause_bias,
+                    effect_bias = effect_bias,
+                    confidence = hint.confidence,
+                    "E5: Applied LLM causal hint bias to embeddings"
+                );
+            }
+        }
+
+        Ok((cause_vec, effect_vec))
     }
 }
 
@@ -994,6 +1053,9 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
         // E4-FIX: Generate E4 instruction from metadata
         let e4_instruction = metadata.e4_instruction();
 
+        // CAUSAL-HINT Phase 6: Clone causal hint for E5 embedding
+        let causal_hint = metadata.causal_hint.clone();
+
         // Run all 13 embedders in parallel
         let (
             (r1, d1),
@@ -1028,9 +1090,11 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
                 let inst = e4_instruction.clone();
                 async move { e4.embed_with_instruction(&c, Some(&inst)).await }
             }),
+            // CAUSAL-HINT Phase 6: Use embed_dual_with_hint for E5 if hint is available
             Self::timed_embed("E5_Causal_Dual", {
                 let c = content_owned.clone();
-                async move { e5.embed_dual(&c).await }
+                let hint = causal_hint.clone();
+                async move { e5.embed_dual_with_hint(&c, hint.as_ref()).await }
             }),
             Self::timed_embed("E6_Sparse", {
                 let c = content_owned.clone();
@@ -1488,6 +1552,7 @@ mod tests {
             session_id: None,
             session_sequence: Some(42),
             timestamp: None,
+            causal_hint: None,
         };
 
         let instruction = metadata.e4_instruction();

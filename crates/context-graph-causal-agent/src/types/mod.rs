@@ -2,10 +2,25 @@
 //!
 //! Contains structures for causal analysis results, candidate pairs,
 //! and configuration options.
+//!
+//! # Causal Hint System
+//!
+//! The [`CausalHint`] and [`CausalDirectionHint`] types are re-exported from
+//! `context_graph_core::traits` and enable LLM-enhanced E5 embeddings by
+//! providing direction hints during memory storage.
+//! See the Causal Discovery LLM + E5 Integration Plan for details.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+// ============================================================================
+// CAUSAL HINTS FOR E5 EMBEDDING ENHANCEMENT
+// ============================================================================
+
+// Re-export CausalHint types from context-graph-core to ensure type compatibility
+// with EmbeddingMetadata. This is the authoritative source for these types.
+pub use context_graph_core::traits::{CausalDirectionHint, CausalHint};
 
 // ============================================================================
 // DIRECTIONAL EMBEDDINGS (Phase 2a)
@@ -378,5 +393,81 @@ mod tests {
             CausalMarkers::count_markers("Because of X, therefore Y"),
             2
         );
+    }
+
+    // =========================================================================
+    // CAUSAL HINT TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_causal_direction_hint_from_str() {
+        assert_eq!(
+            CausalDirectionHint::from_str("cause"),
+            CausalDirectionHint::Cause
+        );
+        assert_eq!(
+            CausalDirectionHint::from_str("effect"),
+            CausalDirectionHint::Effect
+        );
+        assert_eq!(
+            CausalDirectionHint::from_str("neutral"),
+            CausalDirectionHint::Neutral
+        );
+        assert_eq!(
+            CausalDirectionHint::from_str("unknown"),
+            CausalDirectionHint::Neutral
+        );
+    }
+
+    #[test]
+    fn test_causal_direction_hint_bias_factors() {
+        assert_eq!(CausalDirectionHint::Cause.bias_factors(), (1.3, 0.8));
+        assert_eq!(CausalDirectionHint::Effect.bias_factors(), (0.8, 1.3));
+        assert_eq!(CausalDirectionHint::Neutral.bias_factors(), (1.0, 1.0));
+    }
+
+    #[test]
+    fn test_causal_hint_is_useful() {
+        // High confidence causal hint is useful
+        let useful_hint = CausalHint::new(
+            true,
+            CausalDirectionHint::Cause,
+            0.8,
+            vec!["causes".to_string()],
+        );
+        assert!(useful_hint.is_useful());
+
+        // Low confidence causal hint is not useful
+        let low_conf_hint = CausalHint::new(
+            true,
+            CausalDirectionHint::Cause,
+            0.3,
+            vec![],
+        );
+        assert!(!low_conf_hint.is_useful());
+
+        // Non-causal hint is not useful even with high confidence
+        let not_causal = CausalHint::not_causal();
+        assert!(!not_causal.is_useful());
+    }
+
+    #[test]
+    fn test_causal_hint_bias_factors() {
+        // Useful hint returns direction bias
+        let cause_hint = CausalHint::new(true, CausalDirectionHint::Cause, 0.9, vec![]);
+        assert_eq!(cause_hint.bias_factors(), (1.3, 0.8));
+
+        // Non-useful hint returns neutral bias
+        let low_conf = CausalHint::new(true, CausalDirectionHint::Cause, 0.2, vec![]);
+        assert_eq!(low_conf.bias_factors(), (1.0, 1.0));
+    }
+
+    #[test]
+    fn test_causal_hint_confidence_clamping() {
+        let hint = CausalHint::new(true, CausalDirectionHint::Cause, 1.5, vec![]);
+        assert_eq!(hint.confidence, 1.0);
+
+        let hint2 = CausalHint::new(true, CausalDirectionHint::Cause, -0.5, vec![]);
+        assert_eq!(hint2.confidence, 0.0);
     }
 }

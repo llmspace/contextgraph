@@ -237,10 +237,39 @@ impl Handlers {
             .map(String::from)
             .or_else(|| self.get_session_id());
 
+        // CAUSAL-HINT: Get causal hint if provider is available (non-blocking with timeout)
+        // Per Phase 5: LLM analyzes content for causal nature, provides hints to E5 embedder
+        let causal_hint = if let Some(provider) = &self.causal_hint_provider {
+            if provider.is_available() {
+                match provider.get_hint(&content).await {
+                    Some(hint) => {
+                        debug!(
+                            is_causal = hint.is_causal,
+                            direction = ?hint.direction_hint,
+                            confidence = hint.confidence,
+                            key_phrases = ?hint.key_phrases,
+                            "store_memory: Got causal hint from LLM"
+                        );
+                        Some(hint)
+                    }
+                    None => {
+                        debug!("store_memory: Causal hint provider returned None (timeout or low confidence)");
+                        None
+                    }
+                }
+            } else {
+                debug!("store_memory: Causal hint provider not available");
+                None
+            }
+        } else {
+            None // No provider configured
+        };
+
         let metadata = EmbeddingMetadata {
             session_id: session_id.clone(),
             session_sequence: Some(session_sequence),
             timestamp: Some(chrono::Utc::now()),
+            causal_hint,
         };
 
         debug!(

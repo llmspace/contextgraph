@@ -211,7 +211,117 @@ impl MultiArrayEmbeddingOutput {
     }
 }
 
-/// Metadata for temporal embedding models (E2-E4).
+// ============================================================================
+// CAUSAL HINTS FOR E5 EMBEDDING ENHANCEMENT
+// ============================================================================
+
+/// Direction hint from LLM single-text analysis.
+///
+/// Used to bias E5 (V_causality) embeddings based on whether content
+/// primarily describes causes, effects, or neutral causal content.
+///
+/// # Direction Modifiers (Applied to E5 Embedding)
+///
+/// - `Cause`: Boosts cause embedding (1.3x), dampens effect (0.8x)
+/// - `Effect`: Boosts effect embedding (1.3x), dampens cause (0.8x)
+/// - `Neutral`: No bias applied (1.0x for both)
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CausalDirectionHint {
+    /// Text describes something that causes other things.
+    Cause,
+    /// Text describes something that is an effect.
+    Effect,
+    /// Causal content but no clear direction bias.
+    #[default]
+    Neutral,
+}
+
+impl CausalDirectionHint {
+    /// Parse direction from string.
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "cause" | "causes" | "causal" => Self::Cause,
+            "effect" | "effects" | "result" | "outcome" => Self::Effect,
+            _ => Self::Neutral,
+        }
+    }
+
+    /// Get embedding bias factors (cause_bias, effect_bias).
+    pub fn bias_factors(&self) -> (f32, f32) {
+        match self {
+            Self::Cause => (1.3, 0.8),
+            Self::Effect => (0.8, 1.3),
+            Self::Neutral => (1.0, 1.0),
+        }
+    }
+}
+
+/// LLM-generated hint for E5 embedding enhancement.
+///
+/// Used at store-time to enhance E5 (V_causality) embeddings based on
+/// LLM analysis of whether content describes causes or effects.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct CausalHint {
+    /// Whether content contains causal language.
+    pub is_causal: bool,
+    /// Direction bias for this content.
+    pub direction_hint: CausalDirectionHint,
+    /// Confidence [0.0, 1.0].
+    pub confidence: f32,
+    /// Key causal phrases detected.
+    pub key_phrases: Vec<String>,
+}
+
+impl CausalHint {
+    /// Minimum confidence threshold for hint to be useful.
+    pub const MIN_USEFUL_CONFIDENCE: f32 = 0.5;
+
+    /// Create a new causal hint.
+    pub fn new(
+        is_causal: bool,
+        direction_hint: CausalDirectionHint,
+        confidence: f32,
+        key_phrases: Vec<String>,
+    ) -> Self {
+        Self {
+            is_causal,
+            direction_hint,
+            confidence: confidence.clamp(0.0, 1.0),
+            key_phrases,
+        }
+    }
+
+    /// Create a hint indicating non-causal content.
+    pub fn not_causal() -> Self {
+        Self {
+            is_causal: false,
+            direction_hint: CausalDirectionHint::Neutral,
+            confidence: 1.0,
+            key_phrases: Vec::new(),
+        }
+    }
+
+    /// Check if this hint is useful for embedding enhancement.
+    pub fn is_useful(&self) -> bool {
+        self.is_causal && self.confidence >= Self::MIN_USEFUL_CONFIDENCE
+    }
+
+    /// Get embedding bias factors from this hint.
+    pub fn bias_factors(&self) -> (f32, f32) {
+        if self.is_useful() {
+            self.direction_hint.bias_factors()
+        } else {
+            (1.0, 1.0)
+        }
+    }
+}
+
+// ============================================================================
+// EMBEDDING METADATA
+// ============================================================================
+
+/// Metadata for temporal embedding models (E2-E4) and causal hints (E5).
 ///
 /// Provides explicit context for temporal embedders rather than relying on
 /// implicit time extraction. This is particularly important for E4 (V_ordering)
@@ -223,6 +333,11 @@ impl MultiArrayEmbeddingOutput {
 /// Unix timestamps (same as E2), making it a duplicate. With this metadata,
 /// E4 now receives proper session sequence numbers.
 ///
+/// # Causal Hints
+///
+/// The `causal_hint` field enables LLM-enhanced E5 embeddings by providing
+/// direction hints during memory storage.
+///
 /// # Usage
 ///
 /// ```ignore
@@ -230,6 +345,7 @@ impl MultiArrayEmbeddingOutput {
 ///     session_id: Some("session-123".to_string()),
 ///     session_sequence: Some(42),  // 43rd memory in this session
 ///     timestamp: Some(Utc::now()),
+///     causal_hint: None,  // Optional LLM hint for E5
 /// };
 ///
 /// let output = provider.embed_all_with_metadata(content, metadata).await?;
@@ -252,6 +368,12 @@ pub struct EmbeddingMetadata {
     ///
     /// If not provided, defaults to `Utc::now()`.
     pub timestamp: Option<DateTime<Utc>>,
+
+    /// Optional LLM-generated causal hint for E5 (V_causality) enhancement.
+    ///
+    /// When provided, the E5 embedder can use direction hints to generate
+    /// better cause/effect vectors. If None, falls back to marker detection.
+    pub causal_hint: Option<CausalHint>,
 }
 
 impl EmbeddingMetadata {
@@ -266,6 +388,7 @@ impl EmbeddingMetadata {
             session_id: Some(session_id.into()),
             session_sequence: Some(sequence),
             timestamp: Some(Utc::now()),
+            causal_hint: None,
         }
     }
 
@@ -276,7 +399,18 @@ impl EmbeddingMetadata {
             session_id: None,
             session_sequence: None,
             timestamp: Some(timestamp),
+            causal_hint: None,
         }
+    }
+
+    /// Set a causal hint for E5 embedding enhancement.
+    ///
+    /// # Arguments
+    /// * `hint` - LLM-generated causal hint
+    #[must_use]
+    pub fn with_causal_hint(mut self, hint: CausalHint) -> Self {
+        self.causal_hint = Some(hint);
+        self
     }
 
     /// Format E4 instruction string for hybrid session+sequence mode.
@@ -985,6 +1119,7 @@ mod tests {
             session_id: None,
             session_sequence: Some(42),
             timestamp: None,
+            causal_hint: None,
         };
         let instruction = metadata.e4_instruction();
 
@@ -1022,6 +1157,7 @@ mod tests {
             session_id: Some("my-session".to_string()),
             session_sequence: None,
             timestamp: Some(ts),
+            causal_hint: None,
         };
         let instruction = metadata.e4_instruction();
 

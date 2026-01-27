@@ -21,9 +21,10 @@ pub use graph_index::GraphIndex;
 
 // Multi-array embedding provider (13 embeddings) - TASK-F007
 // E4-FIX: Added EmbeddingMetadata for session sequence support
+// CAUSAL-HINT: Added CausalHint and CausalDirectionHint for E5 enhancement
 pub use multi_array_embedding::{
-    EmbeddingMetadata, MultiArrayEmbeddingOutput, MultiArrayEmbeddingProvider, SingleEmbedder,
-    SparseEmbedder, TokenEmbedder,
+    CausalDirectionHint, CausalHint, EmbeddingMetadata, MultiArrayEmbeddingOutput,
+    MultiArrayEmbeddingProvider, SingleEmbedder, SparseEmbedder, TokenEmbedder,
 };
 
 // Teleological memory store trait - TASK-F008

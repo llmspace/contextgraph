@@ -3,6 +3,7 @@
 //! This module provides the core abstractions for embedding providers:
 //! - [`EmbeddingProvider`]: Trait for single-model embedding providers
 //! - [`ProductionMultiArrayProvider`]: Production 13-embedder orchestrator
+//! - [`CausalHintProvider`]: LLM-based causal hints for E5 enhancement
 //!
 //! # Architecture
 //!
@@ -20,10 +21,17 @@
 //! ├── model_ids() -> [&str; 13]                     // Model identifiers
 //! ├── is_ready() -> bool                            // Readiness check
 //! └── health_status() -> [bool; 13]                 // Per-embedder health
+//!
+//! CausalHintProvider (trait)
+//! ├── get_hint(&str) -> Option<CausalHint>  // LLM-based causal hint
+//! ├── is_available() -> bool                // Check if LLM is ready
+//! └── timeout() -> Duration                 // Get timeout duration
 //! ```
 
+mod causal_hint;
 mod multi_array;
 
+pub use causal_hint::{CausalHintProvider, NoOpCausalHintProvider};
 pub use multi_array::ProductionMultiArrayProvider;
 
 use async_trait::async_trait;

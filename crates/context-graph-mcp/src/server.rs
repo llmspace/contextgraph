@@ -66,7 +66,8 @@ use context_graph_embeddings::{
 };
 
 // REAL implementations - NO STUBS
-use crate::adapters::LazyMultiArrayProvider;
+use crate::adapters::{LazyMultiArrayProvider, LlmCausalHintProvider};
+use context_graph_embeddings::provider::CausalHintProvider;
 use context_graph_storage::teleological::RocksDbTeleologicalStore;
 // TASK-GRAPHLINK: EdgeRepository and BackgroundGraphBuilder for K-NN graph linking
 use context_graph_storage::{BackgroundGraphBuilder, EdgeRepository, GraphBuilderConfig};
@@ -474,16 +475,27 @@ impl McpServer {
         })?;
         info!("CausalDiscoveryLLM loaded successfully (~6GB VRAM)");
 
+        // CAUSAL-HINT: Wrap LLM in Arc first to enable sharing between services
+        let shared_llm = Arc::new(llm);
+
         let graph_discovery_config = GraphDiscoveryConfig::default();
         let graph_discovery_service = Arc::new(GraphDiscoveryService::with_config(
-            Arc::new(llm),
+            Arc::clone(&shared_llm), // Clone for GraphDiscoveryService
             graph_discovery_config,
         ));
+
+        // CAUSAL-HINT: Create LlmCausalHintProvider using shared LLM
+        info!("CAUSAL-HINT: Creating LlmCausalHintProvider (100ms timeout)");
+        let causal_hint_provider: Arc<dyn CausalHintProvider> =
+            Arc::new(LlmCausalHintProvider::new(
+                shared_llm, // Move remaining Arc
+                LlmCausalHintProvider::DEFAULT_TIMEOUT_MS,
+            ));
 
         // TASK-GRAPHLINK: Use with_graph_discovery to enable K-NN graph operations
         // with background builder support and LLM-based relationship detection
         // NO FALLBACKS - All components MUST work or server startup fails
-        info!("Creating Handlers with graph discovery enabled - NO FALLBACKS, LLM required");
+        info!("Creating Handlers with graph discovery and causal hints enabled - NO FALLBACKS");
         let handlers = Handlers::with_graph_discovery(
             Arc::clone(&teleological_store),
             lazy_provider,
@@ -491,6 +503,7 @@ impl McpServer {
             edge_repository,
             Arc::clone(&graph_builder),
             graph_discovery_service,
+            causal_hint_provider, // NEW: Enable LLM-based causal hints for E5
         );
         info!("Created Handlers with full graph linking enabled (K-NN edges + background builder, NO FALLBACKS)");
 

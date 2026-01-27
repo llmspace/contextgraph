@@ -91,6 +91,16 @@ pub struct Handlers {
     /// REQUIRED - NO FALLBACKS. LLM must load successfully or server startup fails.
     /// Uses shared CausalDiscoveryLLM (~6GB VRAM for Qwen2.5-3B).
     pub(in crate::handlers) graph_discovery_service: Arc<GraphDiscoveryService>,
+
+    // =========================================================================
+    // Causal Hint Provider (CAUSAL-HINT Phase 5)
+    // =========================================================================
+
+    /// Causal hint provider for E5 embedding enhancement.
+    /// Optional - uses LLM to analyze content for causal nature during store_memory.
+    /// CAUSAL-HINT Phase 5: Provides direction hints to E5 embedder.
+    pub(in crate::handlers) causal_hint_provider:
+        Option<Arc<dyn context_graph_embeddings::provider::CausalHintProvider>>,
 }
 
 impl Handlers {
@@ -132,6 +142,8 @@ impl Handlers {
             graph_builder: None,
             // GRAPH-AGENT: REQUIRED - NO FALLBACKS
             graph_discovery_service,
+            // CAUSAL-HINT: Disabled by default
+            causal_hint_provider: None,
         }
     }
 
@@ -176,6 +188,8 @@ impl Handlers {
             graph_builder: None,
             // GRAPH-AGENT: REQUIRED - NO FALLBACKS
             graph_discovery_service,
+            // CAUSAL-HINT: Disabled by default
+            causal_hint_provider: None,
         }
     }
 
@@ -223,6 +237,8 @@ impl Handlers {
             graph_builder: None,
             // GRAPH-AGENT: REQUIRED - NO FALLBACKS
             graph_discovery_service,
+            // CAUSAL-HINT: Disabled by default
+            causal_hint_provider: None,
         }
     }
 
@@ -267,6 +283,8 @@ impl Handlers {
             graph_builder: None,
             // GRAPH-AGENT: REQUIRED - NO FALLBACKS
             graph_discovery_service,
+            // CAUSAL-HINT: Disabled by default
+            causal_hint_provider: None,
         }
     }
 
@@ -282,6 +300,7 @@ impl Handlers {
     /// * `edge_repository` - Edge repository for K-NN graph edges and typed edges
     /// * `graph_builder` - Background graph builder for K-NN construction
     /// * `graph_discovery_service` - REQUIRED LLM-based graph relationship discovery
+    /// * `causal_hint_provider` - REQUIRED LLM-based causal hint provider for E5 enhancement
     pub fn with_graph_discovery(
         teleological_store: Arc<dyn TeleologicalMemoryStore>,
         multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
@@ -289,8 +308,9 @@ impl Handlers {
         edge_repository: EdgeRepository,
         graph_builder: Arc<BackgroundGraphBuilder>,
         graph_discovery_service: Arc<GraphDiscoveryService>,
+        causal_hint_provider: Arc<dyn context_graph_embeddings::provider::CausalHintProvider>,
     ) -> Self {
-        info!("Creating Handlers with graph discovery enabled - NO FALLBACKS, LLM required");
+        info!("Creating Handlers with graph discovery and causal hints enabled - NO FALLBACKS");
 
         let cluster_manager = MultiSpaceClusterManager::with_defaults()
             .expect("Default cluster manager should always succeed");
@@ -310,6 +330,8 @@ impl Handlers {
             graph_builder: Some(graph_builder),
             // GRAPH-AGENT: REQUIRED - NO FALLBACKS
             graph_discovery_service,
+            // CAUSAL-HINT: REQUIRED - shares LLM with graph discovery
+            causal_hint_provider: Some(causal_hint_provider),
         }
     }
 

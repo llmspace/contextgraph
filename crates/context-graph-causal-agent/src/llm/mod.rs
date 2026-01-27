@@ -33,10 +33,11 @@ use llama_cpp_2::model::{AddBos, LlamaModel, Special};
 use llama_cpp_2::sampling::LlamaSampler;
 use llama_cpp_2::token::LlamaToken;
 use parking_lot::RwLock;
+use serde::Deserialize;
 use tracing::{debug, info, warn};
 
 use crate::error::{CausalAgentError, CausalAgentResult};
-use crate::types::{CausalAnalysisResult, CausalLinkDirection};
+use crate::types::{CausalAnalysisResult, CausalDirectionHint, CausalHint, CausalLinkDirection};
 
 pub use prompt::CausalPromptBuilder;
 
@@ -99,12 +100,14 @@ impl Default for LlmConfig {
 /// Grammar type for different analysis tasks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GrammarType {
-    /// Causal relationship analysis.
+    /// Causal relationship analysis (pair comparison).
     Causal,
     /// Graph relationship analysis.
     Graph,
     /// Validation analysis.
     Validation,
+    /// Single-text causal hint analysis (for E5 enhancement).
+    SingleText,
 }
 
 /// Internal state of the LLM.
@@ -143,6 +146,12 @@ unsafe impl Sync for LlmState {}
 /// This implementation uses GBNF grammar constraints to guarantee
 /// 100% valid JSON output, solving the JSON parsing issues of the
 /// previous Candle/Qwen implementation.
+///
+/// # Single-Text Analysis
+///
+/// The [`analyze_single_text`](Self::analyze_single_text) method provides
+/// fast classification of individual texts for causal nature, returning
+/// [`CausalHint`] for E5 embedding enhancement.
 pub struct CausalDiscoveryLLM {
     /// Configuration.
     config: LlmConfig,
@@ -160,6 +169,7 @@ pub struct CausalDiscoveryLLM {
     causal_grammar: String,
     graph_grammar: String,
     validation_grammar: String,
+    single_text_grammar: String,
 }
 
 impl CausalDiscoveryLLM {
@@ -186,6 +196,8 @@ impl CausalDiscoveryLLM {
         let causal_grammar = Self::load_grammar_file(&config.causal_grammar_path)?;
         let graph_grammar = Self::load_grammar_file(&config.graph_grammar_path)?;
         let validation_grammar = Self::load_grammar_file(&config.validation_grammar_path)?;
+        // Single-text grammar uses embedded default (simpler than pair analysis)
+        let single_text_grammar = Self::default_single_text_grammar().to_string();
 
         Ok(Self {
             config,
@@ -195,6 +207,7 @@ impl CausalDiscoveryLLM {
             causal_grammar,
             graph_grammar,
             validation_grammar,
+            single_text_grammar,
         })
     }
 
@@ -224,6 +237,24 @@ mechanism ::= "\"mechanism\"" ws ":" ws string
 direction-value ::= "\"A_causes_B\"" | "\"B_causes_A\"" | "\"bidirectional\"" | "\"none\""
 boolean ::= "true" | "false"
 number ::= "0" ("." [0-9] [0-9]?)? | "1" ("." "0" "0"?)?
+string ::= "\"" ([^"\\] | "\\" .)* "\""
+ws ::= [ \t\n\r]*"#
+    }
+
+    /// Default embedded grammar for single-text causal hint analysis.
+    ///
+    /// Simpler than pair analysis - just classifies if text is causal
+    /// and what direction it primarily describes.
+    const fn default_single_text_grammar() -> &'static str {
+        r#"root ::= "{" ws is-causal "," ws direction "," ws confidence "," ws key-phrases ws "}"
+is-causal ::= "\"is_causal\"" ws ":" ws boolean
+direction ::= "\"direction\"" ws ":" ws direction-value
+confidence ::= "\"confidence\"" ws ":" ws number
+key-phrases ::= "\"key_phrases\"" ws ":" ws phrase-array
+direction-value ::= "\"cause\"" | "\"effect\"" | "\"neutral\""
+boolean ::= "true" | "false"
+number ::= "0" ("." [0-9] [0-9]?)? | "1" ("." "0" "0"?)?
+phrase-array ::= "[" ws (string (ws "," ws string)*)? ws "]"
 string ::= "\"" ([^"\\] | "\\" .)* "\""
 ws ::= [ \t\n\r]*"#
     }
@@ -367,6 +398,138 @@ ws ::= [ \t\n\r]*"#
         Ok(results)
     }
 
+    // =========================================================================
+    // SINGLE-TEXT CAUSAL ANALYSIS (E5 Embedding Enhancement)
+    // =========================================================================
+
+    /// Analyze a SINGLE text for causal nature.
+    ///
+    /// Returns a [`CausalHint`] for E5 embedding enhancement. This method is
+    /// optimized for fast classification (~50ms target latency) to avoid
+    /// blocking the memory storage pipeline.
+    ///
+    /// # Arguments
+    ///
+    /// * `content` - The text content to analyze
+    ///
+    /// # Returns
+    ///
+    /// A [`CausalHint`] containing:
+    /// - `is_causal`: Whether the text contains causal language
+    /// - `direction_hint`: Whether it primarily describes causes or effects
+    /// - `confidence`: Classification confidence [0.0, 1.0]
+    /// - `key_phrases`: Detected causal markers
+    ///
+    /// # Graceful Degradation
+    ///
+    /// If LLM analysis fails, returns a default hint with `is_causal: false`.
+    /// The caller can then fall back to marker-based detection.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let hint = llm.analyze_single_text("High cortisol causes memory loss").await?;
+    /// assert!(hint.is_causal);
+    /// assert_eq!(hint.direction_hint, CausalDirectionHint::Cause);
+    /// ```
+    pub async fn analyze_single_text(&self, content: &str) -> CausalAgentResult<CausalHint> {
+        if !self.is_loaded() {
+            return Err(CausalAgentError::LlmNotInitialized);
+        }
+
+        // Build prompt for single-text analysis
+        let prompt = self.prompt_builder.build_single_text_prompt(content);
+
+        // Generate response with grammar constraint
+        let response = self
+            .generate_with_grammar(&prompt, GrammarType::SingleText)
+            .await?;
+
+        // Parse and return
+        self.parse_single_text_response(&response)
+    }
+
+    /// Parse single-text analysis response into CausalHint.
+    fn parse_single_text_response(&self, response: &str) -> CausalAgentResult<CausalHint> {
+        // The response should be valid JSON thanks to grammar constraint
+        // Format: {"is_causal":true/false,"direction":"cause"/"effect"/"neutral","confidence":0.0-1.0,"key_phrases":[]}
+
+        #[derive(Deserialize)]
+        struct SingleTextResponse {
+            is_causal: bool,
+            direction: String,
+            confidence: f32,
+            key_phrases: Vec<String>,
+        }
+
+        // Try JSON parsing first (should work due to grammar constraint)
+        match serde_json::from_str::<SingleTextResponse>(response) {
+            Ok(parsed) => {
+                let direction_hint = CausalDirectionHint::from_str(&parsed.direction);
+                Ok(CausalHint::new(
+                    parsed.is_causal,
+                    direction_hint,
+                    parsed.confidence,
+                    parsed.key_phrases,
+                ))
+            }
+            Err(e) => {
+                warn!(
+                    response = response,
+                    error = %e,
+                    "Failed to parse single-text response, using fallback"
+                );
+                // Fallback: try regex extraction
+                self.parse_single_text_fallback(response)
+            }
+        }
+    }
+
+    /// Fallback parsing using regex when JSON parsing fails.
+    fn parse_single_text_fallback(&self, response: &str) -> CausalAgentResult<CausalHint> {
+        use regex::Regex;
+
+        // Extract is_causal
+        let is_causal_re = Regex::new(r#""is_causal"\s*:\s*(true|false)"#).unwrap();
+        let is_causal = is_causal_re
+            .captures(response)
+            .and_then(|c| c.get(1))
+            .map(|m| m.as_str() == "true")
+            .unwrap_or(false);
+
+        // Extract direction
+        let direction_re = Regex::new(r#""direction"\s*:\s*"(\w+)""#).unwrap();
+        let direction = direction_re
+            .captures(response)
+            .and_then(|c| c.get(1))
+            .map(|m| CausalDirectionHint::from_str(m.as_str()))
+            .unwrap_or(CausalDirectionHint::Neutral);
+
+        // Extract confidence
+        let confidence_re = Regex::new(r#""confidence"\s*:\s*([0-9.]+)"#).unwrap();
+        let confidence = confidence_re
+            .captures(response)
+            .and_then(|c| c.get(1))
+            .and_then(|m| m.as_str().parse::<f32>().ok())
+            .unwrap_or(0.0);
+
+        // Extract key_phrases (simplified - just get strings)
+        let phrases_re = Regex::new(r#""key_phrases"\s*:\s*\[(.*?)\]"#).unwrap();
+        let key_phrases = phrases_re
+            .captures(response)
+            .and_then(|c| c.get(1))
+            .map(|m| {
+                let phrase_re = Regex::new(r#""([^"]+)""#).unwrap();
+                phrase_re
+                    .captures_iter(m.as_str())
+                    .filter_map(|c| c.get(1).map(|m| m.as_str().to_string()))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        Ok(CausalHint::new(is_causal, direction, confidence, key_phrases))
+    }
+
     /// Generate text from a custom prompt.
     ///
     /// This is a public wrapper for the internal `generate` method,
@@ -446,6 +609,7 @@ ws ::= [ \t\n\r]*"#
             GrammarType::Causal => &self.causal_grammar,
             GrammarType::Graph => &self.graph_grammar,
             GrammarType::Validation => &self.validation_grammar,
+            GrammarType::SingleText => &self.single_text_grammar,
         };
 
         // Create sampler chain with grammar constraint

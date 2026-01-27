@@ -64,4 +64,6 @@ pub use error::{CausalAgentError, CausalAgentResult};
 pub use llm::{CausalDiscoveryLLM, GrammarType, LlmConfig};
 pub use scanner::MemoryScanner;
 pub use service::{CausalDiscoveryConfig, CausalDiscoveryService, DiscoveryCycleResult};
-pub use types::{CausalAnalysisResult, CausalCandidate, CausalLinkDirection};
+pub use types::{
+    CausalAnalysisResult, CausalCandidate, CausalDirectionHint, CausalHint, CausalLinkDirection,
+};
