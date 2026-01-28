@@ -38,6 +38,8 @@ use std::sync::OnceLock;
 use tokio::sync::RwLock;
 
 use crate::error::{EmbeddingError, EmbeddingResult};
+use crate::models::pretrained::{CausalModel, GraphModel};
+use crate::provider::ProductionMultiArrayProvider;
 use context_graph_core::traits::MultiArrayEmbeddingProvider;
 
 /// Global warm provider singleton - initialized ONCE, used everywhere.
@@ -57,8 +59,11 @@ static GLOBAL_WARM_PROVIDER: OnceLock<Arc<RwLock<ProviderState>>> = OnceLock::ne
 /// - `provider: Some, init_error: None` -> Ready
 #[derive(Default)]
 struct ProviderState {
-    /// The actual provider, if initialized successfully
+    /// The actual provider as trait object, if initialized successfully
     provider: Option<Arc<dyn MultiArrayEmbeddingProvider>>,
+    /// The concrete provider for accessing models directly.
+    /// Stored separately to allow model extraction without downcasting.
+    concrete_provider: Option<Arc<ProductionMultiArrayProvider>>,
     /// Error message if initialization failed
     init_error: Option<String>,
 }
@@ -163,9 +168,10 @@ mod cuda_impl {
             return Err(EmbeddingError::InternalError { message: err_msg });
         }
 
-        // Store the provider
-        let provider: Arc<dyn MultiArrayEmbeddingProvider> = Arc::new(provider);
-        guard.provider = Some(provider);
+        // Store the provider (both concrete and trait object)
+        let concrete_provider = Arc::new(provider);
+        guard.concrete_provider = Some(Arc::clone(&concrete_provider));
+        guard.provider = Some(concrete_provider);
 
         tracing::info!("Global warm provider initialized successfully - all 13 models loaded to VRAM");
         Ok(())
@@ -298,6 +304,86 @@ pub fn warm_status_message() -> String {
             }
         }
     }
+}
+
+/// Get the CausalModel from the global warm provider.
+///
+/// This provides direct access to the E5 CausalModel for use by CausalDiscoveryService.
+/// The model is already loaded and ready for use.
+///
+/// # Returns
+///
+/// `Ok(Arc<CausalModel>)` if the provider is initialized
+/// `Err` if the provider is not initialized or initialization failed
+///
+/// # Example
+///
+/// ```rust,ignore
+/// let causal_model = get_warm_causal_model()?;
+/// let service = CausalDiscoveryService::with_models(llm, causal_model, config);
+/// ```
+pub fn get_warm_causal_model() -> EmbeddingResult<Arc<CausalModel>> {
+    let slot = GLOBAL_WARM_PROVIDER.get().ok_or_else(|| EmbeddingError::InternalError {
+        message: "Global warm provider not initialized. Call initialize_global_warm_provider() first.".to_string(),
+    })?;
+
+    let guard = slot.try_read().map_err(|_| EmbeddingError::InternalError {
+        message: "Global warm provider is busy (lock contention). Retry later.".to_string(),
+    })?;
+
+    if let Some(ref err) = guard.init_error {
+        return Err(EmbeddingError::InternalError {
+            message: format!("Global warm provider initialization failed: {}", err),
+        });
+    }
+
+    guard
+        .concrete_provider
+        .as_ref()
+        .map(|p| p.causal_model())
+        .ok_or_else(|| EmbeddingError::InternalError {
+            message: "Global warm provider not initialized. Call initialize_global_warm_provider() first.".to_string(),
+        })
+}
+
+/// Get the GraphModel from the global warm provider.
+///
+/// This provides direct access to the E8 GraphModel for use by GraphDiscoveryService.
+/// The model is already loaded and ready for use.
+///
+/// # Returns
+///
+/// `Ok(Arc<GraphModel>)` if the provider is initialized
+/// `Err` if the provider is not initialized or initialization failed
+///
+/// # Example
+///
+/// ```rust,ignore
+/// let graph_model = get_warm_graph_model()?;
+/// let service = GraphDiscoveryService::with_models(llm, graph_model, config);
+/// ```
+pub fn get_warm_graph_model() -> EmbeddingResult<Arc<GraphModel>> {
+    let slot = GLOBAL_WARM_PROVIDER.get().ok_or_else(|| EmbeddingError::InternalError {
+        message: "Global warm provider not initialized. Call initialize_global_warm_provider() first.".to_string(),
+    })?;
+
+    let guard = slot.try_read().map_err(|_| EmbeddingError::InternalError {
+        message: "Global warm provider is busy (lock contention). Retry later.".to_string(),
+    })?;
+
+    if let Some(ref err) = guard.init_error {
+        return Err(EmbeddingError::InternalError {
+            message: format!("Global warm provider initialization failed: {}", err),
+        });
+    }
+
+    guard
+        .concrete_provider
+        .as_ref()
+        .map(|p| p.graph_model())
+        .ok_or_else(|| EmbeddingError::InternalError {
+            message: "Global warm provider not initialized. Call initialize_global_warm_provider() first.".to_string(),
+        })
 }
 
 /// Reset the global provider (for testing only).

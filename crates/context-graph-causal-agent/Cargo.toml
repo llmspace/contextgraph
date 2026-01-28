@@ -10,6 +10,9 @@ description = "Causal relationship discovery agent using local LLM"
 default = []
 # Enable CUDA acceleration via llama-cpp-2 (RTX 5090 optimized)
 cuda = ["llama-cpp-2/cuda"]
+# Test mode: allows placeholder embeddings when CausalModel unavailable
+# In production (without this feature), missing model = fail fast
+test-mode = []
 
 [dependencies]
 # Workspace dependencies

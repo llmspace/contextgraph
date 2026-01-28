@@ -61,8 +61,8 @@ use context_graph_embeddings::traits::EmbeddingModel;
 use context_graph_storage::code::CodeStore;
 
 use context_graph_embeddings::{
-    get_warm_provider, initialize_global_warm_provider, is_warm_initialized, warm_status_message,
-    GpuConfig, ProductionMultiArrayProvider,
+    get_warm_graph_model, get_warm_provider, initialize_global_warm_provider, is_warm_initialized,
+    warm_status_message, GpuConfig, ProductionMultiArrayProvider,
 };
 
 // REAL implementations - NO STUBS
@@ -477,9 +477,26 @@ impl McpServer {
         // CAUSAL-HINT: Wrap LLM in Arc first to enable sharing between services
         let shared_llm = Arc::new(llm);
 
+        // MODEL-INJECTION: Get GraphModel from warm provider for E8 embeddings
+        // This shares the already-loaded model (~1.3GB VRAM) with the embedding system
+        let graph_model = get_warm_graph_model().map_err(|e| {
+            error!(
+                "FATAL: Failed to get GraphModel from warm provider: {}. \
+                 Ensure embedding models are initialized before graph discovery.",
+                e
+            );
+            anyhow::anyhow!(
+                "Failed to get GraphModel: {}. \
+                 GraphDiscoveryService requires E8 model for relationship embeddings.",
+                e
+            )
+        })?;
+        info!("GraphModel obtained from warm provider - E8 embeddings ready");
+
         let graph_discovery_config = GraphDiscoveryConfig::default();
-        let graph_discovery_service = Arc::new(GraphDiscoveryService::with_config(
-            Arc::clone(&shared_llm), // Clone for GraphDiscoveryService
+        let graph_discovery_service = Arc::new(GraphDiscoveryService::with_models(
+            Arc::clone(&shared_llm), // Shared LLM for relationship classification
+            graph_model,             // GraphModel for E8 asymmetric embeddings
             graph_discovery_config,
         ));
 

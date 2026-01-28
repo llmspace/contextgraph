@@ -21,6 +21,8 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
+use context_graph_embeddings::models::GraphModel;
+
 use crate::activator::{ActivatorConfig, E8Activator, GraphStorage};
 use crate::error::{GraphAgentError, GraphAgentResult};
 use crate::llm::GraphRelationshipLLM;
@@ -118,18 +120,79 @@ pub struct GraphDiscoveryService {
 }
 
 impl GraphDiscoveryService {
-    /// Create a new graph discovery service.
+    /// Create a new graph discovery service (test mode only).
     ///
     /// # Arguments
     /// * `shared_llm` - Shared CausalDiscoveryLLM from causal-agent
+    ///
+    /// # Warning
+    ///
+    /// This constructor creates an E8Activator WITHOUT a GraphModel.
+    /// In production (without `test-mode` feature), embedding operations will fail.
+    /// Use `with_models()` for production deployments.
     pub fn new(shared_llm: Arc<CausalDiscoveryLLM>) -> Self {
         Self::with_config(shared_llm, GraphDiscoveryConfig::default())
     }
 
-    /// Create with custom configuration.
+    /// Create with custom configuration (test mode only).
+    ///
+    /// # Warning
+    ///
+    /// This constructor creates an E8Activator WITHOUT a GraphModel.
+    /// In production (without `test-mode` feature), embedding operations will fail.
+    /// Use `with_models()` for production deployments.
+    #[cfg_attr(
+        not(feature = "test-mode"),
+        deprecated(
+            since = "0.1.0",
+            note = "Use with_models() for production. This constructor creates E8Activator without GraphModel."
+        )
+    )]
     pub fn with_config(shared_llm: Arc<CausalDiscoveryLLM>, config: GraphDiscoveryConfig) -> Self {
         let graph_llm = Arc::new(GraphRelationshipLLM::new(shared_llm));
         let activator = Arc::new(E8Activator::with_config(config.activator_config.clone()));
+        let scanner = MemoryScanner::with_config(config.scanner_config.clone());
+
+        Self {
+            config,
+            llm: graph_llm,
+            scanner: RwLock::new(scanner),
+            activator,
+            running: AtomicBool::new(false),
+            status: RwLock::new(ServiceStatus::Stopped),
+            last_result: RwLock::new(None),
+            shutdown_tx: RwLock::new(None),
+        }
+    }
+
+    /// Create with all models for production use.
+    ///
+    /// This is the recommended constructor for production deployments.
+    /// It properly injects the GraphModel into E8Activator for real embeddings.
+    ///
+    /// # Arguments
+    ///
+    /// * `shared_llm` - Shared CausalDiscoveryLLM from causal-agent (for relationship classification)
+    /// * `graph_model` - GraphModel for E8 asymmetric embeddings (1024D, ~1.3GB VRAM)
+    /// * `config` - Service configuration
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let graph_model = Arc::new(GraphModel::new(path, config)?);
+    /// graph_model.load().await?;
+    /// let service = GraphDiscoveryService::with_models(shared_llm, graph_model, config);
+    /// ```
+    pub fn with_models(
+        shared_llm: Arc<CausalDiscoveryLLM>,
+        graph_model: Arc<GraphModel>,
+        config: GraphDiscoveryConfig,
+    ) -> Self {
+        let graph_llm = Arc::new(GraphRelationshipLLM::new(shared_llm));
+        let activator = Arc::new(E8Activator::with_model(
+            graph_model,
+            config.activator_config.clone(),
+        ));
         let scanner = MemoryScanner::with_config(config.scanner_config.clone());
 
         Self {

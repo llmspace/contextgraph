@@ -20,10 +20,17 @@ use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use uuid::Uuid;
 
+#[cfg(feature = "test-mode")]
+use tracing::debug;
+
+use context_graph_embeddings::models::GraphModel;
+
 use crate::error::{GraphAgentError, GraphAgentResult};
-use crate::types::{
-    ContentDomain, GraphAnalysisResult, GraphLinkDirection, RelationshipCategory, RelationshipType,
-};
+use crate::types::{GraphAnalysisResult, GraphLinkDirection, RelationshipType};
+
+// These are re-exported for tests
+#[cfg(test)]
+use crate::types::{ContentDomain, RelationshipCategory};
 
 /// Configuration for the E8 activator.
 #[derive(Debug, Clone)]
@@ -172,35 +179,88 @@ impl Default for GraphStorage {
 ///
 /// This activator:
 /// 1. Validates relationship confidence
-/// 2. Generates asymmetric E8 embeddings (placeholder for now)
+/// 2. Generates asymmetric E8 embeddings using GraphModel
 /// 3. Stores edges in the graph
+///
+/// # Production vs Test Mode
+///
+/// In production (without `test-mode` feature), GraphModel is REQUIRED.
+/// Use `with_model()` to create activator with real embedding capability.
+/// In test mode, placeholder embeddings are allowed when GraphModel is unavailable.
 pub struct E8Activator {
     config: ActivatorConfig,
     graph: Arc<RwLock<GraphStorage>>,
     stats: RwLock<ActivationStats>,
+    /// Graph model for generating real E8 embeddings.
+    /// When None, behavior depends on `test-mode` feature:
+    /// - Without feature: fail fast with error
+    /// - With feature: use placeholder embeddings
+    graph_model: Option<Arc<GraphModel>>,
 }
 
 impl E8Activator {
-    /// Create a new E8 activator.
+    /// Create a new E8 activator (test mode only, no real embeddings).
+    ///
+    /// In production (without `test-mode` feature), this will fail when
+    /// `activate_relationship` is called. Use `with_model()` instead.
     pub fn new() -> Self {
         Self::with_config(ActivatorConfig::default())
     }
 
-    /// Create with custom configuration.
+    /// Create with custom configuration (test mode only, no real embeddings).
+    ///
+    /// In production (without `test-mode` feature), this will fail when
+    /// `activate_relationship` is called. Use `with_model()` instead.
     pub fn with_config(config: ActivatorConfig) -> Self {
         Self {
             config,
             graph: Arc::new(RwLock::new(GraphStorage::new())),
             stats: RwLock::new(ActivationStats::default()),
+            graph_model: None,
         }
     }
 
-    /// Create with shared graph storage.
+    /// Create with shared graph storage (test mode only, no real embeddings).
+    ///
+    /// In production (without `test-mode` feature), this will fail when
+    /// `activate_relationship` is called. Use `with_model()` instead.
     pub fn with_graph(graph: Arc<RwLock<GraphStorage>>) -> Self {
         Self {
             config: ActivatorConfig::default(),
             graph,
             stats: RwLock::new(ActivationStats::default()),
+            graph_model: None,
+        }
+    }
+
+    /// Create with a real GraphModel for production use.
+    ///
+    /// This is the recommended constructor for production deployments.
+    /// The GraphModel generates real 1024D asymmetric embeddings.
+    ///
+    /// # Arguments
+    /// * `graph_model` - Loaded GraphModel for E8 embeddings
+    /// * `config` - Configuration options
+    pub fn with_model(graph_model: Arc<GraphModel>, config: ActivatorConfig) -> Self {
+        Self {
+            config,
+            graph: Arc::new(RwLock::new(GraphStorage::new())),
+            stats: RwLock::new(ActivationStats::default()),
+            graph_model: Some(graph_model),
+        }
+    }
+
+    /// Create with both GraphModel and shared graph storage.
+    pub fn with_model_and_graph(
+        graph_model: Arc<GraphModel>,
+        graph: Arc<RwLock<GraphStorage>>,
+        config: ActivatorConfig,
+    ) -> Self {
+        Self {
+            config,
+            graph,
+            stats: RwLock::new(ActivationStats::default()),
+            graph_model: Some(graph_model),
         }
     }
 
@@ -214,59 +274,157 @@ impl E8Activator {
     /// * `analysis` - LLM analysis result
     ///
     /// # Returns
-    /// Tuple of (source_embedding, target_embedding) as placeholders
+    /// Tuple of (source_embedding, target_embedding) - 1024D asymmetric vectors
+    ///
+    /// # Errors
+    /// Returns error if GraphModel is not available and test-mode feature is not enabled.
     pub async fn activate_relationship(
         &self,
         source_id: Uuid,
         target_id: Uuid,
-        _source_content: &str,
-        _target_content: &str,
+        source_content: &str,
+        target_content: &str,
         analysis: &GraphAnalysisResult,
     ) -> GraphAgentResult<(Vec<f32>, Vec<f32>)> {
-        let mut stats = self.stats.write();
-        stats.processed += 1;
+        // Phase 1: Validation and graph updates (sync, hold locks briefly)
+        {
+            let mut stats = self.stats.write();
+            stats.processed += 1;
 
-        // Check confidence threshold
-        if analysis.confidence < self.config.min_confidence {
-            stats.skipped_low_confidence += 1;
-            return Err(GraphAgentError::ConfigError {
-                message: format!(
-                    "Confidence {} below threshold {}",
-                    analysis.confidence, self.config.min_confidence
-                ),
-            });
-        }
-
-        // Check if relationship already exists
-        let mut graph = self.graph.write();
-        if !self.config.update_existing {
-            let (effective_source, effective_target) =
-                self.get_effective_source_target(source_id, target_id, analysis.direction);
-
-            if graph.has_edge(effective_source, effective_target) {
-                stats.skipped_existing += 1;
+            // Check confidence threshold
+            if analysis.confidence < self.config.min_confidence {
+                stats.skipped_low_confidence += 1;
                 return Err(GraphAgentError::ConfigError {
-                    message: "Relationship already exists".to_string(),
+                    message: format!(
+                        "Confidence {} below threshold {}",
+                        analysis.confidence, self.config.min_confidence
+                    ),
                 });
             }
-        }
+        } // Release stats lock
 
-        // Add edges based on direction
-        let edges_added = self.add_edges_for_direction(
-            &mut graph,
-            source_id,
-            target_id,
-            analysis,
-        );
-        stats.edges_created += edges_added;
+        // Check if relationship already exists and add edges
+        let edges_added = {
+            let mut graph = self.graph.write();
+            if !self.config.update_existing {
+                let (effective_source, effective_target) =
+                    self.get_effective_source_target(source_id, target_id, analysis.direction);
 
-        // Generate placeholder embeddings (1024D for e5-large-v2)
-        // In production, this would call the actual E8 embedding model
-        let source_embedding = vec![0.0f32; 1024];
-        let target_embedding = vec![0.0f32; 1024];
-        stats.embeddings_generated += 2;
+                if graph.has_edge(effective_source, effective_target) {
+                    self.stats.write().skipped_existing += 1;
+                    return Err(GraphAgentError::ConfigError {
+                        message: "Relationship already exists".to_string(),
+                    });
+                }
+            }
+
+            // Add edges based on direction
+            self.add_edges_for_direction(
+                &mut graph,
+                source_id,
+                target_id,
+                analysis,
+            )
+        }; // Release graph lock
+
+        // Update edges_created stat
+        self.stats.write().edges_created += edges_added;
+
+        // Phase 2: Generate embeddings (async, no locks held)
+        // Combine source and target content for embedding context
+        let combined_content = format!("{}\n\nRelated to:\n{}", source_content, target_content);
+
+        let (source_embedding, target_embedding) =
+            self.generate_e8_embeddings(&combined_content).await?;
+
+        // Phase 3: Update final stats
+        self.stats.write().embeddings_generated += 2;
 
         Ok((source_embedding, target_embedding))
+    }
+
+    /// Generate E8 asymmetric embeddings for source and target roles.
+    ///
+    /// When a real GraphModel is available, uses embed_dual() for genuine asymmetric embeddings.
+    /// In test-mode, falls back to placeholder embeddings for testing without GPU.
+    /// In production (without test-mode feature), fails fast if GraphModel unavailable.
+    async fn generate_e8_embeddings(
+        &self,
+        content: &str,
+    ) -> GraphAgentResult<(Vec<f32>, Vec<f32>)> {
+        match &self.graph_model {
+            Some(model) => {
+                // Use real GraphModel for production embeddings
+                model
+                    .embed_dual(content)
+                    .await
+                    .map_err(|e| GraphAgentError::EmbeddingError {
+                        message: format!("Failed to generate E8 embeddings: {}", e),
+                    })
+            }
+            None => {
+                // Production mode: fail fast - GraphModel is required
+                #[cfg(not(feature = "test-mode"))]
+                {
+                    return Err(GraphAgentError::ConfigError {
+                        message: "GraphModel required in production but not available. \
+                                  Use E8Activator::with_model() or enable test-mode feature."
+                            .to_string(),
+                    });
+                }
+
+                // Test mode: allow placeholder embeddings
+                #[cfg(feature = "test-mode")]
+                {
+                    debug!("Using placeholder E8 embeddings (test-mode, no GraphModel)");
+                    self.generate_placeholder_embeddings(content)
+                }
+            }
+        }
+    }
+
+    /// Generate placeholder embeddings for testing.
+    ///
+    /// Creates deterministic 1024D vectors based on content hash.
+    /// Source and target vectors differ by using different seeds.
+    #[cfg(feature = "test-mode")]
+    fn generate_placeholder_embeddings(
+        &self,
+        content: &str,
+    ) -> GraphAgentResult<(Vec<f32>, Vec<f32>)> {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        fn hash_to_vec(content: &str, seed: &str, dim: usize) -> Vec<f32> {
+            let mut hasher = DefaultHasher::new();
+            content.hash(&mut hasher);
+            seed.hash(&mut hasher);
+            let hash = hasher.finish();
+
+            let mut embedding = Vec::with_capacity(dim);
+            let mut current = hash;
+            let mut sum_sq = 0.0f32;
+
+            for _ in 0..dim {
+                current = current.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                let val = ((current >> 32) as f32 / u32::MAX as f32) * 2.0 - 1.0;
+                embedding.push(val);
+                sum_sq += val * val;
+            }
+
+            // L2 normalize
+            let norm = sum_sq.sqrt();
+            if norm > f32::EPSILON {
+                for val in &mut embedding {
+                    *val /= norm;
+                }
+            }
+            embedding
+        }
+
+        let source_vec = hash_to_vec(content, "source", 1024);
+        let target_vec = hash_to_vec(content, "target", 1024);
+        Ok((source_vec, target_vec))
     }
 
     /// Add edges to the graph based on relationship direction.
@@ -400,8 +558,40 @@ mod tests {
         assert_eq!(activator.stats().skipped_low_confidence, 1);
     }
 
+    // Test that activation fails fast in production mode without GraphModel
+    #[cfg(not(feature = "test-mode"))]
     #[tokio::test]
-    async fn test_activate_success() {
+    async fn test_e8_activator_fails_fast_without_model() {
+        let activator = E8Activator::new(); // No model
+        let analysis = GraphAnalysisResult {
+            has_connection: true,
+            direction: GraphLinkDirection::AConnectsB,
+            relationship_type: RelationshipType::Imports,
+            category: RelationshipCategory::Dependency,
+            domain: ContentDomain::Code,
+            confidence: 0.85,
+            description: "A imports B".to_string(),
+            raw_response: None,
+        };
+
+        let result = activator
+            .activate_relationship(Uuid::new_v4(), Uuid::new_v4(), "source", "target", &analysis)
+            .await;
+
+        // Should fail because GraphModel is required in production
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("GraphModel required") || err.contains("production"),
+            "Error should mention GraphModel requirement: {}",
+            err
+        );
+    }
+
+    // Test that placeholder embeddings work in test-mode
+    #[cfg(feature = "test-mode")]
+    #[tokio::test]
+    async fn test_activate_success_test_mode() {
         let activator = E8Activator::new();
         let analysis = GraphAnalysisResult {
             has_connection: true,
@@ -415,17 +605,33 @@ mod tests {
         };
 
         let result = activator
-            .activate_relationship(Uuid::new_v4(), Uuid::new_v4(), "a", "b", &analysis)
+            .activate_relationship(Uuid::new_v4(), Uuid::new_v4(), "source content", "target content", &analysis)
             .await;
 
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Should use placeholder embeddings in test-mode: {:?}", result);
+        let (source_emb, target_emb) = result.unwrap();
+
+        // Verify dimensions
+        assert_eq!(source_emb.len(), 1024, "E8 embeddings should be 1024D");
+        assert_eq!(target_emb.len(), 1024, "E8 embeddings should be 1024D");
+
+        // Source and target should be different (asymmetric)
+        assert_ne!(source_emb, target_emb, "Source and target embeddings should differ");
+
+        // Verify non-zero
+        let source_sum: f32 = source_emb.iter().map(|x| x.abs()).sum();
+        let target_sum: f32 = target_emb.iter().map(|x| x.abs()).sum();
+        assert!(source_sum > 0.0, "Source embedding should be non-zero");
+        assert!(target_sum > 0.0, "Target embedding should be non-zero");
+
         let stats = activator.stats();
         assert_eq!(stats.edges_created, 1);
         assert_eq!(stats.embeddings_generated, 2);
     }
 
+    #[cfg(feature = "test-mode")]
     #[tokio::test]
-    async fn test_activate_bidirectional() {
+    async fn test_activate_bidirectional_test_mode() {
         let activator = E8Activator::new();
         let analysis = GraphAnalysisResult {
             has_connection: true,

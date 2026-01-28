@@ -30,10 +30,10 @@ use context_graph_core::traits::{SearchStrategy, TeleologicalSearchOptions};
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
 
 use super::embedder_dtos::{
-    CompareEmbedderViewsRequest, CompareEmbedderViewsResponse, EmbedderCluster,
-    EmbedderIndexInfo, EmbedderRanking, EmbedderSearchResult, GetEmbedderClustersRequest,
-    GetEmbedderClustersResponse, ListEmbedderIndexesRequest, ListEmbedderIndexesResponse,
-    RankedMemory, SearchByEmbedderRequest, SearchByEmbedderResponse, UniqueFind,
+    AllEmbedderScores, CompareEmbedderViewsRequest, CompareEmbedderViewsResponse, EmbedderIndexInfo,
+    EmbedderRanking, EmbedderSearchResult, GetEmbedderClustersRequest,
+    ListEmbedderIndexesRequest, ListEmbedderIndexesResponse, RankedMemory,
+    SearchByEmbedderRequest, SearchByEmbedderResponse, UniqueFind,
 };
 
 use super::super::Handlers;
@@ -166,14 +166,26 @@ impl Handlers {
             .map(|(i, cand)| {
                 let content = contents.get(i).and_then(|c| c.clone());
 
-                // Optionally compute all scores if requested
-                // Note: For now, we only return the primary embedder's score
-                // Full all_scores would require accessing all 13 embedder similarities
-                // which is expensive. This is a TODO for full implementation.
+                // Optionally include all 13 embedder scores
+                // TeleologicalSearchResult already computes all 13 scores during search
                 let all_scores = if request.include_all_scores {
-                    // Placeholder: would need to search all 13 spaces for this memory
-                    // For now, just return None - full implementation would be expensive
-                    None
+                    // Convert [f32; 13] array to AllEmbedderScores struct
+                    let s = &cand.embedder_scores;
+                    Some(AllEmbedderScores {
+                        e1: s[0],
+                        e2: s[1],
+                        e3: s[2],
+                        e4: s[3],
+                        e5: s[4],
+                        e6: s[5],
+                        e7: s[6],
+                        e8: s[7],
+                        e9: s[8],
+                        e10: s[9],
+                        e11: s[10],
+                        e12: s[11],
+                        e13: s[12],
+                    })
                 } else {
                     None
                 };
@@ -218,25 +230,23 @@ impl Handlers {
     ///
     /// Explore clusters of memories in a specific embedder's space.
     ///
-    /// # Algorithm
+    /// # Status: NOT IMPLEMENTED
+    ///
+    /// This tool requires cuML HDBSCAN clustering on GPU, which is not yet implemented.
+    /// Returns an error until the clustering infrastructure is in place.
+    ///
+    /// # Planned Algorithm
     ///
     /// 1. Get all memories from the system
-    /// 2. Run HDBSCAN clustering in the selected embedder's space
-    /// 3. Return top clusters with optional samples
-    ///
-    /// # Note
-    ///
-    /// This is a simplified implementation. Full clustering would use
-    /// cuML HDBSCAN on GPU. This version uses a placeholder that
-    /// groups by similarity threshold.
+    /// 2. Extract the selected embedder's vectors
+    /// 3. Run cuML HDBSCAN clustering on GPU
+    /// 4. Return clusters with optional samples
     pub(crate) async fn call_get_embedder_clusters(
         &self,
         id: Option<JsonRpcId>,
         args: serde_json::Value,
     ) -> JsonRpcResponse {
-        let start = Instant::now();
-
-        // Parse and validate request
+        // Parse and validate request to provide better error messages
         let request: GetEmbedderClustersRequest = match serde_json::from_value(args.clone()) {
             Ok(req) => req,
             Err(e) => {
@@ -250,6 +260,7 @@ impl Handlers {
             return self.tool_error(id, &e);
         }
 
+        // Validate embedder exists
         let embedder_id = match request.embedder_id() {
             Some(eid) => eid,
             None => {
@@ -261,123 +272,22 @@ impl Handlers {
             }
         };
 
-        info!(
+        warn!(
             embedder = %request.embedder,
             embedder_name = %embedder_id.name(),
-            min_cluster_size = request.min_cluster_size,
-            "get_embedder_clusters: Starting cluster exploration"
+            "get_embedder_clusters: Tool NOT IMPLEMENTED - requires cuML HDBSCAN"
         );
 
-        // For now, return a placeholder response.
-        // Full implementation would:
-        // 1. Get all fingerprints from the store
-        // 2. Extract the selected embedder's vectors
-        // 3. Run cuML HDBSCAN clustering
-        // 4. Return clusters with samples
-
-        // Check if we have any memories
-        let sample_query = "technology software programming";
-        let sample_fingerprint = match self.multi_array_provider.embed_all(sample_query).await {
-            Ok(output) => output.fingerprint,
-            Err(e) => {
-                error!(error = %e, "get_embedder_clusters: Sample embedding FAILED");
-                return self.tool_error(id, &format!("Embedding failed: {}", e));
-            }
-        };
-
-        let options = TeleologicalSearchOptions::quick(100)
-            .with_strategy(SearchStrategy::E1Only)
-            .with_min_similarity(0.0);
-
-        let all_memories = match self
-            .teleological_store
-            .search_semantic(&sample_fingerprint, options)
-            .await
-        {
-            Ok(results) => results,
-            Err(e) => {
-                error!(error = %e, "get_embedder_clusters: Memory scan FAILED");
-                return self.tool_error(id, &format!("Memory scan failed: {}", e));
-            }
-        };
-
-        let total_memories = all_memories.len();
-
-        // Simple clustering: group by similarity buckets
-        // This is a placeholder - real implementation would use HDBSCAN
-        let mut clusters: Vec<EmbedderCluster> = Vec::new();
-
-        if total_memories >= request.min_cluster_size {
-            // Create a single "main cluster" with samples
-            let sample_ids: Vec<Uuid> = all_memories
-                .iter()
-                .take(request.samples_per_cluster)
-                .map(|m| m.fingerprint.id)
-                .collect();
-
-            // Get content for samples
-            let sample_snippets = if request.include_samples {
-                match self.teleological_store.get_content_batch(&sample_ids).await {
-                    Ok(contents) => Some(
-                        contents
-                            .iter()
-                            .map(|c| {
-                                c.as_ref()
-                                    .map(|s| {
-                                        if s.len() > 100 {
-                                            format!("{}...", &s[..100])
-                                        } else {
-                                            s.clone()
-                                        }
-                                    })
-                                    .unwrap_or_else(|| "[no content]".to_string())
-                            })
-                            .collect(),
-                    ),
-                    Err(_) => None,
-                }
-            } else {
-                None
-            };
-
-            clusters.push(EmbedderCluster {
-                cluster_id: 0,
-                size: total_memories,
-                sample_ids: if request.include_samples {
-                    Some(sample_ids)
-                } else {
-                    None
-                },
-                sample_snippets,
-                description: Some(format!(
-                    "Main cluster in {} space",
-                    embedder_id.name()
-                )),
-            });
-        }
-
-        let elapsed_ms = start.elapsed().as_millis() as u64;
-
-        let response = GetEmbedderClustersResponse {
-            embedder: request.embedder.clone(),
-            embedder_perspective: embedder_id.finds().to_string(),
-            clusters: clusters.clone(),
-            total_memories,
-            total_clusters: clusters.len(),
-            time_ms: elapsed_ms,
-        };
-
-        info!(
-            embedder = %request.embedder,
-            clusters = clusters.len(),
-            total_memories = total_memories,
-            elapsed_ms = elapsed_ms,
-            "get_embedder_clusters: Completed cluster exploration"
-        );
-
-        self.tool_result(
+        // Return honest error instead of fake single-cluster results
+        self.tool_error(
             id,
-            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
+            &format!(
+                "get_embedder_clusters is not yet implemented. \
+                 Clustering in {} space requires cuML HDBSCAN on GPU, \
+                 which is planned but not yet available. \
+                 Use search_by_embedder for similarity-based queries instead.",
+                embedder_id.name()
+            ),
         )
     }
 
@@ -658,12 +568,11 @@ impl Handlers {
                     dimension: e.dimension().to_string(),
                     index_type: index_type.to_string(),
                     vector_count: total_memories,
-                    size_mb: if request.include_details {
-                        Some(0.0) // Would be calculated from actual index
-                    } else {
-                        None
-                    },
-                    gpu_resident: true, // Per Constitution, all embedders are GPU-resident
+                    // Size not available: would require querying actual HNSW/FAISS index stats
+                    size_mb: None,
+                    // GPU residency cannot be verified at runtime without querying CUDA allocator
+                    // Per Constitution ARCH-GPU-04, GPU is expected but we can't confirm
+                    gpu_resident: None,
                     topic_weight,
                     category: category.to_string(),
                 }
@@ -675,11 +584,8 @@ impl Handlers {
         let response = ListEmbedderIndexesResponse {
             indexes,
             total_memories,
-            total_vram_mb: if request.include_details {
-                Some(10.0) // Approximate VRAM for all embedders
-            } else {
-                None
-            },
+            // VRAM not available: would require querying CUDA allocator for actual usage
+            total_vram_mb: None,
         };
 
         info!(
@@ -697,11 +603,10 @@ impl Handlers {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::super::embedder_dtos::EmbedderId;
 
     #[test]
     fn test_embedder_id_properties() {
-        use super::super::embedder_dtos::EmbedderId;
 
         // Test E1 (foundation)
         assert_eq!(EmbedderId::E1.to_index(), 0);

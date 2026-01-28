@@ -34,6 +34,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
 use context_graph_core::causal::CausalGraph;
+use context_graph_embeddings::models::CausalModel;
 
 use crate::activator::{ActivatorConfig, E5EmbedderActivator};
 use crate::error::{CausalAgentError, CausalAgentResult};
@@ -175,7 +176,20 @@ pub struct CausalDiscoveryService {
 }
 
 impl CausalDiscoveryService {
-    /// Create a new service with the given configuration.
+    /// Create a new service with the given configuration (test mode only).
+    ///
+    /// # Warning
+    ///
+    /// This constructor creates an E5EmbedderActivator WITHOUT a CausalModel.
+    /// In production (without `test-mode` feature), embedding operations will fail.
+    /// Use `with_models()` for production deployments.
+    #[cfg_attr(
+        not(feature = "test-mode"),
+        deprecated(
+            since = "0.1.0",
+            note = "Use with_models() for production. This constructor creates E5EmbedderActivator without CausalModel."
+        )
+    )]
     pub async fn new(config: CausalDiscoveryConfig) -> CausalAgentResult<Self> {
         // Create LLM from config
         let llm = CausalDiscoveryLLM::with_config(config.llm_config.clone())?;
@@ -206,6 +220,60 @@ impl CausalDiscoveryService {
             last_result: RwLock::new(None),
             shutdown_tx: RwLock::new(None),
         })
+    }
+
+    /// Create a new service with models for production use.
+    ///
+    /// This is the recommended constructor for production deployments.
+    /// It properly injects the CausalModel into E5EmbedderActivator for real embeddings.
+    ///
+    /// # Arguments
+    ///
+    /// * `shared_llm` - Shared CausalDiscoveryLLM (Qwen2.5-3B) for relationship classification
+    /// * `causal_model` - CausalModel for E5 asymmetric embeddings (768D, ~0.4GB VRAM)
+    /// * `config` - Service configuration
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let causal_model = Arc::new(CausalModel::new(path, config)?);
+    /// causal_model.load().await?;
+    /// let service = CausalDiscoveryService::with_models(shared_llm, causal_model, config);
+    /// ```
+    pub fn with_models(
+        shared_llm: Arc<CausalDiscoveryLLM>,
+        causal_model: Arc<CausalModel>,
+        config: CausalDiscoveryConfig,
+    ) -> Self {
+        // Create causal graph
+        let causal_graph = Arc::new(RwLock::new(CausalGraph::new()));
+
+        // Create scanner
+        let scanner = MemoryScanner::with_config(config.scanner_config.clone());
+
+        // Create activator with real CausalModel
+        let activator_config = ActivatorConfig {
+            min_confidence: config.min_confidence,
+            ..config.activator_config.clone()
+        };
+        let activator = E5EmbedderActivator::with_model(
+            causal_graph.clone(),
+            causal_model,
+            activator_config,
+        );
+        let activator = Arc::new(activator);
+
+        Self {
+            config,
+            llm: shared_llm,
+            scanner: RwLock::new(scanner),
+            activator,
+            causal_graph,
+            running: AtomicBool::new(false),
+            status: RwLock::new(ServiceStatus::Stopped),
+            last_result: RwLock::new(None),
+            shutdown_tx: RwLock::new(None),
+        }
     }
 
     /// Load the LLM model.

@@ -345,6 +345,13 @@ impl CausalDualEmbedderAdapter {
         }
     }
 
+    /// Get the underlying CausalModel.
+    ///
+    /// This method exposes the model for use by CausalDiscoveryService.
+    fn model(&self) -> Arc<CausalModel> {
+        Arc::clone(&self.model)
+    }
+
     /// Embed content as both cause and effect roles.
     ///
     /// Returns (cause_vector, effect_vector) where each is 768D.
@@ -467,6 +474,13 @@ impl GraphDualEmbedderAdapter {
         Self {
             model: Arc::new(model),
         }
+    }
+
+    /// Get the underlying GraphModel.
+    ///
+    /// This method exposes the model for use by GraphDiscoveryService.
+    fn model(&self) -> Arc<GraphModel> {
+        Arc::clone(&self.model)
     }
 
     /// Embed content as both source and target roles.
@@ -818,6 +832,39 @@ impl ProductionMultiArrayProvider {
             tracing::warn!("Embedder {} failed: {}", embedder_name, e);
         }
         (result, duration)
+    }
+
+    // =========================================================================
+    // MODEL ACCESSOR METHODS
+    // =========================================================================
+    // These methods expose the underlying models for use by discovery services.
+    // Per Root Cause Fix Plan: GraphDiscoveryService and CausalDiscoveryService
+    // need direct access to GraphModel and CausalModel for embedding operations.
+
+    /// Get the underlying CausalModel for E5 embeddings.
+    ///
+    /// This method exposes the CausalModel used internally by E5 embeddings
+    /// for use by CausalDiscoveryService. The model is already loaded and
+    /// ready for use.
+    ///
+    /// # Returns
+    ///
+    /// Arc reference to the CausalModel (768D embeddings, ~0.4GB VRAM)
+    pub fn causal_model(&self) -> Arc<CausalModel> {
+        self.e5_causal.model()
+    }
+
+    /// Get the underlying GraphModel for E8 embeddings.
+    ///
+    /// This method exposes the GraphModel used internally by E8 embeddings
+    /// for use by GraphDiscoveryService. The model is already loaded and
+    /// ready for use.
+    ///
+    /// # Returns
+    ///
+    /// Arc reference to the GraphModel (1024D embeddings, ~1.3GB VRAM)
+    pub fn graph_model(&self) -> Arc<GraphModel> {
+        self.e8_graph.model()
     }
 }
 

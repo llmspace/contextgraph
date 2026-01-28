@@ -579,16 +579,17 @@ impl Handlers {
                         warn!(
                             memory_id = %memory_id,
                             error = %e,
-                            "trigger_causal_discovery_extract: Failed to generate source-anchored E5 embeddings"
+                            "trigger_causal_discovery_extract: Failed to generate source-anchored E5 embeddings - skipping relationship"
                         );
                         source_e5_fallback_count += 1;
-                        // Fall back to empty vectors - search will use explanation embeddings only
-                        (Vec::new(), Vec::new())
+                        // Skip this relationship - don't store with empty embeddings
+                        continue;
                     }
                 };
 
                 // Generate E8 graph embeddings for causal structure search
                 // Uses explanation text like E5, but captures graph connectivity patterns
+                // E8 is a relational enhancer (ARCH-12) - critical for graph search
                 let (e8_graph_source, e8_graph_target) = match self
                     .multi_array_provider
                     .embed_e8_dual(&relationship.explanation)
@@ -599,17 +600,18 @@ impl Handlers {
                         warn!(
                             memory_id = %memory_id,
                             error = %e,
-                            "trigger_causal_discovery_extract: Failed to generate E8 embeddings"
+                            "trigger_causal_discovery_extract: Failed to generate E8 embeddings - skipping relationship"
                         );
                         e8_fallback_count += 1;
-                        // Fall back to empty - E8 is optional enhancement, not blocking
-                        (Vec::new(), Vec::new())
+                        // Skip this relationship - don't store corrupted data (per plan: fix #3)
+                        continue;
                     }
                 };
 
                 // Generate E11 KEPLER entity embedding for knowledge graph search
                 // Concatenates cause|effect|explanation for entity context
                 // KEPLER knows entity relationships that E1 misses (e.g., "Diesel" = Rust ORM)
+                // E11 is a relational enhancer (ARCH-12) - critical for entity discovery
                 let e11_entity_text = format!(
                     "{} | {} | {}",
                     relationship.cause,
@@ -626,11 +628,11 @@ impl Handlers {
                         warn!(
                             memory_id = %memory_id,
                             error = %e,
-                            "trigger_causal_discovery_extract: Failed to generate E11 embedding"
+                            "trigger_causal_discovery_extract: Failed to generate E11 embedding - skipping relationship"
                         );
                         e11_fallback_count += 1;
-                        // Fall back to empty - E11 is optional enhancement, not blocking
-                        Vec::new()
+                        // Skip this relationship - don't store corrupted data (per plan: fix #3)
+                        continue;
                     }
                 };
 

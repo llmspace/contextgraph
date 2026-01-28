@@ -324,6 +324,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Design documentation only - direction enforced by get_e10_as_intent/get_e10_as_context implementations"]
     fn test_e10_uses_query_document_direction() {
         // search_by_intent uses query→document direction (per E5-base-v2 training)
         // whether using the `query` or `context` parameter:
@@ -333,5 +334,8 @@ mod tests {
         //
         // This test documents the design decision; the actual direction is enforced
         // by the function implementations using the correct get_e10_as_* methods.
+        //
+        // To verify: inspect TeleologicalFingerprint::get_e10_as_intent() and
+        // TeleologicalFingerprint::get_e10_as_context() in context-graph-core.
     }
 }

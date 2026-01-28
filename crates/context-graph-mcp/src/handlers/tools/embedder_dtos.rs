@@ -507,7 +507,9 @@ pub struct EmbedderIndexInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size_mb: Option<f32>,
     /// Whether the index is GPU-resident.
-    pub gpu_resident: bool,
+    /// None if cannot be verified at runtime.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gpu_resident: Option<bool>,
     /// Topic weight for this embedder.
     pub topic_weight: f32,
     /// Category (Semantic, Relational, Temporal, Structural).
