@@ -552,7 +552,34 @@ impl Handlers {
                     }
                 };
 
-                // Create and store the causal relationship
+                // Generate source-anchored E5 embeddings to prevent explanation clustering
+                // Per plan: Source content is unique per document, preventing LLM outputs from clustering
+                let source_truncated: String = content.chars().take(500).collect();
+                let source_anchored_text = format!(
+                    "{} {} causes {}.",
+                    source_truncated,
+                    relationship.cause,
+                    relationship.effect
+                );
+
+                let (e5_source_cause, e5_source_effect) = match self
+                    .multi_array_provider
+                    .embed_e5_dual(&source_anchored_text)
+                    .await
+                {
+                    Ok(dual) => dual,
+                    Err(e) => {
+                        warn!(
+                            memory_id = %memory_id,
+                            error = %e,
+                            "trigger_causal_discovery_extract: Failed to generate source-anchored E5 embeddings"
+                        );
+                        // Fall back to empty vectors - search will use explanation embeddings only
+                        (Vec::new(), Vec::new())
+                    }
+                };
+
+                // Create and store the causal relationship with source-anchored embeddings
                 let causal_rel = context_graph_core::types::CausalRelationship::new(
                     relationship.cause.clone(),
                     relationship.effect.clone(),
@@ -564,7 +591,8 @@ impl Handlers {
                     *memory_id,
                     relationship.confidence,
                     relationship.mechanism_type.as_str().to_string(),
-                );
+                )
+                .with_source_embeddings(e5_source_cause, e5_source_effect);
 
                 match self
                     .teleological_store

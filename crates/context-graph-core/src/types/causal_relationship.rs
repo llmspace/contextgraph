@@ -180,6 +180,28 @@ pub struct CausalRelationship {
     /// Used when searching for causes: "What caused X?"
     pub e5_as_effect: Vec<f32>,
 
+    // ===== SOURCE-ANCHORED E5 EMBEDDINGS (768D each) =====
+    //
+    // These embeddings anchor to the unique source content rather than the
+    // LLM-generated explanation. This prevents clustering of explanations
+    // that share similar prompt structure but come from different documents.
+    //
+    // Format: source_content + cause_statement + effect_statement
+
+    /// E5 embedding of source-anchored text as a CAUSE (768D).
+    ///
+    /// Source-anchored text = source_content + cause/effect statements.
+    /// Used to prevent LLM explanation clustering by anchoring to unique source.
+    #[serde(default)]
+    pub e5_source_cause: Vec<f32>,
+
+    /// E5 embedding of source-anchored text as an EFFECT (768D).
+    ///
+    /// Source-anchored text = source_content + cause/effect statements.
+    /// Used to prevent LLM explanation clustering by anchoring to unique source.
+    #[serde(default)]
+    pub e5_source_effect: Vec<f32>,
+
     // ===== E1 SEMANTIC EMBEDDING (1024D) =====
 
     /// E1 semantic embedding of the explanation (1024D).
@@ -253,6 +275,8 @@ impl CausalRelationship {
             explanation,
             e5_as_cause,
             e5_as_effect,
+            e5_source_cause: Vec::new(),
+            e5_source_effect: Vec::new(),
             e1_semantic,
             confidence: confidence.clamp(0.0, 1.0),
             mechanism_type,
@@ -285,6 +309,8 @@ impl CausalRelationship {
             explanation,
             e5_as_cause,
             e5_as_effect,
+            e5_source_cause: Vec::new(),
+            e5_source_effect: Vec::new(),
             e1_semantic,
             confidence: confidence.clamp(0.0, 1.0),
             mechanism_type,
@@ -317,6 +343,8 @@ impl CausalRelationship {
             explanation,
             e5_as_cause,
             e5_as_effect,
+            e5_source_cause: Vec::new(),
+            e5_source_effect: Vec::new(),
             e1_semantic,
             confidence: confidence.clamp(0.0, 1.0),
             mechanism_type,
@@ -331,6 +359,70 @@ impl CausalRelationship {
     pub fn with_source_spans(mut self, spans: Vec<CausalSourceSpan>) -> Self {
         self.source_spans = spans;
         self
+    }
+
+    /// Add source-anchored E5 embeddings to an existing relationship.
+    ///
+    /// Source-anchored embeddings are derived from the original source content
+    /// rather than the LLM-generated explanation, preventing clustering of
+    /// relationships that share similar explanation structure.
+    ///
+    /// # Arguments
+    /// * `source_cause` - E5 768D embedding of source-anchored text as cause
+    /// * `source_effect` - E5 768D embedding of source-anchored text as effect
+    pub fn with_source_embeddings(
+        mut self,
+        source_cause: Vec<f32>,
+        source_effect: Vec<f32>,
+    ) -> Self {
+        self.e5_source_cause = source_cause;
+        self.e5_source_effect = source_effect;
+        self
+    }
+
+    /// Set source-anchored E5 embeddings in place.
+    ///
+    /// Mutates the relationship to add source-anchored embeddings.
+    pub fn set_source_embeddings(&mut self, source_cause: Vec<f32>, source_effect: Vec<f32>) {
+        self.e5_source_cause = source_cause;
+        self.e5_source_effect = source_effect;
+    }
+
+    /// Check if source-anchored embeddings are present and valid.
+    ///
+    /// Returns true if both e5_source_cause and e5_source_effect have
+    /// the expected 768D dimensionality.
+    pub fn has_source_embeddings(&self) -> bool {
+        self.e5_source_cause.len() == Self::E5_DIM && self.e5_source_effect.len() == Self::E5_DIM
+    }
+
+    /// Get the source-anchored E5 cause embedding as a slice.
+    ///
+    /// Returns an empty slice if source embeddings are not set.
+    pub fn e5_source_cause_embedding(&self) -> &[f32] {
+        &self.e5_source_cause
+    }
+
+    /// Get the source-anchored E5 effect embedding as a slice.
+    ///
+    /// Returns an empty slice if source embeddings are not set.
+    pub fn e5_source_effect_embedding(&self) -> &[f32] {
+        &self.e5_source_effect
+    }
+
+    /// Build the source-anchored text for embedding.
+    ///
+    /// Combines source content with cause/effect statements to create a unique
+    /// text that anchors to the original document rather than LLM patterns.
+    ///
+    /// Format: "{source_content} {cause_statement} causes {effect_statement}."
+    pub fn build_source_anchored_text(&self) -> String {
+        // Truncate source content to ~500 chars to keep embedding focused
+        let source_truncated: String = self.source_content.chars().take(500).collect();
+        format!(
+            "{} {} causes {}.",
+            source_truncated, self.cause_statement, self.effect_statement
+        )
     }
 
     /// Check if all embeddings have the expected dimensions.

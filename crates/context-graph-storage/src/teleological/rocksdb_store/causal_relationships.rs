@@ -470,6 +470,110 @@ impl RocksDbTeleologicalStore {
         Ok(results)
     }
 
+    /// Search causal relationships using hybrid source + explanation scoring.
+    ///
+    /// Combines source-anchored embeddings with explanation embeddings to prevent
+    /// LLM-generated explanations from clustering together. Source content is unique
+    /// per document, providing diversity; explanation provides mechanism detail.
+    ///
+    /// # Hybrid Scoring
+    /// `score = source_weight * source_similarity + explanation_weight * explanation_similarity`
+    ///
+    /// Default weights: source=0.6, explanation=0.4
+    ///
+    /// # Arguments
+    /// * `query_embedding` - E5 768D query embedding
+    /// * `search_causes` - If true, search cause vectors; if false, search effect vectors
+    /// * `top_k` - Number of results
+    /// * `source_weight` - Weight for source-anchored similarity (default 0.6)
+    /// * `explanation_weight` - Weight for explanation similarity (default 0.4)
+    ///
+    /// # Returns
+    /// Vector of (causal_id, hybrid_score) tuples sorted by score descending.
+    pub async fn search_causal_e5_hybrid(
+        &self,
+        query_embedding: &[f32],
+        search_causes: bool,
+        top_k: usize,
+        source_weight: f32,
+        explanation_weight: f32,
+    ) -> CoreResult<Vec<(Uuid, f32)>> {
+        use crate::teleological::rocksdb_store::helpers::compute_cosine_similarity;
+
+        let cf = self.cf_causal_relationships();
+        let iter = self.db.iterator_cf(cf, rocksdb::IteratorMode::Start);
+
+        let mut results: Vec<(Uuid, f32)> = Vec::new();
+
+        for item in iter {
+            let (_key, value) = item.map_err(|e| {
+                error!(
+                    "ROCKSDB ERROR: Failed to iterate causal_relationships: {}",
+                    e
+                );
+                CoreError::StorageError(format!("Failed to iterate causal_relationships: {}", e))
+            })?;
+
+            let relationship: CausalRelationship = match bincode::deserialize(&value) {
+                Ok(r) => r,
+                Err(e) => {
+                    warn!(
+                        "CAUSAL WARNING: Failed to deserialize relationship during hybrid search: {}",
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            // Select appropriate E5 vectors based on search mode
+            let (explanation_embedding, source_embedding) = if search_causes {
+                // Searching for causes: compare query (effect) against stored cause vectors
+                (&relationship.e5_as_cause, &relationship.e5_source_cause)
+            } else {
+                // Searching for effects: compare query (cause) against stored effect vectors
+                (&relationship.e5_as_effect, &relationship.e5_source_effect)
+            };
+
+            // Skip if E5 explanation embeddings are empty (legacy data)
+            if explanation_embedding.iter().all(|&v| v == 0.0) {
+                continue;
+            }
+
+            // Compute explanation similarity
+            let explanation_sim = compute_cosine_similarity(query_embedding, explanation_embedding);
+
+            // Compute source similarity (if source embeddings exist)
+            let source_sim = if source_embedding.is_empty() || source_embedding.iter().all(|&v| v == 0.0) {
+                // No source embeddings - fall back to explanation only
+                explanation_sim
+            } else {
+                compute_cosine_similarity(query_embedding, source_embedding)
+            };
+
+            // Compute hybrid score
+            let hybrid_score = source_weight * source_sim + explanation_weight * explanation_sim;
+            results.push((relationship.id, hybrid_score));
+        }
+
+        // Sort by hybrid score descending
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Take top_k
+        results.truncate(top_k);
+
+        debug!(
+            query_dim = query_embedding.len(),
+            search_causes = search_causes,
+            top_k = top_k,
+            source_weight = source_weight,
+            explanation_weight = explanation_weight,
+            results_count = results.len(),
+            "Searched causal relationships using E5 hybrid scoring"
+        );
+
+        Ok(results)
+    }
+
     /// Get total count of causal relationships.
     pub async fn count_causal_relationships(&self) -> CoreResult<usize> {
         let cf = self.cf_causal_relationships();

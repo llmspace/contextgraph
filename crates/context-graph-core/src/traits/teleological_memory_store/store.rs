@@ -629,4 +629,31 @@ pub trait TeleologicalMemoryStore: Send + Sync {
         search_causes: bool,
         top_k: usize,
     ) -> CoreResult<Vec<(Uuid, f32)>>;
+
+    /// Search causal relationships using hybrid source + explanation scoring.
+    ///
+    /// Combines source-anchored embeddings with explanation embeddings to prevent
+    /// LLM-generated explanations from clustering together. Source content is unique
+    /// per document, providing diversity; explanation provides mechanism detail.
+    ///
+    /// # Hybrid Scoring
+    /// `score = source_weight * source_similarity + explanation_weight * explanation_similarity`
+    ///
+    /// # Arguments
+    /// * `query_embedding` - E5 768D query embedding
+    /// * `search_causes` - If true, search cause vectors; if false, search effect vectors
+    /// * `top_k` - Number of results
+    /// * `source_weight` - Weight for source-anchored similarity (e.g., 0.6)
+    /// * `explanation_weight` - Weight for explanation similarity (e.g., 0.4)
+    ///
+    /// # Returns
+    /// Vector of (causal_id, hybrid_score) tuples sorted by score descending.
+    async fn search_causal_e5_hybrid(
+        &self,
+        query_embedding: &[f32],
+        search_causes: bool,
+        top_k: usize,
+        source_weight: f32,
+        explanation_weight: f32,
+    ) -> CoreResult<Vec<(Uuid, f32)>>;
 }

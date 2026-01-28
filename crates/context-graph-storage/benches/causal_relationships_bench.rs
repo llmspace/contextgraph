@@ -12,6 +12,7 @@
 //! | search (100 rels) | < 10ms |
 //! | search (1000 rels) | < 100ms |
 //! | search (5000 rels) | < 500ms |
+//! | search_e5_hybrid | < 150% of search_e5 |
 //!
 //! # Usage
 //!
@@ -29,11 +30,14 @@ use context_graph_core::types::CausalRelationship;
 use context_graph_storage::teleological::RocksDbTeleologicalStore;
 
 // ============================================================================
-// CONSTANTS - E1 embedding dimension per constitution (1024D)
+// CONSTANTS - Embedding dimensions per constitution
 // ============================================================================
 
 /// E1 embedding dimension per constitution.yaml
 const E1_DIM: usize = 1024;
+
+/// E5 embedding dimension per constitution.yaml
+const E5_DIM: usize = 768;
 
 // ============================================================================
 // TEST DATA GENERATION (Real data, no mocks)
@@ -53,8 +57,22 @@ fn generate_e1_embedding(rng: &mut StdRng) -> Vec<f32> {
     embedding
 }
 
-/// Sample causal relationship descriptions for benchmark diversity.
-const SAMPLE_DESCRIPTIONS: &[&str] = &[
+/// Generate a random normalized E5 embedding (768D).
+fn generate_e5_embedding(rng: &mut StdRng) -> Vec<f32> {
+    let mut embedding: Vec<f32> = (0..E5_DIM).map(|_| rng.gen::<f32>() - 0.5).collect();
+
+    // Normalize to unit length
+    let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm > 0.0 {
+        embedding.iter_mut().for_each(|x| *x /= norm);
+    }
+
+    embedding
+}
+
+/// Sample causal relationship explanations for benchmark diversity.
+/// These are LLM-style explanations that would normally cluster together.
+const SAMPLE_EXPLANATIONS: &[&str] = &[
     "This causal relationship describes how chronic stress leads to elevated cortisol levels. \
      The mechanism involves sustained activation of the HPA axis, which over time causes \
      hippocampal neurodegeneration. This has implications for understanding cognitive decline \
@@ -74,6 +92,7 @@ const SAMPLE_DESCRIPTIONS: &[&str] = &[
 ];
 
 /// Sample source content for benchmark diversity.
+/// These represent unique documents from which relationships were extracted.
 const SAMPLE_SOURCES: &[&str] = &[
     "Studies show that prolonged exposure to cortisol causes damage to hippocampal neurons. \
      This leads to memory impairment and cognitive decline over extended periods.",
@@ -87,37 +106,55 @@ const SAMPLE_SOURCES: &[&str] = &[
      conflicting data that had to be manually merged when connectivity restored.",
 ];
 
-/// Generate a realistic causal relationship description.
-fn generate_description(index: usize) -> String {
-    SAMPLE_DESCRIPTIONS[index % SAMPLE_DESCRIPTIONS.len()].to_string()
-}
+/// Sample cause statements.
+const SAMPLE_CAUSES: &[&str] = &[
+    "Chronic stress activates HPA axis",
+    "Connection pool exhaustion",
+    "Unclosed database connections in error paths",
+    "Missing mutex synchronization",
+    "Network partition without quorum detection",
+];
 
-/// Generate source content that would have triggered causal detection.
-fn generate_source_content(index: usize) -> String {
-    SAMPLE_SOURCES[index % SAMPLE_SOURCES.len()].to_string()
-}
+/// Sample effect statements.
+const SAMPLE_EFFECTS: &[&str] = &[
+    "Hippocampal neurodegeneration",
+    "Query latency bottleneck",
+    "Cascading service failures",
+    "Shared state corruption",
+    "Split-brain data inconsistency",
+];
 
-/// Direction values for test relationship rotation.
-const DIRECTIONS: &[&str] = &["cause", "effect", "bidirectional"];
-
-/// Standard causal cues for test relationships.
-const CAUSAL_CUES: &[&str] = &["causes", "leads to", "results in"];
+/// Mechanism types for test relationships.
+const MECHANISM_TYPES: &[&str] = &["direct", "mediated", "feedback", "temporal"];
 
 /// Create a realistic test CausalRelationship with real data.
 fn create_test_relationship(rng: &mut StdRng, source_id: Uuid, index: usize) -> CausalRelationship {
     CausalRelationship::new(
-        generate_description(index),
-        generate_e1_embedding(rng),
-        generate_source_content(index),
+        SAMPLE_CAUSES[index % SAMPLE_CAUSES.len()].to_string(),
+        SAMPLE_EFFECTS[index % SAMPLE_EFFECTS.len()].to_string(),
+        SAMPLE_EXPLANATIONS[index % SAMPLE_EXPLANATIONS.len()].to_string(),
+        generate_e5_embedding(rng), // e5_as_cause
+        generate_e5_embedding(rng), // e5_as_effect
+        generate_e1_embedding(rng), // e1_semantic
+        SAMPLE_SOURCES[index % SAMPLE_SOURCES.len()].to_string(),
         source_id,
-        DIRECTIONS[index % DIRECTIONS.len()].to_string(),
         0.75 + (index % 25) as f32 * 0.01, // Varied confidence 0.75-0.99
-        CAUSAL_CUES.iter().map(|s| s.to_string()).collect(),
+        MECHANISM_TYPES[index % MECHANISM_TYPES.len()].to_string(),
     )
 }
 
+/// Create a test CausalRelationship with source-anchored embeddings for hybrid search testing.
+fn create_test_relationship_with_source_embeddings(
+    rng: &mut StdRng,
+    source_id: Uuid,
+    index: usize,
+) -> CausalRelationship {
+    create_test_relationship(rng, source_id, index)
+        .with_source_embeddings(generate_e5_embedding(rng), generate_e5_embedding(rng))
+}
+
 // ============================================================================
-// BENCHMARKS
+// BENCHMARKS - CRUD Operations
 // ============================================================================
 
 /// Benchmark: Store a single causal relationship.
@@ -242,6 +279,10 @@ fn bench_get_by_source(c: &mut Criterion) {
     );
 }
 
+// ============================================================================
+// BENCHMARKS - Search Operations
+// ============================================================================
+
 /// Benchmark: Search causal relationships by embedding similarity.
 /// Tests scaling behavior across different collection sizes.
 /// Uses brute-force scan (suitable for <10K relationships per design).
@@ -305,7 +346,7 @@ fn bench_search_scaling(c: &mut Criterion) {
 }
 
 /// Benchmark: Search with direction filter.
-/// Tests filtering by "cause", "effect", or "bidirectional".
+/// Tests filtering by "direct", "mediated", "feedback", or "temporal".
 fn bench_search_with_filter(c: &mut Criterion) {
     let temp_dir = TempDir::new().expect("BENCH ERROR: Failed to create temp directory");
     let store = RocksDbTeleologicalStore::open(temp_dir.path())
@@ -314,7 +355,7 @@ fn bench_search_with_filter(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().expect("BENCH ERROR: Failed to create tokio runtime");
     let mut rng = StdRng::seed_from_u64(42);
 
-    // Pre-populate with 500 relationships (mixed directions)
+    // Pre-populate with 500 relationships (mixed mechanism types)
     for i in 0..500 {
         let source_id = Uuid::new_v4();
         let rel = create_test_relationship(&mut rng, source_id, i);
@@ -339,15 +380,15 @@ fn bench_search_with_filter(c: &mut Criterion) {
         })
     });
 
-    // Benchmark filtered by "cause"
-    group.bench_function("filter_cause", |b| {
+    // Benchmark filtered by "direct"
+    group.bench_function("filter_direct", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let results = store
                     .search_causal_relationships(
                         black_box(&query_embedding),
                         10,
-                        Some(black_box("cause")),
+                        Some(black_box("direct")),
                     )
                     .await
                     .expect("BENCH ERROR: search failed");
@@ -356,15 +397,15 @@ fn bench_search_with_filter(c: &mut Criterion) {
         })
     });
 
-    // Benchmark filtered by "effect"
-    group.bench_function("filter_effect", |b| {
+    // Benchmark filtered by "mediated"
+    group.bench_function("filter_mediated", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let results = store
                     .search_causal_relationships(
                         black_box(&query_embedding),
                         10,
-                        Some(black_box("effect")),
+                        Some(black_box("mediated")),
                     )
                     .await
                     .expect("BENCH ERROR: search failed");
@@ -387,11 +428,162 @@ fn bench_search_with_filter(c: &mut Criterion) {
     );
 }
 
+// ============================================================================
+// BENCHMARKS - E5 Asymmetric Search
+// ============================================================================
+
+/// Benchmark: E5 asymmetric causal search.
+/// Compares search_causal_e5 vs search_causal_e5_hybrid.
+fn bench_e5_search_comparison(c: &mut Criterion) {
+    let temp_dir = TempDir::new().expect("BENCH ERROR: Failed to create temp directory");
+    let store = RocksDbTeleologicalStore::open(temp_dir.path())
+        .expect("BENCH ERROR: Failed to open RocksDB store");
+
+    let rt = tokio::runtime::Runtime::new().expect("BENCH ERROR: Failed to create tokio runtime");
+    let mut rng = StdRng::seed_from_u64(42);
+
+    // Pre-populate with 500 relationships WITH source embeddings
+    println!("Populating 500 causal relationships with source embeddings...");
+    for i in 0..500 {
+        let source_id = Uuid::new_v4();
+        let rel = create_test_relationship_with_source_embeddings(&mut rng, source_id, i);
+        rt.block_on(async { store.store_causal_relationship(&rel).await })
+            .expect("BENCH ERROR: Failed to pre-store relationship");
+    }
+
+    let query_embedding = generate_e5_embedding(&mut rng);
+
+    let mut group = c.benchmark_group("causal/e5_search");
+
+    // Benchmark E5 search (explanation only)
+    group.bench_function("e5_causes_only", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let results = store
+                    .search_causal_e5(black_box(&query_embedding), true, 10)
+                    .await
+                    .expect("BENCH ERROR: search_causal_e5 failed");
+                black_box(results)
+            })
+        })
+    });
+
+    // Benchmark E5 hybrid search (source + explanation)
+    group.bench_function("e5_hybrid_causes", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let results = store
+                    .search_causal_e5_hybrid(black_box(&query_embedding), true, 10, 0.6, 0.4)
+                    .await
+                    .expect("BENCH ERROR: search_causal_e5_hybrid failed");
+                black_box(results)
+            })
+        })
+    });
+
+    // Benchmark E5 effects search
+    group.bench_function("e5_effects_only", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let results = store
+                    .search_causal_e5(black_box(&query_embedding), false, 10)
+                    .await
+                    .expect("BENCH ERROR: search_causal_e5 failed");
+                black_box(results)
+            })
+        })
+    });
+
+    // Benchmark E5 hybrid effects search
+    group.bench_function("e5_hybrid_effects", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let results = store
+                    .search_causal_e5_hybrid(black_box(&query_embedding), false, 10, 0.6, 0.4)
+                    .await
+                    .expect("BENCH ERROR: search_causal_e5_hybrid failed");
+                black_box(results)
+            })
+        })
+    });
+
+    group.finish();
+
+    // Verify both methods return results
+    let e5_results = rt
+        .block_on(async { store.search_causal_e5(&query_embedding, true, 10).await })
+        .expect("VERIFICATION FAILED: e5 search failed");
+    let hybrid_results = rt
+        .block_on(async { store.search_causal_e5_hybrid(&query_embedding, true, 10, 0.6, 0.4).await })
+        .expect("VERIFICATION FAILED: hybrid search failed");
+
+    println!(
+        "VERIFICATION: E5 returned {} results (top: {:.4}), Hybrid returned {} results (top: {:.4})",
+        e5_results.len(),
+        e5_results.first().map(|r| r.1).unwrap_or(0.0),
+        hybrid_results.len(),
+        hybrid_results.first().map(|r| r.1).unwrap_or(0.0),
+    );
+}
+
+/// Benchmark: E5 hybrid search with different weight configurations.
+fn bench_hybrid_weight_variations(c: &mut Criterion) {
+    let temp_dir = TempDir::new().expect("BENCH ERROR: Failed to create temp directory");
+    let store = RocksDbTeleologicalStore::open(temp_dir.path())
+        .expect("BENCH ERROR: Failed to open RocksDB store");
+
+    let rt = tokio::runtime::Runtime::new().expect("BENCH ERROR: Failed to create tokio runtime");
+    let mut rng = StdRng::seed_from_u64(42);
+
+    // Pre-populate with 500 relationships with source embeddings
+    for i in 0..500 {
+        let source_id = Uuid::new_v4();
+        let rel = create_test_relationship_with_source_embeddings(&mut rng, source_id, i);
+        rt.block_on(async { store.store_causal_relationship(&rel).await })
+            .expect("BENCH ERROR: Failed to pre-store relationship");
+    }
+
+    let query_embedding = generate_e5_embedding(&mut rng);
+
+    let mut group = c.benchmark_group("causal/hybrid_weights");
+
+    // Test different weight combinations
+    let weight_configs = [
+        ("source_heavy_0.8_0.2", 0.8, 0.2),
+        ("balanced_0.6_0.4", 0.6, 0.4),
+        ("equal_0.5_0.5", 0.5, 0.5),
+        ("explanation_heavy_0.3_0.7", 0.3, 0.7),
+    ];
+
+    for (name, source_w, explanation_w) in weight_configs {
+        group.bench_function(name, |b| {
+            b.iter(|| {
+                rt.block_on(async {
+                    let results = store
+                        .search_causal_e5_hybrid(
+                            black_box(&query_embedding),
+                            true,
+                            10,
+                            source_w,
+                            explanation_w,
+                        )
+                        .await
+                        .expect("BENCH ERROR: search_causal_e5_hybrid failed");
+                    black_box(results)
+                })
+            })
+        });
+    }
+
+    group.finish();
+}
+
+// ============================================================================
+// BENCHMARKS - Delete Operations
+// ============================================================================
+
 /// Benchmark: Delete causal relationship.
 /// Tests primary delete + secondary index update.
-///
-/// Uses iter_batched to ensure each iteration has a fresh relationship to delete,
-/// avoiding complex state management within the benchmark closure.
 fn bench_delete_causal_relationship(c: &mut Criterion) {
     let temp_dir = TempDir::new().expect("BENCH ERROR: Failed to create temp directory");
     let store = RocksDbTeleologicalStore::open(temp_dir.path())
@@ -442,6 +634,8 @@ criterion_group!(
     bench_get_by_source,
     bench_search_scaling,
     bench_search_with_filter,
+    bench_e5_search_comparison,
+    bench_hybrid_weight_variations,
     bench_delete_causal_relationship,
 );
 criterion_main!(benches);

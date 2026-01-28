@@ -22,6 +22,11 @@ const MIN_TOP_K: u64 = 1;
 const MAX_TOP_K: u64 = 100;
 const DEFAULT_TOP_K: u64 = 10;
 
+/// Default hybrid search weights
+/// Source-anchored embeddings prevent LLM output clustering
+const DEFAULT_SOURCE_WEIGHT: f32 = 0.6;
+const DEFAULT_EXPLANATION_WEIGHT: f32 = 0.4;
+
 impl Handlers {
     /// search_causal_relationships tool implementation.
     ///
@@ -101,11 +106,36 @@ impl Handlers {
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
+        // Parse hybrid search weight parameters (optional)
+        // sourceWeight: weight for source-anchored embeddings (0.0-1.0, default 0.6)
+        // explanationWeight: weight for explanation embeddings (0.0-1.0, default 0.4)
+        let source_weight = args
+            .get("sourceWeight")
+            .and_then(|v| v.as_f64())
+            .map(|v| v as f32)
+            .unwrap_or(DEFAULT_SOURCE_WEIGHT);
+
+        let explanation_weight = args
+            .get("explanationWeight")
+            .and_then(|v| v.as_f64())
+            .map(|v| v as f32)
+            .unwrap_or(DEFAULT_EXPLANATION_WEIGHT);
+
+        // Validate weights are in range [0.0, 1.0]
+        if !(0.0..=1.0).contains(&source_weight) || !(0.0..=1.0).contains(&explanation_weight) {
+            return self.tool_error(
+                id,
+                "sourceWeight and explanationWeight must be between 0.0 and 1.0",
+            );
+        }
+
         info!(
             query_len = query.len(),
             search_mode = search_mode,
             top_k = top_k,
             include_source = include_source,
+            source_weight = source_weight,
+            explanation_weight = explanation_weight,
             "search_causal_relationships: Starting search"
         );
 
@@ -113,6 +143,7 @@ impl Handlers {
         let search_results = match search_mode {
             "causes" => {
                 // "What caused X?" → query as effect, search cause vectors
+                // Uses hybrid scoring: 0.6 * source + 0.4 * explanation to prevent clustering
                 let e5_result = self.multi_array_provider.embed_e5_dual(query).await;
                 let (_as_cause, as_effect) = match e5_result {
                     Ok(dual) => dual,
@@ -125,23 +156,32 @@ impl Handlers {
                 debug!(
                     embedding_dim = as_effect.len(),
                     mode = "causes",
-                    "search_causal_relationships: Query embedded as effect"
+                    source_weight = source_weight,
+                    explanation_weight = explanation_weight,
+                    "search_causal_relationships: Query embedded as effect (hybrid search)"
                 );
 
                 match self
                     .teleological_store
-                    .search_causal_e5(&as_effect, true, top_k)
+                    .search_causal_e5_hybrid(
+                        &as_effect,
+                        true,
+                        top_k,
+                        source_weight,
+                        explanation_weight,
+                    )
                     .await
                 {
                     Ok(results) => results,
                     Err(e) => {
-                        error!(error = %e, "search_causal_relationships: E5 search failed");
+                        error!(error = %e, "search_causal_relationships: E5 hybrid search failed");
                         return self.tool_error(id, &format!("Search failed: {}", e));
                     }
                 }
             }
             "effects" => {
                 // "What are effects of X?" → query as cause, search effect vectors
+                // Uses hybrid scoring: 0.6 * source + 0.4 * explanation to prevent clustering
                 let e5_result = self.multi_array_provider.embed_e5_dual(query).await;
                 let (as_cause, _as_effect) = match e5_result {
                     Ok(dual) => dual,
@@ -154,17 +194,25 @@ impl Handlers {
                 debug!(
                     embedding_dim = as_cause.len(),
                     mode = "effects",
-                    "search_causal_relationships: Query embedded as cause"
+                    source_weight = source_weight,
+                    explanation_weight = explanation_weight,
+                    "search_causal_relationships: Query embedded as cause (hybrid search)"
                 );
 
                 match self
                     .teleological_store
-                    .search_causal_e5(&as_cause, false, top_k)
+                    .search_causal_e5_hybrid(
+                        &as_cause,
+                        false,
+                        top_k,
+                        source_weight,
+                        explanation_weight,
+                    )
                     .await
                 {
                     Ok(results) => results,
                     Err(e) => {
-                        error!(error = %e, "search_causal_relationships: E5 search failed");
+                        error!(error = %e, "search_causal_relationships: E5 hybrid search failed");
                         return self.tool_error(id, &format!("Search failed: {}", e));
                     }
                 }

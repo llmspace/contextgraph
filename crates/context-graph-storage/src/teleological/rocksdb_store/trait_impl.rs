@@ -269,4 +269,22 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
     ) -> CoreResult<Vec<(Uuid, f32)>> {
         RocksDbTeleologicalStore::search_causal_e5(self, query_embedding, search_causes, top_k).await
     }
+
+    async fn search_causal_e5_hybrid(
+        &self,
+        query_embedding: &[f32],
+        search_causes: bool,
+        top_k: usize,
+        source_weight: f32,
+        explanation_weight: f32,
+    ) -> CoreResult<Vec<(Uuid, f32)>> {
+        RocksDbTeleologicalStore::search_causal_e5_hybrid(
+            self,
+            query_embedding,
+            search_causes,
+            top_k,
+            source_weight,
+            explanation_weight,
+        ).await
+    }
 }

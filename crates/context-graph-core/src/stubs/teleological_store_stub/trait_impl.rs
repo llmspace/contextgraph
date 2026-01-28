@@ -530,6 +530,66 @@ impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
 
         Ok(results)
     }
+
+    async fn search_causal_e5_hybrid(
+        &self,
+        query_embedding: &[f32],
+        search_causes: bool,
+        top_k: usize,
+        source_weight: f32,
+        explanation_weight: f32,
+    ) -> CoreResult<Vec<(Uuid, f32)>> {
+        let mut results: Vec<(Uuid, f32)> = Vec::new();
+
+        for entry in self.causal_relationships.iter() {
+            let rel = entry.value();
+
+            // Select appropriate E5 vectors based on search mode
+            let (explanation_embedding, source_embedding) = if search_causes {
+                (&rel.e5_as_cause, &rel.e5_source_cause)
+            } else {
+                (&rel.e5_as_effect, &rel.e5_source_effect)
+            };
+
+            // Skip if E5 explanation embeddings are empty (legacy data)
+            if explanation_embedding.iter().all(|&v| v == 0.0) {
+                continue;
+            }
+
+            // Compute explanation similarity
+            let explanation_sim = compute_cosine_similarity(query_embedding, explanation_embedding);
+
+            // Compute source similarity (if source embeddings exist)
+            let source_sim = if source_embedding.is_empty() || source_embedding.iter().all(|&v| v == 0.0) {
+                // No source embeddings - fall back to explanation only
+                explanation_sim
+            } else {
+                compute_cosine_similarity(query_embedding, source_embedding)
+            };
+
+            // Compute hybrid score
+            let hybrid_score = source_weight * source_sim + explanation_weight * explanation_sim;
+            results.push((rel.id, hybrid_score));
+        }
+
+        // Sort by hybrid score descending
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Take top_k
+        results.truncate(top_k);
+
+        debug!(
+            query_dim = query_embedding.len(),
+            search_causes = search_causes,
+            top_k = top_k,
+            source_weight = source_weight,
+            explanation_weight = explanation_weight,
+            results_count = results.len(),
+            "Searched causal relationships using E5 hybrid scoring in in-memory store"
+        );
+
+        Ok(results)
+    }
 }
 
 /// Compute cosine similarity between two vectors.

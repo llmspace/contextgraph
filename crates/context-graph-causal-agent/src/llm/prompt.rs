@@ -297,11 +297,30 @@ ADDITIONAL RULES:
 - If relationship spans multiple sentences, use span_type "full"
 - Truncate text_excerpt to 200 characters if needed
 
-EXPLANATION REQUIREMENTS (CRITICAL):
-- Paragraph 1: State the relationship clearly. "X causes Y because..."
-- Paragraph 2: Explain the mechanism. Evidence, process, or pathway.
-- Use \n to separate paragraphs within the explanation string.
-- Each explanation must be SELF-CONTAINED and SEARCHABLE.
+EXPLANATION REQUIREMENTS (CRITICAL FOR E5 EMBEDDING):
+
+The explanation is embedded via E5 asymmetric similarity for causal search.
+Rich mechanism details = better retrieval. Vague summaries = poor retrieval.
+
+REQUIRED FORMAT (2 PARAGRAPHS, 40-60 WORDS TOTAL):
+
+PARAGRAPH 1: State cause-effect with SPECIFIC mechanism.
+- Include scientific/technical terms (e.g., "HPA axis", "glucocorticoid receptors")
+- Name specific pathways, molecules, or processes
+
+PARAGRAPH 2: Describe consequences and conditions.
+- Include downstream effects
+- Mention relevant context or scope
+
+SEPARATE PARAGRAPHS WITH \n\n (double newline).
+
+BAD (vague, no mechanism):
+"Stress causes memory problems. This is harmful."
+✗ No mechanism details, useless for search
+
+GOOD (specific mechanism):
+"Chronic stress activates the HPA axis, elevating cortisol which binds to hippocampal glucocorticoid receptors, triggering oxidative stress and reduced BDNF expression.\n\nThis impairs synaptic plasticity and long-term potentiation, degrading memory encoding and consolidation over time."
+✓ Named: HPA axis, glucocorticoid, BDNF, synaptic plasticity, LTP
 
 EXTRACT ALL RELATIONSHIPS:
 - If text mentions "A causes B" and "B causes C", extract BOTH relationships
