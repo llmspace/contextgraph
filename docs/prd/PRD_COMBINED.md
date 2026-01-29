@@ -16,6 +16,20 @@
 > Python, Go, or C++ in the product. All dependencies are Rust crates. The
 > output is a single statically-linked Rust binary with zero runtime dependencies.
 
+> **PROVENANCE MANDATE**: Every piece of information CaseTrack returns MUST trace
+> back to its exact source. This is non-negotiable. The provenance chain is:
+>
+> **Embedding vector → Chunk → Provenance → Source document (file path + filename)**
+>
+> Every chunk stores: source file path, document filename, page number, paragraph,
+> line number, character offsets, extraction method, and timestamps (created_at,
+> embedded_at). Every embedding vector is keyed to a chunk_id. Every entity mention,
+> citation, and graph edge stores the chunk_id and document_id it came from. Every
+> search result, every MCP tool response, every piece of retrieved text includes
+> its full provenance. There are ZERO orphaned vectors -- every embedding can be
+> traced back to the original document, page, and paragraph it came from.
+> **If the provenance chain is broken, the data is useless.**
+
 ---
 
 ## Document Index
@@ -43,39 +57,14 @@ CaseTrack is a **one-click installable MCP server** that plugs into **Claude Cod
 
 ```
 +---------------------------------------------------------------------------+
-|                              CASETRACK                                     |
-|                                                                           |
-|        "Install once. Everything runs on YOUR machine."                   |
-|                                                                           |
+|  CASETRACK -- "Install once. Everything runs on YOUR machine."            |
 +---------------------------------------------------------------------------+
-|                                                                           |
-|   WHAT IT DOES                                                            |
-|   ============                                                            |
-|   - Ingests PDFs, DOCX, scanned images                                   |
-|   - Embeds documents with 7 specialized legal embedders                  |
-|   - Stores all vectors/embeddings in LOCAL database on YOUR device       |
-|   - Provides semantic search with full source citations                  |
-|                                                                           |
-|   WHAT YOU GET                                                            |
-|   ============                                                            |
-|   - MCP server that plugs into Claude Code or Claude Desktop             |
-|   - All 7 embedding models downloaded and ready to use                   |
-|   - RocksDB database installed on your machine                           |
-|   - Your data NEVER leaves your computer                                 |
-|                                                                           |
-|   RUNS ON                        REQUIRES                                 |
-|   --------                       --------                                 |
-|   - macOS (Intel + Apple Silicon)  - 8GB RAM minimum                     |
-|   - Windows 10/11                  - 5GB storage                         |
-|   - Linux (Ubuntu 20.04+)          - NO GPU needed                       |
-|                                                                           |
-|   STORAGE (All on YOUR device)                                            |
-|   ============================                                            |
-|   - Embedding models: ~400MB                                             |
-|   - Vector database: RocksDB (scales with documents)                     |
-|   - Embeddings: ~50KB per document page                                  |
-|   - Everything stored in ~/Documents/CaseTrack/                          |
-|                                                                           |
+|  - Ingests PDFs, DOCX, scanned images                                    |
+|  - Embeds documents with 7 specialized legal embedders                   |
+|  - Stores all vectors/embeddings locally (RocksDB)                       |
+|  - Provides semantic search with full source citations                   |
+|  - MCP server for Claude Code + Claude Desktop                           |
+|  - Your data NEVER leaves your computer                                  |
 +---------------------------------------------------------------------------+
 ```
 
@@ -97,16 +86,14 @@ Legal professionals waste hours searching through case documents:
 
 CaseTrack solves this with:
 
-1. **One-click install**: Single command or MCPB file -- embedders and database included
-2. **100% local storage**: All embeddings and vectors stored on YOUR device in RocksDB
-3. **Per-case isolation**: Every case has its own separate database -- embeddings from one case NEVER touch another
-4. **Per-customer isolation**: Each customer's installation is fully independent (no shared servers or data)
-5. **7 specialized embedders**: Semantic search that understands legal language
-6. **Full provenance**: Every answer cites the source file path, document name, page, paragraph, and line number
-7. **2000-character chunks**: Documents chunked into 2000-char segments with 10% overlap, each chunk stores its exact origin
-8. **Claude Code + Desktop integration**: Works with both Claude Code CLI and Claude Desktop app
-9. **Runs anywhere**: Works on an 8GB MacBook Air, no GPU needed
-10. **Affordable**: Free tier is genuinely useful; Pro is $29/month
+1. **One-click install** -- single command or MCPB file, embedders and database included
+2. **100% local** -- all data stored on YOUR device in per-case RocksDB instances (case and customer isolation)
+3. **7 specialized embedders** -- semantic search that understands legal language
+4. **Full provenance** -- every answer cites source file path, document name, page, paragraph, and line number
+5. **2000-char chunks** -- 10% overlap, each chunk stores its exact origin
+6. **Claude Code + Desktop** -- works with both CLI and Desktop via MCP stdio
+7. **Auto-sync** -- watches folders for changes; optional scheduled reindexing (daily/hourly/custom)
+8. **Runs anywhere** -- 8GB MacBook Air, no GPU needed; free tier useful, Pro $29/month
 
 ---
 
@@ -156,10 +143,14 @@ DESIGN PRINCIPLES
    No training required
    Works like asking a research assistant
 
-5. PROVENANCE ALWAYS
+5. PROVENANCE ALWAYS (THE MOST IMPORTANT PRINCIPLE)
    Every answer includes exact source citation
-   Document name, page, paragraph, line number
+   Document name, file path, page, paragraph, line number, character offsets
+   Every embedding vector links back to its chunk, which links to its source
+   Every entity, citation, and graph edge traces to its source chunk
+   Timestamps on everything: when ingested, when embedded, when last synced
    One click to view original context
+   If you can't cite the source, you can't return the information
 
 6. GRACEFUL DEGRADATION
    Low RAM? Use fewer models (lazy loading)
@@ -241,6 +232,7 @@ DESIGN PRINCIPLES
 | Model Download | hf-hub | Hugging Face model registry |
 | Serialization | bincode + serde | Fast binary serialization for vectors |
 | Async | tokio | Standard Rust async runtime |
+| File watching | notify | Cross-platform OS file notifications (inotify/FSEvents/ReadDirectoryChanges) |
 | CLI | clap | Standard Rust CLI parsing |
 | Logging | tracing | Structured logging with subscriber |
 | License | ed25519-dalek | Offline cryptographic validation |
@@ -266,6 +258,11 @@ DESIGN PRINCIPLES
 | **rmcp** | Official Rust MCP SDK |
 | **SPLADE** | Sparse Lexical and Expansion Model -- keyword expansion embedder |
 | **stdio** | Standard input/output transport for MCP server communication |
+| **Case Map** | A per-case summary structure containing parties, key dates, legal issues, top authorities, entity statistics, and document counts. Built incrementally during ingestion. |
+| **Citation Network** | The graph of which documents cite which authorities, and how (Cited, Followed, Distinguished, Overruled). Stored in the `citations` column family. |
+| **Context Graph** | The graph layer built on top of chunks and embeddings that stores entities, citations, document relationships, chunk similarity edges, and the case map. Enables AI navigation of 1000+ document cases. |
+| **Document Graph** | Relationship edges between documents based on shared entities, shared citations, semantic similarity, or explicit references (ResponseTo, Amends, Exhibits). |
+| **Entity** | A named thing extracted from document text: person, organization, court, statute, case citation, date, monetary amount, or legal concept. Stored with mentions linking to source chunks. |
 
 ---
 
@@ -280,116 +277,27 @@ DESIGN PRINCIPLES
 
 ---
 
-## 1. Primary Users
+## 1. Target Users
 
-```
-PRIMARY: SOLO PRACTITIONERS & SMALL FIRMS
-=================================================================================
-
-Profile:
-  - 1-10 attorney firm
-  - No dedicated IT staff
-  - Uses consumer hardware (MacBook, Windows laptop)
-  - Handles 5-50 active matters
-  - Documents stored in folders on local drive or cloud sync (Dropbox, OneDrive)
-  - Already uses Claude Code or Claude Desktop for other work
-
-Pain Points:
-  - Can't find documents they know exist
-  - Spend hours re-reading to find specific facts
-  - No budget for enterprise legal tech ($500+/seat/month)
-  - Frustrated by keyword search limitations
-  - Need to cite sources precisely for court filings
-
-Why CaseTrack:
-  - Works on their existing laptop
-  - No IT support needed
-  - Affordable ($29/month or free tier)
-  - Immediate productivity boost
-  - Integrates with Claude they already use
-```
+| Segment | Profile | Key Pain Point | Why CaseTrack |
+|---------|---------|---------------|---------------|
+| **Primary: Solo/Small Firms** (1-10 attorneys) | No IT staff, consumer hardware, 5-50 active matters, already uses Claude | Can't semantically search documents; no budget for enterprise legal tech ($500+/seat) | Works on existing laptop, no setup, $29/mo or free tier |
+| **Secondary: Paralegals** | Support 1-5 attorneys, manage case document collections | Manual document review is tedious; need exact citations for attorney review | Batch ingest folders, search returns cited sources, 70%+ review reduction |
+| **Tertiary: Law Students** | Studying case law, limited budget, CLI-comfortable | Organizing research, finding cross-document connections, accurate citations | Free tier (3 cases), provenance generates proper citations |
 
 ---
 
-## 2. Secondary Users
+## 2. User Personas
 
-```
-SECONDARY: PARALEGALS & LEGAL ASSISTANTS
-=================================================================================
-
-Profile:
-  - Support 1-5 attorneys
-  - Manage document collections per case
-  - Responsible for organizing and indexing case files
-  - Often do initial research and fact-finding
-
-Pain Points:
-  - Manual document review is tedious and error-prone
-  - No way to semantically search across hundreds of documents
-  - Need to produce exact citations for attorney review
-
-Why CaseTrack:
-  - Batch ingest entire case folders at once
-  - Search returns cited sources ready for attorney review
-  - Reduces manual document review by 70%+
-```
-
-```
-TERTIARY: LAW STUDENTS & RESEARCHERS
-=================================================================================
-
-Profile:
-  - Studying case law, writing papers
-  - Limited budget (free tier)
-  - Comfortable with CLI tools
-
-Pain Points:
-  - Organizing research materials across multiple cases
-  - Finding connections between documents
-  - Citing sources accurately
-
-Why CaseTrack:
-  - Free tier handles 3 cases with full search
-  - Provenance system generates proper citations
-```
+| Persona | Role / Practice | Hardware | CaseTrack Use | Key Need |
+|---------|----------------|----------|---------------|----------|
+| **Sarah** | Solo family law attorney | MacBook Air M1, 8GB | Ingests case docs, asks Claude questions about depositions | Zero setup friction |
+| **Mike** | Small firm partner (5 attorneys), commercial litigation | Windows 11, 16GB | Firm license, each attorney searches own cases | Windows support, multi-seat, worth $99/mo |
+| **Alex** | Paralegal, personal injury firm | Windows 10, 8GB | Batch ingests case folders, builds searchable databases | Fast ingestion, reliable OCR |
 
 ---
 
-## 3. User Personas
-
-### Persona A: Sarah (Solo Practitioner)
-
-- **Age**: 42
-- **Practice**: Family law, solo
-- **Hardware**: MacBook Air M1, 8GB RAM
-- **Tech comfort**: Uses email, Word, basic cloud storage
-- **Current workflow**: Ctrl+F in PDFs, manual notes in Word
-- **CaseTrack use**: Ingests all case documents, asks Claude "What did the respondent claim about custody in the deposition?"
-- **Key need**: Just works, no setup friction
-
-### Persona B: Mike (Small Firm Partner)
-
-- **Age**: 55
-- **Practice**: Contract/commercial litigation, 5-attorney firm
-- **Hardware**: Windows 11 desktop, 16GB RAM
-- **Tech comfort**: Moderate, uses practice management software
-- **Current workflow**: Associates do manual document review
-- **CaseTrack use**: Firm license, each attorney searches their own cases
-- **Key need**: Works on Windows, multiple seats, worth $99/month
-
-### Persona C: Alex (Paralegal)
-
-- **Age**: 28
-- **Practice**: Personal injury firm
-- **Hardware**: Windows 10 laptop, 8GB RAM
-- **Tech comfort**: High, uses multiple software tools daily
-- **Current workflow**: Manually indexes documents in spreadsheets
-- **CaseTrack use**: Batch ingests entire case folders, builds searchable case databases
-- **Key need**: Fast ingestion, reliable OCR for scanned documents
-
----
-
-## 4. Minimum Hardware Requirements
+## 3. Minimum Hardware Requirements
 
 ```
 MINIMUM REQUIREMENTS (Must Run)
@@ -431,9 +339,9 @@ Prerequisites:
 
 ---
 
-## 5. Performance by Hardware Tier
+## 4. Performance by Hardware Tier
 
-### 5.1 Ingestion Performance
+### 4.1 Ingestion Performance
 
 | Hardware | 50-page PDF | 500-page PDF | OCR (50 scanned pages) |
 |----------|-------------|--------------|------------------------|
@@ -442,7 +350,7 @@ Prerequisites:
 | **High** (i7 32GB) | 20 seconds | 3 minutes | 90 seconds |
 | **With GPU** (RTX 3060) | 10 seconds | 90 seconds | 45 seconds |
 
-### 5.2 Search Performance
+### 4.2 Search Performance
 
 | Hardware | Free Tier (2-stage) | Pro Tier (4-stage) | Concurrent Models |
 |----------|--------------------|--------------------|-------------------|
@@ -451,7 +359,7 @@ Prerequisites:
 | **High** (i7 32GB) | 40ms | 80ms | 7 (all loaded) |
 | **With GPU** (RTX 3060) | 20ms | 50ms | 7 (all loaded) |
 
-### 5.3 Memory Usage
+### 4.3 Memory Usage
 
 | Scenario | RAM Usage |
 |----------|-----------|
@@ -463,9 +371,9 @@ Prerequisites:
 
 ---
 
-## 6. Supported Platforms
+## 5. Supported Platforms
 
-### 6.1 Build Targets
+### 5.1 Build Targets
 
 | Platform | Architecture | Binary Name | Status |
 |----------|-------------|-------------|--------|
@@ -475,7 +383,7 @@ Prerequisites:
 | Linux | x86_64 | `casetrack-linux-x64` | Supported |
 | Linux | aarch64 | `casetrack-linux-arm64` | Future |
 
-### 6.2 Platform-Specific Notes
+### 5.2 Platform-Specific Notes
 
 **macOS:**
 - CoreML execution provider available for ~2x inference speedup
@@ -494,7 +402,7 @@ Prerequisites:
 - Statically linked against musl for maximum compatibility
 - AppImage format as alternative distribution
 
-### 6.3 Claude Integration Compatibility
+### 5.3 Claude Integration Compatibility
 
 | Client | Transport | Config Location | Status |
 |--------|-----------|-----------------|--------|
@@ -505,37 +413,15 @@ Prerequisites:
 
 ---
 
-## 7. Graceful Degradation Strategy
+## 6. Graceful Degradation Strategy
 
-CaseTrack adapts to available hardware:
+| Tier | RAM | Models Loaded | Behavior |
+|------|-----|---------------|----------|
+| **Full** | 16GB+ | All 7 simultaneously | Zero load latency, parallel embedding |
+| **Standard** | 8-16GB | Free models always (E1, E6, E7 ~800MB); Pro lazy-loaded | ~200ms first-use penalty; models stay loaded until memory pressure |
+| **Constrained** | <8GB | E1 + E13 only (~400MB); others loaded one-at-a-time | Sequential embedding, higher search latency, startup warning |
 
-```
-DEGRADATION TIERS
-=================================================================================
-
-TIER 1: FULL (16GB+ RAM)
-  - All models loaded in memory simultaneously
-  - Zero model loading latency on search
-  - Maximum ingestion throughput (parallel embedding)
-
-TIER 2: STANDARD (8-16GB RAM)
-  - Free models always loaded (E1, E6, E7 = ~800MB)
-  - Pro models lazy-loaded on demand
-  - ~200ms model load penalty on first Pro search
-  - Models stay loaded after first use until memory pressure
-
-TIER 3: CONSTRAINED (<8GB RAM)
-  - Only E1 + E13 (BM25) always loaded (~400MB)
-  - Other models loaded one at a time, unloaded after use
-  - Ingestion uses sequential (not parallel) embedding
-  - Search still works but with higher latency
-  - Warning shown on startup: "Low memory mode active"
-
-DETECTION:
-  - On startup, check available RAM via sysinfo crate
-  - Set tier automatically, log the decision
-  - User can override via --memory-mode=full|standard|constrained
-```
+**Detection**: On startup, check available RAM via `sysinfo` crate. Set tier automatically, log the decision. User override: `--memory-mode=full|standard|constrained`.
 
 ---
 
@@ -604,177 +490,43 @@ DISTRIBUTION CHANNELS (Priority Order)
 
 ### 2.1 macOS/Linux Install Script (`install.sh`)
 
-The install script must:
-
-```bash
-#!/bin/sh
-set -e
-
-# 1. Detect platform
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')   # darwin, linux
-ARCH=$(uname -m)                                # x86_64, arm64, aarch64
-
-# 2. Map to binary name
-case "${OS}-${ARCH}" in
-  darwin-arm64)   BINARY="casetrack-darwin-arm64" ;;
-  darwin-x86_64)  BINARY="casetrack-darwin-x64" ;;
-  linux-x86_64)   BINARY="casetrack-linux-x64" ;;
-  linux-aarch64)  BINARY="casetrack-linux-arm64" ;;
-  *) echo "Unsupported platform: ${OS}-${ARCH}"; exit 1 ;;
-esac
-
-# 3. Download binary
-VERSION="latest"
-URL="https://github.com/casetrack-legal/casetrack/releases/${VERSION}/download/${BINARY}"
-INSTALL_DIR="${HOME}/.local/bin"
-
-mkdir -p "${INSTALL_DIR}"
-curl -fsSL "${URL}" -o "${INSTALL_DIR}/casetrack"
-chmod +x "${INSTALL_DIR}/casetrack"
-
-# 4. Add to PATH if needed
-if ! echo "${PATH}" | grep -q "${INSTALL_DIR}"; then
-  SHELL_RC=""
-  if [ -f "${HOME}/.zshrc" ]; then SHELL_RC="${HOME}/.zshrc"
-  elif [ -f "${HOME}/.bashrc" ]; then SHELL_RC="${HOME}/.bashrc"
-  fi
-  if [ -n "${SHELL_RC}" ]; then
-    echo "export PATH=\"${INSTALL_DIR}:\${PATH}\"" >> "${SHELL_RC}"
-  fi
-fi
-
-# 5. Configure Claude Code (if installed)
-CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
-if [ -d "${HOME}/.claude" ]; then
-  # Merge MCP server config into existing settings
-  casetrack --setup-claude-code
-fi
-
-# 6. Print success
-echo ""
-echo "CaseTrack installed successfully!"
-echo ""
-echo "  Binary: ${INSTALL_DIR}/casetrack"
-echo "  Data:   ~/Documents/CaseTrack/"
-echo ""
-echo "Next steps:"
-echo "  1. Restart your terminal (or run: source ${SHELL_RC})"
-echo "  2. Open Claude Code and ask: 'Create a new case called Test'"
-echo ""
+```
+Steps:
+1. Detect platform (darwin/linux) and architecture (x86_64/arm64/aarch64)
+2. Map to binary name: casetrack-{os}-{arch}
+   Supported: darwin-arm64, darwin-x64, linux-x64, linux-arm64
+3. Download binary from GitHub releases to ~/.local/bin/casetrack
+4. Add ~/.local/bin to PATH via .zshrc or .bashrc (if not already present)
+5. If ~/.claude/ exists, run: casetrack --setup-claude-code
+6. Print success with next steps (restart terminal, try a command)
 ```
 
 ### 2.2 Windows Install Script (`install.ps1`)
 
-```powershell
-# Detect architecture
-$arch = if ([Environment]::Is64BitOperatingSystem) { "x64" } else {
-    Write-Error "CaseTrack requires 64-bit Windows"; exit 1
-}
-
-# Download
-$version = "latest"
-$url = "https://github.com/casetrack-legal/casetrack/releases/$version/download/casetrack-win32-$arch.exe"
-$installDir = "$env:LOCALAPPDATA\CaseTrack"
-
-New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-Invoke-WebRequest -Uri $url -OutFile "$installDir\casetrack.exe"
-
-# Add to PATH
-$currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($currentPath -notlike "*$installDir*") {
-    [Environment]::SetEnvironmentVariable("Path", "$installDir;$currentPath", "User")
-}
-
-# Configure Claude Code
-& "$installDir\casetrack.exe" --setup-claude-code
-
-Write-Host ""
-Write-Host "CaseTrack installed successfully!" -ForegroundColor Green
-Write-Host ""
-Write-Host "  Binary: $installDir\casetrack.exe"
-Write-Host "  Data:   $env:USERPROFILE\Documents\CaseTrack\"
-Write-Host ""
-Write-Host "Next steps:"
-Write-Host "  1. Restart your terminal"
-Write-Host "  2. Open Claude Code and ask: 'Create a new case called Test'"
+```
+Steps:
+1. Require 64-bit Windows
+2. Download binary from GitHub releases to %LOCALAPPDATA%\CaseTrack\casetrack.exe
+3. Add install dir to user PATH
+4. Run: casetrack.exe --setup-claude-code
+5. Print success with next steps
 ```
 
 ---
 
 ## 3. Self-Setup CLI Command
 
-The binary itself handles Claude Code configuration:
-
 ```
 casetrack --setup-claude-code
 ```
 
-This command:
-
-1. Detects Claude Code settings file location:
-   - `~/.claude/settings.json` (all platforms)
-2. Reads existing settings (or creates empty `{}`)
-3. Merges `mcpServers.casetrack` entry
-4. Writes back with proper JSON formatting
-5. Prints confirmation
-
-```rust
-/// CLI setup command for Claude Code integration
-pub fn setup_claude_code(data_dir: &Path) -> Result<()> {
-    let settings_path = dirs::home_dir()
-        .ok_or(CaseTrackError::NoHomeDir)?
-        .join(".claude")
-        .join("settings.json");
-
-    // Read existing settings or create new
-    let mut settings: serde_json::Value = if settings_path.exists() {
-        let content = fs::read_to_string(&settings_path)?;
-        serde_json::from_str(&content)?
-    } else {
-        fs::create_dir_all(settings_path.parent().unwrap())?;
-        json!({})
-    };
-
-    // Add MCP server config
-    let mcp_servers = settings
-        .as_object_mut()
-        .unwrap()
-        .entry("mcpServers")
-        .or_insert(json!({}));
-
-    mcp_servers["casetrack"] = json!({
-        "command": std::env::current_exe()?.to_string_lossy(),
-        "args": ["--data-dir", data_dir.to_string_lossy()]
-    });
-
-    // Write back
-    let formatted = serde_json::to_string_pretty(&settings)?;
-    fs::write(&settings_path, formatted)?;
-
-    println!("Claude Code configured. CaseTrack will be available in your next session.");
-    Ok(())
-}
-```
+Reads or creates `~/.claude/settings.json`, merges `mcpServers.casetrack` entry (using the current binary path and configured data-dir), writes back with pretty JSON formatting.
 
 ---
 
 ## 4. MCPB Bundle Structure
 
-The `.mcpb` file is a ZIP archive for Claude Desktop GUI installation:
-
-```
-casetrack.mcpb (ZIP archive, ~50MB)
-|-- manifest.json           # MCP configuration
-|-- icon.png               # Extension icon (256x256)
-|-- server/
-|   |-- casetrack-darwin-x64      # macOS Intel
-|   |-- casetrack-darwin-arm64    # macOS Apple Silicon
-|   |-- casetrack-win32-x64.exe   # Windows
-|   +-- casetrack-linux-x64       # Linux
-+-- resources/
-    |-- tokenizer.json     # Shared tokenizer (~5MB)
-    +-- legal-vocab.txt    # Legal term expansions (~2MB)
-```
+`.mcpb` = ZIP archive (~50MB) for Claude Desktop GUI install. Contains platform binaries, manifest, icon, and shared resources (tokenizer, legal vocab).
 
 ### 4.1 Manifest Specification
 
@@ -861,114 +613,40 @@ casetrack.mcpb (ZIP archive, ~50MB)
 ## 5. Installation Flow (Claude Desktop)
 
 ```
-INSTALLATION FLOW
-=================================================================================
-
-Step 1: Download (User Action)
----------------------------------
-User visits casetrack.legal
-Clicks "Download for Claude Desktop"
-Browser downloads casetrack.mcpb (~50MB)
-
-Step 2: Install (User Action)
----------------------------------
-User double-clicks casetrack.mcpb
-  OR drags to Claude Desktop window
-  OR Settings -> Extensions -> Install from file
-
-Step 3: Configure (Dialog)
----------------------------------
-+-------------------------------------------------------+
-| Install CaseTrack?                                     |
-|                                                        |
-| CaseTrack lets you search legal documents with AI.     |
-| All processing happens on your computer.               |
-|                                                        |
-| +----------------------------------------------------+ |
-| | Data Location                                      | |
-| | [~/Documents/CaseTrack                        ] [F]| |
-| +----------------------------------------------------+ |
-|                                                        |
-| +----------------------------------------------------+ |
-| | License Key (optional - leave blank for free tier)  | |
-| | [                                             ] [L] | |
-| +----------------------------------------------------+ |
-|                                                        |
-| This extension will:                                   |
-| [Y] Read and write files in your Data Location        |
-| [Y] Download AI models from huggingface.co (~400MB)   |
-| [N] NOT send your documents anywhere                  |
-|                                                        |
-|                         [Cancel]  [Install Extension]  |
-+-------------------------------------------------------+
-
-Step 4: First Run (Automatic)
----------------------------------
-Claude Desktop starts CaseTrack server
-Server detects missing models
-Downloads models in background (~400MB)
-Shows progress notification in Claude Desktop
-
-Step 5: Ready (Automatic)
----------------------------------
-CaseTrack icon appears in Extensions panel
-User can now use CaseTrack tools in conversation
+1. Download: User downloads casetrack.mcpb (~50MB) from casetrack.legal
+2. Install:  Double-click .mcpb, drag to Claude Desktop, or Settings > Extensions > Install
+3. Configure: Dialog prompts for data location and optional license key
+   +-------------------------------------------------------+
+   | Install CaseTrack?                                     |
+   |                                                        |
+   | CaseTrack lets you search legal documents with AI.     |
+   | All processing happens on your computer.               |
+   |                                                        |
+   | Data Location:  [~/Documents/CaseTrack            ] [F]|
+   | License Key:    [optional - blank for free tier   ] [L]|
+   |                                                        |
+   | [Y] Read and write files in your Data Location        |
+   | [Y] Download AI models from huggingface.co (~400MB)   |
+   | [N] NOT send your documents anywhere                  |
+   |                                                        |
+   |                         [Cancel]  [Install Extension]  |
+   +-------------------------------------------------------+
+4. First Run: Server starts, downloads missing models (~400MB) in background
+5. Ready:     CaseTrack icon appears in Extensions panel
 ```
 
 ---
 
 ## 6. First-Run Experience
 
-On first launch, the server must handle model bootstrapping gracefully:
+Initialization sequence on first launch:
 
-```rust
-/// First-run initialization sequence
-pub async fn initialize(config: &Config) -> Result<ServerState> {
-    let data_dir = &config.data_dir;
-
-    // Step 1: Create directory structure
-    create_directory_structure(data_dir)?;
-
-    // Step 2: Check and download models
-    let model_manager = ModelManager::new(&data_dir.join("models"));
-    let missing = model_manager.check_missing_models(config.tier)?;
-
-    if !missing.is_empty() {
-        // Report progress via MCP notification (if supported)
-        // or via stderr logging
-        tracing::info!(
-            "First run detected. Downloading {} models ({} MB)...",
-            missing.len(),
-            missing.iter().map(|m| m.size_mb).sum::<u32>()
-        );
-
-        for model in &missing {
-            tracing::info!("Downloading {}...", model.id);
-            model_manager.download(model).await?;
-            tracing::info!("Downloaded {} ({} MB)", model.id, model.size_mb);
-        }
-
-        tracing::info!("All models ready.");
-    }
-
-    // Step 3: Open or create registry database
-    let registry = CaseRegistry::open(&data_dir.join("registry.db"))?;
-
-    // Step 4: Validate license (offline-first)
-    let tier = LicenseManager::new(data_dir)
-        .validate(config.license_key.as_deref());
-
-    tracing::info!("CaseTrack ready. Tier: {:?}, Cases: {}", tier, registry.count()?);
-
-    Ok(ServerState { registry, model_manager, tier })
-}
-
-fn create_directory_structure(data_dir: &Path) -> Result<()> {
-    fs::create_dir_all(data_dir.join("models"))?;
-    fs::create_dir_all(data_dir.join("cases"))?;
-    // registry.db is created by RocksDB::open
-    Ok(())
-}
+```
+1. Create directory structure: models/, cases/ (registry.db created by RocksDB::open)
+2. Check for missing models based on tier; download any missing (with progress logging)
+3. Open or create registry database
+4. Validate license (offline-first)
+5. Log ready state: tier + case count
 ```
 
 ### 6.1 Model Download Strategy
@@ -1033,41 +711,9 @@ pub const MODELS: &[ModelSpec] = &[
 
 ### 6.2 Download Resilience
 
-```rust
-/// Download with retry and resume support
-pub async fn download_model(&self, spec: &ModelSpec) -> Result<()> {
-    let model_dir = self.cache_dir.join(spec.id);
-    fs::create_dir_all(&model_dir)?;
-
-    for file in spec.files {
-        let dest = model_dir.join(file);
-
-        // Skip if already downloaded and valid
-        if dest.exists() && self.verify_checksum(&dest, spec, file)? {
-            continue;
-        }
-
-        // Download with retry (3 attempts, exponential backoff)
-        let mut attempts = 0;
-        loop {
-            attempts += 1;
-            match self.download_file(spec.repo, file, &dest).await {
-                Ok(()) => break,
-                Err(e) if attempts < 3 => {
-                    tracing::warn!(
-                        "Download attempt {}/3 failed for {}/{}: {}. Retrying...",
-                        attempts, spec.id, file, e
-                    );
-                    tokio::time::sleep(Duration::from_secs(2u64.pow(attempts))).await;
-                }
-                Err(e) => return Err(e.into()),
-            }
-        }
-    }
-
-    Ok(())
-}
-```
+- Skip files already downloaded with valid checksums
+- Retry up to 3 attempts with exponential backoff (2s, 4s, 8s)
+- Fatal error after 3 failures for any single file
 
 ---
 
@@ -1075,35 +721,10 @@ pub async fn download_model(&self, spec: &ModelSpec) -> Result<()> {
 
 ### 7.1 Version Checking
 
-CaseTrack checks for updates on startup (non-blocking, does not delay server start):
-
-```rust
-/// Non-blocking update check
-pub async fn check_for_updates(current_version: &str) {
-    // Fire and forget -- do not block server startup
-    tokio::spawn(async move {
-        let check = async {
-            let url = "https://api.github.com/repos/casetrack-legal/casetrack/releases/latest";
-            let resp: GithubRelease = reqwest::get(url).await?.json().await?;
-            let latest = resp.tag_name.trim_start_matches('v');
-
-            if semver::Version::parse(latest)? > semver::Version::parse(current_version)? {
-                tracing::info!(
-                    "Update available: v{} -> v{}. \
-                     Run 'casetrack --update' or download from https://casetrack.legal",
-                    current_version, latest
-                );
-            }
-            Ok::<(), anyhow::Error>(())
-        };
-
-        if let Err(e) = check.await {
-            // Silently ignore update check failures -- user is offline or rate limited
-            tracing::debug!("Update check failed (non-critical): {}", e);
-        }
-    });
-}
-```
+Non-blocking check on startup (fire-and-forget via `tokio::spawn`):
+- Queries GitHub releases API for latest version
+- Compares via semver; logs update notice if newer version exists
+- Silently ignores failures (offline, rate-limited)
 
 ### 7.2 Self-Update Command
 
@@ -1194,6 +815,7 @@ rm -rf ~/Documents/CaseTrack/
 ~/Documents/CaseTrack/                       <-- All CaseTrack data lives here
 |
 |-- config.toml                              <-- User configuration (optional)
+|-- watches.json                             <-- Folder watch registry (auto-sync)
 |
 |-- models/                                  <-- Embedding models (~400MB)
 |   |-- bge-small-en-v1.5/                     Downloaded on first use
@@ -1281,6 +903,14 @@ pub const COLUMN_FAMILIES: &[&str] = &[
     "provenance",   // Source location tracking
     "bm25_index",   // Inverted index for BM25
     "metadata",     // Case-level metadata, stats
+
+    // === Context Graph (relationships between documents, chunks, entities) ===
+    "entities",     // Extracted entities (parties, courts, statutes, dates)
+    "entity_index", // Entity → chunk mentions index
+    "citations",    // Legal citations (statutes, case law references)
+    "doc_graph",    // Document-to-document relationships (similarity, citation links)
+    "chunk_graph",  // Chunk-to-chunk relationships (similarity edges)
+    "case_map",     // Case-level summary: parties, issues, dates, doc categories
 ];
 ```
 
@@ -1292,6 +922,10 @@ pub const COLUMN_FAMILIES: &[&str] = &[
 // Case listing
 "case:{uuid}"                      -> bincode<Case>
 "schema_version"                   -> u32 (current: 1)
+
+// Folder watches (auto-sync)
+"watch:{uuid}"                     -> bincode<FolderWatch>
+"watch_case:{case_uuid}:{watch_uuid}" -> watch_uuid  (index: watches by case)
 
 // === Case DB Keys (per column family) ===
 
@@ -1321,6 +955,39 @@ pub const COLUMN_FAMILIES: &[&str] = &[
 // metadata CF
 "case_info"                        -> bincode<Case>
 "stats"                            -> bincode<CaseStats>
+
+// === CONTEXT GRAPH COLUMN FAMILIES ===
+
+// entities CF
+"entity:{type}:{normalized_name}"  -> bincode<Entity>
+// type = person | organization | court | statute | case_citation | date | monetary_amount | legal_concept
+
+// entity_index CF (bidirectional)
+"ent_chunks:{entity_key}"          -> bincode<Vec<EntityMention>>
+"chunk_ents:{chunk_uuid}"          -> bincode<Vec<EntityRef>>
+
+// citations CF
+"cite:{authority_key}"             -> bincode<CitationRecord>
+"cite_chunks:{authority_key}"      -> bincode<Vec<CitationMention>>
+"chunk_cites:{chunk_uuid}"         -> bincode<Vec<AuthorityRef>>
+
+// doc_graph CF
+"doc_sim:{doc_a}:{doc_b}"         -> f32 (cosine similarity)
+"doc_cites:{citing_doc}:{cited_doc}" -> bincode<DocCitation>
+"doc_entities:{doc_uuid}"         -> bincode<Vec<EntityRef>>
+"doc_category:{category}:{doc_uuid}" -> doc_uuid
+
+// chunk_graph CF
+"chunk_sim:{chunk_a}:{chunk_b}"   -> f32 (stored only when > 0.7)
+"chunk_seq:{doc_uuid}:{seq}"      -> chunk_uuid
+
+// case_map CF (rebuilt after ingestion)
+"parties"                          -> bincode<Vec<Party>>
+"key_dates"                        -> bincode<Vec<KeyDate>>
+"key_issues"                       -> bincode<Vec<LegalIssue>>
+"doc_categories"                   -> bincode<HashMap<String, Vec<Uuid>>>
+"authority_stats"                  -> bincode<Vec<AuthorityStat>>
+"entity_stats"                     -> bincode<Vec<EntityStat>>
 ```
 
 ### 4.4 RocksDB Tuning for Consumer Hardware
@@ -1373,25 +1040,73 @@ pub struct ChunkData {
     pub id: Uuid,
     pub document_id: Uuid,
     pub text: String,
-    pub sequence: u32,        // Position within document
-    pub token_count: u32,
+    pub sequence: u32,              // Position within document (0-indexed)
+    pub char_count: u32,
+    pub provenance: Provenance,     // Full source trace -- see Section 5.2 Provenance Chain
+    pub created_at: i64,            // Unix timestamp
+    pub embedded_at: i64,           // Unix timestamp: last embedding computation
+    pub embedder_versions: Vec<String>, // e.g., ["e1", "e6", "e7"] for Free tier
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct DocumentMetadata {
     pub id: Uuid,
-    pub name: String,
-    pub original_path: Option<String>,
+    pub name: String,                     // Original filename
+    pub original_path: Option<String>,    // Absolute path to source file
     pub document_type: DocumentType,
     pub page_count: u32,
     pub chunk_count: u32,
-    pub ingested_at: i64,     // Unix timestamp
-    pub file_hash: String,    // SHA256 of original file (dedup detection)
+    pub ingested_at: i64,
+    pub updated_at: i64,
+    pub file_hash: String,                // SHA256 (dedup + staleness detection)
+    pub file_size_bytes: u64,
     pub extraction_method: ExtractionMethod,
+    pub embedder_coverage: Vec<String>,   // e.g., ["e1", "e6", "e7"]
+    pub entity_count: u32,
+    pub citation_count: u32,
 }
 ```
 
-### 5.2 Embeddings as Raw Bytes
+### 5.2 The Provenance Chain (How Embeddings Trace Back to Source)
+
+```
+PROVENANCE CHAIN -- EVERY VECTOR TRACES TO ITS SOURCE
+=================================================================================
+
+Embedding Vector (e.g., key "e1:{chunk_uuid}")
+    │
+    └──► chunk_uuid ──► ChunkData (key "chunk:{uuid}")
+                           │
+                           ├── text: "Either party may terminate..."
+                           ├── provenance: Provenance {
+                           │       document_id:     "doc-abc"
+                           │       document_name:   "Contract.pdf"
+                           │       document_path:   "/Users/sarah/Cases/Smith/Contract.pdf"
+                           │       page:            12
+                           │       paragraph_start: 8
+                           │       paragraph_end:   9
+                           │       line_start:      1
+                           │       line_end:        14
+                           │       char_start:      2401
+                           │       char_end:        4401
+                           │       extraction_method: Native
+                           │       ocr_confidence:  None
+                           │       chunk_index:     47
+                           │   }
+                           ├── created_at:     1706367600  (when chunk was created)
+                           └── embedded_at:    1706367612  (when embedding was computed)
+
+There is NO embedding without a chunk. There is NO chunk without provenance.
+There is NO provenance without a source document path and filename.
+
+This chain MUST be maintained through all operations:
+  - Ingestion: creates chunk + provenance + embeddings together (atomic)
+  - Reindex: deletes old, creates new (preserves document_path)
+  - Delete: removes all three (chunk, provenance, embeddings) together
+  - Sync: detects changed files by document_path + SHA256 hash
+```
+
+### 5.3 Embeddings as Raw Bytes
 
 Dense vectors stored as raw `f32` byte arrays for zero-copy reads:
 
@@ -1553,16 +1268,13 @@ Each installation is a completely independent system.
 
 ### 7.2 Per-Case Isolation
 
-Within a single customer's installation, each case is a **completely independent RocksDB instance**:
+Each case is a **completely independent RocksDB instance**:
 
-- **Separate database per case**: Each case is its own RocksDB instance on disk
-- **Separate embeddings per case**: Embeddings from Case A are in a different database file than Case B
-- **No cross-case queries**: Search operates within a single case only
-- **No shared vectors**: Case A's vectors cannot influence Case B's search results
-- **No embedding bleed**: There is no shared vector index -- each case has its own index files
-- **Independent lifecycle**: Deleting Case A has zero impact on Case B
-- **Portable**: A case directory can be copied to another machine
-- **Cleanly deletable**: `rm -rf cases/{uuid}/` fully removes a case and all its embeddings
+- Separate database, embeddings, and index files per case
+- No cross-case queries, shared vectors, or embedding bleed
+- Independent lifecycle: deleting Case A has zero impact on Case B
+- Portable: copy a case directory to another machine
+- Cleanly deletable: `rm -rf cases/{uuid}/`
 
 ```rust
 /// Opening a case creates or loads its isolated database
@@ -1604,9 +1316,230 @@ impl CaseHandle {
 
 ---
 
-## 8. Backup & Export
+## 8. Context Graph Data Models
 
-### 8.1 Case Export
+Entities, citations, and relationships extracted during ingestion and stored as graph edges for structured case navigation.
+
+### 8.1 Entity Model
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Entity {
+    pub name: String,                  // Canonical name
+    pub entity_type: EntityType,
+    pub aliases: Vec<String>,
+    pub mention_count: u32,
+    pub first_seen_doc: Uuid,
+    pub first_seen_chunk: Uuid,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum EntityType {
+    Person, Organization, Court, Statute,
+    CaseCitation, Date, MonetaryAmount, LegalConcept,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityMention {
+    pub chunk_id: Uuid,
+    pub document_id: Uuid,
+    pub char_start: u64,
+    pub char_end: u64,
+    pub context_snippet: String,       // ~100 chars around mention
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityRef {
+    pub entity_key: String,            // "person:john_smith"
+    pub entity_type: EntityType,
+    pub name: String,
+}
+```
+
+### 8.2 Citation Model
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CitationRecord {
+    pub authority_key: String,         // e.g., "42_usc_1983"
+    pub authority_type: AuthorityType,
+    pub display_name: String,          // e.g., "42 U.S.C. § 1983"
+    pub mention_count: u32,
+    pub citing_documents: Vec<Uuid>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum AuthorityType {
+    FederalStatute, StateStatute, FederalRule, StateRule,
+    CaseLaw, Regulation, Other,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CitationMention {
+    pub chunk_id: Uuid,
+    pub document_id: Uuid,
+    pub context_snippet: String,
+    pub treatment: Option<CitationTreatment>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum CitationTreatment {
+    Cited, Followed, Distinguished, Overruled, Discussed,
+}
+```
+
+### 8.3 Document Graph Model
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DocRelationship {
+    pub doc_a: Uuid,
+    pub doc_b: Uuid,
+    pub relationship_type: DocRelType,
+    pub similarity_score: Option<f32>,  // E1 cosine similarity
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum DocRelType {
+    CitesAuthority, SharedEntities, SemanticSimilar,
+    ResponseTo, Amends, Exhibits,
+}
+```
+
+### 8.4 Case Map Model
+
+```rust
+/// High-level case overview, rebuilt after each ingestion.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CaseMap {
+    pub parties: Vec<Party>,
+    pub key_dates: Vec<KeyDate>,
+    pub key_issues: Vec<LegalIssue>,
+    pub document_categories: HashMap<String, Vec<Uuid>>,
+    pub top_authorities: Vec<AuthorityStat>,
+    pub top_entities: Vec<EntityStat>,
+    pub statistics: CaseStatistics,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Party {
+    pub name: String,
+    pub role: PartyRole,
+    pub mention_count: u32,
+    pub aliases: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum PartyRole {
+    Plaintiff, Defendant, Judge, Witness, Expert,
+    Attorney, ThirdParty, Arbitrator, Mediator, Other,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyDate {
+    pub date: String,
+    pub description: String,
+    pub source_chunk: Uuid,
+    pub source_document: Uuid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LegalIssue {
+    pub name: String,
+    pub mention_count: u32,
+    pub relevant_documents: Vec<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthorityStat {
+    pub authority_key: String,
+    pub display_name: String,
+    pub citation_count: u32,
+    pub citing_documents: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityStat {
+    pub entity_key: String,
+    pub name: String,
+    pub entity_type: EntityType,
+    pub mention_count: u32,
+    pub document_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CaseStatistics {
+    pub total_documents: u32,
+    pub total_pages: u32,
+    pub total_chunks: u32,
+    pub total_entities: u32,
+    pub total_citations: u32,
+    pub storage_bytes: u64,
+    pub document_type_breakdown: HashMap<String, u32>,
+    pub embedder_coverage: HashMap<String, u32>,
+}
+```
+
+---
+
+## 9. Folder Watch & Auto-Sync Storage
+
+Watch configurations persist in `~/Documents/CaseTrack/watches.json` (JSON for human readability) to survive server restarts.
+
+### 9.1 Watch Registry
+
+```rust
+#[derive(Serialize, Deserialize)]
+pub struct WatchRegistry {
+    pub watches: Vec<FolderWatch>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FolderWatch {
+    pub id: Uuid,
+    pub case_id: Uuid,
+    pub folder_path: String,           // Absolute path to watched folder
+    pub recursive: bool,               // Watch subfolders (default: true)
+    pub enabled: bool,                 // Can be paused
+    pub created_at: i64,               // Unix timestamp
+    pub last_sync_at: Option<i64>,     // Last successful sync timestamp
+    pub schedule: SyncSchedule,        // When to auto-sync
+    pub file_extensions: Option<Vec<String>>,  // Filter (None = all supported)
+    pub auto_remove_deleted: bool,     // Remove docs whose source files are gone
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum SyncSchedule {
+    OnChange,                   // OS file-change notifications
+    Interval { hours: u32 },    // Fixed interval
+    Daily { time: String },     // e.g., "02:00"
+    Manual,                     // Only via sync_folder tool
+}
+```
+
+### 9.2 Per-Document Sync Metadata
+
+Sync uses `file_hash` and `original_path` from `DocumentMetadata` (see Section 5.1) to detect changes:
+
+```
+FOR each file in watched folder:
+  1. Compute SHA256 of file
+  2. Look up file by original_path in case DB
+  3. IF not found → new file → ingest
+  4. IF found AND hash matches → unchanged → skip
+  5. IF found AND hash differs → modified → reindex (delete old, re-ingest)
+
+FOR each document in case DB with original_path under watched folder:
+  6. IF source file no longer exists on disk → deleted
+     IF auto_remove_deleted → delete document from case
+     ELSE → log warning, skip
+```
+
+---
+
+## 10. Backup & Export
+
+### 10.1 Case Export
 
 Cases can be exported as portable archives:
 
@@ -1619,7 +1552,7 @@ The `.ctcase` file is a ZIP containing:
 - `originals/` -- Original documents (if stored)
 - `manifest.json` -- Case metadata, schema version, embedder versions
 
-### 8.2 Case Import
+### 10.2 Case Import
 
 ```
 casetrack import ~/Desktop/smith-v-jones.ctcase
@@ -1632,7 +1565,7 @@ casetrack import ~/Desktop/smith-v-jones.ctcase
 
 ---
 
-## 9. What's Stored Where (Summary)
+## 11. What's Stored Where (Summary)
 
 | Data Type | Storage Location | Format | Size Per Unit |
 |-----------|------------------|--------|---------------|
@@ -1792,18 +1725,26 @@ The embedder stack is designed for **consumer hardware**:
 
 ## 4. What Was Removed (vs. Research System)
 
-| Removed | Original Purpose | Why Removed | Alternative in CaseTrack |
-|---------|------------------|-------------|--------------------------|
-| E2-E4 Temporal | Document recency/sequence | Complex, minimal value for legal | Date metadata filter |
-| E5 Causal | "X caused Y" reasoning | Requires LLM-scale compute | Keyword patterns via E6 |
-| E9 HDC | Noise robustness | Experimental, adds 200MB+ RAM | BM25 fallback |
-| E10 Intent | Same-goal matching | 400MB+ model, GPU preferred | E1 semantic covers this |
-| E14 SAILER | Legal doc structure | Research model, no ONNX export | E7 handles structure |
-| E15 Citation Network | Graph-based citation | Requires graph training infrastructure | E8 simpler pairwise version |
+| Removed | Alternative in CaseTrack |
+|---------|--------------------------|
+| E2-E4 Temporal | Date metadata filter |
+| E5 Causal | Keyword patterns via E6 |
+| E9 HDC | BM25 fallback |
+| E10 Intent | E1 semantic covers this |
+| E14 SAILER | E7 handles structure |
+| E15 Citation Network | E8 simpler pairwise version |
 
 ---
 
-## 5. Embedding Engine Implementation
+## 5. Provenance Linkage
+
+**Every embedding vector is traceable back to its source document, page, and paragraph.** The chain is: `embedding key (e1:{chunk_uuid})` -> `ChunkData` (text + full `Provenance`) -> source file on disk. No embedding is stored without its chunk existing first; the ingestion pipeline (PRD 06) creates ChunkData with full Provenance before calling `embed_chunk()`.
+
+For the canonical Provenance struct fields, storage layout, and complete chain specification, see [PRD 04 Section 5.2](PRD_04_STORAGE_ARCHITECTURE.md#52-the-provenance-chain-how-embeddings-trace-back-to-source).
+
+---
+
+## 6. Embedding Engine Implementation
 
 ```rust
 use ort::{Session, Environment, GraphOptimizationLevel, ExecutionProvider};
@@ -2032,9 +1973,9 @@ pub enum QueryEmbedding {
 
 ---
 
-## 6. Model Management
+## 7. Model Management
 
-### 6.1 Lazy Loading
+### 7.1 Lazy Loading
 
 Models not needed for the current operation are not loaded:
 
@@ -2064,7 +2005,7 @@ pub fn ensure_model_loaded(&mut self, id: EmbedderId) -> Result<&Session> {
 }
 ```
 
-### 6.2 Memory Pressure Handling
+### 7.2 Memory Pressure Handling
 
 ```rust
 /// Unload least-recently-used models when memory is constrained
@@ -2087,7 +2028,7 @@ pub fn handle_memory_pressure(&mut self) {
 
 ---
 
-## 7. ONNX Model Conversion Notes
+## 8. ONNX Model Conversion Notes
 
 For the fresh project build, models must be converted from PyTorch to ONNX:
 
@@ -2183,12 +2124,22 @@ User: "Ingest ~/Downloads/Complaint.pdf"
                     |
                     v
 +-----------------------------------------------------------------------+
-| 3. CHUNK                                                               |
+| 3. CHUNK (provenance is attached here -- THE MOST CRITICAL STEP)       |
 |    - Split into 2000-character chunks                                  |
 |    - 10% overlap (200 chars from end of previous chunk)                |
 |    - Respect paragraph and sentence boundaries                         |
-|    - Attach FULL provenance to every chunk:                            |
-|      file path, doc name, page, paragraph, line, char offsets          |
+|    - Attach FULL provenance to EVERY chunk:                            |
+|      * document_path: absolute file path on disk                       |
+|      * document_name: original filename                                |
+|      * page: page number (1-indexed)                                   |
+|      * paragraph_start/end: which paragraphs this chunk spans          |
+|      * line_start/end: which lines this chunk spans                    |
+|      * char_start/end: exact character offsets within the page          |
+|      * extraction_method: Native / OCR / Hybrid                        |
+|      * ocr_confidence: quality score for OCR-extracted text             |
+|      * created_at: Unix timestamp of chunk creation                     |
+|      * embedded_at: Unix timestamp (set after Step 4)                   |
+|    A chunk without provenance MUST NOT be stored. Period.              |
 |    Output: Vec<Chunk> with Provenance                                  |
 +-----------------------------------------------------------------------+
                     |
@@ -2203,18 +2154,60 @@ User: "Ingest ~/Downloads/Complaint.pdf"
                     |
                     v
 +-----------------------------------------------------------------------+
-| 5. STORE                                                               |
-|    - Write chunks + embeddings to case RocksDB                        |
-|    - Write provenance records                                         |
+| 5. STORE (provenance chain is sealed here)                             |
+|    - Write chunks + provenance to case RocksDB (chunks CF)            |
+|      Each chunk stored with its FULL provenance inline                |
+|    - Write embedding vectors to embeddings CF, keyed by chunk_id      |
+|      chunk_id is the bridge: embedding → chunk → provenance → file    |
+|    - Update embedded_at timestamp on each chunk                       |
+|    - Write provenance records to provenance CF (prov:{chunk_uuid})    |
 |    - Update BM25 inverted index                                       |
-|    - Update document metadata and case stats                          |
+|    - Update document metadata (ingested_at, updated_at timestamps)    |
+|    - Update case stats                                                |
 |    - Optionally copy original file to case/originals/                 |
-|    Output: IngestResult { pages, chunks, duration }                   |
+|    Output: IngestResult { pages, chunks, duration, timestamps }       |
 +-----------------------------------------------------------------------+
                     |
                     v
 Response: "Ingested Complaint.pdf: 45 pages, 234 chunks, 12s"
 ```
+
+### 2.1 Post-Chunk Processing: Entity & Citation Extraction
+
+After Step 5 (STORE), the pipeline extracts entities and citations to populate the **Context Graph** (see [PRD 04 Section 8](PRD_04_STORAGE_ARCHITECTURE.md)).
+
+**Step 6 -- EXTRACT ENTITIES**: For each chunk, run regex extractors (citations, statutes, dates, amounts) and NER via E11-Legal (persons, organizations, courts). Deduplicate within the document. Store Entity and EntityMention records in `entities` CF, update `entity_index`. Output: `Vec<Entity>`, `Vec<EntityMention>`.
+
+**Step 7 -- EXTRACT CITATIONS**: Parse Bluebook ("Smith v. Jones, 123 F.3d 456"), neutral ("2020 WL 1234567"), and statute ("42 U.S.C. S 1983") citations. Normalize to canonical form. Detect treatment (Cited/Followed/Distinguished/Overruled/Discussed). Store CitationRecord in `citations` CF. Output: `Vec<CitationRecord>`.
+
+**Step 8 -- BUILD DOCUMENT GRAPH EDGES**: Find shared entities (SharedEntities edges), shared authorities (CitesAuthority edges), and compute document-level E1 similarity (SemanticSimilar edges). Store in `doc_graph` and `chunk_graph` CFs. Output: `Vec<DocRelationship>`.
+
+**Step 9 -- UPDATE CASE MAP**: Incrementally add new parties, key dates, authority/entity statistics. Recompute CaseStatistics. Output: Updated CaseMap.
+
+Complete response: `"Ingested Complaint.pdf: 45 pages, 234 chunks, 47 entities, 12 citations, 12s"`
+
+#### Entity Types Extracted
+
+| Type | Detection Method | Examples |
+|------|-----------------|----------|
+| Person | NER (E11-Legal) | "John Smith", "Judge Martinez" |
+| Organization | NER (E11-Legal) | "Acme Corp", "Department of Justice" |
+| Court | NER + Regex | "United States District Court for the N.D. Cal." |
+| Statute | Regex | "42 U.S.C. S 1983", "Cal. Civ. Code S 1714" |
+| CaseCitation | Regex (Bluebook) | "Smith v. Jones, 123 F.3d 456 (9th Cir. 2020)" |
+| Date | Regex + NER | "January 15, 2024", "filed on 01/15/2024" |
+| MonetaryAmount | Regex | "$1,250,000.00", "1.25 million dollars" |
+| LegalConcept | NER (E11-Legal) | "breach of fiduciary duty", "negligence per se" |
+
+#### Citation Treatment Detection
+
+| Treatment | Signal Words |
+|-----------|-------------|
+| Cited | Default (bare citation, no qualifying language) |
+| Followed | "following", "in accord", "consistent with" |
+| Distinguished | "distinguished", "unlike", "in contrast to" |
+| Overruled | "overruled", "abrogated", "no longer good law" |
+| Discussed | "see", "see also", "cf.", "compare" |
 
 ---
 
@@ -2381,12 +2374,13 @@ impl DocxProcessor {
 
 ### 5.1 Bundling Strategy
 
-Tesseract is bundled with the CaseTrack binary:
-- **macOS**: Statically linked via `leptonica-sys` and `tesseract-sys`
-- **Windows**: Tesseract DLLs included in installer/MCPB bundle
-- **Linux**: Statically linked via musl build
+| Platform | Method |
+|----------|--------|
+| macOS | Statically linked via `leptonica-sys` + `tesseract-sys` |
+| Windows | Tesseract DLLs in installer/MCPB bundle |
+| Linux | Statically linked via musl build |
 
-The `eng.traineddata` language model (~15MB) is included in the MCPB bundle or downloaded on first OCR use.
+The `eng.traineddata` (~15MB) is bundled or downloaded on first OCR use.
 
 ### 5.2 OCR Pipeline
 
@@ -2398,44 +2392,25 @@ pub struct OcrEngine {
 impl OcrEngine {
     pub fn new(data_dir: &Path) -> Result<Self> {
         let tessdata = data_dir.join("models").join("tessdata");
-        let tesseract = tesseract::Tesseract::new(
-            tessdata.to_str().unwrap(),
-            "eng",
-        )?;
+        let tesseract = tesseract::Tesseract::new(tessdata.to_str().unwrap(), "eng")?;
         Ok(Self { tesseract })
     }
 
     pub fn recognize(&self, image: &image::DynamicImage) -> Result<OcrResult> {
-        // Preprocess image for better OCR accuracy
         let processed = self.preprocess(image);
-
-        // Convert to bytes
         let bytes = processed.to_luma8();
 
         let mut tess = self.tesseract.clone();
-        tess.set_image(
-            bytes.as_raw(),
-            bytes.width() as i32,
-            bytes.height() as i32,
-            1,  // bytes per pixel
-            bytes.width() as i32,  // bytes per line
-        )?;
-
-        let text = tess.get_text()?;
-        let confidence = tess.mean_text_conf();
+        tess.set_image(bytes.as_raw(), bytes.width() as i32, bytes.height() as i32, 1, bytes.width() as i32)?;
 
         Ok(OcrResult {
-            text,
-            confidence: confidence as f32 / 100.0,
+            text: tess.get_text()?,
+            confidence: tess.mean_text_conf() as f32 / 100.0,
         })
     }
 
-    /// Image preprocessing for better OCR results
     fn preprocess(&self, image: &image::DynamicImage) -> image::DynamicImage {
-        image
-            .grayscale()          // Convert to grayscale
-            .adjust_contrast(1.5) // Increase contrast
-            // Binarization handled by Tesseract internally
+        image.grayscale().adjust_contrast(1.5)
     }
 }
 ```
@@ -2446,59 +2421,22 @@ impl OcrEngine {
 
 ### 6.1 Chunking Rules (MANDATORY)
 
-```
-CHUNKING SPECIFICATION
-=================================================================================
+| Parameter | Value |
+|-----------|-------|
+| Target size | 2000 characters |
+| Overlap | 10% = 200 characters (from end of previous chunk) |
+| Min size | 400 characters (no tiny fragments) |
+| Max size | 2200 characters (small overrun to avoid mid-sentence splits) |
 
-CHUNK SIZE:    2000 characters (hard target)
-OVERLAP:       10% = 200 characters (from end of previous chunk)
-MIN SIZE:      400 characters (don't emit tiny fragments)
-MAX SIZE:      2200 characters (allow small overrun to avoid mid-sentence splits)
+Character-based (not token-based) for deterministic, reproducible chunking.
 
-WHY 2000 CHARACTERS:
-  - Large enough to capture full legal paragraphs and clauses
-  - Small enough for focused embedding (semantic dilution above 2500 chars)
-  - Character-based (not token-based) for deterministic, reproducible chunking
-  - 10% overlap ensures context continuity across chunk boundaries
-
-BOUNDARY RULES:
-  1. Prefer splitting at paragraph boundaries
-  2. If no paragraph break, split at sentence boundary (period + space)
-  3. If no sentence break, split at word boundary (space)
-  4. NEVER split mid-word
-  5. Chunks do NOT cross page boundaries (each page starts a new chunk)
-```
+**Boundary priority**: (1) paragraph break, (2) sentence boundary, (3) word boundary. Never split mid-word. Chunks do NOT cross page boundaries.
 
 ### 6.2 Provenance Per Chunk (MANDATORY)
 
-**Every chunk MUST store its complete provenance at creation time.** This is not optional.
+**Every chunk MUST store its complete provenance at creation time.** Fields: `document_id`, `document_name`, `document_path`, `page`, `paragraph_start/end`, `line_start/end`, `char_start/end`, `extraction_method`, `ocr_confidence`, `bates_number` (optional), `chunk_index`.
 
-```
-PROVENANCE STORED WITH EVERY CHUNK
-=================================================================================
-
-Every chunk records:
-  - document_id:       UUID of the ingested document
-  - document_name:     Original filename ("Contract.pdf")
-  - document_path:     Full filesystem path ("/Users/sarah/Cases/Contract.pdf")
-  - page:              Page number in the original document
-  - paragraph_start:   First paragraph index included in this chunk
-  - paragraph_end:     Last paragraph index included in this chunk
-  - line_start:        First line number in the original page
-  - line_end:          Last line number in the original page
-  - char_start:        Character offset from start of page
-  - char_end:          Character offset from start of page
-  - extraction_method: How text was extracted (Native / OCR)
-  - ocr_confidence:    OCR confidence score (if applicable)
-  - bates_number:      Optional Bates stamp (for litigation)
-  - chunk_index:       Sequential position of this chunk within the document
-
-This provenance is:
-  1. STORED in RocksDB alongside the chunk text and embeddings
-  2. RETURNED in every search result
-  3. QUERYABLE via MCP tools (get_chunk_provenance, get_document_chunks)
-  4. IMMUTABLE once created (never modified after ingestion)
-```
+Provenance is: (1) stored in RocksDB with chunk text and embeddings, (2) returned in every search result, (3) queryable via MCP tools, (4) immutable after creation. See [PRD 04 Section 5.2](PRD_04_STORAGE_ARCHITECTURE.md) for the canonical Provenance struct and storage layout.
 
 ### 6.3 Chunking Implementation
 
@@ -2797,30 +2735,20 @@ fn discover_files(folder: &Path, recursive: bool) -> Result<Vec<PathBuf>> {
 
 ## 8. Duplicate Detection
 
-Before ingesting, check if the document already exists in the case:
+Check SHA256 hash against existing documents before ingesting. If duplicate found, return error with existing document ID and `--force` hint.
 
 ```rust
 pub fn check_duplicate(case: &CaseHandle, file_hash: &str) -> Result<Option<Uuid>> {
     let cf = case.db.cf_handle("documents").unwrap();
-    let iter = case.db.iterator_cf(&cf, rocksdb::IteratorMode::Start);
-
-    for item in iter {
+    for item in case.db.iterator_cf(&cf, rocksdb::IteratorMode::Start) {
         let (_, value) = item?;
         let doc: DocumentMetadata = bincode::deserialize(&value)?;
         if doc.file_hash == file_hash {
             return Ok(Some(doc.id));
         }
     }
-
     Ok(None)
 }
-```
-
-If duplicate is found, return an error with the existing document ID:
-
-```
-"Document already ingested as 'Complaint.pdf' (ID: abc-123).
- Use --force to re-ingest."
 ```
 
 ---
@@ -2943,23 +2871,8 @@ pub enum CaseType {
     Other,
 }
 
-impl CaseType {
-    pub fn from_str(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
-            "civil" => Self::Civil,
-            "criminal" => Self::Criminal,
-            "family" => Self::Family,
-            "bankruptcy" => Self::Bankruptcy,
-            "contract" => Self::Contract,
-            "employment" => Self::Employment,
-            "personal_injury" => Self::PersonalInjury,
-            "real_estate" => Self::RealEstate,
-            "intellectual_property" | "ip" => Self::IntellectualProperty,
-            "immigration" => Self::Immigration,
-            _ => Self::Other,
-        }
-    }
-}
+// Derive FromStr via case-insensitive match on variant names. Default: Other.
+// Note: "ip" is an alias for IntellectualProperty.
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum CaseStatus {
@@ -2973,118 +2886,13 @@ pub enum CaseStatus {
 
 ## 2. Case Registry
 
-The registry is a shared RocksDB instance that indexes all cases:
+Shared RocksDB instance indexing all cases. Key schema: `case:{uuid}` → bincode-serialized `Case`.
 
 ```rust
 pub struct CaseRegistry {
-    db: rocksdb::DB,
+    db: rocksdb::DB,        // registry.db in data_dir
     data_dir: PathBuf,
     active_case: Option<Uuid>,
-}
-
-impl CaseRegistry {
-    pub fn open(data_dir: &Path) -> Result<Self> {
-        let db_path = data_dir.join("registry.db");
-        let db = rocksdb::DB::open_default(&db_path)
-            .map_err(|e| CaseTrackError::RegistryOpenFailed { source: e })?;
-
-        Ok(Self {
-            db,
-            data_dir: data_dir.to_path_buf(),
-            active_case: None,
-        })
-    }
-
-    pub fn create_case(&mut self, params: CreateCaseParams) -> Result<Case> {
-        let id = Uuid::new_v4();
-        let case_dir = self.data_dir.join("cases").join(id.to_string());
-        fs::create_dir_all(case_dir.join("originals"))?;
-
-        let case = Case {
-            id,
-            name: params.name,
-            case_number: params.case_number,
-            case_type: params.case_type.unwrap_or(CaseType::Other),
-            status: CaseStatus::Active,
-            created_at: chrono::Utc::now().timestamp(),
-            updated_at: chrono::Utc::now().timestamp(),
-            stats: CaseStats::default(),
-        };
-
-        // Initialize the case database (creates column families)
-        CaseHandle::initialize(&case_dir)?;
-
-        // Store in registry
-        let key = format!("case:{}", id);
-        self.db.put(key.as_bytes(), bincode::serialize(&case)?)?;
-
-        // Auto-switch to new case
-        self.active_case = Some(id);
-
-        Ok(case)
-    }
-
-    pub fn get_case(&self, case_id: Uuid) -> Result<Case> {
-        let key = format!("case:{}", case_id);
-        let bytes = self.db.get(key.as_bytes())?
-            .ok_or(CaseTrackError::CaseNotFound(case_id))?;
-        Ok(bincode::deserialize(&bytes)?)
-    }
-
-    pub fn list_cases(&self) -> Result<Vec<Case>> {
-        let mut cases = Vec::new();
-        let iter = self.db.prefix_iterator(b"case:");
-        for item in iter {
-            let (key, value) = item?;
-            if key.starts_with(b"case:") {
-                let case: Case = bincode::deserialize(&value)?;
-                cases.push(case);
-            }
-        }
-        cases.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
-        Ok(cases)
-    }
-
-    pub fn update_case(&mut self, case: &Case) -> Result<()> {
-        let key = format!("case:{}", case.id);
-        self.db.put(key.as_bytes(), bincode::serialize(case)?)?;
-        Ok(())
-    }
-
-    pub fn delete_case(&mut self, case_id: Uuid) -> Result<()> {
-        // Remove from registry
-        let key = format!("case:{}", case_id);
-        self.db.delete(key.as_bytes())?;
-
-        // Remove case directory (RocksDB + originals)
-        let case_dir = self.data_dir.join("cases").join(case_id.to_string());
-        if case_dir.exists() {
-            fs::remove_dir_all(&case_dir)?;
-        }
-
-        // Clear active case if it was the deleted one
-        if self.active_case == Some(case_id) {
-            self.active_case = None;
-        }
-
-        Ok(())
-    }
-
-    pub fn switch_case(&mut self, case_id: Uuid) -> Result<CaseHandle> {
-        let _case = self.get_case(case_id)?; // Validates existence
-        let case_dir = self.data_dir.join("cases").join(case_id.to_string());
-        let handle = CaseHandle::open(&case_dir)?;
-        self.active_case = Some(case_id);
-        Ok(handle)
-    }
-
-    pub fn active_case_id(&self) -> Option<Uuid> {
-        self.active_case
-    }
-
-    pub fn count_cases(&self) -> Result<u32> {
-        Ok(self.list_cases()?.len() as u32)
-    }
 }
 
 pub struct CreateCaseParams {
@@ -3092,156 +2900,130 @@ pub struct CreateCaseParams {
     pub case_number: Option<String>,
     pub case_type: Option<CaseType>,
 }
+
+impl CaseRegistry {
+    /// Opens registry.db from data_dir
+    pub fn open(data_dir: &Path) -> Result<Self>;
+
+    /// Creates case dir + originals subdir, initializes CaseHandle DB,
+    /// stores in registry, auto-switches active_case to new case
+    pub fn create_case(&mut self, params: CreateCaseParams) -> Result<Case>;
+
+    /// Lookup by "case:{id}" key. Error: CaseNotFound
+    pub fn get_case(&self, case_id: Uuid) -> Result<Case>;
+
+    /// Prefix scan "case:", returns all cases sorted by updated_at DESC
+    pub fn list_cases(&self) -> Result<Vec<Case>>;
+
+    /// Upsert case metadata
+    pub fn update_case(&mut self, case: &Case) -> Result<()>;
+
+    /// Deletes registry entry + entire case directory. Clears active_case if matched.
+    pub fn delete_case(&mut self, case_id: Uuid) -> Result<()>;
+
+    /// Validates case exists, opens CaseHandle, sets active_case
+    pub fn switch_case(&mut self, case_id: Uuid) -> Result<CaseHandle>;
+
+    pub fn active_case_id(&self) -> Option<Uuid>;
+    pub fn count_cases(&self) -> Result<u32>;
+}
 ```
 
 ---
 
 ## 3. Case Handle
 
+Each case has its own `case.db` RocksDB with column families defined in `super::COLUMN_FAMILIES`.
+
+Key schemas:
+- Documents CF: `doc:{uuid}` → bincode `DocumentMetadata`
+- Chunks CF: `chunk:{uuid}` → bincode `Chunk`
+- Chunks CF index: `doc_chunks:{doc_uuid}:{sequence:06}` → chunk UUID string
+
 ```rust
 /// Handle to an open case database
 pub struct CaseHandle {
     pub db: rocksdb::DB,
-    pub case_id: Uuid,
+    pub case_id: Uuid,       // Parsed from case_dir directory name
     pub case_dir: PathBuf,
 }
 
 impl CaseHandle {
-    /// Initialize a new case database with all column families
-    pub fn initialize(case_dir: &Path) -> Result<()> {
-        let db_path = case_dir.join("case.db");
-        let opts = crate::storage::rocks_options();
+    /// Create case.db with all column families (DB dropped after init, reopened by open())
+    pub fn initialize(case_dir: &Path) -> Result<()>;
 
-        let cfs: Vec<rocksdb::ColumnFamilyDescriptor> = super::COLUMN_FAMILIES
-            .iter()
-            .map(|name| rocksdb::ColumnFamilyDescriptor::new(*name, opts.clone()))
-            .collect();
+    /// Open existing case.db. Error: CaseDbOpenFailed
+    pub fn open(case_dir: &Path) -> Result<Self>;
 
-        let _db = rocksdb::DB::open_cf_descriptors(&opts, &db_path, cfs)?;
-        // DB is dropped/closed here -- will be reopened by open()
-        Ok(())
-    }
+    // --- Document Operations (all use "documents" CF) ---
+    pub fn store_document(&self, doc: &DocumentMetadata) -> Result<()>;
+    pub fn get_document(&self, doc_id: Uuid) -> Result<DocumentMetadata>;
+    /// Prefix scan "doc:", sorted by ingested_at DESC
+    pub fn list_documents(&self) -> Result<Vec<DocumentMetadata>>;
+    /// Deletes doc metadata + all chunks via doc_chunks index + embeddings + provenance
+    pub fn delete_document(&self, doc_id: Uuid) -> Result<()>;
 
-    pub fn open(case_dir: &Path) -> Result<Self> {
-        let db_path = case_dir.join("case.db");
-        let opts = crate::storage::rocks_options();
-
-        let cfs: Vec<rocksdb::ColumnFamilyDescriptor> = super::COLUMN_FAMILIES
-            .iter()
-            .map(|name| rocksdb::ColumnFamilyDescriptor::new(*name, opts.clone()))
-            .collect();
-
-        let db = rocksdb::DB::open_cf_descriptors(&opts, &db_path, cfs)
-            .map_err(|e| CaseTrackError::CaseDbOpenFailed {
-                path: db_path,
-                source: e,
-            })?;
-
-        let case_id = Uuid::parse_str(
-            case_dir.file_name().unwrap().to_str().unwrap()
-        )?;
-
-        Ok(Self { db, case_id, case_dir: case_dir.to_path_buf() })
-    }
-
-    // --- Document Operations ---
-
-    pub fn store_document(&self, doc: &DocumentMetadata) -> Result<()> {
-        let cf = self.db.cf_handle("documents").unwrap();
-        let key = format!("doc:{}", doc.id);
-        self.db.put_cf(&cf, key.as_bytes(), bincode::serialize(doc)?)?;
-        Ok(())
-    }
-
-    pub fn get_document(&self, doc_id: Uuid) -> Result<DocumentMetadata> {
-        let cf = self.db.cf_handle("documents").unwrap();
-        let key = format!("doc:{}", doc_id);
-        let bytes = self.db.get_cf(&cf, key.as_bytes())?
-            .ok_or(CaseTrackError::DocumentNotFound(doc_id))?;
-        Ok(bincode::deserialize(&bytes)?)
-    }
-
-    pub fn list_documents(&self) -> Result<Vec<DocumentMetadata>> {
-        let cf = self.db.cf_handle("documents").unwrap();
-        let iter = self.db.prefix_iterator_cf(&cf, b"doc:");
-        let mut docs = Vec::new();
-        for item in iter {
-            let (_, value) = item?;
-            docs.push(bincode::deserialize(&value)?);
-        }
-        docs.sort_by(|a, b| b.ingested_at.cmp(&a.ingested_at));
-        Ok(docs)
-    }
-
-    pub fn delete_document(&self, doc_id: Uuid) -> Result<()> {
-        // Delete document metadata
-        let cf = self.db.cf_handle("documents").unwrap();
-        self.db.delete_cf(&cf, format!("doc:{}", doc_id).as_bytes())?;
-
-        // Delete all chunks for this document
-        let chunks_cf = self.db.cf_handle("chunks").unwrap();
-        let idx_cf = self.db.cf_handle("chunks").unwrap();
-        let prefix = format!("doc_chunks:{}:", doc_id);
-        let iter = self.db.prefix_iterator_cf(&idx_cf, prefix.as_bytes());
-        for item in iter {
-            let (key, value) = item?;
-            let chunk_id_str = String::from_utf8_lossy(&value);
-            // Delete chunk, embeddings, provenance
-            self.delete_chunk_data(&chunk_id_str)?;
-            self.db.delete_cf(&idx_cf, &key)?;
-        }
-
-        Ok(())
-    }
-
-    // --- Chunk Operations ---
-
-    pub fn store_chunk(&self, chunk: &Chunk) -> Result<()> {
-        let cf = self.db.cf_handle("chunks").unwrap();
-        let key = format!("chunk:{}", chunk.id);
-        self.db.put_cf(&cf, key.as_bytes(), bincode::serialize(chunk)?)?;
-
-        // Also store document->chunk index
-        let idx_key = format!("doc_chunks:{}:{:06}", chunk.document_id, chunk.sequence);
-        self.db.put_cf(&cf, idx_key.as_bytes(), chunk.id.to_string().as_bytes())?;
-
-        Ok(())
-    }
-
-    pub fn get_chunk(&self, chunk_id: Uuid) -> Result<Chunk> {
-        let cf = self.db.cf_handle("chunks").unwrap();
-        let key = format!("chunk:{}", chunk_id);
-        let bytes = self.db.get_cf(&cf, key.as_bytes())?
-            .ok_or(CaseTrackError::ChunkNotFound(chunk_id))?;
-        Ok(bincode::deserialize(&bytes)?)
-    }
+    // --- Chunk Operations (all use "chunks" CF) ---
+    /// Stores chunk + doc_chunks index entry (keyed by doc_id + zero-padded sequence)
+    pub fn store_chunk(&self, chunk: &Chunk) -> Result<()>;
+    pub fn get_chunk(&self, chunk_id: Uuid) -> Result<Chunk>;
 }
 ```
 
 ---
 
-## 4. Provenance System
+## 4. Provenance System (THE MOST IMPORTANT SYSTEM IN CASETRACK)
 
 ### 4.1 Provenance Model
+
+```
+PROVENANCE IS NON-NEGOTIABLE
+=================================================================================
+
+Every piece of information CaseTrack stores or returns MUST trace back to:
+  1. The SOURCE FILE (file path + filename on disk)
+  2. The exact LOCATION (page, paragraph, line, character offsets)
+  3. The EXTRACTION METHOD (Native text, OCR, Hybrid)
+  4. TIMESTAMPS (when created, when last embedded)
+
+This applies to:
+  - Every text chunk
+  - Every embedding vector (linked via chunk_id)
+  - Every entity mention (stores chunk_id + char offsets)
+  - Every citation record (stores chunk_id + document_id)
+  - Every search result (includes full provenance)
+  - Every MCP tool response that returns text
+
+If the provenance chain is broken, the data is USELESS.
+A search result without a source citation is worthless to an attorney.
+```
 
 Every chunk tracks exactly where it came from:
 
 ```rust
-/// EVERY chunk stores full provenance. This is the core of CaseTrack.
-/// When the AI returns information, the user must know EXACTLY where it came from.
+/// EVERY chunk stores full provenance. This is THE MOST IMPORTANT DATA STRUCTURE
+/// in CaseTrack. When the AI returns information, the user must know EXACTLY where
+/// it came from -- which document, which file on disk, which page, which paragraph,
+/// which line, which character range. Without provenance, the data is useless.
+///
+/// The Provenance chain: Embedding vector → chunk_id → ChunkData.provenance → source file
+/// This chain is NEVER broken. Every embedding, every entity mention, every citation,
+/// every search result carries its Provenance. If you can't cite the source, you can't
+/// return the information.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Provenance {
-    // === Source Document ===
+    // === Source Document (WHERE did this come from?) ===
     /// UUID of the ingested document
     pub document_id: Uuid,
-    /// Original filename ("Contract.pdf")
+    /// Original filename ("Contract.pdf") -- always stored, never empty
     pub document_name: String,
     /// Full filesystem path where the file was when ingested
     /// ("/Users/sarah/Cases/Smith/Contract.pdf")
+    /// Used for: reindexing (re-reads the file), sync (detects changes), display
     pub document_path: Option<PathBuf>,
 
-    // === Location in Document ===
-    /// Page number (1-indexed)
+    // === Location in Document (EXACTLY where in the document?) ===
+    /// Page number (1-indexed) -- which page of the PDF/DOCX
     pub page: u32,
     /// First paragraph index included in this chunk (0-indexed within page)
     pub paragraph_start: u32,
@@ -3252,16 +3034,17 @@ pub struct Provenance {
     /// Last line number
     pub line_end: u32,
 
-    // === Character Offsets (for exact highlighting) ===
-    /// Character offset from start of page
+    // === Character Offsets (for exact highlighting and cursor positioning) ===
+    /// Character offset from start of page -- pinpoints exactly where the text starts
     pub char_start: u64,
-    /// Character offset end
+    /// Character offset end -- pinpoints exactly where the text ends
     pub char_end: u64,
 
-    // === Extraction Metadata ===
+    // === Extraction Metadata (HOW was the text obtained?) ===
     /// How the text was extracted from the original file
     pub extraction_method: ExtractionMethod,
-    /// OCR confidence score (0.0-1.0) if extracted via OCR
+    /// OCR confidence score (0.0-1.0) if extracted via OCR. Lets the AI warn when
+    /// text may be unreliable ("This text was OCR'd with 72% confidence").
     pub ocr_confidence: Option<f32>,
 
     // === Legal Metadata ===
@@ -3271,6 +3054,13 @@ pub struct Provenance {
     // === Chunk Position ===
     /// Sequential position of this chunk within the entire document (0-indexed)
     pub chunk_index: u32,
+
+    // === Timestamps (WHEN was this data created/updated?) ===
+    /// When this chunk was first created from the source document (Unix timestamp)
+    pub created_at: i64,
+    /// When the embedding vectors for this chunk were last computed (Unix timestamp)
+    /// Updated on reindex. Lets the system detect stale embeddings.
+    pub embedded_at: i64,
 }
 
 impl Provenance {
@@ -3352,48 +3142,17 @@ impl SearchResult {
 
 ### 4.3 Context Window
 
-Search results include surrounding context for better comprehension:
+Search results include surrounding chunks for comprehension. Uses the `doc_chunks` index to look up adjacent chunks by `sequence +/- window`.
 
 ```rust
 impl CaseHandle {
-    /// Get chunks immediately before and after a given chunk
+    /// Returns (before_text, after_text) by looking up adjacent chunks
+    /// via doc_chunks:{doc_id}:{sequence +/- 1} index keys
     pub fn get_surrounding_context(
         &self,
         chunk: &Chunk,
-        window: usize,  // Number of chunks before/after
-    ) -> Result<(Option<String>, Option<String>)> {
-        let cf = self.db.cf_handle("chunks").unwrap();
-
-        let before = if chunk.sequence > 0 {
-            let prev_idx = format!(
-                "doc_chunks:{}:{:06}",
-                chunk.document_id,
-                chunk.sequence - 1
-            );
-            self.db.get_cf(&cf, prev_idx.as_bytes())?
-                .and_then(|id_bytes| {
-                    let id = Uuid::parse_str(&String::from_utf8_lossy(&id_bytes)).ok()?;
-                    self.get_chunk(id).ok().map(|c| c.text)
-                })
-        } else {
-            None
-        };
-
-        let after = {
-            let next_idx = format!(
-                "doc_chunks:{}:{:06}",
-                chunk.document_id,
-                chunk.sequence + 1
-            );
-            self.db.get_cf(&cf, next_idx.as_bytes())?
-                .and_then(|id_bytes| {
-                    let id = Uuid::parse_str(&String::from_utf8_lossy(&id_bytes)).ok()?;
-                    self.get_chunk(id).ok().map(|c| c.text)
-                })
-        };
-
-        Ok((before, after))
-    }
+        window: usize,
+    ) -> Result<(Option<String>, Option<String>)>;
 }
 ```
 
@@ -3427,6 +3186,92 @@ Notes:
   - CLOSED: Read-only. Search works. Cannot ingest new documents.
   - ARCHIVED: Same as closed but hidden from default list_cases.
   - DELETED: Completely removed. Not recoverable.
+```
+
+---
+
+## 6. Case Management via MCP Tools -- Operations Guide
+
+This section is the definitive reference for how the AI (Claude) and the user manage cases, documents, embeddings, and databases through MCP tools. **Every operation below is exposed as an MCP tool** (see PRD 09 for full input/output schemas).
+
+### 6.1 Isolation Guarantee
+
+```
+CRITICAL: DATA NEVER CROSSES CASE BOUNDARIES
+=================================================================================
+
+- Each case = its own RocksDB database on disk (separate files, separate directory)
+- Embeddings from Case A are in a DIFFERENT DATABASE FILE than Case B
+- Search operates within a SINGLE CASE ONLY -- there is no cross-case search
+- Ingestion targets the ACTIVE CASE ONLY -- documents go into exactly one case
+- Deleting a case deletes ONLY that case's database, chunks, embeddings, and index
+- No shared vector index, no shared embedding store, no shared anything
+
+The AI MUST switch_case before performing ANY operation on a different case.
+There is no way to accidentally mix data between cases.
+```
+
+### 6.2 Case Lifecycle Operations (MCP Tools)
+
+| Operation | MCP Tool | What It Does | Data Impact |
+|-----------|----------|-------------|-------------|
+| Create a case | `create_case` | Creates a new case directory, initializes an empty RocksDB instance with all column families, registers in the case registry, auto-switches to the new case | New database on disk |
+| List all cases | `list_cases` | Lists all cases with status, document count, chunk count, creation date | Read-only |
+| Switch active case | `switch_case` | Changes which case all subsequent operations target. Opens that case's RocksDB database. | Changes active DB handle |
+| Get case details | `get_case_info` | Shows all documents, total pages, total chunks, storage usage, embedder info | Read-only |
+| Delete a case | `delete_case` | **Permanently removes**: case directory, RocksDB database, ALL chunks, ALL embeddings, ALL indexes, ALL provenance records, optionally stored original files. Requires `confirm=true`. Not recoverable. | **Destroys entire database** |
+
+### 6.3 Document Management Operations (MCP Tools)
+
+| Operation | MCP Tool | What It Does | Data Impact |
+|-----------|----------|-------------|-------------|
+| Ingest one file | `ingest_document` | Reads file → extracts text → chunks into 2000-char segments → embeds with all active models → stores in active case's DB | Adds chunks + embeddings to active case |
+| Ingest a folder | `ingest_folder` | Recursively walks directory → ingests all supported files → skips already-ingested (SHA256) | Bulk add to active case |
+| Sync a folder | `sync_folder` | Compares disk vs DB → ingests new files, reindexes changed files, optionally removes deleted | Add/update/remove in active case |
+| List documents | `list_documents` | Lists all documents in active case with page count, chunk count, type | Read-only |
+| Get document details | `get_document` | Shows one document's metadata, extraction method, chunk stats | Read-only |
+| **Delete a document** | `delete_document` | **Removes from active case**: document metadata, ALL chunks for that document, ALL embeddings for those chunks, ALL provenance records, ALL BM25 index entries. Requires `confirm=true`. | **Destroys document data** |
+
+### 6.4 Embedding & Index Management Operations (MCP Tools)
+
+| Operation | MCP Tool | What It Does | Data Impact |
+|-----------|----------|-------------|-------------|
+| Check index health | `get_index_status` | Per-document report: embedder coverage (4/7 vs 7/7), SHA256 staleness, missing source files | Read-only |
+| Reindex one document | `reindex_document` | Deletes ALL old chunks + embeddings → re-reads source file → re-chunks → re-embeds → rebuilds BM25 entries. Option: `reparse=false` keeps chunks, only rebuilds embeddings. | **Replaces** old embeddings with fresh ones |
+| Reindex entire case | `reindex_case` | Full rebuild of every document in the case. Option: `skip_unchanged=true` only touches stale documents. Requires `confirm=true`. | **Replaces** all embeddings in case |
+| Get chunk provenance | `get_chunk` | Retrieves one chunk with full text and provenance (file, page, paragraph, line, char offsets) | Read-only |
+| List document chunks | `get_document_chunks` | Lists all chunks in a document with their provenance | Read-only |
+| Get surrounding context | `get_source_context` | Gets the chunks before/after a given chunk for context | Read-only |
+
+### 6.5 Folder Watch & Auto-Sync Operations (MCP Tools)
+
+| Operation | MCP Tool | What It Does | Data Impact |
+|-----------|----------|-------------|-------------|
+| Watch a folder | `watch_folder` | Starts OS-level file monitoring. New/modified/deleted files automatically trigger ingestion/reindex/removal in the target case. | Automatic ongoing changes |
+| Stop watching | `unwatch_folder` | Stops auto-sync. Existing case data is untouched. | No data change |
+| List watches | `list_watches` | Shows all active watches, their schedule, last sync, health status | Read-only |
+| Change schedule | `set_sync_schedule` | Changes how often a watch syncs (on_change, hourly, daily, manual) | No data change |
+
+### 6.6 Typical AI Workflow
+
+```
+User: "New case, Smith v. Jones. Docs in ~/Cases/Smith/"
+
+Claude:
+  1. create_case("Smith v. Jones", case_type="contract")  → isolated DB, auto-switched
+  2. ingest_folder("~/Cases/Smith/", recursive=true)      → chunks + embeds all files
+  3. watch_folder("~/Cases/Smith/", schedule="on_change") → auto-sync future changes
+
+User: "Search for termination clauses"
+  4. search_case("termination clauses", top_k=5)          → results with full provenance
+
+User: "Switch to Doe case and search witness testimony"
+  5. switch_case("Doe v. State")                          → separate DB, Smith inaccessible
+  6. search_case("witness testimony")                     → Doe-only results
+
+Key invariant: delete_case/delete_document/reindex always cascade through
+chunks → embeddings → provenance → BM25 entries. Original source files on
+disk are NEVER removed. See PRD 09 for full tool schemas.
 ```
 
 ---
@@ -3612,111 +3457,23 @@ impl SearchEngine {
 
 ## 3. BM25 Implementation
 
+Standard BM25 with `k1=1.2, b=0.75`. Stored in `bm25_index` column family.
+
+**Key schema**: `term:{token}` → bincode `PostingList`, `stats` → bincode `Bm25Stats`
+
+**Tokenization**: lowercase, split on non-alphanumeric (preserving apostrophes), filter stopwords and single-char tokens.
+
 ```rust
 pub struct Bm25Index;
 
 impl Bm25Index {
-    /// Search the inverted index
-    pub fn search(
-        case: &CaseHandle,
-        query: &str,
-        limit: usize,
-        document_filter: Option<Uuid>,
-    ) -> Result<Vec<Uuid>> {
-        let cf = case.db.cf_handle("bm25_index").unwrap();
+    /// Tokenize query → lookup postings per term → accumulate BM25 scores
+    /// per chunk → apply optional document_filter → return top `limit` chunk IDs
+    pub fn search(case: &CaseHandle, query: &str, limit: usize,
+                  document_filter: Option<Uuid>) -> Result<Vec<Uuid>>;
 
-        // Load stats
-        let stats: Bm25Stats = {
-            let bytes = case.db.get_cf(&cf, b"stats")?
-                .ok_or(CaseTrackError::Bm25IndexEmpty)?;
-            bincode::deserialize(&bytes)?
-        };
-
-        // Tokenize query
-        let terms = tokenize_for_bm25(query);
-
-        // Accumulate scores per chunk
-        let mut scores: HashMap<Uuid, f32> = HashMap::new();
-
-        for term in &terms {
-            let key = format!("term:{}", term);
-            if let Some(bytes) = case.db.get_cf(&cf, key.as_bytes())? {
-                let postings: PostingList = bincode::deserialize(&bytes)?;
-
-                let idf = ((stats.total_docs as f32 - postings.doc_freq as f32 + 0.5)
-                    / (postings.doc_freq as f32 + 0.5) + 1.0).ln();
-
-                for posting in &postings.entries {
-                    // Apply document filter if specified
-                    if let Some(filter_doc) = document_filter {
-                        if posting.document_id != filter_doc {
-                            continue;
-                        }
-                    }
-
-                    let tf = posting.term_freq as f32;
-                    let dl = posting.doc_length as f32;
-                    let avgdl = stats.avg_doc_length;
-
-                    // BM25 formula
-                    let k1 = 1.2;
-                    let b = 0.75;
-                    let score = idf * (tf * (k1 + 1.0))
-                        / (tf + k1 * (1.0 - b + b * dl / avgdl));
-
-                    *scores.entry(posting.chunk_id).or_default() += score;
-                }
-            }
-        }
-
-        // Sort by score, return top N
-        let mut results: Vec<(Uuid, f32)> = scores.into_iter().collect();
-        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-        results.truncate(limit);
-
-        Ok(results.into_iter().map(|(id, _)| id).collect())
-    }
-
-    /// Index a chunk's text into the inverted index
-    pub fn index_chunk(
-        case: &CaseHandle,
-        chunk: &Chunk,
-    ) -> Result<()> {
-        let cf = case.db.cf_handle("bm25_index").unwrap();
-        let terms = tokenize_for_bm25(&chunk.text);
-        let term_freqs = count_term_frequencies(&terms);
-
-        for (term, freq) in &term_freqs {
-            let key = format!("term:{}", term);
-
-            let mut postings: PostingList = case.db.get_cf(&cf, key.as_bytes())?
-                .map(|b| bincode::deserialize(&b).unwrap_or_default())
-                .unwrap_or_default();
-
-            postings.doc_freq += 1;
-            postings.entries.push(PostingEntry {
-                chunk_id: chunk.id,
-                document_id: chunk.document_id,
-                term_freq: *freq,
-                doc_length: terms.len() as u32,
-            });
-
-            case.db.put_cf(&cf, key.as_bytes(), bincode::serialize(&postings)?)?;
-        }
-
-        // Update global stats
-        let mut stats: Bm25Stats = case.db.get_cf(&cf, b"stats")?
-            .map(|b| bincode::deserialize(&b).unwrap_or_default())
-            .unwrap_or_default();
-
-        stats.total_docs += 1;
-        stats.total_tokens += terms.len() as u64;
-        stats.avg_doc_length = stats.total_tokens as f32 / stats.total_docs as f32;
-
-        case.db.put_cf(&cf, b"stats", bincode::serialize(&stats)?)?;
-
-        Ok(())
-    }
+    /// Tokenize chunk text → upsert PostingList per term → update Bm25Stats
+    pub fn index_chunk(case: &CaseHandle, chunk: &Chunk) -> Result<()>;
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -3738,14 +3495,6 @@ pub struct PostingEntry {
     pub document_id: Uuid,
     pub term_freq: u32,
     pub doc_length: u32,
-}
-
-/// Simple tokenization for BM25 (lowercased, alphanumeric, stopwords removed)
-fn tokenize_for_bm25(text: &str) -> Vec<String> {
-    text.split(|c: char| !c.is_alphanumeric() && c != '\'')
-        .map(|w| w.to_lowercase())
-        .filter(|w| w.len() > 1 && !is_stopword(w))
-        .collect()
 }
 ```
 
@@ -3837,58 +3586,10 @@ pub struct TokenEmbeddings {
 
 ---
 
-## 6. Similarity Functions
+## 6. Search Response Format (Canonical)
 
-```rust
-/// Cosine similarity between two dense vectors
-pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-    debug_assert_eq!(a.len(), b.len(), "Vector dimensions must match");
-
-    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-
-    if norm_a == 0.0 || norm_b == 0.0 {
-        return 0.0;
-    }
-
-    dot / (norm_a * norm_b)
-}
-
-/// Dot product for sparse vectors (SPLADE)
-pub fn sparse_dot(a: &SparseVec, b: &SparseVec) -> f32 {
-    a.dot(b)  // Implementation in SparseVec struct
-}
-```
-
----
-
-## 7. Document-Filtered Search
-
-Search can be restricted to a single document:
-
-```rust
-/// Search within a specific document only
-pub fn search_document(
-    &self,
-    case: &CaseHandle,
-    query: &str,
-    document_id: Uuid,
-    top_k: usize,
-) -> Result<Vec<SearchResult>> {
-    self.search(case, query, top_k, Some(document_id))
-}
-```
-
-This is useful for queries like:
-- "What does the contract say about non-compete?"
-- "Find all mentions of damages in the complaint"
-
----
-
-## 8. Search Response Format
-
-The MCP tool returns results in this structure:
+This is the canonical MCP response format for `search_case` (also referenced by PRD 09).
+Document-scoped search uses the same pipeline via the `document_filter` parameter on `SearchEngine::search`.
 
 ```json
 {
@@ -3919,7 +3620,10 @@ The MCP tool returns results in this structure:
         "char_end": 26580,
         "bates": null,
         "extraction_method": "Native",
-        "ocr_confidence": null
+        "ocr_confidence": null,
+        "chunk_created_at": "2026-01-15T14:30:00Z",
+        "chunk_embedded_at": "2026-01-15T14:30:12Z",
+        "document_ingested_at": "2026-01-15T14:29:48Z"
       },
       "context": {
         "before": "...the previous paragraph text...",
@@ -3953,7 +3657,8 @@ The MCP tool returns results in this structure:
 | `delete_case` | Delete a case and all its data | Free | No |
 | `get_case_info` | Get details about active case | Free | Yes |
 | `ingest_document` | Ingest a PDF, DOCX, or image | Free | Yes |
-| `ingest_folder` | Batch ingest all files in folder | Pro | Yes |
+| `ingest_folder` | Ingest all supported files in a folder and subfolders | Free | Yes |
+| `sync_folder` | Sync a folder -- ingest new/changed files, optionally remove deleted | Free | Yes |
 | `list_documents` | List documents in active case | Free | Yes |
 | `get_document` | Get document details and stats | Free | Yes |
 | `delete_document` | Remove a document from a case | Free | Yes |
@@ -3962,11 +3667,95 @@ The MCP tool returns results in this structure:
 | `get_chunk` | Get a specific chunk with full provenance | Free | Yes |
 | `get_document_chunks` | List all chunks in a document with provenance | Free | Yes |
 | `get_source_context` | Get surrounding text for a chunk (context window) | Free | Yes |
+| `reindex_document` | Delete old embeddings/indexes for a document and rebuild from scratch | Free | Yes |
+| `reindex_case` | Rebuild all embeddings and indexes for the entire active case | Free | Yes |
+| `get_index_status` | Show embedding/index health for all documents in active case | Free | Yes |
+| `watch_folder` | Start watching a folder for file changes -- auto-sync on change or schedule | Free | Yes |
+| `unwatch_folder` | Stop watching a folder | Free | Yes |
+| `list_watches` | List all active folder watches and their sync status | Free | No |
+| `set_sync_schedule` | Set the auto-sync schedule (on_change, hourly, daily, manual) | Free | Yes |
 | `get_status` | Get server status and model info | Free | No |
+| | | | |
+| **--- Context Graph: Case Overview ---** | | | |
+| `get_case_map` | High-level case briefing: parties, key dates, issues, document categories, top entities, top authorities, statistics | Free | Yes |
+| `get_case_timeline` | Chronological view of key dates and events extracted from documents | Free | Yes |
+| `get_case_statistics` | Document counts, page counts, chunk counts, entity counts, authority counts, embedder coverage | Free | Yes |
+| | | | |
+| **--- Context Graph: Entity & Citation Search ---** | | | |
+| `list_entities` | List all extracted entities in the case, grouped by type (person, org, court, statute, etc.) | Free | Yes |
+| `get_entity_mentions` | Get all chunks mentioning a specific entity, with context snippets | Free | Yes |
+| `search_entity_relationships` | Find chunks mentioning two or more entities together | Pro | Yes |
+| `list_authorities` | List all cited legal authorities (statutes, case law) with citation counts | Free | Yes |
+| `get_authority_citations` | Get all chunks citing a specific authority, with treatment (cited, followed, distinguished) | Free | Yes |
+| | | | |
+| **--- Context Graph: Document Navigation ---** | | | |
+| `get_document_structure` | Get headings, sections, and table of contents for a document | Free | Yes |
+| `browse_pages` | Get all chunks from a specific page range within a document | Free | Yes |
+| `find_related_documents` | Find documents similar to a given document (by shared entities, authorities, or semantic similarity) | Free | Yes |
+| `list_documents_by_type` | List documents filtered by type (pleading, discovery, exhibit, etc.) | Free | Yes |
+| `traverse_chunks` | Navigate forward/backward through chunks in a document from a starting point | Free | Yes |
+| | | | |
+| **--- Context Graph: Advanced Search ---** | | | |
+| `search_similar_chunks` | Find chunks semantically similar to a given chunk across all documents | Free | Yes |
+| `compare_documents` | Compare what two documents say about a topic (side-by-side search) | Pro | Yes |
+| `find_document_clusters` | Group documents by theme/topic using semantic clustering | Pro | Yes |
 
 ---
 
 ## 2. Tool Specifications
+
+> **PROVENANCE IN EVERY RESPONSE**: Every MCP tool that returns text from a document
+> MUST include the full provenance chain: source document filename, file path on disk,
+> page number, paragraph range, line range, character offsets, extraction method, OCR
+> confidence (if applicable), and timestamps (when ingested, when last embedded).
+> A tool response that returns document text without telling the user exactly where
+> it came from is a **bug**. The AI must always be able to cite its sources.
+
+### Common Error Patterns
+
+All tools return errors in a consistent MCP format. The four common error types:
+
+```json
+// NoCaseActive -- returned by any tool that requires an active case
+{
+  "isError": true,
+  "content": [{
+    "type": "text",
+    "text": "No active case. Create or switch to a case first:\n  - create_case: Create a new case\n  - switch_case: Switch to an existing case\n  - list_cases: See all cases"
+  }]
+}
+
+// FileNotFound -- returned by ingest_document, reindex_document, etc.
+{
+  "isError": true,
+  "content": [{
+    "type": "text",
+    "text": "File not found: /Users/sarah/Downloads/Complaint.pdf\n\nCheck that the path is correct and the file exists."
+  }]
+}
+
+// FreeTierLimit -- returned when a free tier quota is exceeded
+{
+  "isError": true,
+  "content": [{
+    "type": "text",
+    "text": "Free tier allows 3 cases (you have 3). Delete a case or upgrade to Pro for unlimited cases: https://casetrack.legal/upgrade"
+  }]
+}
+
+// NotFound -- returned when a case, document, or chunk ID is not found
+{
+  "isError": true,
+  "content": [{
+    "type": "text",
+    "text": "Case not found: \"Smith\". Did you mean:\n  - Smith v. Jones Corp (ID: a1b2c3d4)\nUse the full name or ID."
+  }]
+}
+```
+
+Per-tool error examples are omitted below; all errors follow these patterns.
+
+---
 
 ### 2.1 `create_case`
 
@@ -4006,17 +3795,6 @@ The MCP tool returns results in this structure:
 }
 ```
 
-**Error (Free tier limit):**
-```json
-{
-  "isError": true,
-  "content": [{
-    "type": "text",
-    "text": "Free tier allows 3 cases (you have 3). Delete a case or upgrade to Pro for unlimited cases: https://casetrack.legal/upgrade"
-  }]
-}
-```
-
 ---
 
 ### 2.2 `list_cases`
@@ -4039,16 +3817,6 @@ The MCP tool returns results in this structure:
 }
 ```
 
-**Response:**
-```json
-{
-  "content": [{
-    "type": "text",
-    "text": "Cases (2 active):\n\n* Smith v. Jones Corp [ACTIVE] <-- current\n  Contract | 5 documents | 234 chunks | Created 2026-01-15\n\n  Doe v. State [ACTIVE]\n  Criminal | 12 documents | 890 chunks | Created 2026-01-20"
-  }]
-}
-```
-
 ---
 
 ### 2.3 `switch_case`
@@ -4067,27 +3835,6 @@ The MCP tool returns results in this structure:
     },
     "required": ["case_name"]
   }
-}
-```
-
-**Response:**
-```json
-{
-  "content": [{
-    "type": "text",
-    "text": "Switched to case \"Doe v. State\" (12 documents, 890 chunks)."
-  }]
-}
-```
-
-**Error (not found):**
-```json
-{
-  "isError": true,
-  "content": [{
-    "type": "text",
-    "text": "Case not found: \"Smith\". Did you mean:\n  - Smith v. Jones Corp (ID: a1b2c3d4)\nUse the full name or ID."
-  }]
 }
 ```
 
@@ -4117,17 +3864,6 @@ The MCP tool returns results in this structure:
 }
 ```
 
-**Error (no confirmation):**
-```json
-{
-  "isError": true,
-  "content": [{
-    "type": "text",
-    "text": "Deletion requires confirm=true. This will permanently delete case \"Smith v. Jones Corp\" and all 5 documents. This cannot be undone."
-  }]
-}
-```
-
 ---
 
 ### 2.5 `get_case_info`
@@ -4140,16 +3876,6 @@ The MCP tool returns results in this structure:
     "type": "object",
     "properties": {}
   }
-}
-```
-
-**Response:**
-```json
-{
-  "content": [{
-    "type": "text",
-    "text": "Case: Smith v. Jones Corp\nType: Contract | Status: Active\nCreated: 2026-01-15\n\nDocuments (5):\n  1. Complaint.pdf - 45 pages, 234 chunks (Native extraction)\n  2. Contract.pdf - 28 pages, 156 chunks (Native extraction)\n  3. Exhibit_A.jpg - 1 page, 3 chunks (OCR, 97% confidence)\n  4. Deposition.docx - 120 pages, 580 chunks (Native extraction)\n  5. Motion.pdf - 15 pages, 78 chunks (Native extraction)\n\nTotal: 209 pages, 1,051 chunks\nStorage: 52 MB (embeddings + index)\nEmbedders: E1-Legal, E6-Legal, E7, E13-BM25 (Free tier)"
-  }]
 }
 ```
 
@@ -4188,49 +3914,6 @@ The MCP tool returns results in this structure:
 }
 ```
 
-**Success Response:**
-```json
-{
-  "content": [{
-    "type": "text",
-    "text": "Ingested \"Complaint.pdf\" into Smith v. Jones Corp\n\n  Pages:      45\n  Chunks:     234\n  Extraction: Native text\n  Embedders:  E1-Legal, E6-Legal, E7, BM25\n  Duration:   12.3 seconds\n  Storage:    3.2 MB\n\nThis document is now searchable."
-  }]
-}
-```
-
-**Error (no active case):**
-```json
-{
-  "isError": true,
-  "content": [{
-    "type": "text",
-    "text": "No active case. Create or switch to a case first:\n  - create_case: Create a new case\n  - switch_case: Switch to an existing case\n  - list_cases: See all cases"
-  }]
-}
-```
-
-**Error (file not found):**
-```json
-{
-  "isError": true,
-  "content": [{
-    "type": "text",
-    "text": "File not found: /Users/sarah/Downloads/Complaint.pdf\n\nCheck that the path is correct and the file exists."
-  }]
-}
-```
-
-**Error (unsupported format):**
-```json
-{
-  "isError": true,
-  "content": [{
-    "type": "text",
-    "text": "Unsupported file format: .xlsx\n\nSupported formats: PDF, DOCX, DOC, TXT, RTF, JPG, PNG, TIFF"
-  }]
-}
-```
-
 ---
 
 ### 2.7 `ingest_folder`
@@ -4238,23 +3921,33 @@ The MCP tool returns results in this structure:
 ```json
 {
   "name": "ingest_folder",
-  "description": "Batch ingest all supported documents in a folder. Pro tier only.",
+  "description": "Ingest all supported documents in a folder and all subfolders. Walks the entire directory tree recursively. Automatically skips files already ingested (matched by SHA256 hash). Supported formats: PDF, DOCX, DOC, TXT, RTF, JPG, PNG, TIFF. Each file is chunked into 2000-character segments with full provenance.",
   "inputSchema": {
     "type": "object",
     "properties": {
       "folder_path": {
         "type": "string",
-        "description": "Path to folder containing documents"
+        "description": "Absolute path to folder containing documents. All subfolders are included automatically."
       },
       "recursive": {
         "type": "boolean",
-        "default": false,
-        "description": "Include subfolders"
+        "default": true,
+        "description": "Include subfolders (default: true). Set to false to only process the top-level folder."
+      },
+      "skip_existing": {
+        "type": "boolean",
+        "default": true,
+        "description": "Skip files already ingested (matched by SHA256 hash). Set to false to re-ingest everything."
       },
       "document_type": {
         "type": "string",
-        "enum": ["pleading", "motion", "brief", "contract", "exhibit", "correspondence", "deposition", "discovery", "other"],
-        "description": "Default type for all documents"
+        "enum": ["pleading", "motion", "brief", "contract", "exhibit", "correspondence", "deposition", "discovery", "statute", "case_law", "other"],
+        "description": "Default document type for all files. If omitted, CaseTrack infers from file content."
+      },
+      "file_extensions": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Optional filter: only ingest files with these extensions (e.g., [\"pdf\", \"docx\"]). Default: all supported formats."
       }
     },
     "required": ["folder_path"]
@@ -4262,19 +3955,55 @@ The MCP tool returns results in this structure:
 }
 ```
 
-**Response:**
+**Success Response:**
 ```json
 {
   "content": [{
     "type": "text",
-    "text": "Batch ingestion complete for Smith v. Jones Corp\n\n  Folder:    ~/Cases/Smith/Documents/\n  Found:     23 supported files\n  Succeeded: 21\n  Failed:    2\n  Duration:  3 minutes 45 seconds\n\n  Failures:\n  - corrupted.pdf: PDF parsing error (file may be corrupted)\n  - scan_2019.tiff: OCR failed (image too low resolution)"
+    "text": "Folder ingestion complete for Smith v. Jones Corp\n\n  Folder:     ~/Cases/Smith/Documents/\n  Subfolders: 4 (Pleadings/, Discovery/, Exhibits/, Correspondence/)\n  Found:      47 supported files\n  New:        23 (ingested)\n  Skipped:    22 (already ingested, matching SHA256)\n  Failed:     2\n  Duration:   4 minutes 12 seconds\n\n  New documents ingested:\n  - Pleadings/Complaint.pdf (45 pages, 234 chunks)\n  - Pleadings/Answer.pdf (12 pages, 67 chunks)\n  - Discovery/Interrogatories.docx (8 pages, 42 chunks)\n  ... 20 more\n\n  Failures:\n  - Exhibits/corrupted.pdf: PDF parsing error (file may be corrupted)\n  - Exhibits/scan_2019.tiff: OCR failed (image too low resolution)\n\nAll 23 new documents are now searchable."
   }]
 }
 ```
 
 ---
 
-### 2.8 `list_documents`
+### 2.8 `sync_folder`
+
+```json
+{
+  "name": "sync_folder",
+  "description": "Sync a folder with the active case. Compares files on disk against what is already ingested and: (1) ingests new files not yet in the case, (2) re-ingests files that have changed since last ingestion (detected by SHA256 mismatch), (3) optionally removes documents whose source files no longer exist on disk. This is the easiest way to keep a case up to date with a directory of documents -- just point it at the folder and run it whenever files change.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "folder_path": {
+        "type": "string",
+        "description": "Absolute path to folder to sync. All subfolders are included."
+      },
+      "remove_deleted": {
+        "type": "boolean",
+        "default": false,
+        "description": "If true, documents whose source files no longer exist on disk will be removed from the case (chunks + embeddings deleted). Default: false (only add/update, never remove)."
+      },
+      "document_type": {
+        "type": "string",
+        "enum": ["pleading", "motion", "brief", "contract", "exhibit", "correspondence", "deposition", "discovery", "statute", "case_law", "other"],
+        "description": "Default document type for newly ingested files."
+      },
+      "dry_run": {
+        "type": "boolean",
+        "default": false,
+        "description": "If true, report what would change without actually ingesting or removing anything. Useful for previewing a sync."
+      }
+    },
+    "required": ["folder_path"]
+  }
+}
+```
+
+---
+
+### 2.9 `list_documents`
 
 ```json
 {
@@ -4296,7 +4025,7 @@ The MCP tool returns results in this structure:
 
 ---
 
-### 2.9 `get_document`
+### 2.10 `get_document`
 
 ```json
 {
@@ -4317,7 +4046,7 @@ The MCP tool returns results in this structure:
 
 ---
 
-### 2.10 `delete_document`
+### 2.11 `delete_document`
 
 ```json
 {
@@ -4343,12 +4072,12 @@ The MCP tool returns results in this structure:
 
 ---
 
-### 2.11 `search_case`
+### 2.12 `search_case`
 
 ```json
 {
   "name": "search_case",
-  "description": "Search across all documents in the active case using semantic and keyword search. Returns results with full source citations (document, page, paragraph, line).",
+  "description": "Search across all documents in the active case using semantic and keyword search. Returns results with FULL provenance: source document filename, file path, page, paragraph, line numbers, character offsets, extraction method, timestamps. Every result is traceable to its exact source location.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -4373,7 +4102,7 @@ The MCP tool returns results in this structure:
 }
 ```
 
-**Full Response Example:**
+**Success Response:**
 ```json
 {
   "content": [{
@@ -4385,7 +4114,7 @@ The MCP tool returns results in this structure:
 
 ---
 
-### 2.12 `find_entity`
+### 2.13 `find_entity`
 
 ```json
 {
@@ -4417,7 +4146,90 @@ The MCP tool returns results in this structure:
 
 ---
 
-### 2.13 `get_status`
+### 2.14 `reindex_document`
+
+```json
+{
+  "name": "reindex_document",
+  "description": "Rebuild all embeddings, chunks, and search indexes for a single document. Deletes all existing chunks and embeddings for the document, re-extracts text from the original file, re-chunks into 2000-character segments, re-embeds with all active models, and rebuilds the BM25 index. Use this when: (1) a document's source file has been updated on disk, (2) you upgraded to Pro tier and want the document embedded with all 7 models, (3) embeddings seem stale or corrupt, (4) OCR results need refreshing. The original file path stored in provenance is used to re-read the source file.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "document_name": {
+        "type": "string",
+        "description": "Document name or ID to reindex"
+      },
+      "force": {
+        "type": "boolean",
+        "default": false,
+        "description": "If true, reindex even if the source file SHA256 has not changed. Default: only reindex if the file has changed."
+      },
+      "reparse": {
+        "type": "boolean",
+        "default": true,
+        "description": "If true (default), re-extract text from the source file and re-chunk. If false, keep existing chunks but only rebuild embeddings and indexes (faster, useful after tier upgrade)."
+      }
+    },
+    "required": ["document_name"]
+  }
+}
+```
+
+---
+
+### 2.15 `reindex_case`
+
+```json
+{
+  "name": "reindex_case",
+  "description": "Rebuild all embeddings, chunks, and search indexes for every document in the active case. This is a full rebuild -- it deletes ALL existing chunks and embeddings, re-reads every source file, re-chunks, re-embeds with all active models, and rebuilds the entire BM25 index. Use this when: (1) upgrading from Free to Pro tier (re-embed everything with 7 models instead of 4), (2) after a CaseTrack update that changes chunking or embedding logic, (3) the case index seems corrupted or stale, (4) you want a clean rebuild. WARNING: This can be slow for large cases (hundreds of documents).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "confirm": {
+        "type": "boolean",
+        "default": false,
+        "description": "Must be true to confirm. This deletes and rebuilds ALL embeddings in the case."
+      },
+      "reparse": {
+        "type": "boolean",
+        "default": true,
+        "description": "If true (default), re-extract text from source files and re-chunk everything. If false, keep existing chunks but only rebuild embeddings and indexes (faster, useful after tier upgrade)."
+      },
+      "skip_unchanged": {
+        "type": "boolean",
+        "default": false,
+        "description": "If true, skip documents whose source files have not changed (SHA256 match) and whose embeddings are complete for the current tier. Default: false (rebuild everything)."
+      }
+    },
+    "required": ["confirm"]
+  }
+}
+```
+
+---
+
+### 2.16 `get_index_status`
+
+```json
+{
+  "name": "get_index_status",
+  "description": "Show the embedding and index health status for all documents in the active case. Reports which documents have complete embeddings for the current tier, which need reindexing (source file changed, missing embedder coverage, stale embeddings), and overall case index health. Use this to diagnose issues or decide whether to run reindex_document or reindex_case.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "document_filter": {
+        "type": "string",
+        "description": "Optional: check a specific document instead of all"
+      }
+    }
+  }
+}
+```
+
+---
+
+### 2.17 `get_status`
 
 ```json
 {
@@ -4430,17 +4242,9 @@ The MCP tool returns results in this structure:
 }
 ```
 
-**Response:**
-```json
-{
-  "content": [{
-    "type": "text",
-    "text": "CaseTrack v1.0.0\n\nLicense: Pro\nActive Case: Smith v. Jones Corp\n\nModels Loaded:\n  E1-Legal (bge-small-en-v1.5): Ready\n  E6-Legal (SPLADE): Ready\n  E7 (MiniLM-L6): Ready\n  E8-Legal (Citation): Ready\n  E11-Legal (Entity): Ready\n  E12 (ColBERT): Ready\n  E13 (BM25): Ready (algorithmic)\n\nStorage: ~/Documents/CaseTrack/\n  Models: 370 MB\n  Cases: 2 (52 MB total)\n  Total: 422 MB\n\nSystem:\n  RAM: 1.4 GB used / 16 GB available\n  OS: macOS 14.2 (Apple M2)\n  Memory Mode: Full"
-  }]
-}
-```
+---
 
-### 2.14 `get_chunk`
+### 2.18 `get_chunk`
 
 ```json
 {
@@ -4471,7 +4275,7 @@ The MCP tool returns results in this structure:
 
 ---
 
-### 2.15 `get_document_chunks`
+### 2.19 `get_document_chunks`
 
 ```json
 {
@@ -4494,19 +4298,9 @@ The MCP tool returns results in this structure:
 }
 ```
 
-**Response:**
-```json
-{
-  "content": [{
-    "type": "text",
-    "text": "Document: Contract.pdf (28 pages, 156 chunks)\nFile Path: /Users/sarah/Cases/Smith/Contract.pdf\n\nChunk 0: p.1, paras 0-3, ll.1-12, chars 0-1987\n  \"AGREEMENT made this 15th day of January 2024 between...\"\n\nChunk 1: p.1, paras 3-6, ll.10-22, chars 1788-3790\n  \"...hereinafter referred to as 'Contractor'. WHEREAS the parties...\"\n  [200-char overlap from chunk 0]\n\nChunk 2: p.2, paras 0-2, ll.1-8, chars 0-1834\n  \"Section 2. SCOPE OF WORK. The Contractor shall provide...\"\n\n... (156 total chunks)"
-  }]
-}
-```
-
 ---
 
-### 2.16 `get_source_context`
+### 2.20 `get_source_context`
 
 ```json
 {
@@ -4532,206 +4326,616 @@ The MCP tool returns results in this structure:
 }
 ```
 
+---
+
+### 2.21 `watch_folder`
+
+```json
+{
+  "name": "watch_folder",
+  "description": "Start watching a folder for file changes. When files are added, modified, or deleted in the watched folder (or any subfolder), CaseTrack automatically syncs the changes into the active case -- new files are ingested, modified files are reindexed (old chunks/embeddings deleted, new ones created), and optionally deleted files are removed from the case. Uses OS-level file notifications (inotify on Linux, FSEvents on macOS, ReadDirectoryChangesW on Windows) for instant detection. Also supports scheduled sync as a safety net (daily, hourly, or custom interval). Watch persists across server restarts.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "folder_path": {
+        "type": "string",
+        "description": "Absolute path to the folder to watch. All subfolders are included."
+      },
+      "schedule": {
+        "type": "string",
+        "enum": ["on_change", "hourly", "daily", "every_6h", "every_12h", "manual"],
+        "default": "on_change",
+        "description": "When to sync: 'on_change' = real-time via OS file notifications (recommended), 'hourly'/'daily'/'every_6h'/'every_12h' = scheduled interval (runs in addition to on_change), 'manual' = only sync when you call sync_folder."
+      },
+      "auto_remove_deleted": {
+        "type": "boolean",
+        "default": false,
+        "description": "If true, documents whose source files are deleted from disk will be automatically removed from the case (chunks + embeddings deleted). Default: false (only add/update, never auto-remove)."
+      },
+      "file_extensions": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Optional filter: only watch files with these extensions (e.g., [\"pdf\", \"docx\"]). Default: all supported formats."
+      }
+    },
+    "required": ["folder_path"]
+  }
+}
+```
+
+---
+
+### 2.22 `unwatch_folder`
+
+```json
+{
+  "name": "unwatch_folder",
+  "description": "Stop watching a folder. Removes the watch but does NOT delete any documents already ingested from that folder. The case data remains intact -- only the automatic sync is stopped.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "folder_path": {
+        "type": "string",
+        "description": "Path to the folder to stop watching (or watch ID)"
+      }
+    },
+    "required": ["folder_path"]
+  }
+}
+```
+
+---
+
+### 2.23 `list_watches`
+
+```json
+{
+  "name": "list_watches",
+  "description": "List all active folder watches across all cases. Shows the watched folder, which case it syncs to, the schedule, last sync time, and current status.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "case_filter": {
+        "type": "string",
+        "description": "Optional: only show watches for a specific case name or ID"
+      }
+    }
+  }
+}
+```
+
+---
+
+### 2.24 `set_sync_schedule`
+
+```json
+{
+  "name": "set_sync_schedule",
+  "description": "Change the sync schedule for an existing folder watch. Controls how often CaseTrack checks for file changes and reindexes.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "folder_path": {
+        "type": "string",
+        "description": "Path to the watched folder (or watch ID)"
+      },
+      "schedule": {
+        "type": "string",
+        "enum": ["on_change", "hourly", "daily", "every_6h", "every_12h", "manual"],
+        "description": "New schedule: 'on_change' = real-time OS notifications, 'hourly'/'daily' etc = interval-based, 'manual' = only when you call sync_folder"
+      },
+      "auto_remove_deleted": {
+        "type": "boolean",
+        "description": "Optionally update auto-remove behavior"
+      }
+    },
+    "required": ["folder_path", "schedule"]
+  }
+}
+```
+
+---
+
+## 2b. Context Graph Tool Specifications
+
+The context graph tools give the AI structured navigation of the case beyond flat search. They are built on the entity, citation, and document graph data extracted during ingestion (see PRD 04 Section 8).
+
+### 2.25 `get_case_map`
+
+```json
+{
+  "name": "get_case_map",
+  "description": "Get a high-level briefing on the active case. Returns: all identified parties and their roles, key dates and events, key legal issues, document breakdown by category, most-cited legal authorities, most-mentioned entities, and case statistics. This is the FIRST tool the AI should call when starting work on a case -- it provides the structural overview needed to plan search strategy for 1000+ documents.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  }
+}
+```
+
 **Response:**
 ```json
 {
   "content": [{
     "type": "text",
-    "text": "Context for chunk abc-123 (Contract.pdf, p.12)\n\n--- BEFORE (chunk 46, p.12, paras 6-7) ---\n\"The parties agree that in the event of any dispute arising under this Agreement, they shall first attempt to resolve the dispute through good faith negotiation...\"\n\n--- TARGET (chunk 47, p.12, paras 8-9) ---\n\"Either party may terminate this Agreement upon thirty (30) days written notice to the other party. In the event of material breach, the non-breaching party may terminate immediately upon written notice specifying the breach...\"\n\n--- AFTER (chunk 48, p.13, paras 0-1) ---\n\"Upon termination, all confidential information shall be returned or destroyed within fourteen (14) days. The obligations under Sections 5, 7, and 9 shall survive termination...\""
+    "text": "CASE MAP: Smith v. Jones Corp (Contract)\n\n  PARTIES:\n    Plaintiff:  Smith Corp (CEO: John Smith)\n    Defendant:  Jones LLC (CEO: Mary Jones)\n    Judge:      Hon. Robert Anderson, U.S. District Court, S.D.N.Y.\n    Attorneys:  Sarah Chen (Plaintiff), Michael Brown (Defendant)\n\n  KEY DATES:\n    2022-01-15  Contract signed (Contract.pdf, p.1)\n    2023-06-01  Alleged breach (Complaint.pdf, p.5)\n    2023-07-01  Complaint filed (Complaint.pdf, p.1)\n    2023-09-15  Answer filed (Answer.pdf, p.1)\n    2024-01-10  Discovery deadline (Scheduling_Order.pdf, p.2)\n    2024-06-15  Trial date (Scheduling_Order.pdf, p.3)\n\n  KEY LEGAL ISSUES:\n    1. Breach of non-compete clause (§4.2) -- 23 documents, 187 chunks\n    2. Damages calculation -- 18 documents, 145 chunks\n    3. Injunctive relief eligibility -- 8 documents, 42 chunks\n    4. Attorney's fees -- 5 documents, 28 chunks\n\n  DOCUMENTS (47 total, 2,341 pages, 12,450 chunks):\n    Pleadings:       5 docs (Complaint, Answer, Motions...)\n    Discovery:      20 docs (Interrogatories, Depositions...)\n    Exhibits:       15 docs (Contracts, Emails, Invoices...)\n    Correspondence:  7 docs (Settlement letters, Notices...)\n\n  TOP AUTHORITIES (most cited):\n    1. 42 U.S.C. § 1983 -- 47 citations across 15 documents\n    2. Fed. R. Civ. P. 12(b)(6) -- 23 citations across 8 documents\n    3. Smith v. Board of Regents, 429 U.S. 438 -- 12 citations across 6 documents\n\n  TOP ENTITIES:\n    Smith Corp -- 892 mentions in 45 documents\n    Jones LLC -- 756 mentions in 42 documents\n    John Smith -- 234 mentions in 28 documents\n    Non-compete agreement -- 187 mentions in 23 documents\n\n  EMBEDDINGS: 7/7 embedders (Pro tier), all 12,450 chunks fully embedded"
   }]
 }
 ```
 
 ---
 
-## 3. MCP Server Lifecycle
+### 2.26 `get_case_timeline`
 
-### 3.1 Server Initialization
-
-```rust
-use rmcp::{ServerBuilder, ServerHandler, tool};
-
-#[derive(Clone)]
-pub struct CaseTrackServer {
-    state: Arc<RwLock<ServerState>>,
-}
-
-pub struct ServerState {
-    pub registry: CaseRegistry,
-    pub embedding_engine: EmbeddingEngine,
-    pub search_engine: SearchEngine,
-    pub active_case: Option<CaseHandle>,
-    pub tier: LicenseTier,
-    pub config: Config,
-}
-
-impl CaseTrackServer {
-    pub async fn start(config: Config) -> Result<()> {
-        // Initialize state
-        let state = initialize(&config).await?;
-
-        // Check for updates (non-blocking)
-        check_for_updates(env!("CARGO_PKG_VERSION")).await;
-
-        // Build MCP server
-        let server = ServerBuilder::new("casetrack", env!("CARGO_PKG_VERSION"))
-            .with_capabilities(ServerCapabilities {
-                tools: Some(json!({ "listChanged": false })),
-                ..Default::default()
-            })
-            .build(CaseTrackServer {
-                state: Arc::new(RwLock::new(state)),
-            });
-
-        // Run on stdio transport
-        let transport = rmcp::StdioTransport::new();
-        server.run(transport).await?;
-
-        Ok(())
+```json
+{
+  "name": "get_case_timeline",
+  "description": "Get a chronological timeline of key dates and events extracted from documents in the active case. Each event includes the date, description, and source document/chunk provenance. Use this to understand the narrative sequence of the case.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "start_date": {
+        "type": "string",
+        "description": "Optional: filter events from this date (YYYY-MM-DD)"
+      },
+      "end_date": {
+        "type": "string",
+        "description": "Optional: filter events until this date (YYYY-MM-DD)"
+      }
     }
-}
-```
-
-### 3.2 Tool Registration
-
-```rust
-#[rmcp::tool]
-impl CaseTrackServer {
-    #[tool(description = "Create a new legal case")]
-    async fn create_case(
-        &self,
-        name: String,
-        case_number: Option<String>,
-        case_type: Option<String>,
-    ) -> Result<ToolResult> {
-        let mut state = self.state.write().await;
-
-        // Check license limits
-        check_case_limit(&state.registry, state.tier)?;
-
-        let params = CreateCaseParams {
-            name,
-            case_number,
-            case_type: case_type.map(|t| CaseType::from_str(&t)),
-        };
-
-        let case = state.registry.create_case(params)?;
-        let handle = state.registry.switch_case(case.id)?;
-        state.active_case = Some(handle);
-
-        Ok(ToolResult::text(format!(
-            "Created case \"{}\" (ID: {}).\nType: {:?}\nThis is now your active case.\n\nNext: Ingest documents with ingest_document.",
-            case.name, case.id, case.case_type
-        )))
-    }
-
-    #[tool(description = "Search across all documents in the active case")]
-    async fn search_case(
-        &self,
-        query: String,
-        top_k: Option<u32>,
-        document_filter: Option<String>,
-    ) -> Result<ToolResult> {
-        let state = self.state.read().await;
-
-        let case = state.active_case.as_ref()
-            .ok_or(CaseTrackError::NoCaseActive)?;
-
-        let doc_filter = document_filter
-            .map(|f| self.resolve_document_filter(case, &f))
-            .transpose()?;
-
-        let results = state.search_engine.search(
-            case,
-            &query,
-            top_k.unwrap_or(10) as usize,
-            doc_filter,
-        )?;
-
-        Ok(ToolResult::text(self.format_search_results(&query, case, &results)))
-    }
-
-    // ... other tools follow the same pattern
-}
-```
-
-### 3.3 Error Handling in MCP
-
-All errors returned to Claude follow a consistent format:
-
-```rust
-impl From<CaseTrackError> for ToolError {
-    fn from(err: CaseTrackError) -> Self {
-        match &err {
-            CaseTrackError::NoCaseActive => ToolError {
-                code: ErrorCode::InvalidRequest,
-                message: "No active case. Create or switch to a case first:\n  \
-                          - create_case: Create a new case\n  \
-                          - switch_case: Switch to an existing case\n  \
-                          - list_cases: See all cases".to_string(),
-            },
-            CaseTrackError::CaseNotFound(id) => ToolError {
-                code: ErrorCode::InvalidRequest,
-                message: format!("Case not found: {}. Use list_cases to see available cases.", id),
-            },
-            CaseTrackError::FreeTierLimit { resource, current, max } => ToolError {
-                code: ErrorCode::InvalidRequest,
-                message: format!(
-                    "Free tier allows {} {} (you have {}). \
-                     Upgrade to Pro: https://casetrack.legal/upgrade",
-                    max, resource, current
-                ),
-            },
-            CaseTrackError::FileNotFound(path) => ToolError {
-                code: ErrorCode::InvalidRequest,
-                message: format!(
-                    "File not found: {}\n\nCheck that the path is correct and the file exists.",
-                    path.display()
-                ),
-            },
-            // All other errors
-            other => ToolError {
-                code: ErrorCode::InternalError,
-                message: format!("Internal error: {}. Please report this at https://github.com/casetrack-legal/casetrack/issues", other),
-            },
-        }
-    }
+  }
 }
 ```
 
 ---
 
+### 2.27 `get_case_statistics`
+
+```json
+{
+  "name": "get_case_statistics",
+  "description": "Get detailed statistics about the active case: document counts by type, page/chunk totals, entity and citation counts, embedder coverage, storage usage. Useful for understanding case scope and data quality.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  }
+}
+```
+
+---
+
+### 2.28 `list_entities`
+
+```json
+{
+  "name": "list_entities",
+  "description": "List all entities extracted from documents in the active case, grouped by type. Shows name, type, mention count, and number of documents mentioning each entity. Entities include: persons, organizations, courts, statutes, case citations, dates, monetary amounts, and legal concepts.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "entity_type": {
+        "type": "string",
+        "enum": ["person", "organization", "court", "statute", "case_citation", "date", "monetary_amount", "legal_concept", "all"],
+        "default": "all",
+        "description": "Filter by entity type"
+      },
+      "sort_by": {
+        "type": "string",
+        "enum": ["mentions", "documents", "name"],
+        "default": "mentions",
+        "description": "Sort order"
+      },
+      "top_k": {
+        "type": "integer",
+        "default": 50,
+        "maximum": 500,
+        "description": "Maximum entities to return"
+      }
+    }
+  }
+}
+```
+
+---
+
+### 2.29 `get_entity_mentions`
+
+```json
+{
+  "name": "get_entity_mentions",
+  "description": "Get all chunks that mention a specific entity, with context snippets showing how the entity is referenced. Uses the entity index built during ingestion. Supports fuzzy matching on entity name.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "entity_name": {
+        "type": "string",
+        "description": "Name of the entity to find (e.g., 'John Smith', '42 USC 1983', 'breach of contract')"
+      },
+      "entity_type": {
+        "type": "string",
+        "enum": ["person", "organization", "court", "statute", "case_citation", "date", "monetary_amount", "legal_concept", "any"],
+        "default": "any"
+      },
+      "top_k": {
+        "type": "integer",
+        "default": 20,
+        "maximum": 100
+      }
+    },
+    "required": ["entity_name"]
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "content": [{
+    "type": "text",
+    "text": "Mentions of \"John Smith\" (person) -- 234 total, showing top 20:\n\n  1. Complaint.pdf, p.2, para.3\n     \"Plaintiff JOHN SMITH, CEO of Smith Corp, brings this action...\"\n\n  2. Deposition_Smith.pdf, p.15, para.8\n     \"Q: Mr. Smith, when did you first learn of the alleged breach?\"\n     \"A: I received a call from our VP on March 10, 2023...\"\n\n  3. Contract.pdf, p.12, para.1 (signature block)\n     \"John Smith, Chief Executive Officer, Smith Corp\"\n\n  ... 17 more mentions"
+  }]
+}
+```
+
+---
+
+### 2.30 `search_entity_relationships`
+
+```json
+{
+  "name": "search_entity_relationships",
+  "description": "Find chunks where two or more entities are mentioned together. Use this to trace relationships (who interacted with whom, what statute applies to which party). Pro tier only.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "entities": {
+        "type": "array",
+        "items": { "type": "string" },
+        "minItems": 2,
+        "maxItems": 5,
+        "description": "Entity names to find together (e.g., ['Smith Corp', 'Jones LLC'])"
+      },
+      "top_k": {
+        "type": "integer",
+        "default": 20,
+        "maximum": 100
+      }
+    },
+    "required": ["entities"]
+  }
+}
+```
+
+---
+
+### 2.31 `list_authorities`
+
+```json
+{
+  "name": "list_authorities",
+  "description": "List all legal authorities (statutes, case law, rules, regulations) cited in the active case. Shows the authority, type, citation count, and number of citing documents. Use this to understand which legal authorities matter most in the case.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "authority_type": {
+        "type": "string",
+        "enum": ["federal_statute", "state_statute", "federal_rule", "state_rule", "case_law", "regulation", "all"],
+        "default": "all"
+      },
+      "sort_by": {
+        "type": "string",
+        "enum": ["citations", "documents", "name"],
+        "default": "citations"
+      },
+      "top_k": {
+        "type": "integer",
+        "default": 50,
+        "maximum": 200
+      }
+    }
+  }
+}
+```
+
+---
+
+### 2.32 `get_authority_citations`
+
+```json
+{
+  "name": "get_authority_citations",
+  "description": "Get all chunks that cite a specific legal authority. Shows the context of each citation and the treatment (cited, followed, distinguished, overruled). Use this to understand how an authority is used throughout the case.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "authority": {
+        "type": "string",
+        "description": "The legal authority to look up (e.g., '42 USC 1983', 'Miranda v. Arizona')"
+      },
+      "treatment_filter": {
+        "type": "string",
+        "enum": ["cited", "followed", "distinguished", "overruled", "discussed", "all"],
+        "default": "all"
+      },
+      "top_k": {
+        "type": "integer",
+        "default": 20,
+        "maximum": 100
+      }
+    },
+    "required": ["authority"]
+  }
+}
+```
+
+---
+
+### 2.33 `get_document_structure`
+
+```json
+{
+  "name": "get_document_structure",
+  "description": "Get the structural outline of a document: headings, sections, numbered clauses, and their page/chunk locations. This gives the AI a table-of-contents view for navigation. Works best with structured documents (contracts, briefs, statutes).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "document_name": {
+        "type": "string",
+        "description": "Document name or ID"
+      }
+    },
+    "required": ["document_name"]
+  }
+}
+```
+
+---
+
+### 2.34 `browse_pages`
+
+```json
+{
+  "name": "browse_pages",
+  "description": "Get all chunks from a specific page range within a document. Use this to read through a section of a document sequentially. Returns chunks in order with full provenance.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "document_name": {
+        "type": "string",
+        "description": "Document name or ID"
+      },
+      "start_page": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "First page to read"
+      },
+      "end_page": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Last page to read"
+      }
+    },
+    "required": ["document_name", "start_page", "end_page"]
+  }
+}
+```
+
+---
+
+### 2.35 `find_related_documents`
+
+```json
+{
+  "name": "find_related_documents",
+  "description": "Find documents related to a given document. Relationships detected: shared entities, shared legal authorities, semantic similarity (E1 cosine), response chains (complaint->answer->reply), and amendment chains. Returns related documents ranked by relationship strength.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "document_name": {
+        "type": "string",
+        "description": "Document name or ID to find relationships for"
+      },
+      "relationship_type": {
+        "type": "string",
+        "enum": ["all", "shared_entities", "shared_authorities", "semantic_similar", "response_chain", "amendment_chain"],
+        "default": "all"
+      },
+      "top_k": {
+        "type": "integer",
+        "default": 10,
+        "maximum": 50
+      }
+    },
+    "required": ["document_name"]
+  }
+}
+```
+
+---
+
+### 2.36 `list_documents_by_type`
+
+```json
+{
+  "name": "list_documents_by_type",
+  "description": "List all documents in the active case filtered by document type (pleading, discovery, exhibit, etc.). Includes page count, chunk count, and ingestion date.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "document_type": {
+        "type": "string",
+        "enum": ["pleading", "motion", "brief", "contract", "exhibit", "correspondence", "deposition", "discovery", "statute", "case_law", "other"],
+        "description": "Type to filter by"
+      }
+    },
+    "required": ["document_type"]
+  }
+}
+```
+
+---
+
+### 2.37 `traverse_chunks`
+
+```json
+{
+  "name": "traverse_chunks",
+  "description": "Navigate forward or backward through chunks in a document from a starting point. Use this to read through a document sequentially from any position. Returns N chunks in document order with full provenance.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "start_chunk_id": {
+        "type": "string",
+        "description": "UUID of the starting chunk"
+      },
+      "direction": {
+        "type": "string",
+        "enum": ["forward", "backward"],
+        "default": "forward",
+        "description": "Direction to traverse"
+      },
+      "count": {
+        "type": "integer",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 20,
+        "description": "Number of chunks to return"
+      }
+    },
+    "required": ["start_chunk_id"]
+  }
+}
+```
+
+---
+
+### 2.38 `search_similar_chunks`
+
+```json
+{
+  "name": "search_similar_chunks",
+  "description": "Find chunks across all documents that are semantically similar to a given chunk. Uses E1 cosine similarity. Use this to find related passages in other documents (e.g., 'find other places in the case that discuss the same issue as this paragraph').",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "chunk_id": {
+        "type": "string",
+        "description": "UUID of the chunk to find similar content for"
+      },
+      "exclude_same_document": {
+        "type": "boolean",
+        "default": true,
+        "description": "Exclude results from the same document (default: true, for cross-document discovery)"
+      },
+      "min_similarity": {
+        "type": "number",
+        "default": 0.6,
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "description": "Minimum cosine similarity threshold"
+      },
+      "top_k": {
+        "type": "integer",
+        "default": 10,
+        "maximum": 50
+      }
+    },
+    "required": ["chunk_id"]
+  }
+}
+```
+
+---
+
+### 2.39 `compare_documents`
+
+```json
+{
+  "name": "compare_documents",
+  "description": "Compare what two documents say about a specific topic. Searches both documents independently, then returns side-by-side results showing how each document addresses the topic. Pro tier only. Use this for: contract vs. complaint comparison, deposition A vs. deposition B, any 'what does X say vs. what does Y say' question.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "document_a": {
+        "type": "string",
+        "description": "First document name or ID"
+      },
+      "document_b": {
+        "type": "string",
+        "description": "Second document name or ID"
+      },
+      "topic": {
+        "type": "string",
+        "description": "Topic to compare (e.g., 'termination provisions', 'damages', 'breach of duty')"
+      },
+      "top_k_per_document": {
+        "type": "integer",
+        "default": 5,
+        "maximum": 20
+      }
+    },
+    "required": ["document_a", "document_b", "topic"]
+  }
+}
+```
+
+---
+
+### 2.40 `find_document_clusters`
+
+```json
+{
+  "name": "find_document_clusters",
+  "description": "Group all documents in the case by theme or topic using semantic clustering. Returns clusters of related documents with a label describing what they share. Pro tier only. Use this to understand the structure of a large case (100+ documents) at a glance.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "strategy": {
+        "type": "string",
+        "enum": ["topical", "entity", "authority", "document_type"],
+        "default": "topical",
+        "description": "Clustering strategy: 'topical' = semantic similarity, 'entity' = shared parties, 'authority' = shared citations, 'document_type' = by type"
+      },
+      "max_clusters": {
+        "type": "integer",
+        "default": 10,
+        "maximum": 20
+      }
+    }
+  }
+}
+```
+
+---
+
+## 3. Background Watch System
+
+The folder watch system runs as background tasks inside the MCP server process using the `notify` crate for cross-platform OS file notifications. Key data structures:
+
+```rust
+pub struct WatchManager {
+    watches: Arc<RwLock<Vec<ActiveWatch>>>,
+    fs_watcher: notify::RecommendedWatcher,
+    event_tx: mpsc::Sender<FsEvent>,
+}
+
+struct ActiveWatch {
+    config: FolderWatch,
+    case_handle: Arc<CaseHandle>,
+}
+
+enum FsEventKind { Created, Modified, Deleted }
+```
+
+Behavior: On startup, `WatchManager::init` restores saved watches from `watches.json`, starts OS watchers, and spawns two background tasks -- an event processor (with 2-second debounce) and a scheduled sync runner (checks every 60 seconds). Events are batched: Created triggers ingest, Modified triggers reindex, Deleted triggers removal (if `auto_remove_deleted` is enabled).
+
+For full implementation details (server initialization, tool registration, error handling), see [PRD 10: Technical Build Guide](PRD_10_TECHNICAL_BUILD.md).
+
+---
+
 ## 4. Active Case State
 
-The server maintains an "active case" that all document and search operations target:
-
-```
-STATE MANAGEMENT
-=================================================================================
-
-- Server starts with NO active case
-- create_case automatically switches to the new case
-- switch_case explicitly changes the active case
-- Tools that require a case (ingest, search, etc.) return clear errors if none active
-- Active case persists for the duration of the MCP session (conversation)
-- No persistence of active case across sessions (fresh start each time)
-```
-
-This design means Claude naturally manages case context through conversation:
-
-```
-User: "Create a case called Smith v. Jones"
-Claude: [calls create_case] -> case is now active
-
-User: "Ingest this PDF"
-Claude: [calls ingest_document] -> goes into Smith v. Jones (active)
-
-User: "Switch to the Doe case"
-Claude: [calls switch_case] -> Doe is now active
-
-User: "Search for damages"
-Claude: [calls search_case] -> searches Doe case (active)
-```
+The server maintains an "active case" that all document and search operations target. The server starts with no active case; `create_case` automatically switches to the new case, and `switch_case` explicitly changes it. Tools requiring a case return a `NoCaseActive` error if none is set. The active case persists for the MCP session duration but not across sessions.
 
 ---
 
@@ -4747,12 +4951,9 @@ Claude: [calls search_case] -> searches Doe case (active)
 ---
 
 > **LANGUAGE: RUST** -- This entire project is built in Rust. Every crate, every
-> module, every line of product code is Rust. Use `cargo` for building, testing,
-> and releasing. All dependencies are Rust crates from crates.io. The final
-> deliverable is a single statically-linked Rust binary per platform. No runtime
-> dependencies (no Node.js, no Python, no JVM, no .NET). The only non-Rust code
-> in the repository is `scripts/convert_models.py`, a one-time build tool for
-> converting PyTorch models to ONNX format (not shipped to users).
+> module, every line of product code is Rust. The final deliverable is a single
+> statically-linked Rust binary per platform. No runtime dependencies. The only
+> non-Rust code is `scripts/convert_models.py` (one-time build tool, not shipped).
 
 ---
 
@@ -4761,23 +4962,12 @@ Claude: [calls search_case] -> searches Doe case (active)
 ### 1.1 Create Fresh Project
 
 ```bash
-# Create new project directory
 mkdir casetrack && cd casetrack
-
-# Initialize workspace
 cargo init --name casetrack
 mkdir -p crates/casetrack-core
-
-# Initialize core library crate
-cd crates/casetrack-core
-cargo init --lib --name casetrack-core
-cd ../..
-
-# Initialize git
+cd crates/casetrack-core && cargo init --lib --name casetrack-core && cd ../..
 git init
-echo "target/" > .gitignore
-echo "*.onnx" >> .gitignore
-echo "models/" >> .gitignore
+echo -e "target/\n*.onnx\nmodels/" > .gitignore
 ```
 
 ### 1.2 Workspace Structure
@@ -4786,64 +4976,34 @@ echo "models/" >> .gitignore
 casetrack/
 |-- Cargo.toml                   # Workspace root
 |-- Cargo.lock
-|-- .github/
-|   +-- workflows/
-|       |-- ci.yml               # CI pipeline
-|       +-- release.yml          # Release builds
+|-- .github/workflows/
+|   |-- ci.yml
+|   +-- release.yml
 |-- scripts/
-|   |-- convert_models.py        # PyTorch -> ONNX conversion
-|   |-- build_mcpb.sh           # Build MCPB bundle
-|   +-- install.sh              # macOS/Linux installer
+|   |-- convert_models.py
+|   |-- build_mcpb.sh
+|   +-- install.sh
 |-- crates/
 |   |-- casetrack/               # Binary crate (MCP server entry point)
 |   |   |-- Cargo.toml
 |   |   +-- src/
-|   |       |-- main.rs          # Entry point, CLI parsing, server start
-|   |       |-- cli.rs           # CLI argument definitions (clap)
-|   |       |-- server.rs        # MCP server setup + tool registration
-|   |       +-- format.rs        # Output formatting for MCP responses
-|   |
+|   |       |-- main.rs
+|   |       |-- cli.rs
+|   |       |-- server.rs
+|   |       +-- format.rs
 |   +-- casetrack-core/          # Library crate (all business logic)
 |       |-- Cargo.toml
 |       +-- src/
-|           |-- lib.rs           # Public API re-exports
-|           |-- error.rs         # Error types
-|           |-- config.rs        # Configuration
-|           |-- case/
-|           |   |-- mod.rs
-|           |   |-- registry.rs  # CaseRegistry (manages all cases)
-|           |   |-- handle.rs    # CaseHandle (open case database)
-|           |   +-- model.rs     # Case, CaseType, CaseStatus structs
-|           |-- document/
-|           |   |-- mod.rs
-|           |   |-- pdf.rs       # PDF text extraction
-|           |   |-- docx.rs      # DOCX parsing
-|           |   |-- ocr.rs       # Tesseract OCR
-|           |   |-- chunker.rs   # Legal-aware text chunking
-|           |   +-- model.rs     # Page, Paragraph, Chunk structs
-|           |-- embedding/
-|           |   |-- mod.rs
-|           |   |-- engine.rs    # EmbeddingEngine (ONNX inference)
-|           |   |-- models.rs    # Model specs, download config
-|           |   |-- download.rs  # Model download from Hugging Face
-|           |   +-- types.rs     # ChunkEmbeddings, SparseVec, TokenEmbeddings
-|           |-- search/
-|           |   |-- mod.rs
-|           |   |-- engine.rs    # SearchEngine (4-stage pipeline)
-|           |   |-- bm25.rs      # BM25 inverted index
-|           |   |-- ranking.rs   # RRF, cosine similarity, ColBERT MaxSim
-|           |   +-- result.rs    # SearchResult struct
-|           |-- provenance/
-|           |   |-- mod.rs
-|           |   +-- citation.rs  # Provenance struct, cite() formatting
-|           |-- storage/
-|           |   |-- mod.rs
-|           |   |-- rocks.rs     # RocksDB configuration and helpers
-|           |   +-- schema.rs    # Column families, key formats, migration
-|           +-- license/
-|               |-- mod.rs
-|               +-- validator.rs # License key validation (ed25519)
-|
+|           |-- lib.rs
+|           |-- error.rs
+|           |-- config.rs
+|           |-- case/            # registry, handle, model
+|           |-- document/        # pdf, docx, ocr, chunker, model
+|           |-- embedding/       # engine, models, download, types
+|           |-- search/          # engine, bm25, ranking, result
+|           |-- provenance/      # citation formatting
+|           |-- storage/         # rocks, schema
+|           +-- license/         # validator (ed25519)
 |-- tests/
 |   |-- integration/
 |   |   |-- test_case_lifecycle.rs
@@ -4851,22 +5011,17 @@ casetrack/
 |   |   |-- test_search.rs
 |   |   +-- test_mcp_tools.rs
 |   +-- fixtures/
-|       |-- sample.pdf           # 3-page test PDF
-|       |-- sample.docx          # Test Word document
-|       +-- scanned.png          # Test scanned image
-|
-+-- docs/
-    +-- prd/                     # These PRD documents
+|       |-- sample.pdf
+|       |-- sample.docx
+|       +-- scanned.png
++-- docs/prd/
 ```
 
 ### 1.3 Workspace Cargo.toml
 
 ```toml
 [workspace]
-members = [
-    "crates/casetrack",
-    "crates/casetrack-core",
-]
+members = ["crates/casetrack", "crates/casetrack-core"]
 resolver = "2"
 
 [workspace.package]
@@ -4877,81 +5032,41 @@ license = "LicenseRef-Commercial"
 repository = "https://github.com/casetrack-legal/casetrack"
 
 [workspace.dependencies]
-# MCP server
 rmcp = { version = "0.13", features = ["server", "transport-io", "macros"] }
-
-# Async runtime
 tokio = { version = "1.35", features = ["full"] }
-
-# Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 bincode = "1.3"
-
-# Storage
 rocksdb = "0.22"
-
-# ML inference
 ort = { version = "2.0", features = ["download-binaries"] }
-
-# PDF processing
 pdf-extract = "0.7"
 lopdf = "0.32"
-
-# DOCX processing
 docx-rs = "0.4"
-
-# Image processing
 image = "0.25"
-
-# OCR
 tesseract = { version = "0.14", optional = true }
-
-# Model download
 hf-hub = "0.3"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
-
-# Identifiers
 uuid = { version = "1.6", features = ["v4", "serde"] }
-
-# Time
 chrono = { version = "0.4", features = ["serde"] }
-
-# CLI
 clap = { version = "4.4", features = ["derive"] }
-
-# Error handling
 thiserror = "2.0"
 anyhow = "1.0"
-
-# Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-# Cryptography (license validation)
 ed25519-dalek = "2.1"
 base64 = "0.22"
-
-# Byte casting (zero-copy embedding reads)
 bytemuck = { version = "1.14", features = ["derive"] }
-
-# Hashing (duplicate detection)
 sha2 = "0.10"
-
-# System info (memory detection)
 sysinfo = "0.30"
-
-# File walking (batch ingest)
 walkdir = "2.4"
-
-# Semver (update checking)
+notify = "6.1"
 semver = "1.0"
-
-# Directories (platform-specific paths)
 dirs = "5.0"
 ```
 
-### 1.4 Binary Crate Cargo.toml
+### 1.4 Crate Cargo.toml Files
+
+**Binary crate** (`crates/casetrack/Cargo.toml`):
 
 ```toml
 [package]
@@ -4986,7 +5101,7 @@ strip = true
 panic = "abort"
 ```
 
-### 1.5 Core Library Cargo.toml
+**Core library** (`crates/casetrack-core/Cargo.toml`):
 
 ```toml
 [package]
@@ -4995,50 +5110,30 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-# Storage
 rocksdb.workspace = true
-
-# ML
 ort.workspace = true
-
-# Document processing
 pdf-extract.workspace = true
 lopdf.workspace = true
 docx-rs.workspace = true
 image.workspace = true
-
-# OCR (optional)
 tesseract = { workspace = true, optional = true }
-
-# Model download
 hf-hub.workspace = true
 reqwest.workspace = true
-
-# Serialization
 serde.workspace = true
 serde_json.workspace = true
 bincode.workspace = true
-
-# Identifiers + time
 uuid.workspace = true
 chrono.workspace = true
-
-# Error handling
 thiserror.workspace = true
 anyhow.workspace = true
-
-# Logging
 tracing.workspace = true
-
-# Crypto
 ed25519-dalek.workspace = true
 base64.workspace = true
-
-# Utilities
 bytemuck.workspace = true
 sha2.workspace = true
 sysinfo.workspace = true
 walkdir.workspace = true
+notify.workspace = true
 semver.workspace = true
 dirs.workspace = true
 
@@ -5053,7 +5148,6 @@ ocr = ["dep:tesseract"]
 
 ```rust
 // crates/casetrack/src/main.rs
-
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
@@ -5065,37 +5159,24 @@ mod format;
 async fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
 
-    // Handle non-server commands
     match &args.command {
-        Some(cli::Command::SetupClaudeCode) => {
-            return casetrack_core::setup_claude_code(&args.data_dir());
-        }
-        Some(cli::Command::Update) => {
-            return casetrack_core::self_update().await;
-        }
-        Some(cli::Command::Uninstall) => {
-            return casetrack_core::uninstall();
-        }
-        None => {} // Default: run MCP server
+        Some(cli::Command::SetupClaudeCode) => return casetrack_core::setup_claude_code(&args.data_dir()),
+        Some(cli::Command::Update) => return casetrack_core::self_update().await,
+        Some(cli::Command::Uninstall) => return casetrack_core::uninstall(),
+        None => {}
     }
 
-    // Initialize logging (to stderr, since stdout is MCP transport)
     tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("casetrack=info"))
-        )
+        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("casetrack=info")))
         .with_writer(std::io::stderr)
         .init();
 
     tracing::info!("CaseTrack v{} starting...", env!("CARGO_PKG_VERSION"));
 
-    // Start MCP server
     server::CaseTrackServer::start(casetrack_core::Config {
         data_dir: args.data_dir(),
-        license_key: args.license_key(),
-    })
-    .await
+        license_key: args.license.clone(),
+    }).await
 }
 ```
 
@@ -5105,24 +5186,18 @@ async fn main() -> anyhow::Result<()> {
 
 ```rust
 // crates/casetrack/src/cli.rs
-
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(name = "casetrack")]
-#[command(about = "Legal document analysis MCP server for Claude")]
-#[command(version)]
+#[command(name = "casetrack", about = "Legal document analysis MCP server for Claude", version)]
 pub struct Args {
-    /// Data directory (models, cases, config)
     #[arg(long, env = "CASETRACK_HOME")]
     pub data_dir: Option<PathBuf>,
 
-    /// License key
     #[arg(long, env = "CASETRACK_LICENSE")]
     pub license: Option<String>,
 
-    /// Memory mode override
     #[arg(long, value_enum)]
     pub memory_mode: Option<MemoryMode>,
 
@@ -5132,37 +5207,16 @@ pub struct Args {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Configure Claude Code to use CaseTrack
     SetupClaudeCode,
-
-    /// Update CaseTrack to the latest version
     Update,
-
-    /// Uninstall CaseTrack
     Uninstall,
 }
 
 #[derive(Clone, Copy, clap::ValueEnum)]
-pub enum MemoryMode {
-    Full,
-    Standard,
-    Constrained,
-}
-
-impl Args {
-    pub fn data_dir(&self) -> PathBuf {
-        self.data_dir.clone().unwrap_or_else(|| {
-            dirs::document_dir()
-                .unwrap_or_else(|| dirs::home_dir().unwrap().join("Documents"))
-                .join("CaseTrack")
-        })
-    }
-
-    pub fn license_key(&self) -> Option<String> {
-        self.license.clone()
-    }
-}
+pub enum MemoryMode { Full, Standard, Constrained }
 ```
+
+`Args::data_dir()` defaults to `~/Documents/CaseTrack/` via `dirs::document_dir()`.
 
 ---
 
@@ -5172,7 +5226,6 @@ impl Args {
 
 ```rust
 // crates/casetrack-core/src/error.rs
-
 use thiserror::Error;
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -5288,64 +5341,38 @@ pub type Result<T> = std::result::Result<T, CaseTrackError>;
 
 ```rust
 // crates/casetrack-core/src/config.rs
-
 use std::path::PathBuf;
 
-/// Server configuration (from CLI args + env vars + optional config file)
 pub struct Config {
     pub data_dir: PathBuf,
     pub license_key: Option<String>,
 }
 
-/// Optional config file (~/Documents/CaseTrack/config.toml)
-/// NOT required -- zero-config is a design principle
+/// Optional config file (~/Documents/CaseTrack/config.toml) -- zero-config by default
 #[derive(serde::Deserialize, Default)]
 pub struct ConfigFile {
-    /// Override default data directory
     pub data_dir: Option<PathBuf>,
-
-    /// License key
     pub license_key: Option<String>,
-
-    /// OCR language (default: "eng")
     pub ocr_language: Option<String>,
-
-    /// Copy originals to case folder on ingest
     pub copy_originals: Option<bool>,
-
-    /// Memory mode override
     pub memory_mode: Option<String>,
-
-    /// Max threads for embedding inference
     pub inference_threads: Option<u32>,
 }
 ```
 
 ---
 
-## 6. Logging & Diagnostics
+## 6. Logging
 
-```rust
-// Logging goes to STDERR (stdout is MCP transport)
-// Controlled by RUST_LOG env var or --log-level CLI arg
+Logging goes to stderr (stdout is MCP transport). Controlled by `RUST_LOG` env var.
 
-// Log levels:
-// ERROR: Failures that prevent operations (file not found, DB corruption)
-// WARN:  Degraded functionality (low memory, OCR disabled, slow inference)
-// INFO:  Normal operations (server started, case created, search completed)
-// DEBUG: Internal details (model loading times, RocksDB stats)
-// TRACE: Verbose (individual chunk embeddings, token counts)
-
-// Examples of what gets logged:
-tracing::info!("CaseTrack v{} starting...", version);
-tracing::info!("License tier: {:?}", tier);
-tracing::info!("Models loaded: {} ({} MB RAM)", count, ram_mb);
-tracing::warn!("Low memory mode active ({} MB available)", available);
-tracing::info!("Ingested {} ({} pages, {} chunks, {}ms)", filename, pages, chunks, ms);
-tracing::info!("Search: {} results in {}ms (query: '{}')", results, ms, query);
-tracing::error!("Failed to ingest {}: {}", filename, error);
-tracing::debug!("E1 inference: {}ms for {} chunks", ms, count);
-```
+| Level | Usage |
+|-------|-------|
+| ERROR | Failures preventing operations (file not found, DB corruption) |
+| WARN  | Degraded functionality (low memory, OCR disabled) |
+| INFO  | Normal operations (server started, case created, search completed) |
+| DEBUG | Internal details (model loading times, RocksDB stats) |
+| TRACE | Verbose (individual chunk embeddings, token counts) |
 
 ---
 
@@ -5354,21 +5381,16 @@ tracing::debug!("E1 inference: {}ms for {} chunks", ms, count);
 ### 7.1 Path Handling
 
 ```rust
-/// Resolve user-provided paths across platforms
 pub fn resolve_path(input: &str) -> PathBuf {
     let expanded = if input.starts_with('~') {
         if let Some(home) = dirs::home_dir() {
-            home.join(&input[2..])  // Skip "~/"
+            home.join(&input[2..])
         } else {
             PathBuf::from(input)
         }
     } else {
         PathBuf::from(input)
     };
-
-    // Normalize path separators
-    // On Windows: handle both / and \
-    // On Unix: just canonicalize
     expanded
 }
 ```
@@ -5379,29 +5401,15 @@ pub fn resolve_path(input: &str) -> PathBuf {
 |----------|-------------|
 | macOS | `~/Documents/CaseTrack/` |
 | Windows | `C:\Users\{user}\Documents\CaseTrack\` |
-| Linux | `~/Documents/CaseTrack/` (or `~/.local/share/casetrack/` if no Documents) |
+| Linux | `~/Documents/CaseTrack/` (or `~/.local/share/casetrack/`) |
 
-### 7.3 RocksDB Platform Notes
+### 7.3 Platform Dependencies
 
-- **macOS**: Works out of the box via `rust-rocksdb`
-- **Windows**: Requires MSVC build tools. `rocksdb` crate handles compilation.
-- **Linux**: Statically link to avoid `librocksdb.so` dependency
-
-### 7.4 Tesseract Bundling
-
-| Platform | Strategy |
-|----------|----------|
-| macOS | Static link via `tesseract-sys` with vendored feature |
-| Windows | Bundle `tesseract.dll` + `leptonica.dll` in installer |
-| Linux | Static link via musl build OR require system package |
-
-### 7.5 ONNX Runtime
-
-| Platform | Execution Providers |
-|----------|-------------------|
-| macOS | CoreML (hardware accel) + CPU fallback |
-| Windows | DirectML (GPU) + CPU fallback |
-| Linux | CPU only (CUDA optional via feature flag) |
+| Component | macOS | Windows | Linux |
+|-----------|-------|---------|-------|
+| RocksDB | Works via `rust-rocksdb` | Requires MSVC build tools | Static link |
+| Tesseract | Static link (vendored) | Bundle DLLs in installer | Static link or system pkg |
+| ONNX Runtime | CoreML + CPU fallback | DirectML + CPU fallback | CPU only (CUDA optional) |
 
 ---
 
@@ -5410,49 +5418,35 @@ pub fn resolve_path(input: &str) -> PathBuf {
 ### 8.1 Input Validation
 
 ```rust
-/// Validate file paths to prevent path traversal
 pub fn validate_file_path(path: &Path, data_dir: &Path) -> Result<PathBuf> {
     let canonical = path.canonicalize()
         .map_err(|_| CaseTrackError::FileNotFound(path.to_path_buf()))?;
-
-    // For reads: allow any path the user provides (they own their machine)
-    // For writes: only within data_dir
     Ok(canonical)
 }
 
-/// Validate that a write path is within the data directory
 pub fn validate_write_path(path: &Path, data_dir: &Path) -> Result<PathBuf> {
     let canonical = path.canonicalize()
         .map_err(|_| CaseTrackError::FileNotFound(path.to_path_buf()))?;
-
     let data_canonical = data_dir.canonicalize()?;
-
     if !canonical.starts_with(&data_canonical) {
         return Err(CaseTrackError::Io(std::io::Error::new(
             std::io::ErrorKind::PermissionDenied,
             format!("Write path must be within data directory: {}", data_dir.display()),
         )));
     }
-
     Ok(canonical)
 }
 ```
 
 ### 8.2 License Key Security
 
-- Keys are ed25519 signed: can be validated offline
-- Public key embedded in binary (cannot be extracted to forge keys)
-- Key format: `TIER-XXXXXX-XXXXXX-XXXXXX-SIG` (human-readable prefix + signature)
-- Cached validation avoids repeated network calls
-- No user data in license validation requests
+- ed25519 signed keys, validated offline. Public key embedded in binary.
+- Key format: `TIER-XXXXXX-XXXXXX-XXXXXX-SIG`
+- Cached validation avoids repeated network calls. No user data sent.
 
 ### 8.3 No Network After Setup
 
-After initial model download and license activation, CaseTrack makes ZERO network requests:
-- Document processing: 100% local
-- Search: 100% local
-- Storage: 100% local
-- Update checks: optional, non-blocking, can be disabled
+After initial model download and license activation, CaseTrack makes zero network requests. Document processing, search, and storage are 100% local. Update checks are optional and non-blocking.
 
 ---
 
@@ -5460,71 +5454,46 @@ After initial model download and license activation, CaseTrack makes ZERO networ
 
 ### 9.1 Unit Tests
 
-Every module has unit tests. Key areas:
+Key test areas (every module has unit tests):
 
 ```rust
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    // Chunking (2000-char target, 200-char overlap)
-    #[test]
+    // Chunking: 2000-char target, 200-char overlap, paragraph-aware
     fn test_chunk_respects_paragraph_boundaries() { ... }
-
-    #[test]
     fn test_chunk_target_2000_chars() { ... }
-
-    #[test]
     fn test_chunk_overlap_200_chars() { ... }
-
-    #[test]
     fn test_chunk_min_400_chars() { ... }
-
-    #[test]
     fn test_chunk_max_2200_chars() { ... }
-
-    #[test]
-    fn test_chunk_provenance_complete() { ... }  // Every chunk has file path, page, paragraph, line, char offsets
+    fn test_chunk_provenance_complete() { ... }
 
     // BM25
-    #[test]
     fn test_bm25_basic_search() { ... }
-
-    #[test]
     fn test_bm25_term_frequency() { ... }
 
-    // Provenance (must include: file path, document name, page, paragraph, line, char offsets)
-    #[test]
+    // PROVENANCE (MOST CRITICAL TEST SUITE)
+    // Every chunk MUST have: file path, document name, page, paragraph, line, char offsets, timestamps.
+    // Every embedding MUST link back to a chunk with valid provenance.
+    // Every search result MUST include complete provenance.
     fn test_citation_format() { ... }
-
-    #[test]
     fn test_short_citation() { ... }
-
-    #[test]
     fn test_provenance_includes_file_path() { ... }
-
-    #[test]
+    fn test_provenance_includes_document_name() { ... }
+    fn test_provenance_includes_page_number() { ... }
+    fn test_provenance_includes_paragraph_range() { ... }
+    fn test_provenance_includes_line_range() { ... }
     fn test_provenance_includes_char_offsets() { ... }
+    fn test_provenance_includes_timestamps() { ... }
+    fn test_provenance_round_trip() { ... }
+    fn test_embedding_links_to_valid_chunk() { ... }
+    fn test_no_orphaned_embeddings() { ... }
+    fn test_no_chunk_without_provenance() { ... }
 
-    #[test]
-    fn test_provenance_round_trip() { ... }  // Store + retrieve preserves all fields
-
-    // RRF
-    #[test]
+    // RRF, cosine similarity, license
     fn test_rrf_fusion() { ... }
-
-    // Cosine similarity
-    #[test]
     fn test_cosine_identical_vectors() { ... }
-
-    #[test]
     fn test_cosine_orthogonal_vectors() { ... }
-
-    // License
-    #[test]
     fn test_free_tier_limits() { ... }
-
-    #[test]
     fn test_valid_license_key() { ... }
 }
 ```
@@ -5533,84 +5502,38 @@ mod tests {
 
 ```rust
 // tests/integration/test_case_lifecycle.rs
-
 #[tokio::test]
 async fn test_create_list_switch_delete_case() {
     let dir = tempdir().unwrap();
     let mut registry = CaseRegistry::open(dir.path()).unwrap();
 
-    // Create
     let case = registry.create_case(CreateCaseParams {
         name: "Test Case".to_string(),
         case_number: None,
         case_type: Some(CaseType::Contract),
     }).unwrap();
-
     assert_eq!(case.name, "Test Case");
-    assert_eq!(case.case_type, CaseType::Contract);
 
-    // List
     let cases = registry.list_cases().unwrap();
     assert_eq!(cases.len(), 1);
 
-    // Switch
     let handle = registry.switch_case(case.id).unwrap();
     assert_eq!(registry.active_case_id(), Some(case.id));
 
-    // Delete
     drop(handle);
     registry.delete_case(case.id).unwrap();
     assert_eq!(registry.list_cases().unwrap().len(), 0);
 }
-```
 
-```rust
-// tests/integration/test_ingest_pdf.rs
-
-#[tokio::test]
-async fn test_ingest_sample_pdf() {
-    let dir = tempdir().unwrap();
-    let mut registry = CaseRegistry::open(dir.path()).unwrap();
-    let case = registry.create_case(/* ... */).unwrap();
-    let handle = registry.switch_case(case.id).unwrap();
-
-    // Ingest test PDF
-    let result = ingest_document(
-        &handle,
-        &engine,
-        Path::new("tests/fixtures/sample.pdf"),
-        None,
-    ).await.unwrap();
-
-    assert_eq!(result.page_count, 3);
-    assert!(result.chunk_count > 0);
-
-    // Verify chunks stored
-    let docs = handle.list_documents().unwrap();
-    assert_eq!(docs.len(), 1);
-    assert_eq!(docs[0].page_count, 3);
-}
-```
-
-```rust
 // tests/integration/test_search.rs
-
 #[tokio::test]
 async fn test_search_returns_relevant_results() {
     // Setup: create case, ingest sample PDF with known content
-    // ...
-
-    let results = search_engine.search(
-        &case_handle,
-        "termination clause",
-        10,
-        None,
-    ).unwrap();
+    let results = search_engine.search(&case_handle, "termination clause", 10, None).unwrap();
 
     assert!(!results.is_empty());
     assert!(results[0].score > 0.5);
     assert!(results[0].citation.contains("sample.pdf"));
-    assert!(results[0].provenance.page > 0);
 
     // Verify full provenance on every result
     for result in &results {
@@ -5624,32 +5547,13 @@ async fn test_search_returns_relevant_results() {
 #[tokio::test]
 async fn test_case_isolation() {
     // Verify chunks from one case never appear in another case's search
-    let dir = tempdir().unwrap();
-    let mut registry = CaseRegistry::open(dir.path()).unwrap();
-
-    let case_a = registry.create_case(CreateCaseParams {
-        name: "Case A".to_string(), ..Default::default()
-    }).unwrap();
-    let case_b = registry.create_case(CreateCaseParams {
-        name: "Case B".to_string(), ..Default::default()
-    }).unwrap();
-
-    // Ingest into Case A only
-    let handle_a = registry.switch_case(case_a.id).unwrap();
-    ingest_document(&handle_a, &engine, Path::new("tests/fixtures/sample.pdf"), None).await.unwrap();
-    drop(handle_a);
-
-    // Search Case B -- must return zero results
-    let handle_b = registry.switch_case(case_b.id).unwrap();
-    let results = search_engine.search(&handle_b, "termination clause", 10, None).unwrap();
-    assert!(results.is_empty(), "Case B must not contain Case A documents");
+    // Ingest into Case A, search Case B -- must return zero results
 }
 ```
 
 ### 9.3 Test Fixtures
 
-The `tests/fixtures/` directory contains:
-- `sample.pdf` -- 3-page PDF with known text content about contract terms
+- `sample.pdf` -- 3-page PDF with known contract terms
 - `sample.docx` -- Word document with headings, paragraphs, lists
 - `scanned.png` -- Image of typed text for OCR testing
 - `empty.pdf` -- Edge case: empty PDF
@@ -5658,20 +5562,11 @@ The `tests/fixtures/` directory contains:
 ### 9.4 Running Tests
 
 ```bash
-# All tests
-cargo test
-
-# Unit tests only (fast, no fixtures needed)
-cargo test --lib
-
-# Integration tests (needs fixtures)
-cargo test --test '*'
-
-# With logging
-RUST_LOG=debug cargo test -- --nocapture
-
-# Specific test
-cargo test test_bm25_basic_search
+cargo test              # All tests
+cargo test --lib        # Unit tests only (fast)
+cargo test --test '*'   # Integration tests (needs fixtures)
+RUST_LOG=debug cargo test -- --nocapture   # With logging
+cargo test test_bm25_basic_search          # Specific test
 ```
 
 ---
@@ -5681,14 +5576,10 @@ cargo test test_bm25_basic_search
 ### 10.1 GitHub Actions CI
 
 ```yaml
-# .github/workflows/ci.yml
 name: CI
-
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
 
 jobs:
   test:
@@ -5698,111 +5589,71 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo
-        uses: actions/cache@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo build --release
+      - run: cargo test
+      - run: cargo clippy -- -D warnings
+      - run: cargo fmt -- --check
 
-      - name: Build
-        run: cargo build --release
-
-      - name: Test
-        run: cargo test
-
-      - name: Clippy
-        run: cargo clippy -- -D warnings
-
-      - name: Format check
-        run: cargo fmt -- --check
-
-  # Ensure binary size is reasonable
   size-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release
-      - name: Check binary size
+      - name: Check binary size (<50MB)
         run: |
           SIZE=$(stat -f%z target/release/casetrack 2>/dev/null || stat -c%s target/release/casetrack)
           echo "Binary size: $SIZE bytes ($(($SIZE / 1024 / 1024)) MB)"
-          if [ "$SIZE" -gt 52428800 ]; then  # 50MB limit
-            echo "ERROR: Binary too large (>50MB)"
-            exit 1
-          fi
+          [ "$SIZE" -le 52428800 ] || exit 1
 ```
 
 ### 10.2 Release Pipeline
 
 ```yaml
-# .github/workflows/release.yml
 name: Release
-
 on:
-  push:
-    tags: ['v*']
-
-permissions:
-  contents: write
+  push: { tags: ['v*'] }
+permissions: { contents: write }
 
 jobs:
   build:
     strategy:
       matrix:
         include:
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            name: casetrack-darwin-x64
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            name: casetrack-darwin-arm64
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            name: casetrack-win32-x64.exe
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            name: casetrack-linux-x64
-
+          - { target: x86_64-apple-darwin, os: macos-latest, name: casetrack-darwin-x64 }
+          - { target: aarch64-apple-darwin, os: macos-latest, name: casetrack-darwin-arm64 }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, name: casetrack-win32-x64.exe }
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, name: casetrack-linux-x64 }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Rename binary
-        shell: bash
+        with: { targets: "${{ matrix.target }}" }
+      - run: cargo build --release --target ${{ matrix.target }}
+      - shell: bash
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             cp target/${{ matrix.target }}/release/casetrack.exe ${{ matrix.name }}
           else
             cp target/${{ matrix.target }}/release/casetrack ${{ matrix.name }}
           fi
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.name }}
-          path: ${{ matrix.name }}
+      - uses: actions/upload-artifact@v4
+        with: { name: "${{ matrix.name }}", path: "${{ matrix.name }}" }
 
   release:
     needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
-      - name: Create release
-        uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v1
         with:
           files: |
             casetrack-darwin-x64/casetrack-darwin-x64
@@ -5817,14 +5668,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-
-      - name: Build MCPB bundle
-        run: bash scripts/build_mcpb.sh
-
-      - name: Upload MCPB to release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: casetrack.mcpb
+      - run: bash scripts/build_mcpb.sh
+      - uses: softprops/action-gh-release@v1
+        with: { files: casetrack.mcpb }
 ```
 
 ---
@@ -5841,12 +5687,7 @@ jobs:
 
 ### 11.2 License Key System
 
-See [PRD 07](PRD_07_CASE_MANAGEMENT.md) for monetization details. Key implementation points:
-
-- ed25519 signature validation (offline-capable)
-- Online activation on first use (one HTTP call to Lemon Squeezy API)
-- Cached validation for 30 days
-- Graceful degradation: if license check fails, fall back to Free tier (never block the user)
+See [PRD 07](PRD_07_CASE_MANAGEMENT.md) for details. Key points: ed25519 offline validation, online activation via Lemon Squeezy on first use, 30-day cache, graceful degradation to Free tier on failure.
 
 ---
 
@@ -5957,10 +5798,114 @@ LICENSE SYSTEM
   [ ] Feature gating per tier
   [ ] Upgrade prompts in error messages
 
-BATCH OPERATIONS
-  [ ] ingest_folder tool (directory walking)
-  [ ] Progress reporting
-  [ ] Error collection for batch
+FOLDER INGESTION & SYNC
+  [ ] ingest_folder tool (recursive directory walking via walkdir)
+  [ ] SHA256 duplicate detection (skip already-ingested files)
+  [ ] sync_folder tool (differential sync: new/changed/deleted detection)
+  [ ] sync_folder dry_run mode (preview changes without applying)
+  [ ] sync_folder remove_deleted option (remove docs whose source files are gone)
+  [ ] File extension filtering
+  [ ] Progress reporting (per-file status via stderr logging)
+  [ ] Error collection and summary for batch operations
+
+REINDEXING & EMBEDDING FRESHNESS
+  [ ] reindex_document tool (delete old chunks/embeddings, re-extract, re-chunk, re-embed)
+  [ ] reindex_case tool (full rebuild of all documents in a case)
+  [ ] reparse=false mode (keep chunks, rebuild embeddings only -- fast tier upgrade path)
+  [ ] skip_unchanged mode (only reindex docs whose source SHA256 changed or embeddings incomplete)
+  [ ] get_index_status tool (health check: per-document embedder coverage, SHA256 staleness)
+  [ ] Embedder coverage tracking (store which embedders were used per chunk)
+  [ ] Automatic stale detection (compare stored SHA256 vs source file on disk)
+  [ ] Force reindex flag (rebuild even if SHA256 matches)
+
+AUTO-SYNC & FOLDER WATCHING (see PRD 09 Section 3)
+  [ ] WatchManager struct (manages all active watches)
+  [ ] notify crate integration (cross-platform OS file notifications)
+      - inotify (Linux), FSEvents (macOS), ReadDirectoryChangesW (Windows)
+  [ ] watches.json persistence (survives server restarts)
+  [ ] FolderWatch config struct (folder_path, schedule, auto_remove, extensions)
+  [ ] SyncSchedule enum (OnChange, Interval, Daily, Manual)
+  [ ] Real-time event processing with 2-second debounce
+  [ ] Event batching (Created -> ingest, Modified -> reindex, Deleted -> remove)
+  [ ] Scheduled sync runner (tokio interval, checks every 60 seconds)
+  [ ] watch_folder MCP tool
+  [ ] unwatch_folder MCP tool
+  [ ] list_watches MCP tool
+  [ ] set_sync_schedule MCP tool
+  [ ] Restore watches on server startup (WatchManager::init)
+  [ ] Graceful shutdown (stop watchers, flush pending events)
+```
+
+### Phase 4b: Context Graph
+
+```
+ENTITY EXTRACTION (runs during ingestion, after chunking)
+  [ ] Entity extraction pipeline (post-chunk processing step)
+  [ ] Regex-based extractors:
+      - Case citations (e.g., "Smith v. Jones, 123 F.3d 456 (9th Cir. 2020)")
+      - Statute references (e.g., "42 U.S.C. § 1983")
+      - Date patterns (filed dates, hearing dates, deadlines)
+      - Monetary amounts ("$1,250,000.00", "1.25 million dollars")
+  [ ] NER-based extractors (reuse E11-Legal embedder):
+      - Person names (parties, attorneys, judges, witnesses)
+      - Organization names (companies, agencies, courts)
+      - Court names and jurisdictions
+      - Legal concepts and doctrines
+  [ ] Entity deduplication (same entity across chunks/documents)
+  [ ] Entity storage in `entities` and `entity_index` column families
+  [ ] EntityMention records linking entities to chunks with char offsets
+
+CITATION EXTRACTION & NETWORK
+  [ ] Citation parser (regex for Bluebook, neutral citations, statute refs)
+  [ ] Citation normalization (canonical form for dedup)
+  [ ] CitationRecord storage with source_doc, target, treatment
+  [ ] CitationTreatment detection (Cited, Followed, Distinguished, Overruled, Discussed)
+  [ ] Authority type classification (Case, Statute, Regulation, SecondarySource)
+  [ ] Citation network storage in `citations` column family
+  [ ] Cross-document citation linking (Doc A cites same authority as Doc B)
+
+DOCUMENT GRAPH
+  [ ] DocRelationship storage in `doc_graph` column family
+  [ ] Relationship types: CitesAuthority, SharedEntities, SemanticSimilar, ResponseTo, Amends, Exhibits
+  [ ] Automatic relationship detection during ingestion:
+      - CitesAuthority: documents citing same authorities
+      - SharedEntities: documents mentioning same entities
+      - SemanticSimilar: E1 cosine > 0.75 between document-level embeddings
+  [ ] Chunk similarity graph in `chunk_graph` column family
+  [ ] Cross-chunk similarity edges (E1 cosine > 0.8 between chunks)
+
+CASE MAP
+  [ ] CaseMap builder (aggregates entities, citations, relationships per case)
+  [ ] Party extraction and role classification (Plaintiff, Defendant, Judge, Witness, Attorney)
+  [ ] Key date extraction and timeline construction
+  [ ] Legal issue extraction from headings, arguments, holdings
+  [ ] Authority statistics (most-cited authorities in the case)
+  [ ] Entity statistics (most-mentioned entities)
+  [ ] CaseStatistics computation (doc count, chunk count, entity count, etc.)
+  [ ] Case map storage in `case_map` column family
+  [ ] Incremental case map updates (on ingest/delete/reindex)
+
+CONTEXT GRAPH MCP TOOLS (16 tools -- see PRD 09 Section 2b)
+  [ ] Case Overview tools:
+      - get_case_map (parties, issues, key dates, top authorities)
+      - get_case_timeline (chronological events extracted from documents)
+      - get_case_statistics (counts, coverage, health metrics)
+  [ ] Entity & Citation tools:
+      - list_entities (filter by type, sort by mention count)
+      - get_entity_mentions (all mentions of an entity across documents)
+      - search_entity_relationships (entities connected via shared documents)
+      - list_authorities (all cited authorities with citation counts)
+      - get_authority_citations (all documents citing a specific authority)
+  [ ] Document Navigation tools:
+      - get_document_structure (headings, sections, page count, entity/citation summary)
+      - browse_pages (paginated page content with entities highlighted)
+      - find_related_documents (documents related via citations, entities, or semantics)
+      - list_documents_by_type (filter by inferred document type)
+      - traverse_chunks (sequential chunk navigation with prev/next)
+  [ ] Advanced Search tools:
+      - search_similar_chunks (find chunks semantically similar to a given chunk)
+      - compare_documents (side-by-side entity, citation, and semantic comparison)
+      - find_document_clusters (group documents by topic/entity similarity)
 ```
 
 ### Phase 5: OCR & Polish

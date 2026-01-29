@@ -133,18 +133,26 @@ The embedder stack is designed for **consumer hardware**:
 
 ## 4. What Was Removed (vs. Research System)
 
-| Removed | Original Purpose | Why Removed | Alternative in CaseTrack |
-|---------|------------------|-------------|--------------------------|
-| E2-E4 Temporal | Document recency/sequence | Complex, minimal value for legal | Date metadata filter |
-| E5 Causal | "X caused Y" reasoning | Requires LLM-scale compute | Keyword patterns via E6 |
-| E9 HDC | Noise robustness | Experimental, adds 200MB+ RAM | BM25 fallback |
-| E10 Intent | Same-goal matching | 400MB+ model, GPU preferred | E1 semantic covers this |
-| E14 SAILER | Legal doc structure | Research model, no ONNX export | E7 handles structure |
-| E15 Citation Network | Graph-based citation | Requires graph training infrastructure | E8 simpler pairwise version |
+| Removed | Alternative in CaseTrack |
+|---------|--------------------------|
+| E2-E4 Temporal | Date metadata filter |
+| E5 Causal | Keyword patterns via E6 |
+| E9 HDC | BM25 fallback |
+| E10 Intent | E1 semantic covers this |
+| E14 SAILER | E7 handles structure |
+| E15 Citation Network | E8 simpler pairwise version |
 
 ---
 
-## 5. Embedding Engine Implementation
+## 5. Provenance Linkage
+
+**Every embedding vector is traceable back to its source document, page, and paragraph.** The chain is: `embedding key (e1:{chunk_uuid})` -> `ChunkData` (text + full `Provenance`) -> source file on disk. No embedding is stored without its chunk existing first; the ingestion pipeline (PRD 06) creates ChunkData with full Provenance before calling `embed_chunk()`.
+
+For the canonical Provenance struct fields, storage layout, and complete chain specification, see [PRD 04 Section 5.2](PRD_04_STORAGE_ARCHITECTURE.md#52-the-provenance-chain-how-embeddings-trace-back-to-source).
+
+---
+
+## 6. Embedding Engine Implementation
 
 ```rust
 use ort::{Session, Environment, GraphOptimizationLevel, ExecutionProvider};
@@ -373,9 +381,9 @@ pub enum QueryEmbedding {
 
 ---
 
-## 6. Model Management
+## 7. Model Management
 
-### 6.1 Lazy Loading
+### 7.1 Lazy Loading
 
 Models not needed for the current operation are not loaded:
 
@@ -405,7 +413,7 @@ pub fn ensure_model_loaded(&mut self, id: EmbedderId) -> Result<&Session> {
 }
 ```
 
-### 6.2 Memory Pressure Handling
+### 7.2 Memory Pressure Handling
 
 ```rust
 /// Unload least-recently-used models when memory is constrained
@@ -428,7 +436,7 @@ pub fn handle_memory_pressure(&mut self) {
 
 ---
 
-## 7. ONNX Model Conversion Notes
+## 8. ONNX Model Conversion Notes
 
 For the fresh project build, models must be converted from PyTorch to ONNX:
 

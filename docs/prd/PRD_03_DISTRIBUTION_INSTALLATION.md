@@ -58,177 +58,43 @@ DISTRIBUTION CHANNELS (Priority Order)
 
 ### 2.1 macOS/Linux Install Script (`install.sh`)
 
-The install script must:
-
-```bash
-#!/bin/sh
-set -e
-
-# 1. Detect platform
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')   # darwin, linux
-ARCH=$(uname -m)                                # x86_64, arm64, aarch64
-
-# 2. Map to binary name
-case "${OS}-${ARCH}" in
-  darwin-arm64)   BINARY="casetrack-darwin-arm64" ;;
-  darwin-x86_64)  BINARY="casetrack-darwin-x64" ;;
-  linux-x86_64)   BINARY="casetrack-linux-x64" ;;
-  linux-aarch64)  BINARY="casetrack-linux-arm64" ;;
-  *) echo "Unsupported platform: ${OS}-${ARCH}"; exit 1 ;;
-esac
-
-# 3. Download binary
-VERSION="latest"
-URL="https://github.com/casetrack-legal/casetrack/releases/${VERSION}/download/${BINARY}"
-INSTALL_DIR="${HOME}/.local/bin"
-
-mkdir -p "${INSTALL_DIR}"
-curl -fsSL "${URL}" -o "${INSTALL_DIR}/casetrack"
-chmod +x "${INSTALL_DIR}/casetrack"
-
-# 4. Add to PATH if needed
-if ! echo "${PATH}" | grep -q "${INSTALL_DIR}"; then
-  SHELL_RC=""
-  if [ -f "${HOME}/.zshrc" ]; then SHELL_RC="${HOME}/.zshrc"
-  elif [ -f "${HOME}/.bashrc" ]; then SHELL_RC="${HOME}/.bashrc"
-  fi
-  if [ -n "${SHELL_RC}" ]; then
-    echo "export PATH=\"${INSTALL_DIR}:\${PATH}\"" >> "${SHELL_RC}"
-  fi
-fi
-
-# 5. Configure Claude Code (if installed)
-CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
-if [ -d "${HOME}/.claude" ]; then
-  # Merge MCP server config into existing settings
-  casetrack --setup-claude-code
-fi
-
-# 6. Print success
-echo ""
-echo "CaseTrack installed successfully!"
-echo ""
-echo "  Binary: ${INSTALL_DIR}/casetrack"
-echo "  Data:   ~/Documents/CaseTrack/"
-echo ""
-echo "Next steps:"
-echo "  1. Restart your terminal (or run: source ${SHELL_RC})"
-echo "  2. Open Claude Code and ask: 'Create a new case called Test'"
-echo ""
+```
+Steps:
+1. Detect platform (darwin/linux) and architecture (x86_64/arm64/aarch64)
+2. Map to binary name: casetrack-{os}-{arch}
+   Supported: darwin-arm64, darwin-x64, linux-x64, linux-arm64
+3. Download binary from GitHub releases to ~/.local/bin/casetrack
+4. Add ~/.local/bin to PATH via .zshrc or .bashrc (if not already present)
+5. If ~/.claude/ exists, run: casetrack --setup-claude-code
+6. Print success with next steps (restart terminal, try a command)
 ```
 
 ### 2.2 Windows Install Script (`install.ps1`)
 
-```powershell
-# Detect architecture
-$arch = if ([Environment]::Is64BitOperatingSystem) { "x64" } else {
-    Write-Error "CaseTrack requires 64-bit Windows"; exit 1
-}
-
-# Download
-$version = "latest"
-$url = "https://github.com/casetrack-legal/casetrack/releases/$version/download/casetrack-win32-$arch.exe"
-$installDir = "$env:LOCALAPPDATA\CaseTrack"
-
-New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-Invoke-WebRequest -Uri $url -OutFile "$installDir\casetrack.exe"
-
-# Add to PATH
-$currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($currentPath -notlike "*$installDir*") {
-    [Environment]::SetEnvironmentVariable("Path", "$installDir;$currentPath", "User")
-}
-
-# Configure Claude Code
-& "$installDir\casetrack.exe" --setup-claude-code
-
-Write-Host ""
-Write-Host "CaseTrack installed successfully!" -ForegroundColor Green
-Write-Host ""
-Write-Host "  Binary: $installDir\casetrack.exe"
-Write-Host "  Data:   $env:USERPROFILE\Documents\CaseTrack\"
-Write-Host ""
-Write-Host "Next steps:"
-Write-Host "  1. Restart your terminal"
-Write-Host "  2. Open Claude Code and ask: 'Create a new case called Test'"
+```
+Steps:
+1. Require 64-bit Windows
+2. Download binary from GitHub releases to %LOCALAPPDATA%\CaseTrack\casetrack.exe
+3. Add install dir to user PATH
+4. Run: casetrack.exe --setup-claude-code
+5. Print success with next steps
 ```
 
 ---
 
 ## 3. Self-Setup CLI Command
 
-The binary itself handles Claude Code configuration:
-
 ```
 casetrack --setup-claude-code
 ```
 
-This command:
-
-1. Detects Claude Code settings file location:
-   - `~/.claude/settings.json` (all platforms)
-2. Reads existing settings (or creates empty `{}`)
-3. Merges `mcpServers.casetrack` entry
-4. Writes back with proper JSON formatting
-5. Prints confirmation
-
-```rust
-/// CLI setup command for Claude Code integration
-pub fn setup_claude_code(data_dir: &Path) -> Result<()> {
-    let settings_path = dirs::home_dir()
-        .ok_or(CaseTrackError::NoHomeDir)?
-        .join(".claude")
-        .join("settings.json");
-
-    // Read existing settings or create new
-    let mut settings: serde_json::Value = if settings_path.exists() {
-        let content = fs::read_to_string(&settings_path)?;
-        serde_json::from_str(&content)?
-    } else {
-        fs::create_dir_all(settings_path.parent().unwrap())?;
-        json!({})
-    };
-
-    // Add MCP server config
-    let mcp_servers = settings
-        .as_object_mut()
-        .unwrap()
-        .entry("mcpServers")
-        .or_insert(json!({}));
-
-    mcp_servers["casetrack"] = json!({
-        "command": std::env::current_exe()?.to_string_lossy(),
-        "args": ["--data-dir", data_dir.to_string_lossy()]
-    });
-
-    // Write back
-    let formatted = serde_json::to_string_pretty(&settings)?;
-    fs::write(&settings_path, formatted)?;
-
-    println!("Claude Code configured. CaseTrack will be available in your next session.");
-    Ok(())
-}
-```
+Reads or creates `~/.claude/settings.json`, merges `mcpServers.casetrack` entry (using the current binary path and configured data-dir), writes back with pretty JSON formatting.
 
 ---
 
 ## 4. MCPB Bundle Structure
 
-The `.mcpb` file is a ZIP archive for Claude Desktop GUI installation:
-
-```
-casetrack.mcpb (ZIP archive, ~50MB)
-|-- manifest.json           # MCP configuration
-|-- icon.png               # Extension icon (256x256)
-|-- server/
-|   |-- casetrack-darwin-x64      # macOS Intel
-|   |-- casetrack-darwin-arm64    # macOS Apple Silicon
-|   |-- casetrack-win32-x64.exe   # Windows
-|   +-- casetrack-linux-x64       # Linux
-+-- resources/
-    |-- tokenizer.json     # Shared tokenizer (~5MB)
-    +-- legal-vocab.txt    # Legal term expansions (~2MB)
-```
+`.mcpb` = ZIP archive (~50MB) for Claude Desktop GUI install. Contains platform binaries, manifest, icon, and shared resources (tokenizer, legal vocab).
 
 ### 4.1 Manifest Specification
 
@@ -315,114 +181,40 @@ casetrack.mcpb (ZIP archive, ~50MB)
 ## 5. Installation Flow (Claude Desktop)
 
 ```
-INSTALLATION FLOW
-=================================================================================
-
-Step 1: Download (User Action)
----------------------------------
-User visits casetrack.legal
-Clicks "Download for Claude Desktop"
-Browser downloads casetrack.mcpb (~50MB)
-
-Step 2: Install (User Action)
----------------------------------
-User double-clicks casetrack.mcpb
-  OR drags to Claude Desktop window
-  OR Settings -> Extensions -> Install from file
-
-Step 3: Configure (Dialog)
----------------------------------
-+-------------------------------------------------------+
-| Install CaseTrack?                                     |
-|                                                        |
-| CaseTrack lets you search legal documents with AI.     |
-| All processing happens on your computer.               |
-|                                                        |
-| +----------------------------------------------------+ |
-| | Data Location                                      | |
-| | [~/Documents/CaseTrack                        ] [F]| |
-| +----------------------------------------------------+ |
-|                                                        |
-| +----------------------------------------------------+ |
-| | License Key (optional - leave blank for free tier)  | |
-| | [                                             ] [L] | |
-| +----------------------------------------------------+ |
-|                                                        |
-| This extension will:                                   |
-| [Y] Read and write files in your Data Location        |
-| [Y] Download AI models from huggingface.co (~400MB)   |
-| [N] NOT send your documents anywhere                  |
-|                                                        |
-|                         [Cancel]  [Install Extension]  |
-+-------------------------------------------------------+
-
-Step 4: First Run (Automatic)
----------------------------------
-Claude Desktop starts CaseTrack server
-Server detects missing models
-Downloads models in background (~400MB)
-Shows progress notification in Claude Desktop
-
-Step 5: Ready (Automatic)
----------------------------------
-CaseTrack icon appears in Extensions panel
-User can now use CaseTrack tools in conversation
+1. Download: User downloads casetrack.mcpb (~50MB) from casetrack.legal
+2. Install:  Double-click .mcpb, drag to Claude Desktop, or Settings > Extensions > Install
+3. Configure: Dialog prompts for data location and optional license key
+   +-------------------------------------------------------+
+   | Install CaseTrack?                                     |
+   |                                                        |
+   | CaseTrack lets you search legal documents with AI.     |
+   | All processing happens on your computer.               |
+   |                                                        |
+   | Data Location:  [~/Documents/CaseTrack            ] [F]|
+   | License Key:    [optional - blank for free tier   ] [L]|
+   |                                                        |
+   | [Y] Read and write files in your Data Location        |
+   | [Y] Download AI models from huggingface.co (~400MB)   |
+   | [N] NOT send your documents anywhere                  |
+   |                                                        |
+   |                         [Cancel]  [Install Extension]  |
+   +-------------------------------------------------------+
+4. First Run: Server starts, downloads missing models (~400MB) in background
+5. Ready:     CaseTrack icon appears in Extensions panel
 ```
 
 ---
 
 ## 6. First-Run Experience
 
-On first launch, the server must handle model bootstrapping gracefully:
+Initialization sequence on first launch:
 
-```rust
-/// First-run initialization sequence
-pub async fn initialize(config: &Config) -> Result<ServerState> {
-    let data_dir = &config.data_dir;
-
-    // Step 1: Create directory structure
-    create_directory_structure(data_dir)?;
-
-    // Step 2: Check and download models
-    let model_manager = ModelManager::new(&data_dir.join("models"));
-    let missing = model_manager.check_missing_models(config.tier)?;
-
-    if !missing.is_empty() {
-        // Report progress via MCP notification (if supported)
-        // or via stderr logging
-        tracing::info!(
-            "First run detected. Downloading {} models ({} MB)...",
-            missing.len(),
-            missing.iter().map(|m| m.size_mb).sum::<u32>()
-        );
-
-        for model in &missing {
-            tracing::info!("Downloading {}...", model.id);
-            model_manager.download(model).await?;
-            tracing::info!("Downloaded {} ({} MB)", model.id, model.size_mb);
-        }
-
-        tracing::info!("All models ready.");
-    }
-
-    // Step 3: Open or create registry database
-    let registry = CaseRegistry::open(&data_dir.join("registry.db"))?;
-
-    // Step 4: Validate license (offline-first)
-    let tier = LicenseManager::new(data_dir)
-        .validate(config.license_key.as_deref());
-
-    tracing::info!("CaseTrack ready. Tier: {:?}, Cases: {}", tier, registry.count()?);
-
-    Ok(ServerState { registry, model_manager, tier })
-}
-
-fn create_directory_structure(data_dir: &Path) -> Result<()> {
-    fs::create_dir_all(data_dir.join("models"))?;
-    fs::create_dir_all(data_dir.join("cases"))?;
-    // registry.db is created by RocksDB::open
-    Ok(())
-}
+```
+1. Create directory structure: models/, cases/ (registry.db created by RocksDB::open)
+2. Check for missing models based on tier; download any missing (with progress logging)
+3. Open or create registry database
+4. Validate license (offline-first)
+5. Log ready state: tier + case count
 ```
 
 ### 6.1 Model Download Strategy
@@ -487,41 +279,9 @@ pub const MODELS: &[ModelSpec] = &[
 
 ### 6.2 Download Resilience
 
-```rust
-/// Download with retry and resume support
-pub async fn download_model(&self, spec: &ModelSpec) -> Result<()> {
-    let model_dir = self.cache_dir.join(spec.id);
-    fs::create_dir_all(&model_dir)?;
-
-    for file in spec.files {
-        let dest = model_dir.join(file);
-
-        // Skip if already downloaded and valid
-        if dest.exists() && self.verify_checksum(&dest, spec, file)? {
-            continue;
-        }
-
-        // Download with retry (3 attempts, exponential backoff)
-        let mut attempts = 0;
-        loop {
-            attempts += 1;
-            match self.download_file(spec.repo, file, &dest).await {
-                Ok(()) => break,
-                Err(e) if attempts < 3 => {
-                    tracing::warn!(
-                        "Download attempt {}/3 failed for {}/{}: {}. Retrying...",
-                        attempts, spec.id, file, e
-                    );
-                    tokio::time::sleep(Duration::from_secs(2u64.pow(attempts))).await;
-                }
-                Err(e) => return Err(e.into()),
-            }
-        }
-    }
-
-    Ok(())
-}
-```
+- Skip files already downloaded with valid checksums
+- Retry up to 3 attempts with exponential backoff (2s, 4s, 8s)
+- Fatal error after 3 failures for any single file
 
 ---
 
@@ -529,35 +289,10 @@ pub async fn download_model(&self, spec: &ModelSpec) -> Result<()> {
 
 ### 7.1 Version Checking
 
-CaseTrack checks for updates on startup (non-blocking, does not delay server start):
-
-```rust
-/// Non-blocking update check
-pub async fn check_for_updates(current_version: &str) {
-    // Fire and forget -- do not block server startup
-    tokio::spawn(async move {
-        let check = async {
-            let url = "https://api.github.com/repos/casetrack-legal/casetrack/releases/latest";
-            let resp: GithubRelease = reqwest::get(url).await?.json().await?;
-            let latest = resp.tag_name.trim_start_matches('v');
-
-            if semver::Version::parse(latest)? > semver::Version::parse(current_version)? {
-                tracing::info!(
-                    "Update available: v{} -> v{}. \
-                     Run 'casetrack --update' or download from https://casetrack.legal",
-                    current_version, latest
-                );
-            }
-            Ok::<(), anyhow::Error>(())
-        };
-
-        if let Err(e) = check.await {
-            // Silently ignore update check failures -- user is offline or rate limited
-            tracing::debug!("Update check failed (non-critical): {}", e);
-        }
-    });
-}
-```
+Non-blocking check on startup (fire-and-forget via `tokio::spawn`):
+- Queries GitHub releases API for latest version
+- Compares via semver; logs update notice if newer version exists
+- Silently ignores failures (offline, rate-limited)
 
 ### 7.2 Self-Update Command
 

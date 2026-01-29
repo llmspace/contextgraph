@@ -174,111 +174,23 @@ impl SearchEngine {
 
 ## 3. BM25 Implementation
 
+Standard BM25 with `k1=1.2, b=0.75`. Stored in `bm25_index` column family.
+
+**Key schema**: `term:{token}` → bincode `PostingList`, `stats` → bincode `Bm25Stats`
+
+**Tokenization**: lowercase, split on non-alphanumeric (preserving apostrophes), filter stopwords and single-char tokens.
+
 ```rust
 pub struct Bm25Index;
 
 impl Bm25Index {
-    /// Search the inverted index
-    pub fn search(
-        case: &CaseHandle,
-        query: &str,
-        limit: usize,
-        document_filter: Option<Uuid>,
-    ) -> Result<Vec<Uuid>> {
-        let cf = case.db.cf_handle("bm25_index").unwrap();
+    /// Tokenize query → lookup postings per term → accumulate BM25 scores
+    /// per chunk → apply optional document_filter → return top `limit` chunk IDs
+    pub fn search(case: &CaseHandle, query: &str, limit: usize,
+                  document_filter: Option<Uuid>) -> Result<Vec<Uuid>>;
 
-        // Load stats
-        let stats: Bm25Stats = {
-            let bytes = case.db.get_cf(&cf, b"stats")?
-                .ok_or(CaseTrackError::Bm25IndexEmpty)?;
-            bincode::deserialize(&bytes)?
-        };
-
-        // Tokenize query
-        let terms = tokenize_for_bm25(query);
-
-        // Accumulate scores per chunk
-        let mut scores: HashMap<Uuid, f32> = HashMap::new();
-
-        for term in &terms {
-            let key = format!("term:{}", term);
-            if let Some(bytes) = case.db.get_cf(&cf, key.as_bytes())? {
-                let postings: PostingList = bincode::deserialize(&bytes)?;
-
-                let idf = ((stats.total_docs as f32 - postings.doc_freq as f32 + 0.5)
-                    / (postings.doc_freq as f32 + 0.5) + 1.0).ln();
-
-                for posting in &postings.entries {
-                    // Apply document filter if specified
-                    if let Some(filter_doc) = document_filter {
-                        if posting.document_id != filter_doc {
-                            continue;
-                        }
-                    }
-
-                    let tf = posting.term_freq as f32;
-                    let dl = posting.doc_length as f32;
-                    let avgdl = stats.avg_doc_length;
-
-                    // BM25 formula
-                    let k1 = 1.2;
-                    let b = 0.75;
-                    let score = idf * (tf * (k1 + 1.0))
-                        / (tf + k1 * (1.0 - b + b * dl / avgdl));
-
-                    *scores.entry(posting.chunk_id).or_default() += score;
-                }
-            }
-        }
-
-        // Sort by score, return top N
-        let mut results: Vec<(Uuid, f32)> = scores.into_iter().collect();
-        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-        results.truncate(limit);
-
-        Ok(results.into_iter().map(|(id, _)| id).collect())
-    }
-
-    /// Index a chunk's text into the inverted index
-    pub fn index_chunk(
-        case: &CaseHandle,
-        chunk: &Chunk,
-    ) -> Result<()> {
-        let cf = case.db.cf_handle("bm25_index").unwrap();
-        let terms = tokenize_for_bm25(&chunk.text);
-        let term_freqs = count_term_frequencies(&terms);
-
-        for (term, freq) in &term_freqs {
-            let key = format!("term:{}", term);
-
-            let mut postings: PostingList = case.db.get_cf(&cf, key.as_bytes())?
-                .map(|b| bincode::deserialize(&b).unwrap_or_default())
-                .unwrap_or_default();
-
-            postings.doc_freq += 1;
-            postings.entries.push(PostingEntry {
-                chunk_id: chunk.id,
-                document_id: chunk.document_id,
-                term_freq: *freq,
-                doc_length: terms.len() as u32,
-            });
-
-            case.db.put_cf(&cf, key.as_bytes(), bincode::serialize(&postings)?)?;
-        }
-
-        // Update global stats
-        let mut stats: Bm25Stats = case.db.get_cf(&cf, b"stats")?
-            .map(|b| bincode::deserialize(&b).unwrap_or_default())
-            .unwrap_or_default();
-
-        stats.total_docs += 1;
-        stats.total_tokens += terms.len() as u64;
-        stats.avg_doc_length = stats.total_tokens as f32 / stats.total_docs as f32;
-
-        case.db.put_cf(&cf, b"stats", bincode::serialize(&stats)?)?;
-
-        Ok(())
-    }
+    /// Tokenize chunk text → upsert PostingList per term → update Bm25Stats
+    pub fn index_chunk(case: &CaseHandle, chunk: &Chunk) -> Result<()>;
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -300,14 +212,6 @@ pub struct PostingEntry {
     pub document_id: Uuid,
     pub term_freq: u32,
     pub doc_length: u32,
-}
-
-/// Simple tokenization for BM25 (lowercased, alphanumeric, stopwords removed)
-fn tokenize_for_bm25(text: &str) -> Vec<String> {
-    text.split(|c: char| !c.is_alphanumeric() && c != '\'')
-        .map(|w| w.to_lowercase())
-        .filter(|w| w.len() > 1 && !is_stopword(w))
-        .collect()
 }
 ```
 
@@ -399,58 +303,10 @@ pub struct TokenEmbeddings {
 
 ---
 
-## 6. Similarity Functions
+## 6. Search Response Format (Canonical)
 
-```rust
-/// Cosine similarity between two dense vectors
-pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-    debug_assert_eq!(a.len(), b.len(), "Vector dimensions must match");
-
-    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-
-    if norm_a == 0.0 || norm_b == 0.0 {
-        return 0.0;
-    }
-
-    dot / (norm_a * norm_b)
-}
-
-/// Dot product for sparse vectors (SPLADE)
-pub fn sparse_dot(a: &SparseVec, b: &SparseVec) -> f32 {
-    a.dot(b)  // Implementation in SparseVec struct
-}
-```
-
----
-
-## 7. Document-Filtered Search
-
-Search can be restricted to a single document:
-
-```rust
-/// Search within a specific document only
-pub fn search_document(
-    &self,
-    case: &CaseHandle,
-    query: &str,
-    document_id: Uuid,
-    top_k: usize,
-) -> Result<Vec<SearchResult>> {
-    self.search(case, query, top_k, Some(document_id))
-}
-```
-
-This is useful for queries like:
-- "What does the contract say about non-compete?"
-- "Find all mentions of damages in the complaint"
-
----
-
-## 8. Search Response Format
-
-The MCP tool returns results in this structure:
+This is the canonical MCP response format for `search_case` (also referenced by PRD 09).
+Document-scoped search uses the same pipeline via the `document_filter` parameter on `SearchEngine::search`.
 
 ```json
 {
@@ -481,7 +337,10 @@ The MCP tool returns results in this structure:
         "char_end": 26580,
         "bates": null,
         "extraction_method": "Native",
-        "ocr_confidence": null
+        "ocr_confidence": null,
+        "chunk_created_at": "2026-01-15T14:30:00Z",
+        "chunk_embedded_at": "2026-01-15T14:30:12Z",
+        "document_ingested_at": "2026-01-15T14:29:48Z"
       },
       "context": {
         "before": "...the previous paragraph text...",

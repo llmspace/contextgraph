@@ -24,6 +24,7 @@
 ~/Documents/CaseTrack/                       <-- All CaseTrack data lives here
 |
 |-- config.toml                              <-- User configuration (optional)
+|-- watches.json                             <-- Folder watch registry (auto-sync)
 |
 |-- models/                                  <-- Embedding models (~400MB)
 |   |-- bge-small-en-v1.5/                     Downloaded on first use
@@ -111,6 +112,14 @@ pub const COLUMN_FAMILIES: &[&str] = &[
     "provenance",   // Source location tracking
     "bm25_index",   // Inverted index for BM25
     "metadata",     // Case-level metadata, stats
+
+    // === Context Graph (relationships between documents, chunks, entities) ===
+    "entities",     // Extracted entities (parties, courts, statutes, dates)
+    "entity_index", // Entity → chunk mentions index
+    "citations",    // Legal citations (statutes, case law references)
+    "doc_graph",    // Document-to-document relationships (similarity, citation links)
+    "chunk_graph",  // Chunk-to-chunk relationships (similarity edges)
+    "case_map",     // Case-level summary: parties, issues, dates, doc categories
 ];
 ```
 
@@ -122,6 +131,10 @@ pub const COLUMN_FAMILIES: &[&str] = &[
 // Case listing
 "case:{uuid}"                      -> bincode<Case>
 "schema_version"                   -> u32 (current: 1)
+
+// Folder watches (auto-sync)
+"watch:{uuid}"                     -> bincode<FolderWatch>
+"watch_case:{case_uuid}:{watch_uuid}" -> watch_uuid  (index: watches by case)
 
 // === Case DB Keys (per column family) ===
 
@@ -151,6 +164,39 @@ pub const COLUMN_FAMILIES: &[&str] = &[
 // metadata CF
 "case_info"                        -> bincode<Case>
 "stats"                            -> bincode<CaseStats>
+
+// === CONTEXT GRAPH COLUMN FAMILIES ===
+
+// entities CF
+"entity:{type}:{normalized_name}"  -> bincode<Entity>
+// type = person | organization | court | statute | case_citation | date | monetary_amount | legal_concept
+
+// entity_index CF (bidirectional)
+"ent_chunks:{entity_key}"          -> bincode<Vec<EntityMention>>
+"chunk_ents:{chunk_uuid}"          -> bincode<Vec<EntityRef>>
+
+// citations CF
+"cite:{authority_key}"             -> bincode<CitationRecord>
+"cite_chunks:{authority_key}"      -> bincode<Vec<CitationMention>>
+"chunk_cites:{chunk_uuid}"         -> bincode<Vec<AuthorityRef>>
+
+// doc_graph CF
+"doc_sim:{doc_a}:{doc_b}"         -> f32 (cosine similarity)
+"doc_cites:{citing_doc}:{cited_doc}" -> bincode<DocCitation>
+"doc_entities:{doc_uuid}"         -> bincode<Vec<EntityRef>>
+"doc_category:{category}:{doc_uuid}" -> doc_uuid
+
+// chunk_graph CF
+"chunk_sim:{chunk_a}:{chunk_b}"   -> f32 (stored only when > 0.7)
+"chunk_seq:{doc_uuid}:{seq}"      -> chunk_uuid
+
+// case_map CF (rebuilt after ingestion)
+"parties"                          -> bincode<Vec<Party>>
+"key_dates"                        -> bincode<Vec<KeyDate>>
+"key_issues"                       -> bincode<Vec<LegalIssue>>
+"doc_categories"                   -> bincode<HashMap<String, Vec<Uuid>>>
+"authority_stats"                  -> bincode<Vec<AuthorityStat>>
+"entity_stats"                     -> bincode<Vec<EntityStat>>
 ```
 
 ### 4.4 RocksDB Tuning for Consumer Hardware
@@ -203,25 +249,73 @@ pub struct ChunkData {
     pub id: Uuid,
     pub document_id: Uuid,
     pub text: String,
-    pub sequence: u32,        // Position within document
-    pub token_count: u32,
+    pub sequence: u32,              // Position within document (0-indexed)
+    pub char_count: u32,
+    pub provenance: Provenance,     // Full source trace -- see Section 5.2 Provenance Chain
+    pub created_at: i64,            // Unix timestamp
+    pub embedded_at: i64,           // Unix timestamp: last embedding computation
+    pub embedder_versions: Vec<String>, // e.g., ["e1", "e6", "e7"] for Free tier
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct DocumentMetadata {
     pub id: Uuid,
-    pub name: String,
-    pub original_path: Option<String>,
+    pub name: String,                     // Original filename
+    pub original_path: Option<String>,    // Absolute path to source file
     pub document_type: DocumentType,
     pub page_count: u32,
     pub chunk_count: u32,
-    pub ingested_at: i64,     // Unix timestamp
-    pub file_hash: String,    // SHA256 of original file (dedup detection)
+    pub ingested_at: i64,
+    pub updated_at: i64,
+    pub file_hash: String,                // SHA256 (dedup + staleness detection)
+    pub file_size_bytes: u64,
     pub extraction_method: ExtractionMethod,
+    pub embedder_coverage: Vec<String>,   // e.g., ["e1", "e6", "e7"]
+    pub entity_count: u32,
+    pub citation_count: u32,
 }
 ```
 
-### 5.2 Embeddings as Raw Bytes
+### 5.2 The Provenance Chain (How Embeddings Trace Back to Source)
+
+```
+PROVENANCE CHAIN -- EVERY VECTOR TRACES TO ITS SOURCE
+=================================================================================
+
+Embedding Vector (e.g., key "e1:{chunk_uuid}")
+    │
+    └──► chunk_uuid ──► ChunkData (key "chunk:{uuid}")
+                           │
+                           ├── text: "Either party may terminate..."
+                           ├── provenance: Provenance {
+                           │       document_id:     "doc-abc"
+                           │       document_name:   "Contract.pdf"
+                           │       document_path:   "/Users/sarah/Cases/Smith/Contract.pdf"
+                           │       page:            12
+                           │       paragraph_start: 8
+                           │       paragraph_end:   9
+                           │       line_start:      1
+                           │       line_end:        14
+                           │       char_start:      2401
+                           │       char_end:        4401
+                           │       extraction_method: Native
+                           │       ocr_confidence:  None
+                           │       chunk_index:     47
+                           │   }
+                           ├── created_at:     1706367600  (when chunk was created)
+                           └── embedded_at:    1706367612  (when embedding was computed)
+
+There is NO embedding without a chunk. There is NO chunk without provenance.
+There is NO provenance without a source document path and filename.
+
+This chain MUST be maintained through all operations:
+  - Ingestion: creates chunk + provenance + embeddings together (atomic)
+  - Reindex: deletes old, creates new (preserves document_path)
+  - Delete: removes all three (chunk, provenance, embeddings) together
+  - Sync: detects changed files by document_path + SHA256 hash
+```
+
+### 5.3 Embeddings as Raw Bytes
 
 Dense vectors stored as raw `f32` byte arrays for zero-copy reads:
 
@@ -383,16 +477,13 @@ Each installation is a completely independent system.
 
 ### 7.2 Per-Case Isolation
 
-Within a single customer's installation, each case is a **completely independent RocksDB instance**:
+Each case is a **completely independent RocksDB instance**:
 
-- **Separate database per case**: Each case is its own RocksDB instance on disk
-- **Separate embeddings per case**: Embeddings from Case A are in a different database file than Case B
-- **No cross-case queries**: Search operates within a single case only
-- **No shared vectors**: Case A's vectors cannot influence Case B's search results
-- **No embedding bleed**: There is no shared vector index -- each case has its own index files
-- **Independent lifecycle**: Deleting Case A has zero impact on Case B
-- **Portable**: A case directory can be copied to another machine
-- **Cleanly deletable**: `rm -rf cases/{uuid}/` fully removes a case and all its embeddings
+- Separate database, embeddings, and index files per case
+- No cross-case queries, shared vectors, or embedding bleed
+- Independent lifecycle: deleting Case A has zero impact on Case B
+- Portable: copy a case directory to another machine
+- Cleanly deletable: `rm -rf cases/{uuid}/`
 
 ```rust
 /// Opening a case creates or loads its isolated database
@@ -434,9 +525,230 @@ impl CaseHandle {
 
 ---
 
-## 8. Backup & Export
+## 8. Context Graph Data Models
 
-### 8.1 Case Export
+Entities, citations, and relationships extracted during ingestion and stored as graph edges for structured case navigation.
+
+### 8.1 Entity Model
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Entity {
+    pub name: String,                  // Canonical name
+    pub entity_type: EntityType,
+    pub aliases: Vec<String>,
+    pub mention_count: u32,
+    pub first_seen_doc: Uuid,
+    pub first_seen_chunk: Uuid,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum EntityType {
+    Person, Organization, Court, Statute,
+    CaseCitation, Date, MonetaryAmount, LegalConcept,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityMention {
+    pub chunk_id: Uuid,
+    pub document_id: Uuid,
+    pub char_start: u64,
+    pub char_end: u64,
+    pub context_snippet: String,       // ~100 chars around mention
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityRef {
+    pub entity_key: String,            // "person:john_smith"
+    pub entity_type: EntityType,
+    pub name: String,
+}
+```
+
+### 8.2 Citation Model
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CitationRecord {
+    pub authority_key: String,         // e.g., "42_usc_1983"
+    pub authority_type: AuthorityType,
+    pub display_name: String,          // e.g., "42 U.S.C. § 1983"
+    pub mention_count: u32,
+    pub citing_documents: Vec<Uuid>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum AuthorityType {
+    FederalStatute, StateStatute, FederalRule, StateRule,
+    CaseLaw, Regulation, Other,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CitationMention {
+    pub chunk_id: Uuid,
+    pub document_id: Uuid,
+    pub context_snippet: String,
+    pub treatment: Option<CitationTreatment>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum CitationTreatment {
+    Cited, Followed, Distinguished, Overruled, Discussed,
+}
+```
+
+### 8.3 Document Graph Model
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DocRelationship {
+    pub doc_a: Uuid,
+    pub doc_b: Uuid,
+    pub relationship_type: DocRelType,
+    pub similarity_score: Option<f32>,  // E1 cosine similarity
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum DocRelType {
+    CitesAuthority, SharedEntities, SemanticSimilar,
+    ResponseTo, Amends, Exhibits,
+}
+```
+
+### 8.4 Case Map Model
+
+```rust
+/// High-level case overview, rebuilt after each ingestion.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CaseMap {
+    pub parties: Vec<Party>,
+    pub key_dates: Vec<KeyDate>,
+    pub key_issues: Vec<LegalIssue>,
+    pub document_categories: HashMap<String, Vec<Uuid>>,
+    pub top_authorities: Vec<AuthorityStat>,
+    pub top_entities: Vec<EntityStat>,
+    pub statistics: CaseStatistics,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Party {
+    pub name: String,
+    pub role: PartyRole,
+    pub mention_count: u32,
+    pub aliases: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum PartyRole {
+    Plaintiff, Defendant, Judge, Witness, Expert,
+    Attorney, ThirdParty, Arbitrator, Mediator, Other,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyDate {
+    pub date: String,
+    pub description: String,
+    pub source_chunk: Uuid,
+    pub source_document: Uuid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LegalIssue {
+    pub name: String,
+    pub mention_count: u32,
+    pub relevant_documents: Vec<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthorityStat {
+    pub authority_key: String,
+    pub display_name: String,
+    pub citation_count: u32,
+    pub citing_documents: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityStat {
+    pub entity_key: String,
+    pub name: String,
+    pub entity_type: EntityType,
+    pub mention_count: u32,
+    pub document_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CaseStatistics {
+    pub total_documents: u32,
+    pub total_pages: u32,
+    pub total_chunks: u32,
+    pub total_entities: u32,
+    pub total_citations: u32,
+    pub storage_bytes: u64,
+    pub document_type_breakdown: HashMap<String, u32>,
+    pub embedder_coverage: HashMap<String, u32>,
+}
+```
+
+---
+
+## 9. Folder Watch & Auto-Sync Storage
+
+Watch configurations persist in `~/Documents/CaseTrack/watches.json` (JSON for human readability) to survive server restarts.
+
+### 9.1 Watch Registry
+
+```rust
+#[derive(Serialize, Deserialize)]
+pub struct WatchRegistry {
+    pub watches: Vec<FolderWatch>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FolderWatch {
+    pub id: Uuid,
+    pub case_id: Uuid,
+    pub folder_path: String,           // Absolute path to watched folder
+    pub recursive: bool,               // Watch subfolders (default: true)
+    pub enabled: bool,                 // Can be paused
+    pub created_at: i64,               // Unix timestamp
+    pub last_sync_at: Option<i64>,     // Last successful sync timestamp
+    pub schedule: SyncSchedule,        // When to auto-sync
+    pub file_extensions: Option<Vec<String>>,  // Filter (None = all supported)
+    pub auto_remove_deleted: bool,     // Remove docs whose source files are gone
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum SyncSchedule {
+    OnChange,                   // OS file-change notifications
+    Interval { hours: u32 },    // Fixed interval
+    Daily { time: String },     // e.g., "02:00"
+    Manual,                     // Only via sync_folder tool
+}
+```
+
+### 9.2 Per-Document Sync Metadata
+
+Sync uses `file_hash` and `original_path` from `DocumentMetadata` (see Section 5.1) to detect changes:
+
+```
+FOR each file in watched folder:
+  1. Compute SHA256 of file
+  2. Look up file by original_path in case DB
+  3. IF not found → new file → ingest
+  4. IF found AND hash matches → unchanged → skip
+  5. IF found AND hash differs → modified → reindex (delete old, re-ingest)
+
+FOR each document in case DB with original_path under watched folder:
+  6. IF source file no longer exists on disk → deleted
+     IF auto_remove_deleted → delete document from case
+     ELSE → log warning, skip
+```
+
+---
+
+## 10. Backup & Export
+
+### 10.1 Case Export
 
 Cases can be exported as portable archives:
 
@@ -449,7 +761,7 @@ The `.ctcase` file is a ZIP containing:
 - `originals/` -- Original documents (if stored)
 - `manifest.json` -- Case metadata, schema version, embedder versions
 
-### 8.2 Case Import
+### 10.2 Case Import
 
 ```
 casetrack import ~/Desktop/smith-v-jones.ctcase
@@ -462,7 +774,7 @@ casetrack import ~/Desktop/smith-v-jones.ctcase
 
 ---
 
-## 9. What's Stored Where (Summary)
+## 11. What's Stored Where (Summary)
 
 | Data Type | Storage Location | Format | Size Per Unit |
 |-----------|------------------|--------|---------------|

@@ -47,12 +47,22 @@ User: "Ingest ~/Downloads/Complaint.pdf"
                     |
                     v
 +-----------------------------------------------------------------------+
-| 3. CHUNK                                                               |
+| 3. CHUNK (provenance is attached here -- THE MOST CRITICAL STEP)       |
 |    - Split into 2000-character chunks                                  |
 |    - 10% overlap (200 chars from end of previous chunk)                |
 |    - Respect paragraph and sentence boundaries                         |
-|    - Attach FULL provenance to every chunk:                            |
-|      file path, doc name, page, paragraph, line, char offsets          |
+|    - Attach FULL provenance to EVERY chunk:                            |
+|      * document_path: absolute file path on disk                       |
+|      * document_name: original filename                                |
+|      * page: page number (1-indexed)                                   |
+|      * paragraph_start/end: which paragraphs this chunk spans          |
+|      * line_start/end: which lines this chunk spans                    |
+|      * char_start/end: exact character offsets within the page          |
+|      * extraction_method: Native / OCR / Hybrid                        |
+|      * ocr_confidence: quality score for OCR-extracted text             |
+|      * created_at: Unix timestamp of chunk creation                     |
+|      * embedded_at: Unix timestamp (set after Step 4)                   |
+|    A chunk without provenance MUST NOT be stored. Period.              |
 |    Output: Vec<Chunk> with Provenance                                  |
 +-----------------------------------------------------------------------+
                     |
@@ -67,18 +77,60 @@ User: "Ingest ~/Downloads/Complaint.pdf"
                     |
                     v
 +-----------------------------------------------------------------------+
-| 5. STORE                                                               |
-|    - Write chunks + embeddings to case RocksDB                        |
-|    - Write provenance records                                         |
+| 5. STORE (provenance chain is sealed here)                             |
+|    - Write chunks + provenance to case RocksDB (chunks CF)            |
+|      Each chunk stored with its FULL provenance inline                |
+|    - Write embedding vectors to embeddings CF, keyed by chunk_id      |
+|      chunk_id is the bridge: embedding → chunk → provenance → file    |
+|    - Update embedded_at timestamp on each chunk                       |
+|    - Write provenance records to provenance CF (prov:{chunk_uuid})    |
 |    - Update BM25 inverted index                                       |
-|    - Update document metadata and case stats                          |
+|    - Update document metadata (ingested_at, updated_at timestamps)    |
+|    - Update case stats                                                |
 |    - Optionally copy original file to case/originals/                 |
-|    Output: IngestResult { pages, chunks, duration }                   |
+|    Output: IngestResult { pages, chunks, duration, timestamps }       |
 +-----------------------------------------------------------------------+
                     |
                     v
 Response: "Ingested Complaint.pdf: 45 pages, 234 chunks, 12s"
 ```
+
+### 2.1 Post-Chunk Processing: Entity & Citation Extraction
+
+After Step 5 (STORE), the pipeline extracts entities and citations to populate the **Context Graph** (see [PRD 04 Section 8](PRD_04_STORAGE_ARCHITECTURE.md)).
+
+**Step 6 -- EXTRACT ENTITIES**: For each chunk, run regex extractors (citations, statutes, dates, amounts) and NER via E11-Legal (persons, organizations, courts). Deduplicate within the document. Store Entity and EntityMention records in `entities` CF, update `entity_index`. Output: `Vec<Entity>`, `Vec<EntityMention>`.
+
+**Step 7 -- EXTRACT CITATIONS**: Parse Bluebook ("Smith v. Jones, 123 F.3d 456"), neutral ("2020 WL 1234567"), and statute ("42 U.S.C. S 1983") citations. Normalize to canonical form. Detect treatment (Cited/Followed/Distinguished/Overruled/Discussed). Store CitationRecord in `citations` CF. Output: `Vec<CitationRecord>`.
+
+**Step 8 -- BUILD DOCUMENT GRAPH EDGES**: Find shared entities (SharedEntities edges), shared authorities (CitesAuthority edges), and compute document-level E1 similarity (SemanticSimilar edges). Store in `doc_graph` and `chunk_graph` CFs. Output: `Vec<DocRelationship>`.
+
+**Step 9 -- UPDATE CASE MAP**: Incrementally add new parties, key dates, authority/entity statistics. Recompute CaseStatistics. Output: Updated CaseMap.
+
+Complete response: `"Ingested Complaint.pdf: 45 pages, 234 chunks, 47 entities, 12 citations, 12s"`
+
+#### Entity Types Extracted
+
+| Type | Detection Method | Examples |
+|------|-----------------|----------|
+| Person | NER (E11-Legal) | "John Smith", "Judge Martinez" |
+| Organization | NER (E11-Legal) | "Acme Corp", "Department of Justice" |
+| Court | NER + Regex | "United States District Court for the N.D. Cal." |
+| Statute | Regex | "42 U.S.C. S 1983", "Cal. Civ. Code S 1714" |
+| CaseCitation | Regex (Bluebook) | "Smith v. Jones, 123 F.3d 456 (9th Cir. 2020)" |
+| Date | Regex + NER | "January 15, 2024", "filed on 01/15/2024" |
+| MonetaryAmount | Regex | "$1,250,000.00", "1.25 million dollars" |
+| LegalConcept | NER (E11-Legal) | "breach of fiduciary duty", "negligence per se" |
+
+#### Citation Treatment Detection
+
+| Treatment | Signal Words |
+|-----------|-------------|
+| Cited | Default (bare citation, no qualifying language) |
+| Followed | "following", "in accord", "consistent with" |
+| Distinguished | "distinguished", "unlike", "in contrast to" |
+| Overruled | "overruled", "abrogated", "no longer good law" |
+| Discussed | "see", "see also", "cf.", "compare" |
 
 ---
 
@@ -245,12 +297,13 @@ impl DocxProcessor {
 
 ### 5.1 Bundling Strategy
 
-Tesseract is bundled with the CaseTrack binary:
-- **macOS**: Statically linked via `leptonica-sys` and `tesseract-sys`
-- **Windows**: Tesseract DLLs included in installer/MCPB bundle
-- **Linux**: Statically linked via musl build
+| Platform | Method |
+|----------|--------|
+| macOS | Statically linked via `leptonica-sys` + `tesseract-sys` |
+| Windows | Tesseract DLLs in installer/MCPB bundle |
+| Linux | Statically linked via musl build |
 
-The `eng.traineddata` language model (~15MB) is included in the MCPB bundle or downloaded on first OCR use.
+The `eng.traineddata` (~15MB) is bundled or downloaded on first OCR use.
 
 ### 5.2 OCR Pipeline
 
@@ -262,44 +315,25 @@ pub struct OcrEngine {
 impl OcrEngine {
     pub fn new(data_dir: &Path) -> Result<Self> {
         let tessdata = data_dir.join("models").join("tessdata");
-        let tesseract = tesseract::Tesseract::new(
-            tessdata.to_str().unwrap(),
-            "eng",
-        )?;
+        let tesseract = tesseract::Tesseract::new(tessdata.to_str().unwrap(), "eng")?;
         Ok(Self { tesseract })
     }
 
     pub fn recognize(&self, image: &image::DynamicImage) -> Result<OcrResult> {
-        // Preprocess image for better OCR accuracy
         let processed = self.preprocess(image);
-
-        // Convert to bytes
         let bytes = processed.to_luma8();
 
         let mut tess = self.tesseract.clone();
-        tess.set_image(
-            bytes.as_raw(),
-            bytes.width() as i32,
-            bytes.height() as i32,
-            1,  // bytes per pixel
-            bytes.width() as i32,  // bytes per line
-        )?;
-
-        let text = tess.get_text()?;
-        let confidence = tess.mean_text_conf();
+        tess.set_image(bytes.as_raw(), bytes.width() as i32, bytes.height() as i32, 1, bytes.width() as i32)?;
 
         Ok(OcrResult {
-            text,
-            confidence: confidence as f32 / 100.0,
+            text: tess.get_text()?,
+            confidence: tess.mean_text_conf() as f32 / 100.0,
         })
     }
 
-    /// Image preprocessing for better OCR results
     fn preprocess(&self, image: &image::DynamicImage) -> image::DynamicImage {
-        image
-            .grayscale()          // Convert to grayscale
-            .adjust_contrast(1.5) // Increase contrast
-            // Binarization handled by Tesseract internally
+        image.grayscale().adjust_contrast(1.5)
     }
 }
 ```
@@ -310,59 +344,22 @@ impl OcrEngine {
 
 ### 6.1 Chunking Rules (MANDATORY)
 
-```
-CHUNKING SPECIFICATION
-=================================================================================
+| Parameter | Value |
+|-----------|-------|
+| Target size | 2000 characters |
+| Overlap | 10% = 200 characters (from end of previous chunk) |
+| Min size | 400 characters (no tiny fragments) |
+| Max size | 2200 characters (small overrun to avoid mid-sentence splits) |
 
-CHUNK SIZE:    2000 characters (hard target)
-OVERLAP:       10% = 200 characters (from end of previous chunk)
-MIN SIZE:      400 characters (don't emit tiny fragments)
-MAX SIZE:      2200 characters (allow small overrun to avoid mid-sentence splits)
+Character-based (not token-based) for deterministic, reproducible chunking.
 
-WHY 2000 CHARACTERS:
-  - Large enough to capture full legal paragraphs and clauses
-  - Small enough for focused embedding (semantic dilution above 2500 chars)
-  - Character-based (not token-based) for deterministic, reproducible chunking
-  - 10% overlap ensures context continuity across chunk boundaries
-
-BOUNDARY RULES:
-  1. Prefer splitting at paragraph boundaries
-  2. If no paragraph break, split at sentence boundary (period + space)
-  3. If no sentence break, split at word boundary (space)
-  4. NEVER split mid-word
-  5. Chunks do NOT cross page boundaries (each page starts a new chunk)
-```
+**Boundary priority**: (1) paragraph break, (2) sentence boundary, (3) word boundary. Never split mid-word. Chunks do NOT cross page boundaries.
 
 ### 6.2 Provenance Per Chunk (MANDATORY)
 
-**Every chunk MUST store its complete provenance at creation time.** This is not optional.
+**Every chunk MUST store its complete provenance at creation time.** Fields: `document_id`, `document_name`, `document_path`, `page`, `paragraph_start/end`, `line_start/end`, `char_start/end`, `extraction_method`, `ocr_confidence`, `bates_number` (optional), `chunk_index`.
 
-```
-PROVENANCE STORED WITH EVERY CHUNK
-=================================================================================
-
-Every chunk records:
-  - document_id:       UUID of the ingested document
-  - document_name:     Original filename ("Contract.pdf")
-  - document_path:     Full filesystem path ("/Users/sarah/Cases/Contract.pdf")
-  - page:              Page number in the original document
-  - paragraph_start:   First paragraph index included in this chunk
-  - paragraph_end:     Last paragraph index included in this chunk
-  - line_start:        First line number in the original page
-  - line_end:          Last line number in the original page
-  - char_start:        Character offset from start of page
-  - char_end:          Character offset from start of page
-  - extraction_method: How text was extracted (Native / OCR)
-  - ocr_confidence:    OCR confidence score (if applicable)
-  - bates_number:      Optional Bates stamp (for litigation)
-  - chunk_index:       Sequential position of this chunk within the document
-
-This provenance is:
-  1. STORED in RocksDB alongside the chunk text and embeddings
-  2. RETURNED in every search result
-  3. QUERYABLE via MCP tools (get_chunk_provenance, get_document_chunks)
-  4. IMMUTABLE once created (never modified after ingestion)
-```
+Provenance is: (1) stored in RocksDB with chunk text and embeddings, (2) returned in every search result, (3) queryable via MCP tools, (4) immutable after creation. See [PRD 04 Section 5.2](PRD_04_STORAGE_ARCHITECTURE.md) for the canonical Provenance struct and storage layout.
 
 ### 6.3 Chunking Implementation
 
@@ -661,30 +658,20 @@ fn discover_files(folder: &Path, recursive: bool) -> Result<Vec<PathBuf>> {
 
 ## 8. Duplicate Detection
 
-Before ingesting, check if the document already exists in the case:
+Check SHA256 hash against existing documents before ingesting. If duplicate found, return error with existing document ID and `--force` hint.
 
 ```rust
 pub fn check_duplicate(case: &CaseHandle, file_hash: &str) -> Result<Option<Uuid>> {
     let cf = case.db.cf_handle("documents").unwrap();
-    let iter = case.db.iterator_cf(&cf, rocksdb::IteratorMode::Start);
-
-    for item in iter {
+    for item in case.db.iterator_cf(&cf, rocksdb::IteratorMode::Start) {
         let (_, value) = item?;
         let doc: DocumentMetadata = bincode::deserialize(&value)?;
         if doc.file_hash == file_hash {
             return Ok(Some(doc.id));
         }
     }
-
     Ok(None)
 }
-```
-
-If duplicate is found, return an error with the existing document ID:
-
-```
-"Document already ingested as 'Complaint.pdf' (ID: abc-123).
- Use --force to re-ingest."
 ```
 
 ---

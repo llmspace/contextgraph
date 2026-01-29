@@ -16,6 +16,20 @@
 > Python, Go, or C++ in the product. All dependencies are Rust crates. The
 > output is a single statically-linked Rust binary with zero runtime dependencies.
 
+> **PROVENANCE MANDATE**: Every piece of information CaseTrack returns MUST trace
+> back to its exact source. This is non-negotiable. The provenance chain is:
+>
+> **Embedding vector → Chunk → Provenance → Source document (file path + filename)**
+>
+> Every chunk stores: source file path, document filename, page number, paragraph,
+> line number, character offsets, extraction method, and timestamps (created_at,
+> embedded_at). Every embedding vector is keyed to a chunk_id. Every entity mention,
+> citation, and graph edge stores the chunk_id and document_id it came from. Every
+> search result, every MCP tool response, every piece of retrieved text includes
+> its full provenance. There are ZERO orphaned vectors -- every embedding can be
+> traced back to the original document, page, and paragraph it came from.
+> **If the provenance chain is broken, the data is useless.**
+
 ---
 
 ## Document Index
@@ -43,39 +57,14 @@ CaseTrack is a **one-click installable MCP server** that plugs into **Claude Cod
 
 ```
 +---------------------------------------------------------------------------+
-|                              CASETRACK                                     |
-|                                                                           |
-|        "Install once. Everything runs on YOUR machine."                   |
-|                                                                           |
+|  CASETRACK -- "Install once. Everything runs on YOUR machine."            |
 +---------------------------------------------------------------------------+
-|                                                                           |
-|   WHAT IT DOES                                                            |
-|   ============                                                            |
-|   - Ingests PDFs, DOCX, scanned images                                   |
-|   - Embeds documents with 7 specialized legal embedders                  |
-|   - Stores all vectors/embeddings in LOCAL database on YOUR device       |
-|   - Provides semantic search with full source citations                  |
-|                                                                           |
-|   WHAT YOU GET                                                            |
-|   ============                                                            |
-|   - MCP server that plugs into Claude Code or Claude Desktop             |
-|   - All 7 embedding models downloaded and ready to use                   |
-|   - RocksDB database installed on your machine                           |
-|   - Your data NEVER leaves your computer                                 |
-|                                                                           |
-|   RUNS ON                        REQUIRES                                 |
-|   --------                       --------                                 |
-|   - macOS (Intel + Apple Silicon)  - 8GB RAM minimum                     |
-|   - Windows 10/11                  - 5GB storage                         |
-|   - Linux (Ubuntu 20.04+)          - NO GPU needed                       |
-|                                                                           |
-|   STORAGE (All on YOUR device)                                            |
-|   ============================                                            |
-|   - Embedding models: ~400MB                                             |
-|   - Vector database: RocksDB (scales with documents)                     |
-|   - Embeddings: ~50KB per document page                                  |
-|   - Everything stored in ~/Documents/CaseTrack/                          |
-|                                                                           |
+|  - Ingests PDFs, DOCX, scanned images                                    |
+|  - Embeds documents with 7 specialized legal embedders                   |
+|  - Stores all vectors/embeddings locally (RocksDB)                       |
+|  - Provides semantic search with full source citations                   |
+|  - MCP server for Claude Code + Claude Desktop                           |
+|  - Your data NEVER leaves your computer                                  |
 +---------------------------------------------------------------------------+
 ```
 
@@ -97,16 +86,14 @@ Legal professionals waste hours searching through case documents:
 
 CaseTrack solves this with:
 
-1. **One-click install**: Single command or MCPB file -- embedders and database included
-2. **100% local storage**: All embeddings and vectors stored on YOUR device in RocksDB
-3. **Per-case isolation**: Every case has its own separate database -- embeddings from one case NEVER touch another
-4. **Per-customer isolation**: Each customer's installation is fully independent (no shared servers or data)
-5. **7 specialized embedders**: Semantic search that understands legal language
-6. **Full provenance**: Every answer cites the source file path, document name, page, paragraph, and line number
-7. **2000-character chunks**: Documents chunked into 2000-char segments with 10% overlap, each chunk stores its exact origin
-8. **Claude Code + Desktop integration**: Works with both Claude Code CLI and Claude Desktop app
-9. **Runs anywhere**: Works on an 8GB MacBook Air, no GPU needed
-10. **Affordable**: Free tier is genuinely useful; Pro is $29/month
+1. **One-click install** -- single command or MCPB file, embedders and database included
+2. **100% local** -- all data stored on YOUR device in per-case RocksDB instances (case and customer isolation)
+3. **7 specialized embedders** -- semantic search that understands legal language
+4. **Full provenance** -- every answer cites source file path, document name, page, paragraph, and line number
+5. **2000-char chunks** -- 10% overlap, each chunk stores its exact origin
+6. **Claude Code + Desktop** -- works with both CLI and Desktop via MCP stdio
+7. **Auto-sync** -- watches folders for changes; optional scheduled reindexing (daily/hourly/custom)
+8. **Runs anywhere** -- 8GB MacBook Air, no GPU needed; free tier useful, Pro $29/month
 
 ---
 
@@ -156,10 +143,14 @@ DESIGN PRINCIPLES
    No training required
    Works like asking a research assistant
 
-5. PROVENANCE ALWAYS
+5. PROVENANCE ALWAYS (THE MOST IMPORTANT PRINCIPLE)
    Every answer includes exact source citation
-   Document name, page, paragraph, line number
+   Document name, file path, page, paragraph, line number, character offsets
+   Every embedding vector links back to its chunk, which links to its source
+   Every entity, citation, and graph edge traces to its source chunk
+   Timestamps on everything: when ingested, when embedded, when last synced
    One click to view original context
+   If you can't cite the source, you can't return the information
 
 6. GRACEFUL DEGRADATION
    Low RAM? Use fewer models (lazy loading)
@@ -241,6 +232,7 @@ DESIGN PRINCIPLES
 | Model Download | hf-hub | Hugging Face model registry |
 | Serialization | bincode + serde | Fast binary serialization for vectors |
 | Async | tokio | Standard Rust async runtime |
+| File watching | notify | Cross-platform OS file notifications (inotify/FSEvents/ReadDirectoryChanges) |
 | CLI | clap | Standard Rust CLI parsing |
 | Logging | tracing | Structured logging with subscriber |
 | License | ed25519-dalek | Offline cryptographic validation |
@@ -266,6 +258,11 @@ DESIGN PRINCIPLES
 | **rmcp** | Official Rust MCP SDK |
 | **SPLADE** | Sparse Lexical and Expansion Model -- keyword expansion embedder |
 | **stdio** | Standard input/output transport for MCP server communication |
+| **Case Map** | A per-case summary structure containing parties, key dates, legal issues, top authorities, entity statistics, and document counts. Built incrementally during ingestion. |
+| **Citation Network** | The graph of which documents cite which authorities, and how (Cited, Followed, Distinguished, Overruled). Stored in the `citations` column family. |
+| **Context Graph** | The graph layer built on top of chunks and embeddings that stores entities, citations, document relationships, chunk similarity edges, and the case map. Enables AI navigation of 1000+ document cases. |
+| **Document Graph** | Relationship edges between documents based on shared entities, shared citations, semantic similarity, or explicit references (ResponseTo, Amends, Exhibits). |
+| **Entity** | A named thing extracted from document text: person, organization, court, statute, case citation, date, monetary amount, or legal concept. Stored with mentions linking to source chunks. |
 
 ---
 

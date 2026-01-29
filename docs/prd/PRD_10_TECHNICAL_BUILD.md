@@ -5,12 +5,9 @@
 ---
 
 > **LANGUAGE: RUST** -- This entire project is built in Rust. Every crate, every
-> module, every line of product code is Rust. Use `cargo` for building, testing,
-> and releasing. All dependencies are Rust crates from crates.io. The final
-> deliverable is a single statically-linked Rust binary per platform. No runtime
-> dependencies (no Node.js, no Python, no JVM, no .NET). The only non-Rust code
-> in the repository is `scripts/convert_models.py`, a one-time build tool for
-> converting PyTorch models to ONNX format (not shipped to users).
+> module, every line of product code is Rust. The final deliverable is a single
+> statically-linked Rust binary per platform. No runtime dependencies. The only
+> non-Rust code is `scripts/convert_models.py` (one-time build tool, not shipped).
 
 ---
 
@@ -19,23 +16,12 @@
 ### 1.1 Create Fresh Project
 
 ```bash
-# Create new project directory
 mkdir casetrack && cd casetrack
-
-# Initialize workspace
 cargo init --name casetrack
 mkdir -p crates/casetrack-core
-
-# Initialize core library crate
-cd crates/casetrack-core
-cargo init --lib --name casetrack-core
-cd ../..
-
-# Initialize git
+cd crates/casetrack-core && cargo init --lib --name casetrack-core && cd ../..
 git init
-echo "target/" > .gitignore
-echo "*.onnx" >> .gitignore
-echo "models/" >> .gitignore
+echo -e "target/\n*.onnx\nmodels/" > .gitignore
 ```
 
 ### 1.2 Workspace Structure
@@ -44,64 +30,34 @@ echo "models/" >> .gitignore
 casetrack/
 |-- Cargo.toml                   # Workspace root
 |-- Cargo.lock
-|-- .github/
-|   +-- workflows/
-|       |-- ci.yml               # CI pipeline
-|       +-- release.yml          # Release builds
+|-- .github/workflows/
+|   |-- ci.yml
+|   +-- release.yml
 |-- scripts/
-|   |-- convert_models.py        # PyTorch -> ONNX conversion
-|   |-- build_mcpb.sh           # Build MCPB bundle
-|   +-- install.sh              # macOS/Linux installer
+|   |-- convert_models.py
+|   |-- build_mcpb.sh
+|   +-- install.sh
 |-- crates/
 |   |-- casetrack/               # Binary crate (MCP server entry point)
 |   |   |-- Cargo.toml
 |   |   +-- src/
-|   |       |-- main.rs          # Entry point, CLI parsing, server start
-|   |       |-- cli.rs           # CLI argument definitions (clap)
-|   |       |-- server.rs        # MCP server setup + tool registration
-|   |       +-- format.rs        # Output formatting for MCP responses
-|   |
+|   |       |-- main.rs
+|   |       |-- cli.rs
+|   |       |-- server.rs
+|   |       +-- format.rs
 |   +-- casetrack-core/          # Library crate (all business logic)
 |       |-- Cargo.toml
 |       +-- src/
-|           |-- lib.rs           # Public API re-exports
-|           |-- error.rs         # Error types
-|           |-- config.rs        # Configuration
-|           |-- case/
-|           |   |-- mod.rs
-|           |   |-- registry.rs  # CaseRegistry (manages all cases)
-|           |   |-- handle.rs    # CaseHandle (open case database)
-|           |   +-- model.rs     # Case, CaseType, CaseStatus structs
-|           |-- document/
-|           |   |-- mod.rs
-|           |   |-- pdf.rs       # PDF text extraction
-|           |   |-- docx.rs      # DOCX parsing
-|           |   |-- ocr.rs       # Tesseract OCR
-|           |   |-- chunker.rs   # Legal-aware text chunking
-|           |   +-- model.rs     # Page, Paragraph, Chunk structs
-|           |-- embedding/
-|           |   |-- mod.rs
-|           |   |-- engine.rs    # EmbeddingEngine (ONNX inference)
-|           |   |-- models.rs    # Model specs, download config
-|           |   |-- download.rs  # Model download from Hugging Face
-|           |   +-- types.rs     # ChunkEmbeddings, SparseVec, TokenEmbeddings
-|           |-- search/
-|           |   |-- mod.rs
-|           |   |-- engine.rs    # SearchEngine (4-stage pipeline)
-|           |   |-- bm25.rs      # BM25 inverted index
-|           |   |-- ranking.rs   # RRF, cosine similarity, ColBERT MaxSim
-|           |   +-- result.rs    # SearchResult struct
-|           |-- provenance/
-|           |   |-- mod.rs
-|           |   +-- citation.rs  # Provenance struct, cite() formatting
-|           |-- storage/
-|           |   |-- mod.rs
-|           |   |-- rocks.rs     # RocksDB configuration and helpers
-|           |   +-- schema.rs    # Column families, key formats, migration
-|           +-- license/
-|               |-- mod.rs
-|               +-- validator.rs # License key validation (ed25519)
-|
+|           |-- lib.rs
+|           |-- error.rs
+|           |-- config.rs
+|           |-- case/            # registry, handle, model
+|           |-- document/        # pdf, docx, ocr, chunker, model
+|           |-- embedding/       # engine, models, download, types
+|           |-- search/          # engine, bm25, ranking, result
+|           |-- provenance/      # citation formatting
+|           |-- storage/         # rocks, schema
+|           +-- license/         # validator (ed25519)
 |-- tests/
 |   |-- integration/
 |   |   |-- test_case_lifecycle.rs
@@ -109,22 +65,17 @@ casetrack/
 |   |   |-- test_search.rs
 |   |   +-- test_mcp_tools.rs
 |   +-- fixtures/
-|       |-- sample.pdf           # 3-page test PDF
-|       |-- sample.docx          # Test Word document
-|       +-- scanned.png          # Test scanned image
-|
-+-- docs/
-    +-- prd/                     # These PRD documents
+|       |-- sample.pdf
+|       |-- sample.docx
+|       +-- scanned.png
++-- docs/prd/
 ```
 
 ### 1.3 Workspace Cargo.toml
 
 ```toml
 [workspace]
-members = [
-    "crates/casetrack",
-    "crates/casetrack-core",
-]
+members = ["crates/casetrack", "crates/casetrack-core"]
 resolver = "2"
 
 [workspace.package]
@@ -135,81 +86,41 @@ license = "LicenseRef-Commercial"
 repository = "https://github.com/casetrack-legal/casetrack"
 
 [workspace.dependencies]
-# MCP server
 rmcp = { version = "0.13", features = ["server", "transport-io", "macros"] }
-
-# Async runtime
 tokio = { version = "1.35", features = ["full"] }
-
-# Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 bincode = "1.3"
-
-# Storage
 rocksdb = "0.22"
-
-# ML inference
 ort = { version = "2.0", features = ["download-binaries"] }
-
-# PDF processing
 pdf-extract = "0.7"
 lopdf = "0.32"
-
-# DOCX processing
 docx-rs = "0.4"
-
-# Image processing
 image = "0.25"
-
-# OCR
 tesseract = { version = "0.14", optional = true }
-
-# Model download
 hf-hub = "0.3"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
-
-# Identifiers
 uuid = { version = "1.6", features = ["v4", "serde"] }
-
-# Time
 chrono = { version = "0.4", features = ["serde"] }
-
-# CLI
 clap = { version = "4.4", features = ["derive"] }
-
-# Error handling
 thiserror = "2.0"
 anyhow = "1.0"
-
-# Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-# Cryptography (license validation)
 ed25519-dalek = "2.1"
 base64 = "0.22"
-
-# Byte casting (zero-copy embedding reads)
 bytemuck = { version = "1.14", features = ["derive"] }
-
-# Hashing (duplicate detection)
 sha2 = "0.10"
-
-# System info (memory detection)
 sysinfo = "0.30"
-
-# File walking (batch ingest)
 walkdir = "2.4"
-
-# Semver (update checking)
+notify = "6.1"
 semver = "1.0"
-
-# Directories (platform-specific paths)
 dirs = "5.0"
 ```
 
-### 1.4 Binary Crate Cargo.toml
+### 1.4 Crate Cargo.toml Files
+
+**Binary crate** (`crates/casetrack/Cargo.toml`):
 
 ```toml
 [package]
@@ -244,7 +155,7 @@ strip = true
 panic = "abort"
 ```
 
-### 1.5 Core Library Cargo.toml
+**Core library** (`crates/casetrack-core/Cargo.toml`):
 
 ```toml
 [package]
@@ -253,50 +164,30 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-# Storage
 rocksdb.workspace = true
-
-# ML
 ort.workspace = true
-
-# Document processing
 pdf-extract.workspace = true
 lopdf.workspace = true
 docx-rs.workspace = true
 image.workspace = true
-
-# OCR (optional)
 tesseract = { workspace = true, optional = true }
-
-# Model download
 hf-hub.workspace = true
 reqwest.workspace = true
-
-# Serialization
 serde.workspace = true
 serde_json.workspace = true
 bincode.workspace = true
-
-# Identifiers + time
 uuid.workspace = true
 chrono.workspace = true
-
-# Error handling
 thiserror.workspace = true
 anyhow.workspace = true
-
-# Logging
 tracing.workspace = true
-
-# Crypto
 ed25519-dalek.workspace = true
 base64.workspace = true
-
-# Utilities
 bytemuck.workspace = true
 sha2.workspace = true
 sysinfo.workspace = true
 walkdir.workspace = true
+notify.workspace = true
 semver.workspace = true
 dirs.workspace = true
 
@@ -311,7 +202,6 @@ ocr = ["dep:tesseract"]
 
 ```rust
 // crates/casetrack/src/main.rs
-
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
@@ -323,37 +213,24 @@ mod format;
 async fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
 
-    // Handle non-server commands
     match &args.command {
-        Some(cli::Command::SetupClaudeCode) => {
-            return casetrack_core::setup_claude_code(&args.data_dir());
-        }
-        Some(cli::Command::Update) => {
-            return casetrack_core::self_update().await;
-        }
-        Some(cli::Command::Uninstall) => {
-            return casetrack_core::uninstall();
-        }
-        None => {} // Default: run MCP server
+        Some(cli::Command::SetupClaudeCode) => return casetrack_core::setup_claude_code(&args.data_dir()),
+        Some(cli::Command::Update) => return casetrack_core::self_update().await,
+        Some(cli::Command::Uninstall) => return casetrack_core::uninstall(),
+        None => {}
     }
 
-    // Initialize logging (to stderr, since stdout is MCP transport)
     tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("casetrack=info"))
-        )
+        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("casetrack=info")))
         .with_writer(std::io::stderr)
         .init();
 
     tracing::info!("CaseTrack v{} starting...", env!("CARGO_PKG_VERSION"));
 
-    // Start MCP server
     server::CaseTrackServer::start(casetrack_core::Config {
         data_dir: args.data_dir(),
-        license_key: args.license_key(),
-    })
-    .await
+        license_key: args.license.clone(),
+    }).await
 }
 ```
 
@@ -363,24 +240,18 @@ async fn main() -> anyhow::Result<()> {
 
 ```rust
 // crates/casetrack/src/cli.rs
-
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(name = "casetrack")]
-#[command(about = "Legal document analysis MCP server for Claude")]
-#[command(version)]
+#[command(name = "casetrack", about = "Legal document analysis MCP server for Claude", version)]
 pub struct Args {
-    /// Data directory (models, cases, config)
     #[arg(long, env = "CASETRACK_HOME")]
     pub data_dir: Option<PathBuf>,
 
-    /// License key
     #[arg(long, env = "CASETRACK_LICENSE")]
     pub license: Option<String>,
 
-    /// Memory mode override
     #[arg(long, value_enum)]
     pub memory_mode: Option<MemoryMode>,
 
@@ -390,37 +261,16 @@ pub struct Args {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Configure Claude Code to use CaseTrack
     SetupClaudeCode,
-
-    /// Update CaseTrack to the latest version
     Update,
-
-    /// Uninstall CaseTrack
     Uninstall,
 }
 
 #[derive(Clone, Copy, clap::ValueEnum)]
-pub enum MemoryMode {
-    Full,
-    Standard,
-    Constrained,
-}
-
-impl Args {
-    pub fn data_dir(&self) -> PathBuf {
-        self.data_dir.clone().unwrap_or_else(|| {
-            dirs::document_dir()
-                .unwrap_or_else(|| dirs::home_dir().unwrap().join("Documents"))
-                .join("CaseTrack")
-        })
-    }
-
-    pub fn license_key(&self) -> Option<String> {
-        self.license.clone()
-    }
-}
+pub enum MemoryMode { Full, Standard, Constrained }
 ```
+
+`Args::data_dir()` defaults to `~/Documents/CaseTrack/` via `dirs::document_dir()`.
 
 ---
 
@@ -430,7 +280,6 @@ impl Args {
 
 ```rust
 // crates/casetrack-core/src/error.rs
-
 use thiserror::Error;
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -546,64 +395,38 @@ pub type Result<T> = std::result::Result<T, CaseTrackError>;
 
 ```rust
 // crates/casetrack-core/src/config.rs
-
 use std::path::PathBuf;
 
-/// Server configuration (from CLI args + env vars + optional config file)
 pub struct Config {
     pub data_dir: PathBuf,
     pub license_key: Option<String>,
 }
 
-/// Optional config file (~/Documents/CaseTrack/config.toml)
-/// NOT required -- zero-config is a design principle
+/// Optional config file (~/Documents/CaseTrack/config.toml) -- zero-config by default
 #[derive(serde::Deserialize, Default)]
 pub struct ConfigFile {
-    /// Override default data directory
     pub data_dir: Option<PathBuf>,
-
-    /// License key
     pub license_key: Option<String>,
-
-    /// OCR language (default: "eng")
     pub ocr_language: Option<String>,
-
-    /// Copy originals to case folder on ingest
     pub copy_originals: Option<bool>,
-
-    /// Memory mode override
     pub memory_mode: Option<String>,
-
-    /// Max threads for embedding inference
     pub inference_threads: Option<u32>,
 }
 ```
 
 ---
 
-## 6. Logging & Diagnostics
+## 6. Logging
 
-```rust
-// Logging goes to STDERR (stdout is MCP transport)
-// Controlled by RUST_LOG env var or --log-level CLI arg
+Logging goes to stderr (stdout is MCP transport). Controlled by `RUST_LOG` env var.
 
-// Log levels:
-// ERROR: Failures that prevent operations (file not found, DB corruption)
-// WARN:  Degraded functionality (low memory, OCR disabled, slow inference)
-// INFO:  Normal operations (server started, case created, search completed)
-// DEBUG: Internal details (model loading times, RocksDB stats)
-// TRACE: Verbose (individual chunk embeddings, token counts)
-
-// Examples of what gets logged:
-tracing::info!("CaseTrack v{} starting...", version);
-tracing::info!("License tier: {:?}", tier);
-tracing::info!("Models loaded: {} ({} MB RAM)", count, ram_mb);
-tracing::warn!("Low memory mode active ({} MB available)", available);
-tracing::info!("Ingested {} ({} pages, {} chunks, {}ms)", filename, pages, chunks, ms);
-tracing::info!("Search: {} results in {}ms (query: '{}')", results, ms, query);
-tracing::error!("Failed to ingest {}: {}", filename, error);
-tracing::debug!("E1 inference: {}ms for {} chunks", ms, count);
-```
+| Level | Usage |
+|-------|-------|
+| ERROR | Failures preventing operations (file not found, DB corruption) |
+| WARN  | Degraded functionality (low memory, OCR disabled) |
+| INFO  | Normal operations (server started, case created, search completed) |
+| DEBUG | Internal details (model loading times, RocksDB stats) |
+| TRACE | Verbose (individual chunk embeddings, token counts) |
 
 ---
 
@@ -612,21 +435,16 @@ tracing::debug!("E1 inference: {}ms for {} chunks", ms, count);
 ### 7.1 Path Handling
 
 ```rust
-/// Resolve user-provided paths across platforms
 pub fn resolve_path(input: &str) -> PathBuf {
     let expanded = if input.starts_with('~') {
         if let Some(home) = dirs::home_dir() {
-            home.join(&input[2..])  // Skip "~/"
+            home.join(&input[2..])
         } else {
             PathBuf::from(input)
         }
     } else {
         PathBuf::from(input)
     };
-
-    // Normalize path separators
-    // On Windows: handle both / and \
-    // On Unix: just canonicalize
     expanded
 }
 ```
@@ -637,29 +455,15 @@ pub fn resolve_path(input: &str) -> PathBuf {
 |----------|-------------|
 | macOS | `~/Documents/CaseTrack/` |
 | Windows | `C:\Users\{user}\Documents\CaseTrack\` |
-| Linux | `~/Documents/CaseTrack/` (or `~/.local/share/casetrack/` if no Documents) |
+| Linux | `~/Documents/CaseTrack/` (or `~/.local/share/casetrack/`) |
 
-### 7.3 RocksDB Platform Notes
+### 7.3 Platform Dependencies
 
-- **macOS**: Works out of the box via `rust-rocksdb`
-- **Windows**: Requires MSVC build tools. `rocksdb` crate handles compilation.
-- **Linux**: Statically link to avoid `librocksdb.so` dependency
-
-### 7.4 Tesseract Bundling
-
-| Platform | Strategy |
-|----------|----------|
-| macOS | Static link via `tesseract-sys` with vendored feature |
-| Windows | Bundle `tesseract.dll` + `leptonica.dll` in installer |
-| Linux | Static link via musl build OR require system package |
-
-### 7.5 ONNX Runtime
-
-| Platform | Execution Providers |
-|----------|-------------------|
-| macOS | CoreML (hardware accel) + CPU fallback |
-| Windows | DirectML (GPU) + CPU fallback |
-| Linux | CPU only (CUDA optional via feature flag) |
+| Component | macOS | Windows | Linux |
+|-----------|-------|---------|-------|
+| RocksDB | Works via `rust-rocksdb` | Requires MSVC build tools | Static link |
+| Tesseract | Static link (vendored) | Bundle DLLs in installer | Static link or system pkg |
+| ONNX Runtime | CoreML + CPU fallback | DirectML + CPU fallback | CPU only (CUDA optional) |
 
 ---
 
@@ -668,49 +472,35 @@ pub fn resolve_path(input: &str) -> PathBuf {
 ### 8.1 Input Validation
 
 ```rust
-/// Validate file paths to prevent path traversal
 pub fn validate_file_path(path: &Path, data_dir: &Path) -> Result<PathBuf> {
     let canonical = path.canonicalize()
         .map_err(|_| CaseTrackError::FileNotFound(path.to_path_buf()))?;
-
-    // For reads: allow any path the user provides (they own their machine)
-    // For writes: only within data_dir
     Ok(canonical)
 }
 
-/// Validate that a write path is within the data directory
 pub fn validate_write_path(path: &Path, data_dir: &Path) -> Result<PathBuf> {
     let canonical = path.canonicalize()
         .map_err(|_| CaseTrackError::FileNotFound(path.to_path_buf()))?;
-
     let data_canonical = data_dir.canonicalize()?;
-
     if !canonical.starts_with(&data_canonical) {
         return Err(CaseTrackError::Io(std::io::Error::new(
             std::io::ErrorKind::PermissionDenied,
             format!("Write path must be within data directory: {}", data_dir.display()),
         )));
     }
-
     Ok(canonical)
 }
 ```
 
 ### 8.2 License Key Security
 
-- Keys are ed25519 signed: can be validated offline
-- Public key embedded in binary (cannot be extracted to forge keys)
-- Key format: `TIER-XXXXXX-XXXXXX-XXXXXX-SIG` (human-readable prefix + signature)
-- Cached validation avoids repeated network calls
-- No user data in license validation requests
+- ed25519 signed keys, validated offline. Public key embedded in binary.
+- Key format: `TIER-XXXXXX-XXXXXX-XXXXXX-SIG`
+- Cached validation avoids repeated network calls. No user data sent.
 
 ### 8.3 No Network After Setup
 
-After initial model download and license activation, CaseTrack makes ZERO network requests:
-- Document processing: 100% local
-- Search: 100% local
-- Storage: 100% local
-- Update checks: optional, non-blocking, can be disabled
+After initial model download and license activation, CaseTrack makes zero network requests. Document processing, search, and storage are 100% local. Update checks are optional and non-blocking.
 
 ---
 
@@ -718,71 +508,46 @@ After initial model download and license activation, CaseTrack makes ZERO networ
 
 ### 9.1 Unit Tests
 
-Every module has unit tests. Key areas:
+Key test areas (every module has unit tests):
 
 ```rust
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    // Chunking (2000-char target, 200-char overlap)
-    #[test]
+    // Chunking: 2000-char target, 200-char overlap, paragraph-aware
     fn test_chunk_respects_paragraph_boundaries() { ... }
-
-    #[test]
     fn test_chunk_target_2000_chars() { ... }
-
-    #[test]
     fn test_chunk_overlap_200_chars() { ... }
-
-    #[test]
     fn test_chunk_min_400_chars() { ... }
-
-    #[test]
     fn test_chunk_max_2200_chars() { ... }
-
-    #[test]
-    fn test_chunk_provenance_complete() { ... }  // Every chunk has file path, page, paragraph, line, char offsets
+    fn test_chunk_provenance_complete() { ... }
 
     // BM25
-    #[test]
     fn test_bm25_basic_search() { ... }
-
-    #[test]
     fn test_bm25_term_frequency() { ... }
 
-    // Provenance (must include: file path, document name, page, paragraph, line, char offsets)
-    #[test]
+    // PROVENANCE (MOST CRITICAL TEST SUITE)
+    // Every chunk MUST have: file path, document name, page, paragraph, line, char offsets, timestamps.
+    // Every embedding MUST link back to a chunk with valid provenance.
+    // Every search result MUST include complete provenance.
     fn test_citation_format() { ... }
-
-    #[test]
     fn test_short_citation() { ... }
-
-    #[test]
     fn test_provenance_includes_file_path() { ... }
-
-    #[test]
+    fn test_provenance_includes_document_name() { ... }
+    fn test_provenance_includes_page_number() { ... }
+    fn test_provenance_includes_paragraph_range() { ... }
+    fn test_provenance_includes_line_range() { ... }
     fn test_provenance_includes_char_offsets() { ... }
+    fn test_provenance_includes_timestamps() { ... }
+    fn test_provenance_round_trip() { ... }
+    fn test_embedding_links_to_valid_chunk() { ... }
+    fn test_no_orphaned_embeddings() { ... }
+    fn test_no_chunk_without_provenance() { ... }
 
-    #[test]
-    fn test_provenance_round_trip() { ... }  // Store + retrieve preserves all fields
-
-    // RRF
-    #[test]
+    // RRF, cosine similarity, license
     fn test_rrf_fusion() { ... }
-
-    // Cosine similarity
-    #[test]
     fn test_cosine_identical_vectors() { ... }
-
-    #[test]
     fn test_cosine_orthogonal_vectors() { ... }
-
-    // License
-    #[test]
     fn test_free_tier_limits() { ... }
-
-    #[test]
     fn test_valid_license_key() { ... }
 }
 ```
@@ -791,84 +556,38 @@ mod tests {
 
 ```rust
 // tests/integration/test_case_lifecycle.rs
-
 #[tokio::test]
 async fn test_create_list_switch_delete_case() {
     let dir = tempdir().unwrap();
     let mut registry = CaseRegistry::open(dir.path()).unwrap();
 
-    // Create
     let case = registry.create_case(CreateCaseParams {
         name: "Test Case".to_string(),
         case_number: None,
         case_type: Some(CaseType::Contract),
     }).unwrap();
-
     assert_eq!(case.name, "Test Case");
-    assert_eq!(case.case_type, CaseType::Contract);
 
-    // List
     let cases = registry.list_cases().unwrap();
     assert_eq!(cases.len(), 1);
 
-    // Switch
     let handle = registry.switch_case(case.id).unwrap();
     assert_eq!(registry.active_case_id(), Some(case.id));
 
-    // Delete
     drop(handle);
     registry.delete_case(case.id).unwrap();
     assert_eq!(registry.list_cases().unwrap().len(), 0);
 }
-```
 
-```rust
-// tests/integration/test_ingest_pdf.rs
-
-#[tokio::test]
-async fn test_ingest_sample_pdf() {
-    let dir = tempdir().unwrap();
-    let mut registry = CaseRegistry::open(dir.path()).unwrap();
-    let case = registry.create_case(/* ... */).unwrap();
-    let handle = registry.switch_case(case.id).unwrap();
-
-    // Ingest test PDF
-    let result = ingest_document(
-        &handle,
-        &engine,
-        Path::new("tests/fixtures/sample.pdf"),
-        None,
-    ).await.unwrap();
-
-    assert_eq!(result.page_count, 3);
-    assert!(result.chunk_count > 0);
-
-    // Verify chunks stored
-    let docs = handle.list_documents().unwrap();
-    assert_eq!(docs.len(), 1);
-    assert_eq!(docs[0].page_count, 3);
-}
-```
-
-```rust
 // tests/integration/test_search.rs
-
 #[tokio::test]
 async fn test_search_returns_relevant_results() {
     // Setup: create case, ingest sample PDF with known content
-    // ...
-
-    let results = search_engine.search(
-        &case_handle,
-        "termination clause",
-        10,
-        None,
-    ).unwrap();
+    let results = search_engine.search(&case_handle, "termination clause", 10, None).unwrap();
 
     assert!(!results.is_empty());
     assert!(results[0].score > 0.5);
     assert!(results[0].citation.contains("sample.pdf"));
-    assert!(results[0].provenance.page > 0);
 
     // Verify full provenance on every result
     for result in &results {
@@ -882,32 +601,13 @@ async fn test_search_returns_relevant_results() {
 #[tokio::test]
 async fn test_case_isolation() {
     // Verify chunks from one case never appear in another case's search
-    let dir = tempdir().unwrap();
-    let mut registry = CaseRegistry::open(dir.path()).unwrap();
-
-    let case_a = registry.create_case(CreateCaseParams {
-        name: "Case A".to_string(), ..Default::default()
-    }).unwrap();
-    let case_b = registry.create_case(CreateCaseParams {
-        name: "Case B".to_string(), ..Default::default()
-    }).unwrap();
-
-    // Ingest into Case A only
-    let handle_a = registry.switch_case(case_a.id).unwrap();
-    ingest_document(&handle_a, &engine, Path::new("tests/fixtures/sample.pdf"), None).await.unwrap();
-    drop(handle_a);
-
-    // Search Case B -- must return zero results
-    let handle_b = registry.switch_case(case_b.id).unwrap();
-    let results = search_engine.search(&handle_b, "termination clause", 10, None).unwrap();
-    assert!(results.is_empty(), "Case B must not contain Case A documents");
+    // Ingest into Case A, search Case B -- must return zero results
 }
 ```
 
 ### 9.3 Test Fixtures
 
-The `tests/fixtures/` directory contains:
-- `sample.pdf` -- 3-page PDF with known text content about contract terms
+- `sample.pdf` -- 3-page PDF with known contract terms
 - `sample.docx` -- Word document with headings, paragraphs, lists
 - `scanned.png` -- Image of typed text for OCR testing
 - `empty.pdf` -- Edge case: empty PDF
@@ -916,20 +616,11 @@ The `tests/fixtures/` directory contains:
 ### 9.4 Running Tests
 
 ```bash
-# All tests
-cargo test
-
-# Unit tests only (fast, no fixtures needed)
-cargo test --lib
-
-# Integration tests (needs fixtures)
-cargo test --test '*'
-
-# With logging
-RUST_LOG=debug cargo test -- --nocapture
-
-# Specific test
-cargo test test_bm25_basic_search
+cargo test              # All tests
+cargo test --lib        # Unit tests only (fast)
+cargo test --test '*'   # Integration tests (needs fixtures)
+RUST_LOG=debug cargo test -- --nocapture   # With logging
+cargo test test_bm25_basic_search          # Specific test
 ```
 
 ---
@@ -939,14 +630,10 @@ cargo test test_bm25_basic_search
 ### 10.1 GitHub Actions CI
 
 ```yaml
-# .github/workflows/ci.yml
 name: CI
-
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
 
 jobs:
   test:
@@ -956,111 +643,71 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo
-        uses: actions/cache@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo build --release
+      - run: cargo test
+      - run: cargo clippy -- -D warnings
+      - run: cargo fmt -- --check
 
-      - name: Build
-        run: cargo build --release
-
-      - name: Test
-        run: cargo test
-
-      - name: Clippy
-        run: cargo clippy -- -D warnings
-
-      - name: Format check
-        run: cargo fmt -- --check
-
-  # Ensure binary size is reasonable
   size-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release
-      - name: Check binary size
+      - name: Check binary size (<50MB)
         run: |
           SIZE=$(stat -f%z target/release/casetrack 2>/dev/null || stat -c%s target/release/casetrack)
           echo "Binary size: $SIZE bytes ($(($SIZE / 1024 / 1024)) MB)"
-          if [ "$SIZE" -gt 52428800 ]; then  # 50MB limit
-            echo "ERROR: Binary too large (>50MB)"
-            exit 1
-          fi
+          [ "$SIZE" -le 52428800 ] || exit 1
 ```
 
 ### 10.2 Release Pipeline
 
 ```yaml
-# .github/workflows/release.yml
 name: Release
-
 on:
-  push:
-    tags: ['v*']
-
-permissions:
-  contents: write
+  push: { tags: ['v*'] }
+permissions: { contents: write }
 
 jobs:
   build:
     strategy:
       matrix:
         include:
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            name: casetrack-darwin-x64
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            name: casetrack-darwin-arm64
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            name: casetrack-win32-x64.exe
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            name: casetrack-linux-x64
-
+          - { target: x86_64-apple-darwin, os: macos-latest, name: casetrack-darwin-x64 }
+          - { target: aarch64-apple-darwin, os: macos-latest, name: casetrack-darwin-arm64 }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, name: casetrack-win32-x64.exe }
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, name: casetrack-linux-x64 }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Rename binary
-        shell: bash
+        with: { targets: "${{ matrix.target }}" }
+      - run: cargo build --release --target ${{ matrix.target }}
+      - shell: bash
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             cp target/${{ matrix.target }}/release/casetrack.exe ${{ matrix.name }}
           else
             cp target/${{ matrix.target }}/release/casetrack ${{ matrix.name }}
           fi
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.name }}
-          path: ${{ matrix.name }}
+      - uses: actions/upload-artifact@v4
+        with: { name: "${{ matrix.name }}", path: "${{ matrix.name }}" }
 
   release:
     needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
-      - name: Create release
-        uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v1
         with:
           files: |
             casetrack-darwin-x64/casetrack-darwin-x64
@@ -1075,14 +722,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-
-      - name: Build MCPB bundle
-        run: bash scripts/build_mcpb.sh
-
-      - name: Upload MCPB to release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: casetrack.mcpb
+      - run: bash scripts/build_mcpb.sh
+      - uses: softprops/action-gh-release@v1
+        with: { files: casetrack.mcpb }
 ```
 
 ---
@@ -1099,12 +741,7 @@ jobs:
 
 ### 11.2 License Key System
 
-See [PRD 07](PRD_07_CASE_MANAGEMENT.md) for monetization details. Key implementation points:
-
-- ed25519 signature validation (offline-capable)
-- Online activation on first use (one HTTP call to Lemon Squeezy API)
-- Cached validation for 30 days
-- Graceful degradation: if license check fails, fall back to Free tier (never block the user)
+See [PRD 07](PRD_07_CASE_MANAGEMENT.md) for details. Key points: ed25519 offline validation, online activation via Lemon Squeezy on first use, 30-day cache, graceful degradation to Free tier on failure.
 
 ---
 
@@ -1215,10 +852,114 @@ LICENSE SYSTEM
   [ ] Feature gating per tier
   [ ] Upgrade prompts in error messages
 
-BATCH OPERATIONS
-  [ ] ingest_folder tool (directory walking)
-  [ ] Progress reporting
-  [ ] Error collection for batch
+FOLDER INGESTION & SYNC
+  [ ] ingest_folder tool (recursive directory walking via walkdir)
+  [ ] SHA256 duplicate detection (skip already-ingested files)
+  [ ] sync_folder tool (differential sync: new/changed/deleted detection)
+  [ ] sync_folder dry_run mode (preview changes without applying)
+  [ ] sync_folder remove_deleted option (remove docs whose source files are gone)
+  [ ] File extension filtering
+  [ ] Progress reporting (per-file status via stderr logging)
+  [ ] Error collection and summary for batch operations
+
+REINDEXING & EMBEDDING FRESHNESS
+  [ ] reindex_document tool (delete old chunks/embeddings, re-extract, re-chunk, re-embed)
+  [ ] reindex_case tool (full rebuild of all documents in a case)
+  [ ] reparse=false mode (keep chunks, rebuild embeddings only -- fast tier upgrade path)
+  [ ] skip_unchanged mode (only reindex docs whose source SHA256 changed or embeddings incomplete)
+  [ ] get_index_status tool (health check: per-document embedder coverage, SHA256 staleness)
+  [ ] Embedder coverage tracking (store which embedders were used per chunk)
+  [ ] Automatic stale detection (compare stored SHA256 vs source file on disk)
+  [ ] Force reindex flag (rebuild even if SHA256 matches)
+
+AUTO-SYNC & FOLDER WATCHING (see PRD 09 Section 3)
+  [ ] WatchManager struct (manages all active watches)
+  [ ] notify crate integration (cross-platform OS file notifications)
+      - inotify (Linux), FSEvents (macOS), ReadDirectoryChangesW (Windows)
+  [ ] watches.json persistence (survives server restarts)
+  [ ] FolderWatch config struct (folder_path, schedule, auto_remove, extensions)
+  [ ] SyncSchedule enum (OnChange, Interval, Daily, Manual)
+  [ ] Real-time event processing with 2-second debounce
+  [ ] Event batching (Created -> ingest, Modified -> reindex, Deleted -> remove)
+  [ ] Scheduled sync runner (tokio interval, checks every 60 seconds)
+  [ ] watch_folder MCP tool
+  [ ] unwatch_folder MCP tool
+  [ ] list_watches MCP tool
+  [ ] set_sync_schedule MCP tool
+  [ ] Restore watches on server startup (WatchManager::init)
+  [ ] Graceful shutdown (stop watchers, flush pending events)
+```
+
+### Phase 4b: Context Graph
+
+```
+ENTITY EXTRACTION (runs during ingestion, after chunking)
+  [ ] Entity extraction pipeline (post-chunk processing step)
+  [ ] Regex-based extractors:
+      - Case citations (e.g., "Smith v. Jones, 123 F.3d 456 (9th Cir. 2020)")
+      - Statute references (e.g., "42 U.S.C. § 1983")
+      - Date patterns (filed dates, hearing dates, deadlines)
+      - Monetary amounts ("$1,250,000.00", "1.25 million dollars")
+  [ ] NER-based extractors (reuse E11-Legal embedder):
+      - Person names (parties, attorneys, judges, witnesses)
+      - Organization names (companies, agencies, courts)
+      - Court names and jurisdictions
+      - Legal concepts and doctrines
+  [ ] Entity deduplication (same entity across chunks/documents)
+  [ ] Entity storage in `entities` and `entity_index` column families
+  [ ] EntityMention records linking entities to chunks with char offsets
+
+CITATION EXTRACTION & NETWORK
+  [ ] Citation parser (regex for Bluebook, neutral citations, statute refs)
+  [ ] Citation normalization (canonical form for dedup)
+  [ ] CitationRecord storage with source_doc, target, treatment
+  [ ] CitationTreatment detection (Cited, Followed, Distinguished, Overruled, Discussed)
+  [ ] Authority type classification (Case, Statute, Regulation, SecondarySource)
+  [ ] Citation network storage in `citations` column family
+  [ ] Cross-document citation linking (Doc A cites same authority as Doc B)
+
+DOCUMENT GRAPH
+  [ ] DocRelationship storage in `doc_graph` column family
+  [ ] Relationship types: CitesAuthority, SharedEntities, SemanticSimilar, ResponseTo, Amends, Exhibits
+  [ ] Automatic relationship detection during ingestion:
+      - CitesAuthority: documents citing same authorities
+      - SharedEntities: documents mentioning same entities
+      - SemanticSimilar: E1 cosine > 0.75 between document-level embeddings
+  [ ] Chunk similarity graph in `chunk_graph` column family
+  [ ] Cross-chunk similarity edges (E1 cosine > 0.8 between chunks)
+
+CASE MAP
+  [ ] CaseMap builder (aggregates entities, citations, relationships per case)
+  [ ] Party extraction and role classification (Plaintiff, Defendant, Judge, Witness, Attorney)
+  [ ] Key date extraction and timeline construction
+  [ ] Legal issue extraction from headings, arguments, holdings
+  [ ] Authority statistics (most-cited authorities in the case)
+  [ ] Entity statistics (most-mentioned entities)
+  [ ] CaseStatistics computation (doc count, chunk count, entity count, etc.)
+  [ ] Case map storage in `case_map` column family
+  [ ] Incremental case map updates (on ingest/delete/reindex)
+
+CONTEXT GRAPH MCP TOOLS (16 tools -- see PRD 09 Section 2b)
+  [ ] Case Overview tools:
+      - get_case_map (parties, issues, key dates, top authorities)
+      - get_case_timeline (chronological events extracted from documents)
+      - get_case_statistics (counts, coverage, health metrics)
+  [ ] Entity & Citation tools:
+      - list_entities (filter by type, sort by mention count)
+      - get_entity_mentions (all mentions of an entity across documents)
+      - search_entity_relationships (entities connected via shared documents)
+      - list_authorities (all cited authorities with citation counts)
+      - get_authority_citations (all documents citing a specific authority)
+  [ ] Document Navigation tools:
+      - get_document_structure (headings, sections, page count, entity/citation summary)
+      - browse_pages (paginated page content with entities highlighted)
+      - find_related_documents (documents related via citations, entities, or semantics)
+      - list_documents_by_type (filter by inferred document type)
+      - traverse_chunks (sequential chunk navigation with prev/next)
+  [ ] Advanced Search tools:
+      - search_similar_chunks (find chunks semantically similar to a given chunk)
+      - compare_documents (side-by-side entity, citation, and semantic comparison)
+      - find_document_clusters (group documents by topic/entity similarity)
 ```
 
 ### Phase 5: OCR & Polish

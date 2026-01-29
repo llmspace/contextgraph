@@ -4,116 +4,27 @@
 
 ---
 
-## 1. Primary Users
+## 1. Target Users
 
-```
-PRIMARY: SOLO PRACTITIONERS & SMALL FIRMS
-=================================================================================
-
-Profile:
-  - 1-10 attorney firm
-  - No dedicated IT staff
-  - Uses consumer hardware (MacBook, Windows laptop)
-  - Handles 5-50 active matters
-  - Documents stored in folders on local drive or cloud sync (Dropbox, OneDrive)
-  - Already uses Claude Code or Claude Desktop for other work
-
-Pain Points:
-  - Can't find documents they know exist
-  - Spend hours re-reading to find specific facts
-  - No budget for enterprise legal tech ($500+/seat/month)
-  - Frustrated by keyword search limitations
-  - Need to cite sources precisely for court filings
-
-Why CaseTrack:
-  - Works on their existing laptop
-  - No IT support needed
-  - Affordable ($29/month or free tier)
-  - Immediate productivity boost
-  - Integrates with Claude they already use
-```
+| Segment | Profile | Key Pain Point | Why CaseTrack |
+|---------|---------|---------------|---------------|
+| **Primary: Solo/Small Firms** (1-10 attorneys) | No IT staff, consumer hardware, 5-50 active matters, already uses Claude | Can't semantically search documents; no budget for enterprise legal tech ($500+/seat) | Works on existing laptop, no setup, $29/mo or free tier |
+| **Secondary: Paralegals** | Support 1-5 attorneys, manage case document collections | Manual document review is tedious; need exact citations for attorney review | Batch ingest folders, search returns cited sources, 70%+ review reduction |
+| **Tertiary: Law Students** | Studying case law, limited budget, CLI-comfortable | Organizing research, finding cross-document connections, accurate citations | Free tier (3 cases), provenance generates proper citations |
 
 ---
 
-## 2. Secondary Users
+## 2. User Personas
 
-```
-SECONDARY: PARALEGALS & LEGAL ASSISTANTS
-=================================================================================
-
-Profile:
-  - Support 1-5 attorneys
-  - Manage document collections per case
-  - Responsible for organizing and indexing case files
-  - Often do initial research and fact-finding
-
-Pain Points:
-  - Manual document review is tedious and error-prone
-  - No way to semantically search across hundreds of documents
-  - Need to produce exact citations for attorney review
-
-Why CaseTrack:
-  - Batch ingest entire case folders at once
-  - Search returns cited sources ready for attorney review
-  - Reduces manual document review by 70%+
-```
-
-```
-TERTIARY: LAW STUDENTS & RESEARCHERS
-=================================================================================
-
-Profile:
-  - Studying case law, writing papers
-  - Limited budget (free tier)
-  - Comfortable with CLI tools
-
-Pain Points:
-  - Organizing research materials across multiple cases
-  - Finding connections between documents
-  - Citing sources accurately
-
-Why CaseTrack:
-  - Free tier handles 3 cases with full search
-  - Provenance system generates proper citations
-```
+| Persona | Role / Practice | Hardware | CaseTrack Use | Key Need |
+|---------|----------------|----------|---------------|----------|
+| **Sarah** | Solo family law attorney | MacBook Air M1, 8GB | Ingests case docs, asks Claude questions about depositions | Zero setup friction |
+| **Mike** | Small firm partner (5 attorneys), commercial litigation | Windows 11, 16GB | Firm license, each attorney searches own cases | Windows support, multi-seat, worth $99/mo |
+| **Alex** | Paralegal, personal injury firm | Windows 10, 8GB | Batch ingests case folders, builds searchable databases | Fast ingestion, reliable OCR |
 
 ---
 
-## 3. User Personas
-
-### Persona A: Sarah (Solo Practitioner)
-
-- **Age**: 42
-- **Practice**: Family law, solo
-- **Hardware**: MacBook Air M1, 8GB RAM
-- **Tech comfort**: Uses email, Word, basic cloud storage
-- **Current workflow**: Ctrl+F in PDFs, manual notes in Word
-- **CaseTrack use**: Ingests all case documents, asks Claude "What did the respondent claim about custody in the deposition?"
-- **Key need**: Just works, no setup friction
-
-### Persona B: Mike (Small Firm Partner)
-
-- **Age**: 55
-- **Practice**: Contract/commercial litigation, 5-attorney firm
-- **Hardware**: Windows 11 desktop, 16GB RAM
-- **Tech comfort**: Moderate, uses practice management software
-- **Current workflow**: Associates do manual document review
-- **CaseTrack use**: Firm license, each attorney searches their own cases
-- **Key need**: Works on Windows, multiple seats, worth $99/month
-
-### Persona C: Alex (Paralegal)
-
-- **Age**: 28
-- **Practice**: Personal injury firm
-- **Hardware**: Windows 10 laptop, 8GB RAM
-- **Tech comfort**: High, uses multiple software tools daily
-- **Current workflow**: Manually indexes documents in spreadsheets
-- **CaseTrack use**: Batch ingests entire case folders, builds searchable case databases
-- **Key need**: Fast ingestion, reliable OCR for scanned documents
-
----
-
-## 4. Minimum Hardware Requirements
+## 3. Minimum Hardware Requirements
 
 ```
 MINIMUM REQUIREMENTS (Must Run)
@@ -155,9 +66,9 @@ Prerequisites:
 
 ---
 
-## 5. Performance by Hardware Tier
+## 4. Performance by Hardware Tier
 
-### 5.1 Ingestion Performance
+### 4.1 Ingestion Performance
 
 | Hardware | 50-page PDF | 500-page PDF | OCR (50 scanned pages) |
 |----------|-------------|--------------|------------------------|
@@ -166,7 +77,7 @@ Prerequisites:
 | **High** (i7 32GB) | 20 seconds | 3 minutes | 90 seconds |
 | **With GPU** (RTX 3060) | 10 seconds | 90 seconds | 45 seconds |
 
-### 5.2 Search Performance
+### 4.2 Search Performance
 
 | Hardware | Free Tier (2-stage) | Pro Tier (4-stage) | Concurrent Models |
 |----------|--------------------|--------------------|-------------------|
@@ -175,7 +86,7 @@ Prerequisites:
 | **High** (i7 32GB) | 40ms | 80ms | 7 (all loaded) |
 | **With GPU** (RTX 3060) | 20ms | 50ms | 7 (all loaded) |
 
-### 5.3 Memory Usage
+### 4.3 Memory Usage
 
 | Scenario | RAM Usage |
 |----------|-----------|
@@ -187,9 +98,9 @@ Prerequisites:
 
 ---
 
-## 6. Supported Platforms
+## 5. Supported Platforms
 
-### 6.1 Build Targets
+### 5.1 Build Targets
 
 | Platform | Architecture | Binary Name | Status |
 |----------|-------------|-------------|--------|
@@ -199,7 +110,7 @@ Prerequisites:
 | Linux | x86_64 | `casetrack-linux-x64` | Supported |
 | Linux | aarch64 | `casetrack-linux-arm64` | Future |
 
-### 6.2 Platform-Specific Notes
+### 5.2 Platform-Specific Notes
 
 **macOS:**
 - CoreML execution provider available for ~2x inference speedup
@@ -218,7 +129,7 @@ Prerequisites:
 - Statically linked against musl for maximum compatibility
 - AppImage format as alternative distribution
 
-### 6.3 Claude Integration Compatibility
+### 5.3 Claude Integration Compatibility
 
 | Client | Transport | Config Location | Status |
 |--------|-----------|-----------------|--------|
@@ -229,37 +140,15 @@ Prerequisites:
 
 ---
 
-## 7. Graceful Degradation Strategy
+## 6. Graceful Degradation Strategy
 
-CaseTrack adapts to available hardware:
+| Tier | RAM | Models Loaded | Behavior |
+|------|-----|---------------|----------|
+| **Full** | 16GB+ | All 7 simultaneously | Zero load latency, parallel embedding |
+| **Standard** | 8-16GB | Free models always (E1, E6, E7 ~800MB); Pro lazy-loaded | ~200ms first-use penalty; models stay loaded until memory pressure |
+| **Constrained** | <8GB | E1 + E13 only (~400MB); others loaded one-at-a-time | Sequential embedding, higher search latency, startup warning |
 
-```
-DEGRADATION TIERS
-=================================================================================
-
-TIER 1: FULL (16GB+ RAM)
-  - All models loaded in memory simultaneously
-  - Zero model loading latency on search
-  - Maximum ingestion throughput (parallel embedding)
-
-TIER 2: STANDARD (8-16GB RAM)
-  - Free models always loaded (E1, E6, E7 = ~800MB)
-  - Pro models lazy-loaded on demand
-  - ~200ms model load penalty on first Pro search
-  - Models stay loaded after first use until memory pressure
-
-TIER 3: CONSTRAINED (<8GB RAM)
-  - Only E1 + E13 (BM25) always loaded (~400MB)
-  - Other models loaded one at a time, unloaded after use
-  - Ingestion uses sequential (not parallel) embedding
-  - Search still works but with higher latency
-  - Warning shown on startup: "Low memory mode active"
-
-DETECTION:
-  - On startup, check available RAM via sysinfo crate
-  - Set tier automatically, log the decision
-  - User can override via --memory-mode=full|standard|constrained
-```
+**Detection**: On startup, check available RAM via `sysinfo` crate. Set tier automatically, log the decision. User override: `--memory-mode=full|standard|constrained`.
 
 ---
 
