@@ -54,9 +54,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     },
                     "blendWithSemantic": {
                         "type": "number",
-                        "description": "[LEGACY] Blend weight parameter kept for backward compatibility. \
-                                        Now uses multiplicative boost (ARCH-17) instead of linear blending. \
-                                        E10 enhances E1 based on intent alignment, not weighted sum.",
+                        "description": "E10 multiplicative boost strength (ARCH-17). Controls how strongly E10 intent \
+                                        alignment modifies E1 scores. Higher = stronger intent influence.",
                         "default": 0.1,
                         "minimum": 0,
                         "maximum": 1

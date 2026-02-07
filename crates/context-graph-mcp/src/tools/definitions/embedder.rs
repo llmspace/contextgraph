@@ -198,9 +198,9 @@ pub fn definitions() -> Vec<ToolDefinition> {
              embedders produced vectors, and understand how a memory is represented across all 13 spaces.",
             json!({
                 "type": "object",
-                "required": ["memory_id"],
+                "required": ["memoryId"],
                 "properties": {
-                    "memory_id": {
+                    "memoryId": {
                         "type": "string",
                         "format": "uuid",
                         "description": "UUID of the memory to inspect."
@@ -227,6 +227,142 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "additionalProperties": false
             }),
         ),
+        // create_weight_profile - Create a session-scoped custom weight profile
+        ToolDefinition::new(
+            "create_weight_profile",
+            "Create a named custom embedder weight profile for the current session. Assigns weights \
+             to each of the 13 embedders (E1-E13). The profile can be referenced by name in \
+             search_graph's weightProfile, get_unified_neighbors, and search_by_intent. Useful \
+             for defining reusable search strategies. Rejects built-in profile names.",
+            json!({
+                "type": "object",
+                "required": ["name", "weights"],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name for the profile (1-64 chars). Must not conflict with built-in profiles.",
+                        "minLength": 1,
+                        "maxLength": 64
+                    },
+                    "weights": {
+                        "type": "object",
+                        "description": "Per-embedder weights. Keys are E1-E13, values are 0-1. Must sum to ~1.0.",
+                        "properties": {
+                            "E1": { "type": "number", "minimum": 0, "maximum": 1 },
+                            "E2": { "type": "number", "minimum": 0, "maximum": 1 },
+                            "E3": { "type": "number", "minimum": 0, "maximum": 1 },
+                            "E4": { "type": "number", "minimum": 0, "maximum": 1 },
+                            "E5": { "type": "number", "minimum": 0, "maximum": 1 },
+                            "E6": { "type": "number", "minimum": 0, "maximum": 1 },
+                            "E7": { "type": "number", "minimum": 0, "maximum": 1 },
+                            "E8": { "type": "number", "minimum": 0, "maximum": 1 },
+                            "E9": { "type": "number", "minimum": 0, "maximum": 1 },
+                            "E10": { "type": "number", "minimum": 0, "maximum": 1 },
+                            "E11": { "type": "number", "minimum": 0, "maximum": 1 },
+                            "E12": { "type": "number", "minimum": 0, "maximum": 1 },
+                            "E13": { "type": "number", "minimum": 0, "maximum": 1 }
+                        },
+                        "additionalProperties": false
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Optional description of the profile's purpose."
+                    }
+                },
+                "additionalProperties": false
+            }),
+        ),
+        // search_cross_embedder_anomalies - Find blind spots between embedders
+        ToolDefinition::new(
+            "search_cross_embedder_anomalies",
+            "Find memories that score high in one embedder but low in another. Reveals blind \
+             spots and perspective disagreements. Example: highEmbedder=E7 (code), \
+             lowEmbedder=E1 (semantic) finds code patterns that semantic search misses. \
+             Anomaly score = high_score - low_score.",
+            json!({
+                "type": "object",
+                "required": ["query", "highEmbedder", "lowEmbedder"],
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query."
+                    },
+                    "highEmbedder": {
+                        "type": "string",
+                        "description": "Embedder expected to score HIGH (E1-E13).",
+                        "enum": ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13"]
+                    },
+                    "lowEmbedder": {
+                        "type": "string",
+                        "description": "Embedder expected to score LOW (E1-E13).",
+                        "enum": ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13"]
+                    },
+                    "highThreshold": {
+                        "type": "number",
+                        "description": "Minimum score in highEmbedder (0-1, default: 0.5).",
+                        "default": 0.5,
+                        "minimum": 0,
+                        "maximum": 1
+                    },
+                    "lowThreshold": {
+                        "type": "number",
+                        "description": "Maximum score in lowEmbedder (0-1, default: 0.3).",
+                        "default": 0.3,
+                        "minimum": 0,
+                        "maximum": 1
+                    },
+                    "topK": {
+                        "type": "integer",
+                        "description": "Maximum results (1-100, default: 10).",
+                        "default": 10,
+                        "minimum": 1,
+                        "maximum": 100
+                    },
+                    "includeContent": {
+                        "type": "boolean",
+                        "description": "Include content text in results (default: false).",
+                        "default": false
+                    }
+                },
+                "additionalProperties": false
+            }),
+        ),
+        // adaptive_search - Auto-classify query and select optimal weight profile
+        ToolDefinition::new(
+            "adaptive_search",
+            "Auto-classify a query by type (causal, code, temporal, entity, semantic) and select \
+             the optimal embedder weight profile. Uses keyword heuristics to detect query intent \
+             and route to the best E1-E13 weighting. Returns results with strategy explanation \
+             showing why the profile was selected and which keywords triggered it.",
+            json!({
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query to auto-classify and search."
+                    },
+                    "topK": {
+                        "type": "integer",
+                        "description": "Maximum results (1-100, default: 10).",
+                        "default": 10,
+                        "minimum": 1,
+                        "maximum": 100
+                    },
+                    "explainStrategy": {
+                        "type": "boolean",
+                        "description": "Include classification explanation in response (default: true).",
+                        "default": true
+                    },
+                    "includeContent": {
+                        "type": "boolean",
+                        "description": "Include content text in results (default: false).",
+                        "default": false
+                    }
+                },
+                "additionalProperties": false
+            }),
+        ),
     ]
 }
 
@@ -236,8 +372,10 @@ mod tests {
 
     #[test]
     fn test_embedder_tool_count() {
-        // 5 embedder-first search tools
-        assert_eq!(definitions().len(), 5);
+        // 8 embedder tools: search_by_embedder, get_embedder_clusters, compare_embedder_views,
+        // list_embedder_indexes, get_memory_fingerprint, create_weight_profile,
+        // search_cross_embedder_anomalies, adaptive_search
+        assert_eq!(definitions().len(), 8);
     }
 
     #[test]

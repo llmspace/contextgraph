@@ -30,11 +30,14 @@ use context_graph_core::traits::{SearchStrategy, TeleologicalSearchOptions};
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
 
 use super::embedder_dtos::{
-    AllEmbedderScores, AsymmetricVariant, CompareEmbedderViewsRequest,
-    CompareEmbedderViewsResponse, EmbedderIndexInfo, EmbedderRanking, EmbedderSearchResult,
-    EmbedderVectorInfo, GetEmbedderClustersRequest, GetMemoryFingerprintRequest,
-    GetMemoryFingerprintResponse, ListEmbedderIndexesRequest, ListEmbedderIndexesResponse,
-    RankedMemory, SearchByEmbedderRequest, SearchByEmbedderResponse, UniqueFind,
+    AdaptiveSearchRequest, AdaptiveSearchResponse, AllEmbedderScores, AsymmetricVariant,
+    CompareEmbedderViewsRequest, CompareEmbedderViewsResponse, CreateWeightProfileRequest,
+    CreateWeightProfileResponse, EmbedderAnomaly, EmbedderId, EmbedderIndexInfo, EmbedderRanking,
+    EmbedderSearchResult, EmbedderVectorInfo, GetEmbedderClustersRequest,
+    GetMemoryFingerprintRequest, GetMemoryFingerprintResponse, ListEmbedderIndexesRequest,
+    ListEmbedderIndexesResponse, QueryClassification, RankedMemory,
+    SearchByEmbedderRequest, SearchByEmbedderResponse, SearchCrossEmbedderAnomaliesRequest,
+    SearchCrossEmbedderAnomaliesResponse, UniqueFind,
 };
 
 use super::super::Handlers;
@@ -893,6 +896,412 @@ impl Handlers {
             id,
             serde_json::to_value(response).unwrap_or_else(|_| json!({})),
         )
+    }
+
+    /// create_weight_profile tool implementation.
+    ///
+    /// Creates a session-scoped custom weight profile that can be referenced
+    /// by name in search_graph, get_unified_neighbors, and search_by_intent.
+    pub(crate) async fn call_create_weight_profile(
+        &self,
+        id: Option<JsonRpcId>,
+        args: serde_json::Value,
+    ) -> JsonRpcResponse {
+        let request: CreateWeightProfileRequest = match serde_json::from_value(args.clone()) {
+            Ok(req) => req,
+            Err(e) => {
+                error!(error = %e, "create_weight_profile: Failed to parse request");
+                return self.tool_error(id, &format!("Invalid request: {}", e));
+            }
+        };
+
+        if let Err(e) = request.validate() {
+            error!(error = %e, "create_weight_profile: Validation failed");
+            return self.tool_error(id, &e);
+        }
+
+        // Reject names that conflict with built-in profiles
+        let built_in = context_graph_core::weights::get_profile_names();
+        if built_in.contains(&request.name.as_str()) {
+            error!(name = %request.name, "create_weight_profile: Name conflicts with built-in profile");
+            return self.tool_error(
+                id,
+                &format!(
+                    "Profile name '{}' conflicts with a built-in profile. Built-in profiles: {}",
+                    request.name,
+                    built_in.join(", ")
+                ),
+            );
+        }
+
+        // Convert to weight array and validate
+        let weights = request.to_weight_array();
+        if let Err(e) = context_graph_core::weights::validate_weights(&weights) {
+            error!(error = %e, "create_weight_profile: Weight validation failed");
+            return self.tool_error(id, &format!("Invalid weights: {}", e));
+        }
+
+        // Store the profile
+        let total = {
+            let mut profiles = self.custom_profiles.write();
+            profiles.insert(request.name.clone(), weights);
+            profiles.len()
+        };
+
+        // Build response weight map
+        let weight_map: HashMap<String, f32> = [
+            ("E1", weights[0]),  ("E2", weights[1]),  ("E3", weights[2]),
+            ("E4", weights[3]),  ("E5", weights[4]),  ("E6", weights[5]),
+            ("E7", weights[6]),  ("E8", weights[7]),  ("E9", weights[8]),
+            ("E10", weights[9]), ("E11", weights[10]), ("E12", weights[11]),
+            ("E13", weights[12]),
+        ]
+        .into_iter()
+        .filter(|(_, v)| *v > 0.0)
+        .map(|(k, v)| (k.to_string(), v))
+        .collect();
+
+        let response = CreateWeightProfileResponse {
+            name: request.name.clone(),
+            weights: weight_map,
+            description: request.description,
+            total_custom_profiles: total,
+        };
+
+        info!(
+            name = %request.name,
+            total_profiles = total,
+            "create_weight_profile: Profile created"
+        );
+
+        self.tool_result(
+            id,
+            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
+        )
+    }
+
+    /// search_cross_embedder_anomalies tool implementation.
+    ///
+    /// Finds memories that score high in one embedder but low in another,
+    /// revealing blind spots and perspective disagreements.
+    pub(crate) async fn call_search_cross_embedder_anomalies(
+        &self,
+        id: Option<JsonRpcId>,
+        args: serde_json::Value,
+    ) -> JsonRpcResponse {
+        let start = Instant::now();
+
+        let request: SearchCrossEmbedderAnomaliesRequest = match serde_json::from_value(args.clone()) {
+            Ok(req) => req,
+            Err(e) => {
+                error!(error = %e, "search_cross_embedder_anomalies: Failed to parse request");
+                return self.tool_error(id, &format!("Invalid request: {}", e));
+            }
+        };
+
+        if let Err(e) = request.validate() {
+            error!(error = %e, "search_cross_embedder_anomalies: Validation failed");
+            return self.tool_error(id, &e);
+        }
+
+        // Safe: validate() above already confirmed both are valid E1-E13
+        let high_eid = EmbedderId::from_str(&request.high_embedder).expect("validated");
+        let low_eid = EmbedderId::from_str(&request.low_embedder).expect("validated");
+        let high_idx = high_eid.to_index();
+        let low_idx = low_eid.to_index();
+
+        info!(
+            query = %request.query,
+            high = %request.high_embedder,
+            low = %request.low_embedder,
+            "search_cross_embedder_anomalies: Starting anomaly search"
+        );
+
+        // Step 1: Embed the query
+        let query_fingerprint = match self.multi_array_provider.embed_all(&request.query).await {
+            Ok(output) => output.fingerprint,
+            Err(e) => {
+                error!(error = %e, "search_cross_embedder_anomalies: Query embedding FAILED");
+                return self.tool_error(id, &format!("Query embedding failed: {}", e));
+            }
+        };
+
+        // Step 2: Search in the HIGH embedder's space (get more candidates than topK for filtering)
+        let search_k = (request.top_k * 5).min(100);
+        let options = TeleologicalSearchOptions::quick(search_k)
+            .with_strategy(SearchStrategy::E1Only)
+            .with_embedders(vec![high_idx])
+            .with_min_similarity(0.0); // no threshold - we filter ourselves
+
+        let candidates = match self
+            .teleological_store
+            .search_semantic(&query_fingerprint, options)
+            .await
+        {
+            Ok(results) => results,
+            Err(e) => {
+                error!(error = %e, "search_cross_embedder_anomalies: Search FAILED");
+                return self.tool_error(id, &format!("Search failed: {}", e));
+            }
+        };
+
+        let total_searched = candidates.len();
+
+        // Step 3: Filter for anomalies (high in one, low in other)
+        let mut anomalies: Vec<EmbedderAnomaly> = candidates
+            .iter()
+            .filter_map(|cand| {
+                let high_score = cand.embedder_scores[high_idx];
+                let low_score = cand.embedder_scores[low_idx];
+
+                if high_score >= request.high_threshold && low_score <= request.low_threshold {
+                    Some(EmbedderAnomaly {
+                        memory_id: cand.fingerprint.id,
+                        high_score,
+                        low_score,
+                        anomaly_score: high_score - low_score,
+                        content: None,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Sort by anomaly score descending
+        anomalies.sort_by(|a, b| b.anomaly_score.total_cmp(&a.anomaly_score));
+        anomalies.truncate(request.top_k);
+
+        // Step 4: Fetch content if requested
+        if request.include_content && !anomalies.is_empty() {
+            let ids: Vec<Uuid> = anomalies.iter().map(|a| a.memory_id).collect();
+            let contents = match self.teleological_store.get_content_batch(&ids).await {
+                Ok(c) => c,
+                Err(e) => {
+                    error!(error = %e, "search_cross_embedder_anomalies: Content retrieval FAILED");
+                    return self.tool_error(id, &format!("Content retrieval failed: {}", e));
+                }
+            };
+            for (anomaly, content) in anomalies.iter_mut().zip(contents) {
+                anomaly.content = content;
+            }
+        }
+
+        let elapsed_ms = start.elapsed().as_millis() as u64;
+
+        let response = SearchCrossEmbedderAnomaliesResponse {
+            query: request.query.clone(),
+            high_embedder: request.high_embedder.clone(),
+            high_embedder_finds: high_eid.finds().to_string(),
+            low_embedder: request.low_embedder.clone(),
+            low_embedder_finds: low_eid.finds().to_string(),
+            anomalies,
+            total_searched,
+            search_time_ms: elapsed_ms,
+        };
+
+        info!(
+            anomalies = response.anomalies.len(),
+            total_searched = total_searched,
+            elapsed_ms = elapsed_ms,
+            "search_cross_embedder_anomalies: Completed"
+        );
+
+        self.tool_result(
+            id,
+            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
+        )
+    }
+
+    /// adaptive_search tool implementation.
+    ///
+    /// Auto-classifies a query by type and selects the optimal weight profile.
+    /// Uses keyword heuristics for classification.
+    pub(crate) async fn call_adaptive_search(
+        &self,
+        id: Option<JsonRpcId>,
+        args: serde_json::Value,
+    ) -> JsonRpcResponse {
+        let start = Instant::now();
+
+        let request: AdaptiveSearchRequest = match serde_json::from_value(args.clone()) {
+            Ok(req) => req,
+            Err(e) => {
+                error!(error = %e, "adaptive_search: Failed to parse request");
+                return self.tool_error(id, &format!("Invalid request: {}", e));
+            }
+        };
+
+        if let Err(e) = request.validate() {
+            error!(error = %e, "adaptive_search: Validation failed");
+            return self.tool_error(id, &e);
+        }
+
+        // Step 1: Classify the query
+        let classification = classify_query(&request.query);
+
+        info!(
+            query = %request.query,
+            query_type = %classification.query_type,
+            profile = %classification.selected_profile,
+            confidence = classification.confidence,
+            "adaptive_search: Query classified"
+        );
+
+        // Step 2: Resolve the weight profile
+        let weights = match context_graph_core::weights::get_weight_profile(&classification.selected_profile) {
+            Ok(w) => w,
+            Err(e) => {
+                error!(error = %e, profile = %classification.selected_profile, "adaptive_search: Profile resolution FAILED");
+                return self.tool_error(id, &format!("Failed to resolve profile '{}': {}", classification.selected_profile, e));
+            }
+        };
+
+        // Step 3: Embed the query
+        let query_fingerprint = match self.multi_array_provider.embed_all(&request.query).await {
+            Ok(output) => output.fingerprint,
+            Err(e) => {
+                error!(error = %e, "adaptive_search: Query embedding FAILED");
+                return self.tool_error(id, &format!("Query embedding failed: {}", e));
+            }
+        };
+
+        // Step 4: Search with the selected profile's weights
+        let options = TeleologicalSearchOptions::quick(request.top_k)
+            .with_custom_weights(weights);
+
+        let candidates = match self
+            .teleological_store
+            .search_semantic(&query_fingerprint, options)
+            .await
+        {
+            Ok(results) => results,
+            Err(e) => {
+                error!(error = %e, "adaptive_search: Search FAILED");
+                return self.tool_error(id, &format!("Search failed: {}", e));
+            }
+        };
+
+        // Step 5: Build results
+        let candidate_ids: Vec<Uuid> = candidates.iter().map(|c| c.fingerprint.id).collect();
+        let contents = if request.include_content {
+            match self.teleological_store.get_content_batch(&candidate_ids).await {
+                Ok(c) => c,
+                Err(e) => {
+                    error!(error = %e, "adaptive_search: Content retrieval FAILED");
+                    return self.tool_error(id, &format!("Content retrieval failed: {}", e));
+                }
+            }
+        } else {
+            vec![None; candidate_ids.len()]
+        };
+
+        let results: Vec<EmbedderSearchResult> = candidates
+            .iter()
+            .enumerate()
+            .map(|(i, cand)| EmbedderSearchResult {
+                memory_id: cand.fingerprint.id,
+                similarity: cand.similarity,
+                content: contents.get(i).and_then(|c| c.clone()),
+                all_scores: None,
+            })
+            .collect();
+
+        let elapsed_ms = start.elapsed().as_millis() as u64;
+
+        let response = AdaptiveSearchResponse {
+            query: request.query.clone(),
+            classification: if request.explain_strategy {
+                Some(classification)
+            } else {
+                None
+            },
+            total_results: results.len(),
+            results,
+            search_time_ms: elapsed_ms,
+        };
+
+        info!(
+            results = response.total_results,
+            elapsed_ms = elapsed_ms,
+            "adaptive_search: Completed"
+        );
+
+        self.tool_result(
+            id,
+            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
+        )
+    }
+}
+
+/// Classify a query by type using keyword heuristics.
+///
+/// Returns the detected query type, selected weight profile, confidence,
+/// and the keywords that triggered the classification.
+fn classify_query(query: &str) -> QueryClassification {
+    let lower = query.to_lowercase();
+    let word_count = lower.split_whitespace().count().max(1) as f32;
+
+    /// Collect keywords from `candidates` that appear in `text`.
+    fn matched_keywords<'a>(text: &str, candidates: &[&'a str]) -> Vec<&'a str> {
+        candidates.iter().copied().filter(|kw| text.contains(kw)).collect()
+    }
+
+    let categories: [(&str, &str, Vec<&str>); 6] = [
+        ("causal", "causal_reasoning", matched_keywords(&lower, &[
+            "why", "because", "caused", "cause", "effect", "leads to",
+            "result of", "consequence", "due to", "therefore", "hence",
+        ])),
+        ("code", "code_search", matched_keywords(&lower, &[
+            "fn ", "function", "class ", "struct ", "impl ", "def ",
+            "async ", "pub fn", "import ", "module", "crate", "package",
+            "compile", "runtime", "error:", "panic", "unwrap",
+        ])),
+        ("temporal", "temporal_navigation", matched_keywords(&lower, &[
+            "recent", "yesterday", "last week", "today", "latest",
+            "newest", "when", "before", "after", "ago", "previous",
+        ])),
+        ("entity", "fact_checking", matched_keywords(&lower, &[
+            "who", "what is", "where", "define", "definition",
+            "entity", "person", "organization", "company",
+        ])),
+        ("intent", "intent_search", matched_keywords(&lower, &[
+            "how to", "goal", "achieve", "accomplish", "implement",
+            "build", "create", "design", "plan",
+        ])),
+        ("graph", "graph_reasoning", matched_keywords(&lower, &[
+            "related to", "connected", "depends on", "dependency",
+            "imports", "uses", "relationship", "link",
+        ])),
+    ];
+
+    // Pick the category with the most keyword matches
+    if let Some((query_type, profile, kws)) = categories
+        .iter()
+        .filter(|(_, _, kws)| !kws.is_empty())
+        .max_by_key(|(_, _, kws)| kws.len())
+    {
+        let count = kws.len();
+        let confidence = (count as f32 / word_count).min(1.0);
+        return QueryClassification {
+            query_type: query_type.to_string(),
+            selected_profile: profile.to_string(),
+            confidence,
+            reason: format!(
+                "Detected {} keyword(s) matching '{}' type. Using '{}' profile for optimal retrieval.",
+                count, query_type, profile
+            ),
+            trigger_keywords: kws.iter().map(|s| s.to_string()).collect(),
+        };
+    }
+
+    // Default: semantic search
+    QueryClassification {
+        query_type: "semantic".to_string(),
+        selected_profile: "semantic_search".to_string(),
+        confidence: 0.5,
+        reason: "No specific query type detected. Using default 'semantic_search' profile.".to_string(),
+        trigger_keywords: vec![],
     }
 }
 

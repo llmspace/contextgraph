@@ -3,6 +3,8 @@
 //! Per Constitution v6.3, these DTOs support searching using any of the
 //! 13 embedders as the primary perspective.
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -631,6 +633,250 @@ pub struct GetMemoryFingerprintResponse {
     pub content: Option<String>,
     /// When the fingerprint was created.
     pub created_at: String,
+}
+
+// ============================================================================
+// create_weight_profile DTOs
+// ============================================================================
+
+/// Request for create_weight_profile tool.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateWeightProfileRequest {
+    /// Name for the custom profile (must not conflict with built-in profiles).
+    pub name: String,
+    /// Per-embedder weights as E1-E13 keys. Must sum to ~1.0.
+    pub weights: HashMap<String, f64>,
+    /// Optional description for the profile.
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+impl CreateWeightProfileRequest {
+    /// Validate the request.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.name.is_empty() {
+            return Err("Profile name cannot be empty".to_string());
+        }
+        if self.name.len() > 64 {
+            return Err("Profile name must be at most 64 characters".to_string());
+        }
+        if self.weights.is_empty() {
+            return Err("Weights cannot be empty".to_string());
+        }
+        // Validate all keys are valid embedder names
+        for key in self.weights.keys() {
+            if EmbedderId::from_str(key).is_none() {
+                return Err(format!(
+                    "Invalid embedder name '{}' in weights. Valid names: E1-E13.",
+                    key
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Convert the weights map to a [f32; 13] array.
+    pub fn to_weight_array(&self) -> [f32; 13] {
+        let mut weights = [0.0f32; 13];
+        for (key, &val) in &self.weights {
+            if let Some(eid) = EmbedderId::from_str(key) {
+                weights[eid.to_index()] = val as f32;
+            }
+        }
+        weights
+    }
+}
+
+/// Response for create_weight_profile tool.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateWeightProfileResponse {
+    /// Name of the created profile.
+    pub name: String,
+    /// The stored weights as E1-E13 map.
+    pub weights: HashMap<String, f32>,
+    /// Description if provided.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Total custom profiles now stored.
+    pub total_custom_profiles: usize,
+}
+
+// ============================================================================
+// search_cross_embedder_anomalies DTOs
+// ============================================================================
+
+/// Request for search_cross_embedder_anomalies tool.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchCrossEmbedderAnomaliesRequest {
+    /// Search query.
+    pub query: String,
+    /// Embedder expected to score HIGH (E1-E13).
+    pub high_embedder: String,
+    /// Embedder expected to score LOW (E1-E13).
+    pub low_embedder: String,
+    /// Minimum score in high embedder (default: 0.5).
+    #[serde(default = "default_high_threshold")]
+    pub high_threshold: f32,
+    /// Maximum score in low embedder (default: 0.3).
+    #[serde(default = "default_low_threshold")]
+    pub low_threshold: f32,
+    /// Maximum results (default: 10).
+    #[serde(default = "default_top_k")]
+    pub top_k: usize,
+    /// Include content in results (default: false).
+    #[serde(default)]
+    pub include_content: bool,
+}
+
+fn default_high_threshold() -> f32 {
+    0.5
+}
+
+fn default_low_threshold() -> f32 {
+    0.3
+}
+
+impl SearchCrossEmbedderAnomaliesRequest {
+    /// Validate the request.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.query.is_empty() {
+            return Err("Query cannot be empty".to_string());
+        }
+        if EmbedderId::from_str(&self.high_embedder).is_none() {
+            return Err(format!(
+                "Invalid highEmbedder '{}'. Must be E1-E13.",
+                self.high_embedder
+            ));
+        }
+        if EmbedderId::from_str(&self.low_embedder).is_none() {
+            return Err(format!(
+                "Invalid lowEmbedder '{}'. Must be E1-E13.",
+                self.low_embedder
+            ));
+        }
+        if self.high_embedder == self.low_embedder {
+            return Err("highEmbedder and lowEmbedder must be different".to_string());
+        }
+        if self.high_threshold < 0.0 || self.high_threshold > 1.0 {
+            return Err("highThreshold must be between 0 and 1".to_string());
+        }
+        if self.low_threshold < 0.0 || self.low_threshold > 1.0 {
+            return Err("lowThreshold must be between 0 and 1".to_string());
+        }
+        if self.top_k == 0 || self.top_k > 100 {
+            return Err("topK must be between 1 and 100".to_string());
+        }
+        Ok(())
+    }
+}
+
+/// A single anomaly result.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbedderAnomaly {
+    /// Memory ID.
+    pub memory_id: Uuid,
+    /// Score in the high embedder.
+    pub high_score: f32,
+    /// Score in the low embedder.
+    pub low_score: f32,
+    /// Anomaly score = high_score - low_score.
+    pub anomaly_score: f32,
+    /// Content (if includeContent=true).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+}
+
+/// Response for search_cross_embedder_anomalies tool.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchCrossEmbedderAnomaliesResponse {
+    /// Query searched.
+    pub query: String,
+    /// Embedder that scored high.
+    pub high_embedder: String,
+    /// What the high embedder finds.
+    pub high_embedder_finds: String,
+    /// Embedder that scored low.
+    pub low_embedder: String,
+    /// What the low embedder finds.
+    pub low_embedder_finds: String,
+    /// Anomalous memories (high in one, low in other).
+    pub anomalies: Vec<EmbedderAnomaly>,
+    /// Total candidates searched.
+    pub total_searched: usize,
+    /// Search time in milliseconds.
+    pub search_time_ms: u64,
+}
+
+// ============================================================================
+// adaptive_search DTOs
+// ============================================================================
+
+/// Request for adaptive_search tool.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdaptiveSearchRequest {
+    /// Search query - will be auto-classified.
+    pub query: String,
+    /// Maximum results (default: 10).
+    #[serde(default = "default_top_k")]
+    pub top_k: usize,
+    /// Include strategy explanation (default: true).
+    #[serde(default = "default_true")]
+    pub explain_strategy: bool,
+    /// Include content in results (default: false).
+    #[serde(default)]
+    pub include_content: bool,
+}
+
+impl AdaptiveSearchRequest {
+    /// Validate the request.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.query.is_empty() {
+            return Err("Query cannot be empty".to_string());
+        }
+        if self.top_k == 0 || self.top_k > 100 {
+            return Err("topK must be between 1 and 100".to_string());
+        }
+        Ok(())
+    }
+}
+
+/// Classification result for a query.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryClassification {
+    /// Detected query type.
+    pub query_type: String,
+    /// Selected weight profile name.
+    pub selected_profile: String,
+    /// Confidence in the classification (0-1).
+    pub confidence: f32,
+    /// Why this profile was selected.
+    pub reason: String,
+    /// Keywords that triggered the classification.
+    pub trigger_keywords: Vec<String>,
+}
+
+/// Response for adaptive_search tool.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdaptiveSearchResponse {
+    /// The original query.
+    pub query: String,
+    /// Query classification and strategy explanation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub classification: Option<QueryClassification>,
+    /// Search results (same structure as search_graph).
+    pub results: Vec<EmbedderSearchResult>,
+    /// Total results found.
+    pub total_results: usize,
+    /// Search time in milliseconds.
+    pub search_time_ms: u64,
 }
 
 #[cfg(test)]

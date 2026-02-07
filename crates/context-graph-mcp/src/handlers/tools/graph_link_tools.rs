@@ -830,10 +830,19 @@ impl Handlers {
 
         // Step 2: Get weight profile for RRF fusion
         // GAP-1: custom_weights overrides weight_profile
+        // AP-NAV-01: FAIL FAST on invalid embedder names
         let mut weights = if let Some(ref custom) = request.custom_weights {
-            let names = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13"];
+            const VALID_NAMES: [&str; 13] = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13"];
+            for key in custom.keys() {
+                if !VALID_NAMES.contains(&key.as_str()) {
+                    error!(invalid_key = %key, "get_unified_neighbors: custom_weights contains invalid embedder name");
+                    return self.tool_error(id, &format!(
+                        "Invalid embedder name '{}' in custom_weights. Valid names: E1-E13.", key
+                    ));
+                }
+            }
             let mut w = [0.0f32; 13];
-            for (i, name) in names.iter().enumerate() {
+            for (i, name) in VALID_NAMES.iter().enumerate() {
                 if let Some(&val) = custom.get(*name) {
                     w[i] = val as f32;
                 }
@@ -855,19 +864,25 @@ impl Handlers {
         };
 
         // GAP-8: Apply embedder exclusions
+        // AP-NAV-01: FAIL FAST on invalid embedder names
         if !request.exclude_embedders.is_empty() {
-            let name_to_idx = |s: &str| -> Option<usize> {
+            let name_to_idx = |s: &str| -> Result<usize, String> {
                 match s {
-                    "E1" => Some(0), "E2" => Some(1), "E3" => Some(2),
-                    "E4" => Some(3), "E5" => Some(4), "E6" => Some(5),
-                    "E7" => Some(6), "E8" => Some(7), "E9" => Some(8),
-                    "E10" => Some(9), "E11" => Some(10), "E12" => Some(11),
-                    "E13" => Some(12), _ => None,
+                    "E1" => Ok(0), "E2" => Ok(1), "E3" => Ok(2),
+                    "E4" => Ok(3), "E5" => Ok(4), "E6" => Ok(5),
+                    "E7" => Ok(6), "E8" => Ok(7), "E9" => Ok(8),
+                    "E10" => Ok(9), "E11" => Ok(10), "E12" => Ok(11),
+                    "E13" => Ok(12),
+                    _ => Err(format!("Invalid embedder '{}' in exclude_embedders. Valid names: E1-E13.", s)),
                 }
             };
             for name in &request.exclude_embedders {
-                if let Some(idx) = name_to_idx(name) {
-                    weights[idx] = 0.0;
+                match name_to_idx(name) {
+                    Ok(idx) => { weights[idx] = 0.0; }
+                    Err(msg) => {
+                        error!(embedder = %name, "get_unified_neighbors: Invalid embedder in exclude_embedders");
+                        return self.tool_error(id, &msg);
+                    }
                 }
             }
             let sum: f32 = weights.iter().sum();

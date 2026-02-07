@@ -1,5 +1,5 @@
-# Context Graph Constitution v6.5.0
-# 13-Perspectives Collaboration | E1 Foundation | GPU-First Architecture | Code Embedding Separation
+# Context Graph Constitution v6.6.0
+# 13-Perspectives Collaboration | E1 Foundation | GPU-First Architecture | Code Embedding Separation | Dynamic Weight Navigation
 # ═══════════════════════════════════════════════════════════════
 
 # GPU-FIRST ARCHITECTURE
@@ -29,6 +29,9 @@
 #   2. BLIND SPOT DETECTION: Highlights when enhancers found what E1 missed
 #   3. NAVIGATION HINTS: Suggests which embedder-specific tools to explore next
 #   4. AGREEMENT METRICS: Shows how many embedders agree on a result's relevance
+#   5. CUSTOM WEIGHT BLENDING: AI specifies arbitrary [f32;13] weights via customWeights
+#   6. EMBEDDER EXCLUSION: AI masks specific embedders via excludeEmbedders (zero + renormalize)
+#   7. BREAKDOWN TRANSPARENCY: Per-embedder RRF contribution visible via includeEmbedderBreakdown
 #
 # The AI model uses this information to:
 #   - Identify which embedders found strong matches for different query aspects
@@ -221,6 +224,24 @@ signal_definitions:
     topic_weight: 0.0  # ALWAYS - temporal proximity ≠ semantic relationship
 
 # ═══════════════════════════════════════════════════════════════
+# CUSTOM WEIGHT RULES (Dynamic Navigation)
+# ═══════════════════════════════════════════════════════════════
+custom_weight_rules:
+  validation:
+    sum_tolerance: 0.01
+    per_weight_range: [0.0, 1.0]
+    validator: "validate_weights() in weights/mod.rs"
+  precedence: "customWeights > weightProfile > DEFAULT_SEMANTIC_WEIGHTS"
+  exclusion_behavior:
+    method: "Zero excluded weights, renormalize remaining to sum=1.0"
+    all_excluded: "Error — cannot exclude all 13 embedders"
+    fail_fast: "Invalid embedder names (e.g., E14) return error immediately"
+  pipeline_embedders:
+    E12_E13: "Weights allowed but only apply in Pipeline strategy. In MultiSpace, silently treated as 0."
+  temporal_embedders:
+    E2_E3_E4: "Weights allowed. High values may reduce topical relevance per AP-73."
+
+# ═══════════════════════════════════════════════════════════════
 # ARCHITECTURAL RULES (MUST follow)
 # ═══════════════════════════════════════════════════════════════
 arch_rules:
@@ -247,6 +268,9 @@ arch_rules:
   ARCH-NAV-03: "Blind spots detected: enhancer >= 0.5 AND E1 < 0.3 triggers alert"
   ARCH-NAV-04: "Navigation hints guide AI to specialized tools based on score patterns"
   ARCH-NAV-05: "Agreement metrics show embedder consensus for confidence assessment"
+  ARCH-NAV-06: "Custom weight blending: AI specifies arbitrary [f32;13] weights via customWeights, validated by validate_weights() (sum ~1.0, each in [0.0,1.0]). Overrides weightProfile."
+  ARCH-NAV-07: "Embedder masking: AI excludes specific embedders via excludeEmbedders array (E1-E13). Excluded weights zeroed and remaining renormalized. All-excluded = error."
+  ARCH-NAV-08: "Breakdown transparency: includeEmbedderBreakdown returns per-embedder {embedder, score, rank, weight, rrfContribution} + dominantEmbedder + agreementLevel per result."
 
   # Core
   ARCH-01: "TeleologicalArray is atomic - all 13 embeddings or nothing"
@@ -300,6 +324,11 @@ forbidden:
   AP-80: "E10 MUST NOT use linear blending - makes E10 compete with E1"
   AP-84: "E10 MUST NOT override E1 - when E1=0, result=0"
 
+  # Navigation Anti-Patterns
+  AP-NAV-01: "NEVER silently drop invalid embedder names — fail fast with descriptive error"
+  AP-NAV-02: "NEVER allow customWeights that don't sum to ~1.0 — validate_weights() must pass"
+  AP-NAV-03: "NEVER exclude all 13 embedders — at least one must remain for search"
+
 # ═══════════════════════════════════════════════════════════════
 # TOPIC SYSTEM
 # ═══════════════════════════════════════════════════════════════
@@ -324,14 +353,17 @@ topics:
 mcp_tools:
   # CORE SEARCH: Primary retrieval operations
   search: [search_graph, search_causes, search_connections, search_by_intent]
+  # search_graph: + customWeights, excludeEmbedders, includeEmbedderBreakdown, all 16 profiles
+  # search_by_intent: + all 16 weight profiles
 
-  # EMBEDDER-FIRST SEARCH: Any embedder as primary perspective (NEW)
+  # EMBEDDER-FIRST SEARCH: Any embedder as primary perspective
   # Enables AI agents to explore the knowledge graph from any of the 13 perspectives
   embedder_search:
     - search_by_embedder      # Generic: search using any embedder (E1-E13) as primary
     - get_embedder_clusters   # Explore clusters in any embedder's space
     - compare_embedder_views  # Compare how different embedders see the same query
     - list_embedder_indexes   # List available embedders and their index stats
+    - get_memory_fingerprint  # Per-embedder fingerprint introspection (Gap 5)
 
   # SPECIALIZED SEARCH: Per-embedder tools with custom logic
   semantic: [search_graph]              # E1
@@ -340,10 +372,10 @@ mcp_tools:
   code: [search_code]                   # E7 code-aware
   graph: [search_connections, get_graph_path]  # E8 structural
   entity: [search_by_entities, extract_entities, infer_relationship, find_related_entities, validate_knowledge, get_entity_graph]  # E11 KEPLER
-  intent: [search_by_intent, find_contextual_matches]  # E10 multiplicative boost
+  intent: [search_by_intent]            # E10 multiplicative boost
 
   # MEMORY OPERATIONS
-  memory: [store_memory, inject_context, get_memetic_status]
+  memory: [store_memory, get_memetic_status]
   sequence: [get_conversation_context, get_session_timeline, traverse_memory_chain]
 
   # TOPIC & CLUSTER OPERATIONS
@@ -433,6 +465,22 @@ embedder_first_search:
           - index_size_mb: "approximate size"
           - gpu_resident: "true|false"
 
+    get_memory_fingerprint:
+      description: "Retrieve per-embedder fingerprint vectors for a specific memory"
+      params:
+        memoryId: "UUID (required)"
+        embedders: "[E1..E13] optional filter (default: all 13)"
+        includeVectorNorms: "boolean (default: true)"
+        includeContent: "boolean (default: false)"
+      output:
+        per_embedder: [embedder, name, dimension, present, actualDimension, l2Norm]
+        asymmetric_variants: { E5: [cause, effect], E8: [source, target], E10: [intent, context] }
+        sparse_embedders: { E6: nnz, E13: nnz }
+      use_cases:
+        - "Debug embedding quality per memory"
+        - "Verify which embedders produced vectors"
+        - "Understand asymmetric representation (E5 cause vs effect)"
+
   # Per-embedder direct search (what each finds)
   embedder_perspectives:
     E1_semantic: "Dense semantic similarity - foundation"
@@ -448,6 +496,37 @@ embedder_first_search:
     E11_entity: "Entity knowledge - named entities, relationships"
     E12_precision: "Exact phrase matches - token-level precision"
     E13_expansion: "Term expansion - synonyms, related terms"
+
+# ═══════════════════════════════════════════════════════════════
+# DYNAMIC NAVIGATION (Gaps 1, 3, 5, 6, 8)
+# ═══════════════════════════════════════════════════════════════
+dynamic_navigation:
+  philosophy: |
+    AI agents dynamically compose arbitrary embedder blends, mask irrelevant
+    embedders, and inspect per-result contributions for explainable navigation.
+
+  capabilities:
+    custom_weights:
+      param: "customWeights"
+      tools: [search_graph, get_unified_neighbors]
+      format: '{"E1": 0.4, "E5": 0.3, "E7": 0.2, "E11": 0.1}'
+      validation: "Sum ~1.0 (±0.01), each in [0.0, 1.0]"
+    embedder_exclusion:
+      param: "excludeEmbedders"
+      tools: [search_graph, get_unified_neighbors]
+      behavior: "Zero + renormalize remaining"
+    breakdown:
+      param: "includeEmbedderBreakdown"
+      tools: [search_graph]
+      returns: [embedderBreakdown, dominantEmbedder, agreementLevel]
+
+  weight_profiles:
+    count: 16
+    all_exposed_in: [search_graph, get_unified_neighbors, search_by_intent]
+    list: [semantic_search, causal_reasoning, code_search, fact_checking,
+           intent_search, intent_enhanced, graph_reasoning, temporal_navigation,
+           sequence_navigation, conversation_history, category_weighted, typo_tolerant,
+           pipeline_stage1_recall, pipeline_stage2_scoring, pipeline_full, balanced]
 
 # ═══════════════════════════════════════════════════════════════
 # RETRIEVAL PIPELINE

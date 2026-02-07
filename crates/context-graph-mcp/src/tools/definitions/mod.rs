@@ -83,7 +83,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
     // Entity tools (6) - E11 integration
     tools.extend(entity::definitions());
 
-    // Embedder-first search tools (4) - Constitution v6.3
+    // Embedder-first search tools (8) - Constitution v6.3 + NAV-GAP tools
     tools.extend(embedder::definitions());
 
     // Temporal tools (2) - E2 recency search, E3 periodic search
@@ -107,13 +107,12 @@ mod tests {
 
     #[test]
     fn test_total_tool_count() {
-        // 54 tools:
+        // 57 tools:
         // core: 4, merge: 1, curation: 2, topic: 4, file_watcher: 4, sequence: 4,
         // causal: 4, causal_discovery: 2, keyword: 1, code: 1, graph: 4,
-        // robustness: 1, intent: 1, entity: 6, embedder: 5, temporal: 2, graph_link: 4,
+        // robustness: 1, intent: 1, entity: 6, embedder: 8, temporal: 2, graph_link: 4,
         // maintenance: 1, provenance: 3
-        // (Note: find_contextual_matches merged into search_by_intent, inject_context merged into store_memory)
-        assert_eq!(get_tool_definitions().len(), 54);
+        assert_eq!(get_tool_definitions().len(), 57);
     }
 
     #[test]
@@ -171,12 +170,15 @@ mod tests {
             "find_related_entities",
             "validate_knowledge",
             "get_entity_graph",
-            // Embedder-first search tools (5) - Constitution v6.3
+            // Embedder-first search tools (8) - Constitution v6.3 + NAV-GAP
             "search_by_embedder",
             "get_embedder_clusters",
             "compare_embedder_views",
             "list_embedder_indexes",
             "get_memory_fingerprint",
+            "create_weight_profile",
+            "search_cross_embedder_anomalies",
+            "adaptive_search",
             // Temporal tools (2) - E2 recency search, E3 periodic search
             "search_recent",
             "search_periodic",
@@ -240,7 +242,7 @@ mod tests {
         assert_eq!(robustness::definitions().len(), 1); // E9 typo-tolerant search
         assert_eq!(intent::definitions().len(), 1); // find_contextual_matches merged into search_by_intent
         assert_eq!(entity::definitions().len(), 6);
-        assert_eq!(embedder::definitions().len(), 5); // Constitution v6.3 embedder-first search + fingerprint introspection
+        assert_eq!(embedder::definitions().len(), 8); // Constitution v6.3 embedder-first search + NAV-GAP tools
         assert_eq!(temporal::definitions().len(), 2); // E2 recency search, E3 periodic search
         assert_eq!(graph_link::definitions().len(), 4); // K-NN navigation, typed edges, unified neighbors
         assert_eq!(maintenance::definitions().len(), 1); // Data repair and cleanup

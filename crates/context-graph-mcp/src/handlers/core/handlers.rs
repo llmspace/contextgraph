@@ -6,6 +6,7 @@
 //! E4-FIX: Added session sequence counter for proper E4 (V_ordering) embeddings.
 //! E7-WIRING: Added code embedding pipeline fields for search_code enhancement.
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -101,6 +102,15 @@ pub struct Handlers {
     /// CAUSAL-HINT Phase 5: Provides direction hints to E5 embedder.
     pub(in crate::handlers) causal_hint_provider:
         Option<Arc<dyn context_graph_embeddings::provider::CausalHintProvider>>,
+
+    // =========================================================================
+    // Session-Scoped Custom Weight Profiles (NAV-GAP Phase 3.1)
+    // =========================================================================
+
+    /// Custom weight profiles created via create_weight_profile tool.
+    /// Session-scoped: cleared when the server restarts.
+    /// Accessible by name from search_graph's weightProfile, get_unified_neighbors, etc.
+    pub(in crate::handlers) custom_profiles: Arc<RwLock<HashMap<String, [f32; 13]>>>,
 }
 
 impl Handlers {
@@ -144,6 +154,8 @@ impl Handlers {
             graph_discovery_service,
             // CAUSAL-HINT: Disabled by default
             causal_hint_provider: None,
+            // NAV-GAP: Empty custom profiles
+            custom_profiles: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -190,6 +202,8 @@ impl Handlers {
             graph_discovery_service,
             // CAUSAL-HINT: Disabled by default
             causal_hint_provider: None,
+            // NAV-GAP: Empty custom profiles
+            custom_profiles: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -239,6 +253,8 @@ impl Handlers {
             graph_discovery_service,
             // CAUSAL-HINT: Disabled by default
             causal_hint_provider: None,
+            // NAV-GAP: Empty custom profiles
+            custom_profiles: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -285,6 +301,8 @@ impl Handlers {
             graph_discovery_service,
             // CAUSAL-HINT: Disabled by default
             causal_hint_provider: None,
+            // NAV-GAP: Empty custom profiles
+            custom_profiles: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -332,6 +350,8 @@ impl Handlers {
             graph_discovery_service,
             // CAUSAL-HINT: REQUIRED - shares LLM with graph discovery
             causal_hint_provider: Some(causal_hint_provider),
+            // NAV-GAP: Empty custom profiles
+            custom_profiles: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 

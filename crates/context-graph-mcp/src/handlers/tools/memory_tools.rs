@@ -699,53 +699,63 @@ impl Handlers {
             .map(String::from);
 
         // GAP-1: Parse custom weights (overrides weightProfile when provided)
-        let custom_weights: Option<[f32; 13]> = args
-            .get("customWeights")
-            .and_then(|v| v.as_object())
-            .map(|obj| {
-                let names = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13"];
+        // AP-NAV-01: FAIL FAST on invalid embedder names
+        let custom_weights: Option<[f32; 13]> = match args.get("customWeights").and_then(|v| v.as_object()) {
+            Some(obj) => {
+                const VALID_NAMES: [&str; 13] = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13"];
+                // Reject any keys that are not valid embedder names
+                for key in obj.keys() {
+                    if !VALID_NAMES.contains(&key.as_str()) {
+                        error!(invalid_key = %key, "search_graph: customWeights contains invalid embedder name");
+                        return self.tool_error(id, &format!(
+                            "Invalid embedder name '{}' in customWeights. Valid names: E1-E13.", key
+                        ));
+                    }
+                }
                 let mut weights = [0.0f32; 13];
-                for (i, name) in names.iter().enumerate() {
+                for (i, name) in VALID_NAMES.iter().enumerate() {
                     if let Some(val) = obj.get(*name).and_then(|v| v.as_f64()) {
                         weights[i] = val as f32;
                     }
                 }
-                weights
-            });
+                Some(weights)
+            }
+            None => None,
+        };
 
         // GAP-8: Parse exclude embedders
-        let exclude_embedders: Vec<usize> = args
-            .get("excludeEmbedders")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str())
-                    .filter_map(|s| {
-                        match s {
-                            "E1" => Some(0), "E2" => Some(1), "E3" => Some(2),
-                            "E4" => Some(3), "E5" => Some(4), "E6" => Some(5),
-                            "E7" => Some(6), "E8" => Some(7), "E9" => Some(8),
-                            "E10" => Some(9), "E11" => Some(10), "E12" => Some(11),
-                            "E13" => Some(12), _ => None,
+        let exclude_embedders: Vec<usize> = match args.get("excludeEmbedders").and_then(|v| v.as_array()) {
+            Some(arr) => {
+                let mut indices = Vec::new();
+                for v in arr {
+                    let s = match v.as_str() {
+                        Some(s) => s,
+                        None => {
+                            error!("search_graph: excludeEmbedders contains non-string value");
+                            return self.tool_error(id, "excludeEmbedders must contain strings (E1-E13)");
                         }
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
+                    };
+                    let idx = match s {
+                        "E1" => 0, "E2" => 1, "E3" => 2, "E4" => 3, "E5" => 4, "E6" => 5,
+                        "E7" => 6, "E8" => 7, "E9" => 8, "E10" => 9, "E11" => 10, "E12" => 11,
+                        "E13" => 12,
+                        _ => {
+                            error!(embedder = %s, "search_graph: Invalid embedder in excludeEmbedders");
+                            return self.tool_error(id, &format!("Invalid embedder '{}' in excludeEmbedders. Must be E1-E13.", s));
+                        }
+                    };
+                    indices.push(idx);
+                }
+                indices
+            }
+            None => Vec::new(),
+        };
 
         // GAP-6: Parse include embedder breakdown
         let include_embedder_breakdown = args
             .get("includeEmbedderBreakdown")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
-
-        // TASK-MULTISPACE: Parse recency boost (default: 0.0 = no boost)
-        // Per ARCH-14: Temporal is a POST-retrieval boost, not similarity
-        let recency_boost = args
-            .get("recencyBoost")
-            .and_then(|v| v.as_f64())
-            .map(|v| (v as f32).clamp(0.0, 1.0))
-            .unwrap_or(0.0);
 
         // TASK-MULTISPACE: Parse enable_rerank (default: false)
         // Per AP-73: ColBERT is for re-ranking only
@@ -1032,33 +1042,16 @@ impl Handlers {
             options = options.with_exclude_embedders(exclude_embedders);
         }
 
-        // Apply temporal options - handle both new temporalWeight and legacy recencyBoost
+        // Apply temporal options
         // Per ARCH-14: Temporal is a POST-retrieval boost, not similarity
-        let effective_temporal_weight = if temporal_weight > 0.0 {
-            temporal_weight
-        } else if recency_boost > 0.0 {
-            // Legacy migration: recencyBoost -> temporal_weight with exponential decay
-            recency_boost
-        } else {
-            0.0
-        };
-
-        if effective_temporal_weight > 0.0 {
-            // Determine decay function - use exponential for legacy recencyBoost
-            let effective_decay = if temporal_weight > 0.0 {
-                decay_function
-            } else {
-                // Legacy recencyBoost used exponential decay
-                context_graph_core::traits::DecayFunction::Exponential
-            };
-
+        if temporal_weight > 0.0 {
             options = options
-                .with_temporal_weight(effective_temporal_weight)
-                .with_decay_function(effective_decay)
+                .with_temporal_weight(temporal_weight)
+                .with_decay_function(decay_function)
                 .with_temporal_scale(temporal_scale);
 
             // Apply decay half-life if exponential
-            if matches!(effective_decay, context_graph_core::traits::DecayFunction::Exponential) {
+            if matches!(decay_function, context_graph_core::traits::DecayFunction::Exponential) {
                 options.temporal_options.decay_half_life_secs = decay_half_life;
             }
         }
@@ -1156,7 +1149,6 @@ impl Handlers {
         debug!(
             strategy = ?strategy,
             weight_profile = ?options.weight_profile,
-            recency_boost = recency_boost,
             enable_rerank = enable_rerank,
             temporal_weight = temporal_weight,
             causal_direction = %causal_direction,
@@ -1471,13 +1463,15 @@ impl Handlers {
                                         let approx_rank = r.embedder_scores.iter()
                                             .filter(|&&s| s > score)
                                             .count();
-                                        // Compute RRF contribution
-                                        let rrf_contrib = 1.0 / (60.0 + approx_rank as f32 + 1.0);
-                                        // Get weight from effective profile
-                                        let weight = effective_weight_profile.as_ref()
-                                            .and_then(|p| get_weight_profile(p))
+                                        // Get weight: custom_weights > profile > uniform
+                                        let weight = custom_weights
                                             .map(|w| w[idx])
+                                            .or_else(|| effective_weight_profile.as_ref()
+                                                .and_then(|p| get_weight_profile(p))
+                                                .map(|w| w[idx]))
                                             .unwrap_or(1.0 / 13.0);
+                                        // Compute RRF contribution (matches breakdown formula)
+                                        let rrf_contrib = weight / (60.0 + approx_rank as f32 + 1.0);
                                         json!({
                                             "embedder": name,
                                             "similarity": score,

@@ -171,6 +171,13 @@ impl Handlers {
             tool_names::GET_MEMORY_FINGERPRINT => {
                 self.call_get_memory_fingerprint(id, arguments).await
             }
+            tool_names::CREATE_WEIGHT_PROFILE => {
+                self.call_create_weight_profile(id, arguments).await
+            }
+            tool_names::SEARCH_CROSS_EMBEDDER_ANOMALIES => {
+                self.call_search_cross_embedder_anomalies(id, arguments).await
+            }
+            tool_names::ADAPTIVE_SEARCH => self.call_adaptive_search(id, arguments).await,
 
             // ========== TEMPORAL TOOLS (E2/E3 Integration) ==========
             tool_names::SEARCH_RECENT => self.call_search_recent(id, arguments).await,

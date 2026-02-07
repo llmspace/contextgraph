@@ -107,6 +107,12 @@ pub const GET_EMBEDDER_CLUSTERS: &str = "get_embedder_clusters";
 pub const COMPARE_EMBEDDER_VIEWS: &str = "compare_embedder_views";
 pub const LIST_EMBEDDER_INDEXES: &str = "list_embedder_indexes";
 pub const GET_MEMORY_FINGERPRINT: &str = "get_memory_fingerprint";
+/// Create a session-scoped custom weight profile for reuse.
+pub const CREATE_WEIGHT_PROFILE: &str = "create_weight_profile";
+/// Find memories that score high in one embedder but low in another.
+pub const SEARCH_CROSS_EMBEDDER_ANOMALIES: &str = "search_cross_embedder_anomalies";
+/// Auto-classify a query and select the optimal weight profile.
+pub const ADAPTIVE_SEARCH: &str = "adaptive_search";
 
 // ========== TEMPORAL TOOLS (E2/E3 Integration) ==========
 // Temporal search with E2/E3 boost applied POST-retrieval per ARCH-25.
