@@ -1327,10 +1327,6 @@ impl Handlers {
                     .iter()
                     .enumerate()
                     .map(|(i, r)| {
-                        // Convert embedder index to human-readable name (E1_Semantic, etc.)
-                        let dominant_idx = r.dominant_embedder();
-                        let dominant_name = embedder_names::name(dominant_idx);
-
                         // =================================================================
                         // 13-EMBEDDER VISIBILITY FOR AI NAVIGATION
                         // =================================================================
@@ -1356,7 +1352,6 @@ impl Handlers {
                         let mut entry = json!({
                             "fingerprintId": r.fingerprint.id.to_string(),
                             "similarity": r.similarity,
-                            "dominantEmbedder": dominant_name,
                             "e1Score": e1_score,
                             "embedderScores": embedder_scores,
                             "agreementCount": agreement_count
@@ -1504,7 +1499,7 @@ impl Handlers {
                                     "queryClassification": query_class,
                                     "embedderContributions": contributions,
                                     "consensusScore": agreement_count as f32 / 13.0,
-                                    "primaryEmbedder": dominant_name,
+                                    "primaryEmbedder": embedder_names::name(r.dominant_embedder()),
                                     "isBlindSpotDiscovery": !blind_spots.is_empty() && agreement_count <= 1
                                 });
                             }
@@ -1535,7 +1530,10 @@ impl Handlers {
                 }
 
                 // Add effective weight profile for debugging
-                if let Some(ref profile) = effective_weight_profile {
+                // When customWeights are provided, they override the profile (per constitution: customWeights > weightProfile)
+                if custom_weights.is_some() {
+                    response["effectiveProfile"] = json!("custom");
+                } else if let Some(ref profile) = effective_weight_profile {
                     response["effectiveProfile"] = json!(profile);
                 }
 

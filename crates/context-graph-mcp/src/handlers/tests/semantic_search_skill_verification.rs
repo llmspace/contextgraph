@@ -93,24 +93,10 @@ async fn test_basic_search_response_structure() {
             first.get("similarity").is_some(),
             "Result must have similarity"
         );
+        // dominantEmbedder only appears when includeEmbedderBreakdown=true (ARCH-NAV-08)
         assert!(
-            first.get("dominantEmbedder").is_some(),
-            "Result must have dominantEmbedder"
-        );
-
-        // dominantEmbedder is returned as a human-readable name like "E1_Semantic"
-        let dominant = first
-            .get("dominantEmbedder")
-            .expect("dominantEmbedder must exist")
-            .as_str()
-            .expect("dominantEmbedder must be a string");
-        println!("  dominantEmbedder: {}", dominant);
-
-        // Verify dominantEmbedder is a valid embedder name (E1_Semantic through E13_Sparse)
-        assert!(
-            dominant.starts_with("E") && dominant.contains("_"),
-            "dominantEmbedder must be a valid embedder name like 'E1_Semantic', got '{}'",
-            dominant
+            first.get("dominantEmbedder").is_none(),
+            "dominantEmbedder must NOT be present without includeEmbedderBreakdown=true"
         );
     }
 
