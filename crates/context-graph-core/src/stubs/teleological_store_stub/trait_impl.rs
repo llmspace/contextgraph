@@ -934,6 +934,28 @@ impl TeleologicalMemoryStore for InMemoryTeleologicalStore {
         Ok(None)
     }
 
+    // ==================== Custom Weight Profile Persistence (Stubs) ====================
+
+    async fn store_custom_weight_profile(&self, _name: &str, _weights: &[f32; 13]) -> CoreResult<()> {
+        // Test stub: no-op
+        Ok(())
+    }
+
+    async fn get_custom_weight_profile(&self, _name: &str) -> CoreResult<Option<[f32; 13]>> {
+        // Test stub: always returns None
+        Ok(None)
+    }
+
+    async fn list_custom_weight_profiles(&self) -> CoreResult<Vec<(String, [f32; 13])>> {
+        // Test stub: always returns empty
+        Ok(Vec::new())
+    }
+
+    async fn delete_custom_weight_profile(&self, _name: &str) -> CoreResult<bool> {
+        // Test stub: always returns false
+        Ok(false)
+    }
+
     // ==================== Type Downcasting ====================
 
     fn as_any(&self) -> &dyn Any {

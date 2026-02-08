@@ -367,10 +367,10 @@ pub fn get_all_column_family_descriptors(block_cache: &Cache) -> Vec<ColumnFamil
 }
 
 /// Total number of column families in a fully configured Context Graph database.
-/// Base (11: 8 original + 3 graph linking) + Teleological (23: 21 active + 2 legacy) + Quantized Embedder (13) + Code (5) + Causal (2) = 54
-/// Teleological 23 = 13 original + 2 audit log + 1 entity provenance + 2 merge/importance history
-///   + 1 tool call index + 1 consolidation recommendations + 1 embedding registry + 2 legacy
-pub const TOTAL_COLUMN_FAMILIES: usize = 54;
+/// Base (11: 8 original + 3 graph linking) + Teleological (24: 22 active + 2 legacy) + Quantized Embedder (13) + Code (5) + Causal (2) = 55
+/// Teleological 24 = 13 original + 2 audit log + 1 entity provenance + 2 merge/importance history
+///   + 1 tool call index + 1 consolidation recommendations + 1 embedding registry + 1 custom weight profiles + 2 legacy
+pub const TOTAL_COLUMN_FAMILIES: usize = 55;
 
 #[cfg(test)]
 mod tests {
@@ -647,8 +647,8 @@ mod tests {
         // PRD v6: Autonomous module removed - topics emerge from clustering, not goal hierarchies
         // Teleological: 15 active + 2 legacy = 17 (includes 2 audit log CFs)
         assert_eq!(
-            TOTAL_COLUMN_FAMILIES, 54,
-            "Total column families should be 54 (11 base + 23 teleological + 13 quantized + 5 code + 2 causal)"
+            TOTAL_COLUMN_FAMILIES, 55,
+            "Total column families should be 55 (11 base + 24 teleological + 13 quantized + 5 code + 2 causal)"
         );
     }
 

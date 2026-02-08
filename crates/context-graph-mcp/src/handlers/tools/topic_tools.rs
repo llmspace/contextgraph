@@ -17,6 +17,7 @@ use chrono::Utc;
 use tracing::{debug, error, info, warn};
 
 use context_graph_core::clustering::Topic;
+use context_graph_core::types::audit::{AuditOperation, AuditRecord};
 use context_graph_core::retrieval::config::low_thresholds;
 use context_graph_core::retrieval::divergence::DIVERGENCE_SPACES;
 use context_graph_core::teleological::Embedder;
@@ -216,7 +217,7 @@ impl Handlers {
 
         let response = TopicPortfolioResponse {
             topics,
-            stability: StabilityMetricsSummary::new(churn_rate, 0.0),
+            stability: StabilityMetricsSummary::new(churn_rate, None),
             total_topics,
             tier,
         };
@@ -282,9 +283,6 @@ impl Handlers {
         let churn_rate = stability_tracker.current_churn();
         let average_churn = stability_tracker.average_churn(request.hours as i64);
 
-        // Entropy is no longer tracked via UTL processor
-        let entropy = 0.0_f32;
-
         let high_churn_warning = TopicStabilityResponse::is_high_churn(churn_rate);
 
         // Get phase breakdown from cluster manager topics
@@ -294,7 +292,7 @@ impl Handlers {
 
         let response = TopicStabilityResponse {
             churn_rate,
-            entropy,
+            entropy: None, // Not currently computed
             phases,
             high_churn_warning,
             average_churn,
@@ -302,7 +300,6 @@ impl Handlers {
 
         info!(
             churn_rate = response.churn_rate,
-            entropy = response.entropy,
             average_churn = response.average_churn,
             high_churn_warning = response.high_churn_warning,
             "get_topic_stability: Returning stability response"
@@ -405,66 +402,104 @@ impl Handlers {
         );
 
         // TASK-INTEG-TOPIC: Trigger reclustering via cluster_manager
-        let mut cluster_manager = self.cluster_manager.write();
+        // Note: cluster_manager uses parking_lot::RwLock (guard is !Send),
+        // so we must drop the guard before any .await calls.
+        let (recluster_result, new_topics, total_after, topic_audit_data) = {
+            let mut cluster_manager = self.cluster_manager.write();
 
-        // Clear existing data in cluster_manager and load all fingerprints from storage
-        // This ensures we cluster ALL fingerprints, not just those added during this session.
-        cluster_manager.clear_all_spaces();
+            // Clear existing data and load all fingerprints from storage
+            cluster_manager.clear_all_spaces();
 
-        let mut insert_errors = 0;
-        for (fp_id, cluster_array) in &fingerprints {
-            if let Err(e) = cluster_manager.insert(*fp_id, cluster_array) {
-                warn!(
-                    fingerprint_id = %fp_id,
-                    error = %e,
-                    "detect_topics: Failed to insert fingerprint into cluster_manager"
-                );
-                insert_errors += 1;
+            let mut insert_errors = 0;
+            for (fp_id, cluster_array) in &fingerprints {
+                if let Err(e) = cluster_manager.insert(*fp_id, cluster_array) {
+                    warn!(
+                        fingerprint_id = %fp_id,
+                        error = %e,
+                        "detect_topics: Failed to insert fingerprint into cluster_manager"
+                    );
+                    insert_errors += 1;
+                }
             }
-        }
 
-        if insert_errors > 0 {
-            warn!(
-                insert_errors = insert_errors,
-                total = fingerprints.len(),
-                "detect_topics: Some fingerprints failed to insert"
-            );
-        }
-
-        info!(
-            inserted = fingerprints.len() - insert_errors,
-            errors = insert_errors,
-            "detect_topics: Loaded fingerprints into cluster_manager"
-        );
-
-        // Track topics before reclustering
-        let topics_before: std::collections::HashSet<uuid::Uuid> =
-            cluster_manager.get_topics().keys().cloned().collect();
-
-        // Run HDBSCAN reclustering
-        match cluster_manager.recluster() {
-            Ok(result) => {
-                // Track topics after reclustering
-                let topics_after = cluster_manager.get_topics();
-                let total_after = topics_after.len();
-
-                // Find new topics (in after but not in before)
-                let new_topics: Vec<TopicSummary> = topics_after
-                    .values()
-                    .filter(|t| !topics_before.contains(&t.id))
-                    .map(topic_to_summary)
-                    .collect();
-
-                // Note: Merged topics detection would require tracking merge operations
-                // For now, we report new topics only
-                let merged_topics = vec![];
-
-                info!(
-                    new_topics = new_topics.len(),
-                    total_after = total_after,
-                    clusters_found = result.total_clusters,
-                    "detect_topics: Reclustering completed successfully"
+            if insert_errors > 0 {
+                warn!(
+                    insert_errors = insert_errors,
+                    total = fingerprints.len(),
+                    "detect_topics: Some fingerprints failed to insert"
                 );
+            }
+
+            info!(
+                inserted = fingerprints.len() - insert_errors,
+                errors = insert_errors,
+                "detect_topics: Loaded fingerprints into cluster_manager"
+            );
+
+            // Track topics before reclustering
+            let topics_before: std::collections::HashSet<uuid::Uuid> =
+                cluster_manager.get_topics().keys().cloned().collect();
+
+            // Run HDBSCAN reclustering
+            match cluster_manager.recluster() {
+                Ok(result) => {
+                    let topics_after = cluster_manager.get_topics();
+                    let total_after = topics_after.len();
+
+                    let new_topics: Vec<TopicSummary> = topics_after
+                        .values()
+                        .filter(|t| !topics_before.contains(&t.id))
+                        .map(topic_to_summary)
+                        .collect();
+
+                    // Collect audit data for all detected topics (id + member_count)
+                    let topic_audit_data: Vec<(uuid::Uuid, usize)> = topics_after
+                        .values()
+                        .map(|t| (t.id, t.member_count()))
+                        .collect();
+
+                    info!(
+                        new_topics = new_topics.len(),
+                        total_after = total_after,
+                        clusters_found = result.total_clusters,
+                        "detect_topics: Reclustering completed successfully"
+                    );
+
+                    (Ok(result), new_topics, total_after, topic_audit_data)
+                }
+                Err(e) => {
+                    error!(error = %e, "detect_topics: Reclustering failed");
+                    (Err(e), vec![], 0, vec![])
+                }
+            }
+            // cluster_manager guard dropped here — safe to .await below
+        };
+
+        match recluster_result {
+            Ok(result) => {
+                // Emit TopicDetected audit for each detected topic (non-fatal)
+                for (topic_id, members) in &topic_audit_data {
+                    let audit_record = AuditRecord::new(
+                        AuditOperation::TopicDetected {
+                            topic_id: topic_id.to_string(),
+                            members: *members,
+                        },
+                        *topic_id,
+                    )
+                    .with_operator("detect_topics")
+                    .with_parameters(serde_json::json!({
+                        "total_topics": total_after,
+                        "total_clusters": result.total_clusters,
+                        "force": request.force,
+                        "memory_count": memory_count,
+                    }));
+
+                    if let Err(e) = self.teleological_store.append_audit_record(&audit_record).await {
+                        warn!(error = %e, topic_id = %topic_id, "detect_topics: Failed to write TopicDetected audit (non-fatal)");
+                    }
+                }
+
+                let merged_topics = vec![];
 
                 let response = DetectTopicsResponse {
                     new_topics,
@@ -482,7 +517,6 @@ impl Handlers {
                 )
             }
             Err(e) => {
-                error!(error = %e, "detect_topics: Reclustering failed");
                 self.tool_error(id, &format!("Clustering error: {}", e))
             }
         }

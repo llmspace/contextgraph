@@ -24,7 +24,7 @@ use context_graph_core::types::audit::{
 };
 
 use crate::teleological::column_families::{
-    CF_EMBEDDING_REGISTRY, CF_IMPORTANCE_HISTORY, CF_MERGE_HISTORY,
+    CF_CUSTOM_WEIGHT_PROFILES, CF_EMBEDDING_REGISTRY, CF_IMPORTANCE_HISTORY, CF_MERGE_HISTORY,
 };
 
 use super::store::RocksDbTeleologicalStore;
@@ -353,6 +353,178 @@ impl RocksDbTeleologicalStore {
                     Some(fingerprint_id),
                     e,
                 ))
+            }
+        }
+    }
+}
+
+// ============================================================================
+// CF_CUSTOM_WEIGHT_PROFILES Operations
+// ============================================================================
+
+impl RocksDbTeleologicalStore {
+    /// Store a custom weight profile.
+    ///
+    /// Key: profile_name UTF-8 bytes
+    /// Value: [f32; 13] JSON-serialized
+    pub fn store_custom_weight_profile(
+        &self,
+        name: &str,
+        weights: &[f32; 13],
+    ) -> TeleologicalStoreResult<()> {
+        let key = name.as_bytes();
+
+        let bytes = serde_json::to_vec(weights).map_err(|e| {
+            error!(
+                "FAIL FAST: Failed to serialize custom weight profile '{}': {}",
+                name, e
+            );
+            TeleologicalStoreError::Serialization {
+                id: None,
+                message: format!("Custom weight profile serialization failed: {}", e),
+            }
+        })?;
+
+        let cf = self.get_cf(CF_CUSTOM_WEIGHT_PROFILES)?;
+        self.db.put_cf(cf, key, &bytes).map_err(|e| {
+            error!(
+                "FAIL FAST: Failed to write custom weight profile '{}' to CF '{}': {}",
+                name, CF_CUSTOM_WEIGHT_PROFILES, e
+            );
+            TeleologicalStoreError::Internal(format!(
+                "RocksDB put failed for custom weight profile '{}': {}",
+                name, e
+            ))
+        })?;
+
+        debug!(
+            "Stored custom weight profile '{}' ({} bytes)",
+            name,
+            bytes.len(),
+        );
+
+        Ok(())
+    }
+
+    /// Retrieve a custom weight profile by name.
+    pub fn get_custom_weight_profile(
+        &self,
+        name: &str,
+    ) -> TeleologicalStoreResult<Option<[f32; 13]>> {
+        let cf = self.get_cf(CF_CUSTOM_WEIGHT_PROFILES)?;
+        let key = name.as_bytes();
+
+        match self.db.get_cf(cf, key) {
+            Ok(Some(bytes)) => {
+                let weights: [f32; 13] = serde_json::from_slice(&bytes).map_err(|e| {
+                    error!(
+                        "FAIL FAST: Failed to deserialize custom weight profile '{}': {}",
+                        name, e
+                    );
+                    TeleologicalStoreError::Deserialization {
+                        key: format!("custom_weight_profiles:{}", name),
+                        message: format!("Custom weight profile deserialization failed: {}", e),
+                    }
+                })?;
+                Ok(Some(weights))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => {
+                error!(
+                    "FAIL FAST: Failed to read custom weight profile '{}' from CF '{}': {}",
+                    name, CF_CUSTOM_WEIGHT_PROFILES, e
+                );
+                Err(TeleologicalStoreError::Internal(format!(
+                    "RocksDB get failed for custom weight profile '{}': {}",
+                    name, e
+                )))
+            }
+        }
+    }
+
+    /// List all custom weight profiles.
+    pub fn list_custom_weight_profiles(
+        &self,
+    ) -> TeleologicalStoreResult<Vec<(String, [f32; 13])>> {
+        let cf = self.get_cf(CF_CUSTOM_WEIGHT_PROFILES)?;
+        let iter = self.db.iterator_cf(cf, rocksdb::IteratorMode::Start);
+
+        let mut profiles = Vec::new();
+        for item in iter {
+            let (key, value) = item.map_err(|e| {
+                error!(
+                    "FAIL FAST: RocksDB iteration failed on CF '{}': {}",
+                    CF_CUSTOM_WEIGHT_PROFILES, e
+                );
+                TeleologicalStoreError::Internal(format!(
+                    "RocksDB iteration failed for custom weight profiles: {}",
+                    e
+                ))
+            })?;
+
+            let name = String::from_utf8(key.to_vec()).map_err(|e| {
+                error!(
+                    "FAIL FAST: Invalid UTF-8 key in CF '{}': {}",
+                    CF_CUSTOM_WEIGHT_PROFILES, e
+                );
+                TeleologicalStoreError::Deserialization {
+                    key: "custom_weight_profiles:<invalid-utf8>".to_string(),
+                    message: format!("Invalid UTF-8 key: {}", e),
+                }
+            })?;
+
+            let weights: [f32; 13] = serde_json::from_slice(&value).map_err(|e| {
+                error!(
+                    "FAIL FAST: Failed to deserialize custom weight profile '{}': {}",
+                    name, e
+                );
+                TeleologicalStoreError::Deserialization {
+                    key: format!("custom_weight_profiles:{}", name),
+                    message: format!("Custom weight profile deserialization failed: {}", e),
+                }
+            })?;
+
+            profiles.push((name, weights));
+        }
+
+        debug!("Listed {} custom weight profiles", profiles.len());
+        Ok(profiles)
+    }
+
+    /// Delete a custom weight profile.
+    pub fn delete_custom_weight_profile(
+        &self,
+        name: &str,
+    ) -> TeleologicalStoreResult<bool> {
+        let cf = self.get_cf(CF_CUSTOM_WEIGHT_PROFILES)?;
+        let key = name.as_bytes();
+
+        // Check existence first
+        match self.db.get_cf(cf, key) {
+            Ok(Some(_)) => {
+                self.db.delete_cf(cf, key).map_err(|e| {
+                    error!(
+                        "FAIL FAST: Failed to delete custom weight profile '{}': {}",
+                        name, e
+                    );
+                    TeleologicalStoreError::Internal(format!(
+                        "RocksDB delete failed for custom weight profile '{}': {}",
+                        name, e
+                    ))
+                })?;
+                debug!("Deleted custom weight profile '{}'", name);
+                Ok(true)
+            }
+            Ok(None) => Ok(false),
+            Err(e) => {
+                error!(
+                    "FAIL FAST: Failed to check existence of custom weight profile '{}': {}",
+                    name, e
+                );
+                Err(TeleologicalStoreError::Internal(format!(
+                    "RocksDB get failed for custom weight profile '{}': {}",
+                    name, e
+                )))
             }
         }
     }

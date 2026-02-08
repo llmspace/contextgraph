@@ -396,6 +396,24 @@ impl TeleologicalMemoryStore for RocksDbTeleologicalStore {
         self.get_embedding_version(fingerprint_id).map_err(Into::into)
     }
 
+    // ==================== Custom Weight Profile Persistence ====================
+
+    async fn store_custom_weight_profile(&self, name: &str, weights: &[f32; 13]) -> CoreResult<()> {
+        self.store_custom_weight_profile(name, weights).map_err(Into::into)
+    }
+
+    async fn get_custom_weight_profile(&self, name: &str) -> CoreResult<Option<[f32; 13]>> {
+        self.get_custom_weight_profile(name).map_err(Into::into)
+    }
+
+    async fn list_custom_weight_profiles(&self) -> CoreResult<Vec<(String, [f32; 13])>> {
+        self.list_custom_weight_profiles().map_err(Into::into)
+    }
+
+    async fn delete_custom_weight_profile(&self, name: &str) -> CoreResult<bool> {
+        self.delete_custom_weight_profile(name).map_err(Into::into)
+    }
+
     // ==================== Type Downcasting ====================
 
     fn as_any(&self) -> &dyn Any {

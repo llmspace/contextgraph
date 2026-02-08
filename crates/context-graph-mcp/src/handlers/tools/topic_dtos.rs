@@ -330,8 +330,10 @@ pub struct StabilityMetricsSummary {
     /// Computed as |symmetric_difference| / |union| of topic IDs over time
     pub churn_rate: f32,
 
-    /// Topic distribution entropy [0.0-1.0]
-    pub entropy: f32,
+    /// Topic distribution entropy [0.0-1.0].
+    /// Currently not computed; serialized as null.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entropy: Option<f32>,
 
     /// Whether portfolio is stable (churn < 0.3 per constitution)
     pub is_stable: bool,
@@ -339,7 +341,7 @@ pub struct StabilityMetricsSummary {
 
 impl StabilityMetricsSummary {
     /// Create stability metrics with the given values.
-    pub fn new(churn_rate: f32, entropy: f32) -> Self {
+    pub fn new(churn_rate: f32, entropy: Option<f32>) -> Self {
         Self {
             churn_rate,
             entropy,
@@ -354,8 +356,9 @@ pub struct TopicStabilityResponse {
     /// Current churn rate
     pub churn_rate: f32,
 
-    /// Current entropy
-    pub entropy: f32,
+    /// Current entropy. Currently not computed; serialized as null.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entropy: Option<f32>,
 
     /// Breakdown by lifecycle phase
     pub phases: PhaseBreakdown,
@@ -721,10 +724,10 @@ mod tests {
 
     #[test]
     fn test_stability_metrics_summary() {
-        let stable = StabilityMetricsSummary::new(0.2, 0.5);
+        let stable = StabilityMetricsSummary::new(0.2, Some(0.5));
         assert!(stable.is_stable);
 
-        let unstable = StabilityMetricsSummary::new(0.4, 0.7);
+        let unstable = StabilityMetricsSummary::new(0.4, Some(0.7));
         assert!(!unstable.is_stable);
         println!("[PASS] StabilityMetricsSummary is_stable based on churn < 0.3");
     }

@@ -26,6 +26,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use context_graph_core::traits::{SearchStrategy, TeleologicalSearchOptions};
+use context_graph_core::types::audit::{AuditOperation, AuditRecord};
 
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
 
@@ -234,6 +235,29 @@ impl Handlers {
             elapsed_ms = elapsed_ms,
             "search_by_embedder: Completed embedder-first search"
         );
+
+        // Emit SearchPerformed audit (non-fatal)
+        {
+            let audit_record = AuditRecord::new(
+                AuditOperation::SearchPerformed {
+                    tool_name: "search_by_embedder".to_string(),
+                    results_returned: response.results.len(),
+                    weight_profile: None,
+                    strategy: Some(format!("embedder_first:{}", request.embedder)),
+                },
+                candidate_ids.first().copied().unwrap_or(Uuid::nil()),
+            )
+            .with_operator("search_by_embedder")
+            .with_parameters(json!({
+                "query_preview": request.query.chars().take(100).collect::<String>(),
+                "top_k": request.top_k,
+                "embedder": request.embedder,
+            }));
+
+            if let Err(e) = self.teleological_store.append_audit_record(&audit_record).await {
+                warn!(error = %e, "search_by_embedder: Failed to write audit record (non-fatal)");
+            }
+        }
 
         self.tool_result(
             id,
@@ -497,6 +521,31 @@ impl Handlers {
             elapsed_ms = elapsed_ms,
             "compare_embedder_views: Completed embedder comparison"
         );
+
+        // Emit SearchPerformed audit (non-fatal)
+        {
+            let total_results: usize = response.rankings.iter().map(|r| r.results.len()).sum();
+            let audit_record = AuditRecord::new(
+                AuditOperation::SearchPerformed {
+                    tool_name: "compare_embedder_views".to_string(),
+                    results_returned: total_results,
+                    weight_profile: None,
+                    strategy: Some(format!("compare:{}", request.embedders.join(","))),
+                },
+                agreement.first().copied().unwrap_or(Uuid::nil()),
+            )
+            .with_operator("compare_embedder_views")
+            .with_parameters(json!({
+                "query_preview": request.query.chars().take(100).collect::<String>(),
+                "top_k": request.top_k,
+                "embedders": request.embedders,
+                "agreement_score": agreement_score,
+            }));
+
+            if let Err(e) = self.teleological_store.append_audit_record(&audit_record).await {
+                warn!(error = %e, "compare_embedder_views: Failed to write audit record (non-fatal)");
+            }
+        }
 
         self.tool_result(
             id,
@@ -941,7 +990,12 @@ impl Handlers {
             return self.tool_error(id, &format!("Invalid weights: {}", e));
         }
 
-        // Store the profile
+        // Persist to RocksDB (source of truth) AND update in-memory cache
+        if let Err(e) = self.teleological_store.store_custom_weight_profile(&request.name, &weights).await {
+            error!(error = %e, name = %request.name, "create_weight_profile: Failed to persist to RocksDB");
+            return self.tool_error(id, &format!("Failed to persist weight profile: {}", e));
+        }
+
         let total = {
             let mut profiles = self.custom_profiles.write();
             profiles.insert(request.name.clone(), weights);
@@ -1112,6 +1166,33 @@ impl Handlers {
             "search_cross_embedder_anomalies: Completed"
         );
 
+        // Emit SearchPerformed audit (non-fatal)
+        {
+            let anomaly_ids: Vec<Uuid> = response.anomalies.iter().map(|a| a.memory_id).collect();
+            let audit_record = AuditRecord::new(
+                AuditOperation::SearchPerformed {
+                    tool_name: "search_cross_embedder_anomalies".to_string(),
+                    results_returned: response.anomalies.len(),
+                    weight_profile: None,
+                    strategy: Some(format!("anomaly:{}>{}", request.high_embedder, request.low_embedder)),
+                },
+                anomaly_ids.first().copied().unwrap_or(Uuid::nil()),
+            )
+            .with_operator("search_cross_embedder_anomalies")
+            .with_parameters(json!({
+                "query_preview": request.query.chars().take(100).collect::<String>(),
+                "top_k": request.top_k,
+                "high_embedder": request.high_embedder,
+                "low_embedder": request.low_embedder,
+                "high_threshold": request.high_threshold,
+                "low_threshold": request.low_threshold,
+            }));
+
+            if let Err(e) = self.teleological_store.append_audit_record(&audit_record).await {
+                warn!(error = %e, "search_cross_embedder_anomalies: Failed to write audit record (non-fatal)");
+            }
+        }
+
         self.tool_result(
             id,
             serde_json::to_value(response).unwrap_or_else(|_| json!({})),
@@ -1216,6 +1297,11 @@ impl Handlers {
 
         let elapsed_ms = start.elapsed().as_millis() as u64;
 
+        // Capture classification fields for audit before moving into response
+        let audit_query_type = classification.query_type.clone();
+        let audit_selected_profile = classification.selected_profile.clone();
+        let audit_confidence = classification.confidence;
+
         let response = AdaptiveSearchResponse {
             query: request.query.clone(),
             classification: if request.explain_strategy {
@@ -1233,6 +1319,31 @@ impl Handlers {
             elapsed_ms = elapsed_ms,
             "adaptive_search: Completed"
         );
+
+        // Emit SearchPerformed audit (non-fatal)
+        {
+            let audit_record = AuditRecord::new(
+                AuditOperation::SearchPerformed {
+                    tool_name: "adaptive_search".to_string(),
+                    results_returned: response.total_results,
+                    weight_profile: Some(audit_selected_profile.clone()),
+                    strategy: Some("MultiSpace".to_string()),
+                },
+                candidate_ids.first().copied().unwrap_or(Uuid::nil()),
+            )
+            .with_operator("adaptive_search")
+            .with_parameters(json!({
+                "query_preview": request.query.chars().take(100).collect::<String>(),
+                "top_k": request.top_k,
+                "detected_type": audit_query_type,
+                "selected_profile": audit_selected_profile,
+                "confidence": audit_confidence,
+            }));
+
+            if let Err(e) = self.teleological_store.append_audit_record(&audit_record).await {
+                warn!(error = %e, "adaptive_search: Failed to write audit record (non-fatal)");
+            }
+        }
 
         self.tool_result(
             id,

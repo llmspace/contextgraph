@@ -1,5 +1,5 @@
-# Context Graph Constitution v6.6.0
-# 13-Perspectives Collaboration | E1 Foundation | GPU-First Architecture | Code Embedding Separation | Dynamic Weight Navigation
+# Context Graph Constitution v6.7.0
+# 13-Perspectives Collaboration | E1 Foundation | GPU-First Architecture | Code Embedding Separation | Dynamic Weight Navigation | Provenance
 # ═══════════════════════════════════════════════════════════════
 
 # GPU-FIRST ARCHITECTURE
@@ -283,7 +283,7 @@ arch_rules:
 
   # Retrieval Pipeline
   ARCH-12: "E1 is foundation - all retrieval starts with E1"
-  ARCH-13: "Strategies: E1Only (default), MultiSpace (E1+enhancers), Pipeline (E13→E1→E12)"
+  ARCH-13: "Strategies: E1Only (default), MultiSpace (E1+E5+E7+E8+E10+E11 via RRF), Pipeline (E13→E1→E12), EmbedderFirst (any E as primary)"
   ARCH-17: "Strong E1 (>0.8): enhancers refine. Weak E1 (<0.4): enhancers broaden"
   ARCH-18: "E5 Causal: asymmetric similarity (cause→effect direction matters)"
   ARCH-21: "Multi-space fusion: use Weighted RRF, not weighted sum"
@@ -351,44 +351,126 @@ topics:
 # MCP TOOLS
 # ═══════════════════════════════════════════════════════════════
 mcp_tools:
-  # CORE SEARCH: Primary retrieval operations
-  search: [search_graph, search_causes, search_connections, search_by_intent]
-  # search_graph: + customWeights, excludeEmbedders, includeEmbedderBreakdown, all 16 profiles
-  # search_by_intent: + all 16 weight profiles
+  # 57 TOOLS TOTAL across 19 categories.
+  # Each tool name matches a constant in tools/names.rs and a definition in tools/definitions/.
 
-  # EMBEDDER-FIRST SEARCH: Any embedder as primary perspective
-  # Enables AI agents to explore the knowledge graph from any of the 13 perspectives
+  # CORE (4): Foundation memory operations
+  core:
+    - store_memory             # Store new memory with 13-embedder TeleologicalArray
+    - get_memetic_status       # System status: memory count, topics, health
+    - search_graph             # Primary search: + customWeights, excludeEmbedders, includeEmbedderBreakdown, searchTransparency, all 16 profiles
+    - trigger_consolidation    # Merge similar memories, reduce redundancy
+
+  # CURATION (3): Memory lifecycle management
+  curation:
+    - merge_concepts           # Merge two memories into one (with provenance)
+    - forget_concept           # Soft-delete a memory (with deletion reason audit)
+    - boost_importance         # Adjust memory importance (with importance history)
+
+  # TOPIC (4): Topic detection and monitoring
+  topic:
+    - get_topic_portfolio      # Current topic clusters with weighted agreement
+    - get_topic_stability      # Churn rate and stability metrics
+    - detect_topics            # Run topic detection on demand
+    - get_divergence_alerts    # Embedder disagreement alerts (SEMANTIC only)
+
+  # FILE WATCHER (4): Code file index management
+  file_watcher:
+    - list_watched_files       # List indexed files and their entity counts
+    - get_file_watcher_stats   # File watcher health and statistics
+    - delete_file_content      # Remove a file's entities from index (audited)
+    - reconcile_files          # Re-sync file index with filesystem (audited)
+
+  # SEQUENCE (4): E4 temporal ordering and session navigation
+  sequence:
+    - get_conversation_context # Memories near a conversation position
+    - get_session_timeline     # Chronological session memory timeline
+    - traverse_memory_chain    # Walk memory chains (before/after)
+    - compare_session_states   # Diff two session snapshots
+
+  # CAUSAL (4): E5 asymmetric causal reasoning
+  causal:
+    - search_causes            # Find causes of a query (asymmetric E5)
+    - search_effects           # Find effects of a query (asymmetric E5)
+    - get_causal_chain         # Multi-hop causal chain traversal
+    - search_causal_relationships  # Search LLM-generated causal descriptions with provenance
+
+  # CAUSAL DISCOVERY (2): LLM-based causal analysis (Qwen2.5 + GBNF grammar)
+  causal_discovery:
+    - trigger_causal_discovery    # Run LLM causal analysis on memories
+    - get_causal_discovery_status # Agent status and statistics
+
+  # KEYWORD (1): E6 sparse exact-match search
+  keyword:
+    - search_by_keywords       # Jaccard + inverted index keyword search
+
+  # CODE (1): E7 code-aware search
+  code:
+    - search_code              # Code pattern and signature search (Qodo-Embed)
+
+  # GRAPH (4): E8 structural relationship reasoning
+  graph:
+    - search_connections       # Find connected memories (asymmetric E8)
+    - get_graph_path           # Shortest path between two memories
+    - discover_graph_relationships  # LLM-based relationship discovery (graph-agent)
+    - validate_graph_link      # LLM-based link validation between memories
+
+  # ROBUSTNESS (1): E9 noise-tolerant search
+  robustness:
+    - search_robust            # HDC blind-spot detection (high E9 + low E1)
+
+  # INTENT (1): E10 multiplicative boost search
+  intent:
+    - search_by_intent         # Goal-aligned search + customWeights, excludeEmbedders, all 16 profiles
+
+  # ENTITY (6): E11 KEPLER entity knowledge
+  entity:
+    - extract_entities         # Extract named entities from text
+    - search_by_entities       # Search by entity names and relationships
+    - infer_relationship       # Infer relationship between two entities (TransE)
+    - find_related_entities    # Find entities related to a given entity
+    - validate_knowledge       # Validate entity knowledge claims
+    - get_entity_graph         # Visualize entity relationship graph
+
+  # EMBEDDER-FIRST SEARCH (8): Any embedder as primary perspective + navigation tools
   embedder_search:
-    - search_by_embedder      # Generic: search using any embedder (E1-E13) as primary
-    - get_embedder_clusters   # Explore clusters in any embedder's space
-    - compare_embedder_views  # Compare how different embedders see the same query
-    - list_embedder_indexes   # List available embedders and their index stats
-    - get_memory_fingerprint  # Per-embedder fingerprint introspection (Gap 5)
+    - search_by_embedder           # Search using any embedder (E1-E13) as primary
+    - get_embedder_clusters        # Explore clusters in any embedder's space
+    - compare_embedder_views       # Compare how different embedders rank the same query
+    - list_embedder_indexes        # List all embedder indexes with stats
+    - get_memory_fingerprint       # Per-embedder fingerprint introspection
+    - create_weight_profile        # Create session-scoped custom weight profile for reuse
+    - search_cross_embedder_anomalies  # Find high-in-one/low-in-another anomalies
+    - adaptive_search              # Auto-classify query and select optimal strategy + weights
 
-  # SPECIALIZED SEARCH: Per-embedder tools with custom logic
-  semantic: [search_graph]              # E1
-  causal: [search_causes, get_causal_chain]    # E5 with asymmetric similarity
-  keyword: [search_by_keywords]         # E6 sparse
-  code: [search_code]                   # E7 code-aware
-  graph: [search_connections, get_graph_path]  # E8 structural
-  entity: [search_by_entities, extract_entities, infer_relationship, find_related_entities, validate_knowledge, get_entity_graph]  # E11 KEPLER
-  intent: [search_by_intent]            # E10 multiplicative boost
+  # TEMPORAL (2): E2/E3 post-retrieval temporal search
+  temporal:
+    - search_recent            # E2 recency-boosted search (POST-retrieval per ARCH-25)
+    - search_periodic          # E3 periodicity-boosted search (POST-retrieval per ARCH-25)
 
-  # MEMORY OPERATIONS
-  memory: [store_memory, get_memetic_status]
-  sequence: [get_conversation_context, get_session_timeline, traverse_memory_chain]
+  # GRAPH LINKING (4): K-NN navigation and typed edges
+  graph_linking:
+    - get_memory_neighbors     # K-NN neighbors in a specific embedder space
+    - get_typed_edges          # Typed edges derived from embedder agreement patterns
+    - traverse_graph           # Multi-hop graph traversal with filters
+    - get_unified_neighbors    # Unified neighbors via Weighted RRF across all 13 embedders
 
-  # TOPIC & CLUSTER OPERATIONS
-  topic: [get_topic_portfolio, get_topic_stability, detect_topics, get_divergence_alerts]
+  # MAINTENANCE (1): Data repair and cleanup
+  maintenance:
+    - repair_causal_relationships  # Scan and remove corrupted causal entries
 
-  # MAINTENANCE
-  maintenance: [trigger_consolidation, trigger_dream, merge_concepts, forget_concept, boost_importance]
+  # PROVENANCE (3): Audit trail and lineage queries
+  provenance:
+    - get_audit_trail          # Query audit log for a memory or time range
+    - get_merge_history        # Merge lineage and history for a fingerprint
+    - get_provenance_chain     # Full provenance from embedding to source
 
   search_strategies:
     E1Only: "Fast, simple semantic queries"
-    MultiSpace: "E1 + enhancers via RRF - use when E1 blind spots matter"
+    MultiSpace: "E1+E5+E7+E8+E10+E11 via RRF (6 embedders) - use when E1 blind spots matter"
     Pipeline: "E13 recall → E1 dense → E12 rerank - maximum precision"
     EmbedderFirst: "Any embedder as primary perspective - explore blind spots"
+    AdaptiveSearch: "Auto-classify query type and select optimal strategy + weight profile"
 
 # ═══════════════════════════════════════════════════════════════
 # EMBEDDER-FIRST SEARCH (NEW)
@@ -498,6 +580,28 @@ embedder_first_search:
     E13_expansion: "Term expansion - synonyms, related terms"
 
 # ═══════════════════════════════════════════════════════════════
+# SEARCH TRANSPARENCY
+# ═══════════════════════════════════════════════════════════════
+# search_graph responses include a searchTransparency block that exposes
+# which embedders were active, which weights were ignored, and the strategy
+# used. This enables the AI to understand and debug search behavior.
+
+search_transparency:
+  response_block: "searchTransparency"
+  fields:
+    activeEmbedders: "List of embedder names that participated in search"
+    ignoredWeights: "Embedders with non-zero weight that were not searched (e.g., E12/E13 in MultiSpace)"
+    weightUtilization: "Fraction of total weight budget that was actually searched"
+    strategyDescription: "Human-readable description of the strategy used"
+  included_in: [search_graph]
+  always_present: true  # Not opt-in — always returned in search_graph responses
+
+  arch_rules:
+    ARCH-TRANS-01: "searchTransparency MUST be included in every search_graph response"
+    ARCH-TRANS-02: "activeEmbedders reflects the ACTUAL embedders searched, not the requested set"
+    ARCH-TRANS-03: "ignoredWeights explains WHY weights were not used (strategy limitation)"
+
+# ═══════════════════════════════════════════════════════════════
 # DYNAMIC NAVIGATION (Gaps 1, 3, 5, 6, 8)
 # ═══════════════════════════════════════════════════════════════
 dynamic_navigation:
@@ -508,12 +612,12 @@ dynamic_navigation:
   capabilities:
     custom_weights:
       param: "customWeights"
-      tools: [search_graph, get_unified_neighbors]
+      tools: [search_graph, get_unified_neighbors, search_by_intent]
       format: '{"E1": 0.4, "E5": 0.3, "E7": 0.2, "E11": 0.1}'
       validation: "Sum ~1.0 (±0.01), each in [0.0, 1.0]"
     embedder_exclusion:
       param: "excludeEmbedders"
-      tools: [search_graph, get_unified_neighbors]
+      tools: [search_graph, get_unified_neighbors, search_by_intent]
       behavior: "Zero + renormalize remaining"
     breakdown:
       param: "includeEmbedderBreakdown"
@@ -753,6 +857,92 @@ code_embedding:
     AP-CODE-04: "NEVER parse code without tree-sitter - no regex extraction"
 
 # ═══════════════════════════════════════════════════════════════
+# PROVENANCE INFRASTRUCTURE
+# ═══════════════════════════════════════════════════════════════
+# Every mutation, search, and discovery operation is audited. The provenance
+# system enables full lineage tracking from embedding to source, merge
+# history preservation, and importance change tracking.
+
+provenance:
+  philosophy: |
+    All operations that create, modify, or delete memories must leave an
+    auditable trail. Provenance data is append-only and non-blocking:
+    audit write failures are logged (warn!) but never block the main operation.
+
+  column_families:
+    CF_AUDIT_LOG: "Append-only audit records keyed by timestamp+UUID"
+    CF_AUDIT_BY_TARGET: "Secondary index: target memory UUID → audit record keys"
+    CF_MERGE_HISTORY: "Permanent merge lineage (source → merged-into)"
+    CF_IMPORTANCE_HISTORY: "Importance change log with old/new/reason"
+    CF_ENTITY_PROVENANCE: "Entity source provenance (EntityLink, TransE scores)"
+    CF_TOOL_CALL_INDEX: "tool_use_id → memory UUID mapping"
+    CF_CONSOLIDATION_RECOMMENDATIONS: "Persisted consolidation analysis results"
+    CF_EMBEDDING_REGISTRY: "Embedding model version tracking per fingerprint"
+
+  audit_operations:
+    # Core lifecycle
+    - MemoryCreated
+    - MemoryDeleted
+    - MemoryMerged
+    - ImportanceChanged
+    # Search and discovery
+    - SearchPerformed
+    - ConsolidationAnalyzed
+    - RelationshipDiscovered
+    - CausalRelationshipRepaired
+    - FileWatcherEvent
+
+  audit_record:
+    builder_pattern: "AuditRecord::new(op, target_id).with_operator().with_session().with_rationale().with_parameters()"
+    target_id: "UUID of affected memory, or Uuid::nil() for operations targeting CFs/files"
+    non_blocking: true  # warn! on failure, never block main operation
+
+  mcp_tools:
+    get_audit_trail: "Query audit log by memory UUID or time range"
+    get_merge_history: "Show merge lineage for a fingerprint"
+    get_provenance_chain: "Full chain: embedding registry → source metadata → audit log → merge history → importance history"
+
+  arch_rules:
+    ARCH-PROV-01: "Audit writes are non-fatal — warn! on failure, never block main operation"
+    ARCH-PROV-02: "AuditRecord target_id uses Uuid::nil() for operations on CFs/files, not single entities"
+    ARCH-PROV-03: "Merge history is permanent — no TTL, no expiration"
+    ARCH-PROV-04: "All destructive ops (delete, repair, reconcile) MUST emit audit records"
+    ARCH-PROV-05: "get_provenance_chain queries all 5 queryable CFs in a single response"
+
+  serialization:
+    format: "JSON (NOT bincode — bincode + skip_serializing_if is broken for SourceMetadata)"
+    rule: "All provenance and SourceMetadata structs use serde_json"
+
+# ═══════════════════════════════════════════════════════════════
+# LLM AGENT CRATES
+# ═══════════════════════════════════════════════════════════════
+# Two workspace crates provide LLM-based analysis using local Qwen2.5 models
+# via llama-cpp-2 bindings with GBNF grammar-constrained generation.
+
+llm_agents:
+  runtime: "llama-cpp-2 (llama.cpp Rust bindings)"
+  model: "Qwen2.5 (GGUF format)"
+  grammar: "GBNF grammar constraints for structured JSON output"
+
+  crates:
+    context-graph-causal-agent:
+      purpose: "Discover causal relationships between memories"
+      tools: [trigger_causal_discovery, get_causal_discovery_status]
+      output: "CausalRelationship records stored in CF_CAUSAL_RELATIONSHIPS"
+      description_format: "1-3 paragraph LLM-generated causal explanations with source provenance"
+
+    context-graph-graph-agent:
+      purpose: "Discover structural graph relationships between memories"
+      tools: [discover_graph_relationships, validate_graph_link]
+      output: "GraphEdge records with LLM-validated relationship types"
+      uses: "CausalDiscoveryLLM for shared inference infrastructure"
+
+  arch_rules:
+    ARCH-LLM-01: "LLM inference is local-only via llama.cpp — no external API calls"
+    ARCH-LLM-02: "All LLM output constrained by GBNF grammar for structured JSON"
+    ARCH-LLM-03: "LLM agent results include source memory provenance links"
+
+# ═══════════════════════════════════════════════════════════════
 # DREAM CONSOLIDATION
 # ═══════════════════════════════════════════════════════════════
 dream:
@@ -784,8 +974,12 @@ hooks:
   SessionEnd: "Persist state, GPU HDBSCAN, check dream triggers"
 
 # ═══════════════════════════════════════════════════════════════
-# GPU INFRASTRUCTURE (RTX 5090 32GB + CUDA 13.1)
+# GPU INFRASTRUCTURE (RTX 5090 32GB + CUDA 13.1) — TARGET SPEC
 # ═══════════════════════════════════════════════════════════════
+# NOTE: This section describes the TARGET hardware and GPU architecture.
+# Current implementation uses Candle (HuggingFace) with CUDA feature flags.
+# FAISS-GPU, cuML HDBSCAN, and CUDA 13.1 features are aspirational targets.
+# The CPU-compatible code path exists for development and testing.
 gpu:
   hardware:
     device: "NVIDIA GeForce RTX 5090"

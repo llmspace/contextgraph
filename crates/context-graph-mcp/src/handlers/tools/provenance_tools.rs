@@ -16,12 +16,13 @@ fn audit_record_to_json(r: &AuditRecord) -> serde_json::Value {
     json!({
         "id": r.id.to_string(),
         "timestamp": r.timestamp.to_rfc3339(),
-        "operation": format!("{}", r.operation),
+        "operation": serde_json::to_value(&r.operation).unwrap_or_else(|_| json!(format!("{}", r.operation))),
         "target_id": r.target_id.to_string(),
         "operator_id": r.operator_id,
         "session_id": r.session_id,
         "rationale": r.rationale,
-        "result": format!("{}", r.result),
+        "parameters": r.parameters.clone(),
+        "result": serde_json::to_value(&r.result).unwrap_or_else(|_| json!(format!("{}", r.result))),
     })
 }
 

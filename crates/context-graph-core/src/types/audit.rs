@@ -146,38 +146,6 @@ impl ImportanceChangeRecord {
 }
 
 // ============================================================================
-// Hook Execution Audit Log (Phase 5, item 5.13)
-// ============================================================================
-
-/// Record of a hook execution for audit purposes (Phase 5, item 5.13).
-///
-/// Stored via CF_AUDIT_LOG as an AuditOperation::HookExecuted variant.
-/// Captures timing, exit code, and outcome of each hook invocation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HookExecutionRecord {
-    /// Type of hook (e.g., "PostToolUse", "SessionStart", "SessionEnd")
-    pub hook_type: String,
-    /// Session ID when the hook ran
-    pub session_id: String,
-    /// When the hook started executing
-    pub timestamp: DateTime<Utc>,
-    /// How long the hook took to complete (milliseconds)
-    pub duration_ms: u64,
-    /// Process exit code (0 = success)
-    pub exit_code: i32,
-    /// Tool name that triggered the hook (for tool-related hooks)
-    pub tool_name: Option<String>,
-    /// Tool use ID from Claude Code (for tool-related hooks)
-    pub tool_use_id: Option<String>,
-    /// Whether the hook completed successfully
-    pub success: bool,
-    /// Error message if the hook failed
-    pub error_message: Option<String>,
-    /// UUIDs of memories created by this hook execution
-    pub memories_created: Vec<Uuid>,
-}
-
-// ============================================================================
 // Consolidation Recommendation Persistence (Phase 5, item 5.14)
 // ============================================================================
 
@@ -332,9 +300,6 @@ pub enum AuditOperation {
         reason: Option<String>,
     },
 
-    /// A previously soft-deleted memory was restored.
-    MemoryRestored,
-
     /// A memory's importance score was boosted.
     ImportanceBoosted {
         /// Previous importance value.
@@ -373,14 +338,6 @@ pub enum AuditOperation {
         embedder: String,
         /// Version of the model used.
         model_version: String,
-    },
-
-    /// A hook execution was recorded (Phase 5, item 5.13).
-    HookExecuted {
-        /// Type of hook
-        hook_type: String,
-        /// Whether the hook succeeded
-        success: bool,
     },
 
     /// A search/query operation was performed (provenance for read-path).
@@ -543,7 +500,6 @@ impl std::fmt::Display for AuditOperation {
             AuditOperation::MemoryDeleted { soft, .. } => {
                 write!(f, "MemoryDeleted(soft={})", soft)
             }
-            AuditOperation::MemoryRestored => write!(f, "MemoryRestored"),
             AuditOperation::ImportanceBoosted { old, new, delta } => {
                 write!(
                     f,
@@ -576,9 +532,6 @@ impl std::fmt::Display for AuditOperation {
                 model_version,
             } => {
                 write!(f, "EmbeddingRecomputed({}, v{})", embedder, model_version)
-            }
-            AuditOperation::HookExecuted { hook_type, success } => {
-                write!(f, "HookExecuted({}, success={})", hook_type, success)
             }
             AuditOperation::SearchPerformed {
                 tool_name,
@@ -731,7 +684,6 @@ mod tests {
                 soft: true,
                 reason: Some("test".to_string()),
             },
-            AuditOperation::MemoryRestored,
             AuditOperation::ImportanceBoosted {
                 old: 0.0,
                 new: 1.0,
@@ -751,10 +703,6 @@ mod tests {
             AuditOperation::EmbeddingRecomputed {
                 embedder: "E1".to_string(),
                 model_version: "1.0".to_string(),
-            },
-            AuditOperation::HookExecuted {
-                hook_type: "PostToolUse".to_string(),
-                success: true,
             },
             AuditOperation::SearchPerformed {
                 tool_name: "search_by_intent".to_string(),

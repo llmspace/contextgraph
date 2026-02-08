@@ -32,6 +32,7 @@ use context_graph_core::causal::asymmetric::{
     compute_e5_asymmetric_fingerprint_similarity, detect_causal_query_intent,
     direction_mod, CausalDirection,
 };
+use context_graph_core::types::audit::{AuditOperation, AuditRecord};
 use context_graph_core::teleological::matrix_search::embedder_names;
 use context_graph_core::traits::{EmbeddingMetadata, SearchStrategy, TeleologicalSearchOptions};
 use context_graph_core::types::fingerprint::{SemanticFingerprint, TeleologicalFingerprint, NUM_EMBEDDERS};
@@ -483,6 +484,49 @@ impl Handlers {
                             fingerprint_id = %fingerprint_id,
                             audit_id = %audit_record.id,
                             "store_memory: Audit record appended successfully"
+                        );
+                    }
+                }
+
+                // Phase 5: Store embedding version record for provenance tracking
+                {
+                    use context_graph_core::types::audit::EmbeddingVersionRecord;
+                    use std::collections::HashMap;
+
+                    let mut embedder_versions = HashMap::new();
+                    embedder_versions.insert("E1".to_string(), "pretrained-semantic-1024d".to_string());
+                    embedder_versions.insert("E2".to_string(), "temporal-recent-decay".to_string());
+                    embedder_versions.insert("E3".to_string(), "temporal-periodic-fourier".to_string());
+                    embedder_versions.insert("E4".to_string(), "temporal-positional-sequence".to_string());
+                    embedder_versions.insert("E5".to_string(), "causal-asymmetric-768d".to_string());
+                    embedder_versions.insert("E6".to_string(), "sparse-tfidf-inverted".to_string());
+                    embedder_versions.insert("E7".to_string(), "qodo-embed-1-1.5b".to_string());
+                    embedder_versions.insert("E8".to_string(), "graph-knn-1024d".to_string());
+                    embedder_versions.insert("E9".to_string(), "structural-positional".to_string());
+                    embedder_versions.insert("E10".to_string(), "multimodal-modifier-768d".to_string());
+                    embedder_versions.insert("E11".to_string(), "entity-kepler-768d".to_string());
+                    embedder_versions.insert("E12".to_string(), "late-interaction-colbert".to_string());
+                    embedder_versions.insert("E13".to_string(), "keyword-splade-sparse".to_string());
+
+                    let record = EmbeddingVersionRecord {
+                        fingerprint_id,
+                        computed_at: chrono::Utc::now(),
+                        embedder_versions,
+                        e7_model_version: Some("qodo-embed-1-1.5b".to_string()),
+                        computation_time_ms: Some(embedding_output.total_latency.as_millis() as u64),
+                    };
+
+                    if let Err(e) = self.teleological_store.store_embedding_version(&record).await {
+                        warn!(
+                            fingerprint_id = %fingerprint_id,
+                            error = %e,
+                            "store_memory: Failed to store embedding version record (non-fatal)"
+                        );
+                    } else {
+                        debug!(
+                            fingerprint_id = %fingerprint_id,
+                            computation_ms = embedding_output.total_latency.as_millis(),
+                            "store_memory: Embedding version record stored"
                         );
                     }
                 }
@@ -1032,10 +1076,20 @@ impl Handlers {
             .with_causal_direction(causal_direction); // ARCH-15, AP-77: Thread direction to retrieval
 
         if let Some(ref profile) = effective_weight_profile {
-            options = options.with_weight_profile(profile);
+            // Check custom profiles first, then fall back to built-in
+            let custom = self.custom_profiles.read().get(profile).copied();
+            if let Some(custom_weights_from_profile) = custom {
+                // Custom profile found - pass as custom_weights array (bypasses storage layer lookup)
+                options = options.with_custom_weights(custom_weights_from_profile);
+                // Must explicitly set MultiSpace for custom weights to work
+                options = options.with_strategy(strategy);
+                debug!(profile = %profile, "Resolved custom weight profile from RocksDB cache");
+            } else {
+                options = options.with_weight_profile(profile);
+            }
         }
 
-        // GAP-1: Custom weights override weight profile
+        // GAP-1: Explicit custom weights override everything (including custom profiles)
         if let Some(weights) = custom_weights {
             options = options.with_custom_weights(weights);
         }
@@ -1420,6 +1474,9 @@ impl Handlers {
                                     let weight = custom_weights
                                         .map(|w| w[idx])
                                         .or_else(|| effective_weight_profile.as_ref()
+                                            .and_then(|p| self.custom_profiles.read().get(p).copied())
+                                            .map(|w| w[idx]))
+                                        .or_else(|| effective_weight_profile.as_ref()
                                             .and_then(|p| get_weight_profile(p))
                                             .map(|w| w[idx]))
                                         .unwrap_or(1.0 / 13.0);
@@ -1461,9 +1518,12 @@ impl Handlers {
                                         let approx_rank = r.embedder_scores.iter()
                                             .filter(|&&s| s > score)
                                             .count();
-                                        // Get weight: custom_weights > profile > uniform
+                                        // Get weight: custom_weights > custom profile > built-in profile > uniform
                                         let weight = custom_weights
                                             .map(|w| w[idx])
+                                            .or_else(|| effective_weight_profile.as_ref()
+                                                .and_then(|p| self.custom_profiles.read().get(p).copied())
+                                                .map(|w| w[idx]))
                                             .or_else(|| effective_weight_profile.as_ref()
                                                 .and_then(|p| get_weight_profile(p))
                                                 .map(|w| w[idx]))
@@ -1571,6 +1631,8 @@ impl Handlers {
                         .unwrap_or([1.0 / 13.0; 13]);
                     let resolved_weights = custom_weights
                         .or_else(|| effective_weight_profile.as_ref()
+                            .and_then(|p| self.custom_profiles.read().get(p).copied()))
+                        .or_else(|| effective_weight_profile.as_ref()
                             .and_then(|p| get_weight_profile(p)))
                         .unwrap_or(default_profile);
 
@@ -1603,6 +1665,31 @@ impl Handlers {
                         "weightUtilization": active_sum,
                         "strategyDescription": strategy_label,
                     });
+                }
+
+                // Emit SearchPerformed audit (non-fatal)
+                {
+                    let result_ids: Vec<uuid::Uuid> = results.iter().map(|r| r.fingerprint.id).collect();
+                    let audit_record = AuditRecord::new(
+                        AuditOperation::SearchPerformed {
+                            tool_name: "search_graph".to_string(),
+                            results_returned: results.len(),
+                            weight_profile: effective_weight_profile.clone(),
+                            strategy: Some(format!("{:?}", strategy)),
+                        },
+                        result_ids.first().copied().unwrap_or(uuid::Uuid::nil()),
+                    )
+                    .with_operator("search_graph")
+                    .with_parameters(json!({
+                        "query_preview": query.chars().take(100).collect::<String>(),
+                        "top_k": top_k,
+                        "strategy": format!("{:?}", strategy),
+                        "weight_profile": effective_weight_profile,
+                    }));
+
+                    if let Err(e) = self.teleological_store.append_audit_record(&audit_record).await {
+                        warn!(error = %e, "search_graph: Failed to write audit record (non-fatal)");
+                    }
                 }
 
                 self.tool_result(id, response)

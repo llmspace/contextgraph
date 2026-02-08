@@ -42,7 +42,7 @@ pub use fingerprint::{
 };
 pub use audit::{
     AuditOperation, AuditRecord, AuditResult, ConsolidationCandidate, ConsolidationRecommendation,
-    EmbeddingVersionRecord, HookExecutionRecord, ImportanceChangeRecord, MergeRecord,
+    EmbeddingVersionRecord, ImportanceChangeRecord, MergeRecord,
     RecommendationStatus,
 };
 pub use graph_edge::*;

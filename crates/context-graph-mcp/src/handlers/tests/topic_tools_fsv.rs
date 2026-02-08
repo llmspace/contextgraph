@@ -156,7 +156,6 @@ async fn test_fsv_topic_stability_default_parameters() {
     // VERIFY ALL REQUIRED FIELDS ARE PRESENT
     let required_fields = [
         "churn_rate",
-        "entropy",
         "phases",
         "high_churn_warning",
         "average_churn",
@@ -171,19 +170,22 @@ async fn test_fsv_topic_stability_default_parameters() {
         println!("FIELD '{}': {:?}", field, data.get(field).unwrap());
     }
 
+    // entropy is omitted when not computed (Option::None with skip_serializing_if)
+    if let Some(entropy_val) = data.get("entropy").and_then(|v| v.as_f64()) {
+        assert!(
+            (0.0..=1.0).contains(&entropy_val),
+            "entropy {} must be in [0.0, 1.0]",
+            entropy_val
+        );
+    }
+
     // VERIFY VALUE RANGES
     let churn_rate = data.get("churn_rate").unwrap().as_f64().unwrap();
-    let entropy = data.get("entropy").unwrap().as_f64().unwrap();
 
     assert!(
         (0.0..=1.0).contains(&churn_rate),
         "churn_rate {} must be in [0.0, 1.0]",
         churn_rate
-    );
-    assert!(
-        (0.0..=1.0).contains(&entropy),
-        "entropy {} must be in [0.0, 1.0]",
-        entropy
     );
 
     println!("[FSV PASS] get_topic_stability returns valid metrics");

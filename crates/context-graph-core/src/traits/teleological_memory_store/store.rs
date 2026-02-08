@@ -819,6 +819,22 @@ pub trait TeleologicalMemoryStore: Send + Sync {
         fingerprint_id: Uuid,
     ) -> CoreResult<Option<crate::types::audit::EmbeddingVersionRecord>>;
 
+    // ==================== Custom Weight Profile Persistence ====================
+
+    /// Store a custom weight profile.
+    ///
+    /// Stored in CF_CUSTOM_WEIGHT_PROFILES. Overwrites existing profile with same name.
+    async fn store_custom_weight_profile(&self, name: &str, weights: &[f32; 13]) -> CoreResult<()>;
+
+    /// Retrieve a custom weight profile by name.
+    async fn get_custom_weight_profile(&self, name: &str) -> CoreResult<Option<[f32; 13]>>;
+
+    /// List all custom weight profiles.
+    async fn list_custom_weight_profiles(&self) -> CoreResult<Vec<(String, [f32; 13])>>;
+
+    /// Delete a custom weight profile by name.
+    async fn delete_custom_weight_profile(&self, name: &str) -> CoreResult<bool>;
+
     // ==================== Type Downcasting ====================
 
     /// Get a reference to self as Any for downcasting.

@@ -57,6 +57,7 @@ pub const CF_E1_MATRYOSHKA_128: &str = "e1_matryoshka_128";
 // TELEOLOGICAL VECTOR COLUMN FAMILIES (TASK-TELEO-006)
 // =============================================================================
 
+// DEPRECATED: Never implemented. Kept in open list for RocksDB compat.
 /// Column family for synergy matrix singleton storage.
 ///
 /// Stores the global 13x13 synergy matrix that captures co-occurrence
@@ -65,6 +66,7 @@ pub const CF_E1_MATRYOSHKA_128: &str = "e1_matryoshka_128";
 /// Value: SynergyMatrix serialized via bincode (~700 bytes: 13x13 f32 + metadata)
 pub const CF_SYNERGY_MATRIX: &str = "synergy_matrix";
 
+// DEPRECATED: Never implemented. Kept in open list for RocksDB compat.
 /// Column family for teleological profiles.
 ///
 /// Stores task-specific teleological profiles that define purpose weighting.
@@ -72,6 +74,7 @@ pub const CF_SYNERGY_MATRIX: &str = "synergy_matrix";
 /// Value: TeleologicalProfile serialized via bincode (~200-500 bytes)
 pub const CF_TELEOLOGICAL_PROFILES: &str = "teleological_profiles";
 
+// DEPRECATED: Never implemented. Kept in open list for RocksDB compat.
 /// Column family for teleological vectors per-memory storage.
 ///
 /// Stores the 13D TeleologicalVector for each memory, capturing purpose alignment.
@@ -97,7 +100,7 @@ pub const CF_CONTENT: &str = "content";
 /// injection to display where memories originated from (e.g., file paths
 /// for MDFileChunk memories).
 ///
-/// Key: UUID (16 bytes) -> Value: SourceMetadata serialized via bincode (~100-500 bytes)
+/// Key: UUID (16 bytes) -> Value: SourceMetadata serialized via JSON (~100-500 bytes)
 ///
 /// # Storage Details
 /// - LZ4 compression (JSON-like data compresses well)
@@ -163,6 +166,7 @@ pub const CF_E12_LATE_INTERACTION: &str = "e12_late_interaction";
 // ENTITY PROVENANCE COLUMN FAMILIES (Phase 3a Provenance)
 // =============================================================================
 
+// DEPRECATED: Trait methods not yet wired. Kept in open list for RocksDB compat.
 /// Column family for entity provenance storage.
 ///
 /// Maps entity canonical_id + memory_id to EntityProvenance records.
@@ -193,7 +197,7 @@ pub const CF_ENTITY_PROVENANCE: &str = "entity_provenance";
 /// records are never updated or deleted.
 ///
 /// Key: `{timestamp_nanos_be}_{uuid_bytes}` (8 + 16 = 24 bytes)
-/// Value: AuditRecord serialized via bincode (~200-2000 bytes)
+/// Value: AuditRecord serialized via JSON (~200-2000 bytes)
 ///
 /// # Storage Details
 /// - LZ4 compression (JSON parameters and strings compress well)
@@ -231,7 +235,7 @@ pub const CF_AUDIT_BY_TARGET: &str = "audit_by_target";
 /// complete lineage tracking.
 ///
 /// Key: `{merged_uuid_bytes}_{timestamp_nanos_be}` (16 + 8 = 24 bytes)
-/// Value: MergeRecord serialized via bincode (~500-5000 bytes)
+/// Value: MergeRecord serialized via JSON (~500-5000 bytes)
 ///
 /// # Storage Details
 /// - LZ4 compression (JSON fingerprint data compresses well)
@@ -245,7 +249,7 @@ pub const CF_MERGE_HISTORY: &str = "merge_history";
 /// all importance score changes over time.
 ///
 /// Key: `{memory_uuid_bytes}_{timestamp_nanos_be}` (16 + 8 = 24 bytes)
-/// Value: ImportanceChangeRecord serialized via bincode (~100-500 bytes)
+/// Value: ImportanceChangeRecord serialized via JSON (~100-500 bytes)
 ///
 /// # Storage Details
 /// - LZ4 compression (structured data compresses well)
@@ -257,6 +261,7 @@ pub const CF_IMPORTANCE_HISTORY: &str = "importance_history";
 // TOOL CALL PROVENANCE COLUMN FAMILIES (Phase 5, item 5.12)
 // =============================================================================
 
+// DEPRECATED: Trait methods not yet wired. Kept in open list for RocksDB compat.
 /// Column family for tool call → memory mapping (Phase 5, item 5.12).
 ///
 /// Maps tool_use_id to fingerprint IDs created by that tool call.
@@ -275,6 +280,7 @@ pub const CF_TOOL_CALL_INDEX: &str = "tool_call_index";
 // CONSOLIDATION RECOMMENDATION PERSISTENCE (Phase 5, item 5.14)
 // =============================================================================
 
+// DEPRECATED: Trait methods not yet wired. Kept in open list for RocksDB compat.
 /// Column family for consolidation recommendation persistence (Phase 5, item 5.14).
 ///
 /// Stores ConsolidationRecommendation records for review and tracking.
@@ -298,7 +304,7 @@ pub const CF_CONSOLIDATION_RECOMMENDATIONS: &str = "consolidation_recommendation
 /// embeddings. Enables stale embedding detection and targeted re-embedding.
 ///
 /// Key: fingerprint_uuid_bytes (16 bytes)
-/// Value: EmbeddingVersionRecord serialized via bincode (~200-500 bytes)
+/// Value: EmbeddingVersionRecord serialized via JSON (~200-500 bytes)
 ///
 /// # Storage Details
 /// - LZ4 compression (structured data compresses well)
@@ -306,6 +312,24 @@ pub const CF_CONSOLIDATION_RECOMMENDATIONS: &str = "consolidation_recommendation
 /// - 16-byte prefix extractor for UUID keys
 /// - PERMANENT: never expires, never deleted
 pub const CF_EMBEDDING_REGISTRY: &str = "embedding_registry";
+
+// =============================================================================
+// CUSTOM WEIGHT PROFILE STORAGE
+// =============================================================================
+
+/// Column family for custom weight profiles.
+///
+/// Stores user-created weight profiles that can be referenced by name
+/// in search_graph, search_by_intent, and adaptive_search.
+///
+/// Key: profile_name bytes (UTF-8, variable length)
+/// Value: [f32; 13] serialized via JSON (~100-200 bytes)
+///
+/// # Storage Details
+/// - LZ4 compression
+/// - Bloom filter for fast name lookups
+/// - Point lookups by profile name
+pub const CF_CUSTOM_WEIGHT_PROFILES: &str = "custom_weight_profiles";
 
 // =============================================================================
 // LEGACY COLUMN FAMILIES (Backwards Compatibility)
@@ -326,7 +350,7 @@ pub const CF_SESSION_IDENTITY: &str = "session_identity";
 /// It is no longer used but must be opened for databases created with older versions.
 pub const CF_EGO_NODE: &str = "ego_node";
 
-/// All teleological column family names (23 total: 5 original + 3 teleological + 1 content + 1 source_metadata + 1 file_index + 1 topic_portfolio + 1 e12_late_interaction + 1 entity_provenance + 2 audit + 2 lifecycle provenance + 2 phase 5 + 1 phase 6 + 2 legacy).
+/// All teleological column family names (24 total: 5 original + 3 teleological + 1 content + 1 source_metadata + 1 file_index + 1 topic_portfolio + 1 e12_late_interaction + 1 entity_provenance + 2 audit + 2 lifecycle provenance + 2 phase 5 + 1 phase 6 + 1 custom weight profiles + 2 legacy).
 pub const TELEOLOGICAL_CFS: &[&str] = &[
     CF_FINGERPRINTS,
     CF_TOPIC_PROFILES,
@@ -360,13 +384,15 @@ pub const TELEOLOGICAL_CFS: &[&str] = &[
     CF_CONSOLIDATION_RECOMMENDATIONS,
     // Phase 6 Provenance: Embedding version registry
     CF_EMBEDDING_REGISTRY,
+    // Custom weight profile persistence
+    CF_CUSTOM_WEIGHT_PROFILES,
     // Legacy CFs for backwards compatibility
     CF_SESSION_IDENTITY,
     CF_EGO_NODE,
 ];
 
-/// Total count of teleological CFs (should be 23: 21 active + 2 legacy).
-pub const TELEOLOGICAL_CF_COUNT: usize = 23;
+/// Total count of teleological CFs (should be 24: 22 active + 2 legacy).
+pub const TELEOLOGICAL_CF_COUNT: usize = 24;
 
 // =============================================================================
 // QUANTIZED EMBEDDER COLUMN FAMILIES (13 CFs for per-embedder storage)
@@ -672,7 +698,7 @@ pub fn content_cf_options(cache: &Cache) -> Options {
 /// Options for source metadata storage (~100-500 bytes per entry).
 ///
 /// # Configuration
-/// - LZ4 compression (bincode data compresses well)
+/// - LZ4 compression (JSON data compresses well)
 /// - Bloom filter for fast lookups
 /// - Point lookups only by UUID
 ///
@@ -680,7 +706,7 @@ pub fn content_cf_options(cache: &Cache) -> Options {
 /// UUID (16 bytes) for fingerprint_id.
 ///
 /// # Value Format
-/// SourceMetadata serialized via bincode (~100-500 bytes).
+/// SourceMetadata serialized via JSON (~100-500 bytes).
 ///
 /// # FAIL FAST Policy
 /// No fallback options - let RocksDB error on open if misconfigured.
@@ -1084,17 +1110,17 @@ pub fn quantized_embedder_cf_options(cache: &Cache) -> Options {
     opts
 }
 
-/// Get all 23 teleological column family descriptors.
+/// Get all 24 teleological column family descriptors.
 ///
-/// Returns 23 descriptors: 5 original + 3 teleological + 1 content + 1 source_metadata
+/// Returns 24 descriptors: 5 original + 3 teleological + 1 content + 1 source_metadata
 /// + 1 file_index + 1 topic_portfolio + 1 e12_late_interaction + 1 entity_provenance
-/// + 2 audit + 2 lifecycle provenance + 2 phase 5 + 1 phase 6 + 2 legacy.
+/// + 2 audit + 2 lifecycle provenance + 2 phase 5 + 1 phase 6 + 1 custom weight profiles + 2 legacy.
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 23 `ColumnFamilyDescriptor`s for teleological storage.
+/// Vector of 24 `ColumnFamilyDescriptor`s for teleological storage.
 ///
 /// # Example
 /// ```ignore
@@ -1103,7 +1129,7 @@ pub fn quantized_embedder_cf_options(cache: &Cache) -> Options {
 ///
 /// let cache = Cache::new_lru_cache(256 * 1024 * 1024); // 256MB
 /// let descriptors = get_teleological_cf_descriptors(&cache);
-/// assert_eq!(descriptors.len(), 23);
+/// assert_eq!(descriptors.len(), 24);
 /// ```
 pub fn get_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     vec![
@@ -1157,6 +1183,8 @@ pub fn get_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescrip
         ),
         // Phase 6 Provenance: Embedding version registry
         ColumnFamilyDescriptor::new(CF_EMBEDDING_REGISTRY, embedding_registry_cf_options(cache)),
+        // Custom weight profile persistence
+        ColumnFamilyDescriptor::new(CF_CUSTOM_WEIGHT_PROFILES, teleological_profiles_cf_options(cache)),
         // Legacy column families for backwards compatibility
         ColumnFamilyDescriptor::new(CF_SESSION_IDENTITY, legacy_cf_options(cache)),
         ColumnFamilyDescriptor::new(CF_EGO_NODE, legacy_cf_options(cache)),
@@ -1192,14 +1220,14 @@ pub fn get_quantized_embedder_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyD
 
 /// Get ALL teleological + quantized embedder column family descriptors.
 ///
-/// Returns 36 descriptors total: 23 teleological + 13 quantized embedder.
+/// Returns 37 descriptors total: 24 teleological + 13 quantized embedder.
 /// Use this when opening a database that needs both fingerprint and per-embedder storage.
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 36 `ColumnFamilyDescriptor`s.
+/// Vector of 37 `ColumnFamilyDescriptor`s.
 ///
 /// # Example
 /// ```ignore
@@ -1208,7 +1236,7 @@ pub fn get_quantized_embedder_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyD
 ///
 /// let cache = Cache::new_lru_cache(256 * 1024 * 1024); // 256MB
 /// let descriptors = get_all_teleological_cf_descriptors(&cache);
-/// assert_eq!(descriptors.len(), 36); // 23 teleological + 13 embedder
+/// assert_eq!(descriptors.len(), 37); // 24 teleological + 13 embedder
 /// ```
 pub fn get_all_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     let mut descriptors = get_teleological_cf_descriptors(cache);
@@ -1529,13 +1557,13 @@ pub fn get_causal_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
 
 /// Get ALL column family descriptors (teleological + embedder + code + causal).
 ///
-/// Returns 43 descriptors total: 23 teleological + 13 quantized embedder + 5 code + 2 causal.
+/// Returns 44 descriptors total: 24 teleological + 13 quantized embedder + 5 code + 2 causal.
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 43 `ColumnFamilyDescriptor`s.
+/// Vector of 44 `ColumnFamilyDescriptor`s.
 pub fn get_all_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     let mut descriptors = get_all_teleological_cf_descriptors(cache);
     descriptors.extend(get_code_cf_descriptors(cache));

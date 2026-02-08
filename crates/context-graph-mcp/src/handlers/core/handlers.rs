@@ -494,6 +494,23 @@ impl Handlers {
             }
         }
 
+        // Load custom weight profiles from RocksDB into in-memory cache
+        match self.teleological_store.list_custom_weight_profiles().await {
+            Ok(profiles) => {
+                let count = profiles.len();
+                if count > 0 {
+                    let mut cache = self.custom_profiles.write();
+                    for (name, weights) in profiles {
+                        cache.insert(name, weights);
+                    }
+                    info!(profile_count = count, "Custom weight profiles loaded from RocksDB");
+                }
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to load custom weight profiles from RocksDB (continuing with empty cache)");
+            }
+        }
+
         let capabilities = json!({
             "protocolVersion": "2024-11-05",
             "capabilities": {

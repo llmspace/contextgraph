@@ -22,6 +22,7 @@ use serde_json::json;
 use tracing::{debug, error, info, warn};
 
 use context_graph_core::traits::{CausalDirectionHint, CausalHint, EmbeddingMetadata};
+use context_graph_core::types::audit::{AuditOperation, AuditRecord};
 use context_graph_core::types::fingerprint::TeleologicalFingerprint;
 use context_graph_core::types::SourceMetadata;
 use context_graph_graph_agent::MemoryForGraphAnalysis;
@@ -667,6 +668,28 @@ impl Handlers {
                             cause = %causal_rel.cause_statement,
                             "trigger_causal_discovery_extract: Stored CausalRelationship"
                         );
+
+                        // Emit RelationshipDiscovered audit (non-fatal)
+                        {
+                            let audit_record = AuditRecord::new(
+                                AuditOperation::RelationshipDiscovered {
+                                    relationship_type: relationship.mechanism_type.as_str().to_string(),
+                                    confidence: relationship.confidence,
+                                },
+                                causal_id,
+                            )
+                            .with_operator("trigger_causal_discovery")
+                            .with_parameters(serde_json::json!({
+                                "mode": "extract",
+                                "source_memory_id": memory_id.to_string(),
+                                "cause_statement": relationship.cause.chars().take(100).collect::<String>(),
+                                "effect_statement": relationship.effect.chars().take(100).collect::<String>(),
+                            }));
+
+                            if let Err(e) = self.teleological_store.append_audit_record(&audit_record).await {
+                                warn!(error = %e, "trigger_causal_discovery: Failed to write audit record (non-fatal)");
+                            }
+                        }
 
                         // NEW: Generate full 13-embedder fingerprint for the explanation
                         // E5+LLM is the ONLY embedder pair that GENERATES new knowledge.

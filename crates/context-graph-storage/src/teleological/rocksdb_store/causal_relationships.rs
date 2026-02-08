@@ -1033,7 +1033,17 @@ impl RocksDbTeleologicalStore {
 
         // Read existing list
         let mut causal_ids: Vec<Uuid> = match self.db.get_cf(cf, key) {
-            Ok(Some(bytes)) => bincode::deserialize(&bytes).unwrap_or_default(),
+            Ok(Some(bytes)) => bincode::deserialize(&bytes).map_err(|e| {
+                error!(
+                    source_id = %source_id,
+                    error = %e,
+                    "FAIL FAST: Corrupted causal_by_source index entry. \
+                     Cannot safely delete causal relationship with corrupted index."
+                );
+                TeleologicalStoreError::Internal(format!(
+                    "Corrupted causal_by_source index for {}: {}", source_id, e
+                ))
+            })?,
             Ok(None) => return Ok(()), // Nothing to remove
             Err(e) => {
                 warn!(
