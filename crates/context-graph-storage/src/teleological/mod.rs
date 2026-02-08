@@ -75,9 +75,7 @@ pub use column_families::{
     CAUSAL_CF_COUNT,
     // Quantized embedder column families (TASK-EMB-022)
     quantized_embedder_cf_options,
-    synergy_matrix_cf_options,
-    teleological_profiles_cf_options,
-    teleological_vectors_cf_options,
+    custom_weight_profiles_cf_options,
     // TASK-CONTENT-001: Content column family
     CF_CONTENT,
     // TASK-STORAGE-P2-001: E12 Late Interaction column family constant
@@ -102,10 +100,6 @@ pub use column_families::{
     CF_EMB_9,
     CF_FINGERPRINTS,
     CF_TOPIC_PROFILES,
-    // TASK-TELEO-006: New teleological vector column families
-    CF_SYNERGY_MATRIX,
-    CF_TELEOLOGICAL_PROFILES,
-    CF_TELEOLOGICAL_VECTORS,
     QUANTIZED_EMBEDDER_CFS,
     QUANTIZED_EMBEDDER_CF_COUNT,
     TELEOLOGICAL_CFS,
@@ -136,14 +130,8 @@ pub use schema::{
     parse_e13_splade_key,
     parse_e1_matryoshka_key,
     parse_fingerprint_key,
-    parse_teleological_profile_key,
-    parse_teleological_vector_key,
     parse_topic_profile_key,
-    teleological_profile_key,
-    teleological_vector_key,
     topic_profile_key,
-    // TASK-TELEO-006: New key format functions
-    SYNERGY_MATRIX_KEY,
 };
 
 // Re-export serialization types

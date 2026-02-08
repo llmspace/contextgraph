@@ -402,7 +402,7 @@ impl Handlers {
                 // E4-FIX Phase 1: Persist session metadata for E4 sequence retrieval
                 // This enables proper before/after queries by storing session_sequence
                 // PHASE-1.2: Add operator attribution fields for provenance tracking
-                let mut source_metadata = SourceMetadata {
+                let source_metadata = SourceMetadata {
                     source_type: SourceType::Manual,
                     session_id: session_id.clone(),
                     session_sequence: Some(session_sequence),

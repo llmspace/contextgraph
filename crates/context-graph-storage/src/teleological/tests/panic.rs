@@ -56,54 +56,6 @@ fn test_panic_on_invalid_splade_key() {
 }
 
 // =========================================================================
-// TASK-TELEO-006: Panic Tests for New Key Types
-// =========================================================================
-
-#[test]
-#[should_panic(expected = "STORAGE ERROR: teleological_profile_key cannot be empty")]
-fn test_teleological_profile_key_empty_panics() {
-    let _ = teleological_profile_key("");
-}
-
-#[test]
-#[should_panic(expected = "STORAGE ERROR: teleological_profile_key too long")]
-fn test_teleological_profile_key_too_long_panics() {
-    let long_id = "x".repeat(256);
-    let _ = teleological_profile_key(&long_id);
-}
-
-#[test]
-#[should_panic(expected = "STORAGE ERROR: teleological_profile key cannot be empty")]
-fn test_parse_teleological_profile_key_empty_panics() {
-    let _ = parse_teleological_profile_key(&[]);
-}
-
-#[test]
-#[should_panic(expected = "STORAGE ERROR: teleological_profile key too long")]
-fn test_parse_teleological_profile_key_too_long_panics() {
-    let long_key = vec![0x61u8; 256]; // 'a' * 256
-    let _ = parse_teleological_profile_key(&long_key);
-}
-
-#[test]
-#[should_panic(expected = "STORAGE ERROR: teleological_vector key must be 16 bytes")]
-fn test_parse_teleological_vector_key_too_short_panics() {
-    let _ = parse_teleological_vector_key(&[0u8; 15]);
-}
-
-#[test]
-#[should_panic(expected = "STORAGE ERROR: teleological_vector key must be 16 bytes")]
-fn test_parse_teleological_vector_key_too_long_panics() {
-    let _ = parse_teleological_vector_key(&[0u8; 17]);
-}
-
-#[test]
-#[should_panic(expected = "STORAGE ERROR: teleological_vector key must be 16 bytes")]
-fn test_parse_teleological_vector_key_empty_panics() {
-    let _ = parse_teleological_vector_key(&[]);
-}
-
-// =========================================================================
 // Content Key Panic Tests
 // =========================================================================
 

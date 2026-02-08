@@ -597,6 +597,7 @@ mod tests {
     #[tokio::test]
     async fn test_service_creation() {
         let config = create_test_config();
+        #[allow(deprecated)]
         let service = CausalDiscoveryService::new(config).await;
         assert!(service.is_ok());
     }
@@ -614,6 +615,7 @@ mod tests {
             return;
         }
 
+        #[allow(deprecated)]
         let service = CausalDiscoveryService::new(config).await.unwrap();
 
         // Load model
@@ -629,13 +631,12 @@ mod tests {
 
         // Check that the cycle ran (may find 0 candidates if similarity is too low)
         assert!(result.errors == 0);
-        // Duration can be 0 if very fast, so just check it's non-negative (always true)
-        assert!(result.duration.as_nanos() >= 0);
     }
 
     #[tokio::test]
     async fn test_service_status() {
         let config = create_test_config();
+        #[allow(deprecated)]
         let service = CausalDiscoveryService::new(config).await.unwrap();
 
         assert_eq!(service.status(), ServiceStatus::Stopped);

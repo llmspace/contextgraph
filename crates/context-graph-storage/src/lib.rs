@@ -96,8 +96,6 @@ pub use teleological::{
     parse_e1_matryoshka_key,
     parse_fingerprint_key,
     parse_topic_profile_key,
-    parse_teleological_profile_key,
-    parse_teleological_vector_key,
     topic_profile_cf_options,
     topic_profile_key,
     // Quantized embedder column families (TASK-EMB-022)
@@ -107,11 +105,7 @@ pub use teleological::{
     serialize_topic_profile,
     // Serialization functions
     serialize_teleological_fingerprint,
-    synergy_matrix_cf_options,
-    teleological_profile_key,
-    teleological_profiles_cf_options,
-    teleological_vector_key,
-    teleological_vectors_cf_options,
+    custom_weight_profiles_cf_options,
     DistanceMetric,
     EmbedderIndex,
     HnswConfig,
@@ -143,10 +137,6 @@ pub use teleological::{
     CF_EMB_9,
     CF_FINGERPRINTS,
     CF_TOPIC_PROFILES,
-    // TASK-TELEO-006: New teleological vector column families
-    CF_SYNERGY_MATRIX,
-    CF_TELEOLOGICAL_PROFILES,
-    CF_TELEOLOGICAL_VECTORS,
     E10_DIM,
     E11_DIM,
     E12_TOKEN_DIM,
@@ -165,8 +155,6 @@ pub use teleological::{
     TOPIC_PROFILE_DIM,
     QUANTIZED_EMBEDDER_CFS,
     QUANTIZED_EMBEDDER_CF_COUNT,
-    // TASK-TELEO-006: New key format functions
-    SYNERGY_MATRIX_KEY,
     TELEOLOGICAL_CFS,
     TELEOLOGICAL_CF_COUNT,
     TELEOLOGICAL_VERSION,

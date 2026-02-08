@@ -18,7 +18,7 @@ fn test_teleological_cf_names_count() {
         "Must have exactly {} teleological column families",
         TELEOLOGICAL_CF_COUNT
     );
-    assert_eq!(TELEOLOGICAL_CF_COUNT, 24); // 22 active + 2 legacy CFs total
+    assert_eq!(TELEOLOGICAL_CF_COUNT, 21); // 19 active + 2 legacy CFs total
 }
 
 #[test]
@@ -51,10 +51,6 @@ fn test_teleological_cf_names_values() {
     assert_eq!(CF_TOPIC_PROFILES, "topic_profiles");
     assert_eq!(CF_E13_SPLADE_INVERTED, "e13_splade_inverted");
     assert_eq!(CF_E1_MATRYOSHKA_128, "e1_matryoshka_128");
-    // TASK-TELEO-006: New 3 CFs
-    assert_eq!(CF_SYNERGY_MATRIX, "synergy_matrix");
-    assert_eq!(CF_TELEOLOGICAL_PROFILES, "teleological_profiles");
-    assert_eq!(CF_TELEOLOGICAL_VECTORS, "teleological_vectors");
 }
 
 #[test]
@@ -63,10 +59,6 @@ fn test_all_cfs_in_array() {
     assert!(TELEOLOGICAL_CFS.contains(&CF_TOPIC_PROFILES));
     assert!(TELEOLOGICAL_CFS.contains(&CF_E13_SPLADE_INVERTED));
     assert!(TELEOLOGICAL_CFS.contains(&CF_E1_MATRYOSHKA_128));
-    // TASK-TELEO-006: New CFs
-    assert!(TELEOLOGICAL_CFS.contains(&CF_SYNERGY_MATRIX));
-    assert!(TELEOLOGICAL_CFS.contains(&CF_TELEOLOGICAL_PROFILES));
-    assert!(TELEOLOGICAL_CFS.contains(&CF_TELEOLOGICAL_VECTORS));
 }
 
 #[test]
@@ -119,27 +111,11 @@ fn test_get_teleological_cf_descriptors_returns_7() {
 // =========================================================================
 
 #[test]
-fn test_synergy_matrix_cf_options_valid() {
+fn test_custom_weight_profiles_cf_options_valid() {
     use rocksdb::Cache;
     let cache = Cache::new_lru_cache(256 * 1024 * 1024);
-    let opts = synergy_matrix_cf_options(&cache);
+    let opts = custom_weight_profiles_cf_options(&cache);
     drop(opts); // Should not panic
-}
-
-#[test]
-fn test_teleological_profiles_cf_options_valid() {
-    use rocksdb::Cache;
-    let cache = Cache::new_lru_cache(256 * 1024 * 1024);
-    let opts = teleological_profiles_cf_options(&cache);
-    drop(opts);
-}
-
-#[test]
-fn test_teleological_vectors_cf_options_valid() {
-    use rocksdb::Cache;
-    let cache = Cache::new_lru_cache(256 * 1024 * 1024);
-    let opts = teleological_vectors_cf_options(&cache);
-    drop(opts);
 }
 
 // =========================================================================
@@ -166,23 +142,22 @@ fn test_descriptors_in_correct_order() {
 }
 
 #[test]
-fn test_get_all_teleological_cf_descriptors_returns_36() {
+fn test_get_all_teleological_cf_descriptors_returns_34() {
     use rocksdb::Cache;
     let cache = Cache::new_lru_cache(256 * 1024 * 1024);
     let descriptors = get_all_teleological_cf_descriptors(&cache);
 
-    // 24 teleological + 13 quantized embedder = 37
-    // Teleological (24): fingerprints, topic_profiles, e13_splade_inverted, e6_sparse_inverted,
-    //   e1_matryoshka_128, synergy_matrix, teleological_profiles, teleological_vectors, content,
-    //   source_metadata, file_index, topic_portfolio, e12_late_interaction, entity_provenance,
-    //   audit_log, audit_by_target, merge_history, importance_history, tool_call_index,
-    //   consolidation_recommendations, embedding_registry, custom_weight_profiles,
-    //   session_identity, ego_node
+    // 21 teleological + 13 quantized embedder = 34
+    // Teleological (21): fingerprints, topic_profiles, e13_splade_inverted, e6_sparse_inverted,
+    //   e1_matryoshka_128, content, source_metadata, file_index, topic_portfolio,
+    //   e12_late_interaction, entity_provenance, audit_log, audit_by_target, merge_history,
+    //   importance_history, tool_call_index, consolidation_recommendations, embedding_registry,
+    //   custom_weight_profiles, session_identity, ego_node
     // Quantized (13): emb_0 through emb_12
     assert_eq!(
         descriptors.len(),
-        37,
-        "Must return 24 teleological + 13 quantized = 37 CFs"
+        34,
+        "Must return 21 teleological + 13 quantized = 34 CFs"
     );
 }
 
@@ -191,19 +166,17 @@ fn test_get_all_teleological_cf_descriptors_returns_36() {
 // =========================================================================
 
 #[test]
-fn edge_case_multiple_cache_references_for_new_cfs() {
-    println!("=== EDGE CASE: Multiple option builders sharing same cache (new CFs) ===");
+fn edge_case_multiple_cache_references_for_cfs() {
+    println!("=== EDGE CASE: Multiple option builders sharing same cache ===");
     use rocksdb::Cache;
     let cache = Cache::new_lru_cache(256 * 1024 * 1024);
 
     println!("BEFORE: Creating options with shared cache reference");
-    let opts1 = synergy_matrix_cf_options(&cache);
-    let opts2 = teleological_profiles_cf_options(&cache);
-    let opts3 = teleological_vectors_cf_options(&cache);
+    let opts1 = fingerprint_cf_options(&cache);
+    let opts2 = custom_weight_profiles_cf_options(&cache);
 
-    println!("AFTER: All 3 new option builders created successfully");
+    println!("AFTER: Option builders created successfully");
     drop(opts1);
     drop(opts2);
-    drop(opts3);
-    println!("RESULT: PASS - Shared cache works across new Options");
+    println!("RESULT: PASS - Shared cache works across Options");
 }
