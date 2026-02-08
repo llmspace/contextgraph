@@ -189,9 +189,8 @@ impl DatasetGenerator {
             e8_graph_as_target: embeddings.e8,
             e8_graph: Vec::new(), // Empty - using new dual format
             e9_hdc: embeddings.e9,
-            e10_multimodal_as_intent: embeddings.e10.clone(),
+            e10_multimodal_paraphrase: embeddings.e10.clone(),
             e10_multimodal_as_context: embeddings.e10,
-            e10_multimodal: Vec::new(), // Empty - using new dual format
             e11_entity: embeddings.e11,
             e12_late_interaction: self.generate_late_interaction(self.config.tokens_e12),
             e13_splade: self.generate_sparse(E13_SPLADE_VOCAB, self.config.sparse_entries_e13),
@@ -369,9 +368,9 @@ mod tests {
             assert!(fp.e8_graph.is_empty(), "Legacy e8_graph should be empty");
             assert_eq!(fp.e9_hdc.len(), E9_DIM);
             // E10 uses dual vectors (intent + context) for asymmetric multimodal similarity
-            assert_eq!(fp.e10_multimodal_as_intent.len(), E10_DIM);
+            assert_eq!(fp.e10_multimodal_paraphrase.len(), E10_DIM);
             assert_eq!(fp.e10_multimodal_as_context.len(), E10_DIM);
-            assert!(fp.e10_multimodal.is_empty(), "Legacy e10_multimodal should be empty");
+            // Legacy e10_multimodal field has been removed from SemanticFingerprint
             assert_eq!(fp.e11_entity.len(), E11_DIM);
         }
     }

@@ -301,8 +301,8 @@ fn fsv_all_embedders_differentiated_scores() {
 
     // E10: Multimodal (768D) - MEDIUM-HIGH similarity (~0.78)
     // Uses dual vectors (paraphrase/context)
-    fp1.e10_multimodal_as_intent = make_dense_vector(768, &[(0, 1.0)]);
-    fp2.e10_multimodal_as_intent = make_dense_vector(768, &[(0, 0.7), (1, 0.714)]); // ~45° → 0.85
+    fp1.e10_multimodal_paraphrase = make_dense_vector(768, &[(0, 1.0)]);
+    fp2.e10_multimodal_paraphrase = make_dense_vector(768, &[(0, 0.7), (1, 0.714)]); // ~45° → 0.85
     fp1.e10_multimodal_as_context = make_dense_vector(768, &[(0, 1.0)]);
     fp2.e10_multimodal_as_context = make_dense_vector(768, &[(0, 0.4), (1, 0.917)]); // ~66° → 0.7
 

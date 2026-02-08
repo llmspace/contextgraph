@@ -306,64 +306,31 @@ pub const CF_EMBEDDING_REGISTRY: &str = "embedding_registry";
 /// - Point lookups by profile name
 pub const CF_CUSTOM_WEIGHT_PROFILES: &str = "custom_weight_profiles";
 
-// =============================================================================
-// LEGACY COLUMN FAMILIES (Backwards Compatibility)
-// =============================================================================
-// These column families were created in earlier versions of the codebase.
-// They must be opened for backwards compatibility with existing databases,
-// even though they are no longer actively used.
-
-/// Legacy column family for session identity storage.
-///
-/// **DEPRECATED**: This column family exists for backwards compatibility only.
-/// It is no longer used but must be opened for databases created with older versions.
-pub const CF_SESSION_IDENTITY: &str = "session_identity";
-
-/// Legacy column family for ego node storage.
-///
-/// **DEPRECATED**: This column family exists for backwards compatibility only.
-/// It is no longer used but must be opened for databases created with older versions.
-pub const CF_EGO_NODE: &str = "ego_node";
-
-/// All teleological column family names (21 total: 5 original + 1 content + 1 source_metadata + 1 file_index + 1 topic_portfolio + 1 e12_late_interaction + 1 entity_provenance + 2 audit + 2 lifecycle provenance + 2 phase 5 + 1 phase 6 + 1 custom weight profiles + 2 legacy).
+/// All teleological column family names (19 total).
 pub const TELEOLOGICAL_CFS: &[&str] = &[
     CF_FINGERPRINTS,
     CF_TOPIC_PROFILES,
     CF_E13_SPLADE_INVERTED,
-    CF_E6_SPARSE_INVERTED, // E6 inverted index for dual Stage 1 recall (e6upgrade.md)
+    CF_E6_SPARSE_INVERTED,
     CF_E1_MATRYOSHKA_128,
-    // TASK-CONTENT-001: Content storage CF
     CF_CONTENT,
-    // Source metadata storage CF
     CF_SOURCE_METADATA,
-    // File index for file watcher management
     CF_FILE_INDEX,
-    // Topic portfolio persistence for session continuity
     CF_TOPIC_PORTFOLIO,
-    // TASK-STORAGE-P2-001: E12 Late Interaction token storage CF
     CF_E12_LATE_INTERACTION,
-    // Phase 3a Provenance: Entity provenance CF
     CF_ENTITY_PROVENANCE,
-    // Phase 1.1 Provenance: Audit log CFs (append-only)
     CF_AUDIT_LOG,
     CF_AUDIT_BY_TARGET,
-    // Phase 4 Lifecycle Provenance: Permanent merge + importance history
     CF_MERGE_HISTORY,
     CF_IMPORTANCE_HISTORY,
-    // Phase 5 Hook & Tool Call Provenance
     CF_TOOL_CALL_INDEX,
     CF_CONSOLIDATION_RECOMMENDATIONS,
-    // Phase 6 Provenance: Embedding version registry
     CF_EMBEDDING_REGISTRY,
-    // Custom weight profile persistence
     CF_CUSTOM_WEIGHT_PROFILES,
-    // Legacy CFs for backwards compatibility
-    CF_SESSION_IDENTITY,
-    CF_EGO_NODE,
 ];
 
-/// Total count of teleological CFs (should be 21: 19 active + 2 legacy).
-pub const TELEOLOGICAL_CF_COUNT: usize = 21;
+/// Total count of teleological CFs.
+pub const TELEOLOGICAL_CF_COUNT: usize = 19;
 
 // =============================================================================
 // QUANTIZED EMBEDDER COLUMN FAMILIES (13 CFs for per-embedder storage)
@@ -886,28 +853,6 @@ pub fn importance_history_cf_options(cache: &Cache) -> Options {
     opts
 }
 
-/// Options for legacy column families (backwards compatibility only).
-///
-/// These column families are no longer actively used but must be openable
-/// for databases created with older versions of the software.
-///
-/// # Configuration
-/// - Default options with minimal overhead
-/// - No compression (these CFs are not written to)
-/// - Bloom filter disabled (no reads expected)
-///
-/// # FAIL FAST Policy
-/// No fallback options - let RocksDB error on open if misconfigured.
-pub fn legacy_cf_options(cache: &Cache) -> Options {
-    let mut block_opts = BlockBasedOptions::default();
-    block_opts.set_block_cache(cache);
-
-    let mut opts = Options::default();
-    opts.set_block_based_table_factory(&block_opts);
-    opts.set_compression_type(rocksdb::DBCompressionType::None);
-    opts.create_if_missing(true);
-    opts
-}
 
 // =============================================================================
 // PHASE 5 PROVENANCE CF OPTION BUILDERS
@@ -1023,27 +968,13 @@ pub fn quantized_embedder_cf_options(cache: &Cache) -> Options {
     opts
 }
 
-/// Get all 21 teleological column family descriptors.
-///
-/// Returns 21 descriptors: 5 original + 1 E6 inverted + 1 content + 1 source_metadata
-/// + 1 file_index + 1 topic_portfolio + 1 e12_late_interaction + 1 entity_provenance
-/// + 2 audit + 2 lifecycle provenance + 2 phase 5 + 1 phase 6 + 1 custom weight profiles + 2 legacy.
+/// Get all 19 teleological column family descriptors.
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 21 `ColumnFamilyDescriptor`s for teleological storage.
-///
-/// # Example
-/// ```ignore
-/// use rocksdb::Cache;
-/// use context_graph_storage::teleological::get_teleological_cf_descriptors;
-///
-/// let cache = Cache::new_lru_cache(256 * 1024 * 1024); // 256MB
-/// let descriptors = get_teleological_cf_descriptors(&cache);
-/// assert_eq!(descriptors.len(), 21);
-/// ```
+/// Vector of 19 `ColumnFamilyDescriptor`s for teleological storage.
 pub fn get_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     vec![
         ColumnFamilyDescriptor::new(CF_FINGERPRINTS, fingerprint_cf_options(cache)),
@@ -1088,9 +1019,6 @@ pub fn get_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescrip
         ColumnFamilyDescriptor::new(CF_EMBEDDING_REGISTRY, embedding_registry_cf_options(cache)),
         // Custom weight profile persistence
         ColumnFamilyDescriptor::new(CF_CUSTOM_WEIGHT_PROFILES, custom_weight_profiles_cf_options(cache)),
-        // Legacy column families for backwards compatibility
-        ColumnFamilyDescriptor::new(CF_SESSION_IDENTITY, legacy_cf_options(cache)),
-        ColumnFamilyDescriptor::new(CF_EGO_NODE, legacy_cf_options(cache)),
     ]
 }
 
@@ -1123,14 +1051,14 @@ pub fn get_quantized_embedder_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyD
 
 /// Get ALL teleological + quantized embedder column family descriptors.
 ///
-/// Returns 34 descriptors total: 21 teleological + 13 quantized embedder.
+/// Returns 32 descriptors total: 19 teleological + 13 quantized embedder.
 /// Use this when opening a database that needs both fingerprint and per-embedder storage.
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 34 `ColumnFamilyDescriptor`s.
+/// Vector of 32 `ColumnFamilyDescriptor`s.
 ///
 /// # Example
 /// ```ignore
@@ -1139,7 +1067,7 @@ pub fn get_quantized_embedder_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyD
 ///
 /// let cache = Cache::new_lru_cache(256 * 1024 * 1024); // 256MB
 /// let descriptors = get_all_teleological_cf_descriptors(&cache);
-/// assert_eq!(descriptors.len(), 34); // 21 teleological + 13 embedder
+/// assert_eq!(descriptors.len(), 32); // 19 teleological + 13 embedder
 /// ```
 pub fn get_all_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     let mut descriptors = get_teleological_cf_descriptors(cache);
@@ -1460,13 +1388,13 @@ pub fn get_causal_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
 
 /// Get ALL column family descriptors (teleological + embedder + code + causal).
 ///
-/// Returns 41 descriptors total: 21 teleological + 13 quantized embedder + 5 code + 2 causal.
+/// Returns 39 descriptors total: 19 teleological + 13 quantized embedder + 5 code + 2 causal.
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 44 `ColumnFamilyDescriptor`s.
+/// Vector of 39 `ColumnFamilyDescriptor`s.
 pub fn get_all_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     let mut descriptors = get_all_teleological_cf_descriptors(cache);
     descriptors.extend(get_code_cf_descriptors(cache));

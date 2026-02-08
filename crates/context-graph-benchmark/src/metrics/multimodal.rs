@@ -1,8 +1,8 @@
 //! E10 Multimodal benchmark metrics.
 //!
-//! Metrics for evaluating E10 intent/context embeddings:
+//! Metrics for evaluating E10 paraphrase/context embeddings:
 //!
-//! - **Intent Detection**: Accuracy of detecting intent vs context
+//! - **Paraphrase Detection**: Accuracy of detecting paraphrase vs context
 //! - **Context Matching**: Quality of context-aware retrieval
 //! - **Asymmetric Retrieval**: Validation of 1.2/0.8 direction modifiers
 //! - **Ablation**: E10 contribution vs E1 baseline
@@ -13,8 +13,8 @@ use std::collections::HashMap;
 /// Combined E10 multimodal metrics.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct E10MultimodalMetrics {
-    /// Intent detection metrics.
-    pub intent_detection: IntentDetectionMetrics,
+    /// Paraphrase detection metrics.
+    pub paraphrase_detection: ParaphraseDetectionMetrics,
     /// Context matching metrics.
     pub context_matching: ContextMatchingMetrics,
     /// Asymmetric retrieval metrics.
@@ -26,7 +26,7 @@ pub struct E10MultimodalMetrics {
 impl E10MultimodalMetrics {
     /// Compute overall quality score.
     pub fn overall_score(&self) -> f64 {
-        let intent_score = self.intent_detection.accuracy;
+        let paraphrase_score = self.paraphrase_detection.accuracy;
         let context_score = self.context_matching.mrr;
         let asymmetry_score = if self.asymmetric_retrieval.formula_compliant {
             1.0
@@ -34,18 +34,18 @@ impl E10MultimodalMetrics {
             0.5
         };
 
-        // 40% intent detection + 40% context matching + 20% asymmetry compliance
-        0.4 * intent_score + 0.4 * context_score + 0.2 * asymmetry_score
+        // 40% paraphrase detection + 40% context matching + 20% asymmetry compliance
+        0.4 * paraphrase_score + 0.4 * context_score + 0.2 * asymmetry_score
     }
 }
 
-/// Metrics for intent detection evaluation.
+/// Metrics for paraphrase detection evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IntentDetectionMetrics {
+pub struct ParaphraseDetectionMetrics {
     /// Total queries evaluated.
     pub total_queries: usize,
-    /// Correctly classified as intent.
-    pub correct_intent: usize,
+    /// Correctly classified as paraphrase.
+    pub correct_paraphrase: usize,
     /// Correctly classified as context.
     pub correct_context: usize,
     /// Misclassified queries.
@@ -54,33 +54,33 @@ pub struct IntentDetectionMetrics {
     pub accuracy: f64,
     /// Per-domain accuracy breakdown.
     pub per_domain_accuracy: HashMap<String, f64>,
-    /// Precision for intent class.
-    pub intent_precision: f64,
-    /// Recall for intent class.
-    pub intent_recall: f64,
-    /// F1 score for intent class.
-    pub intent_f1: f64,
+    /// Precision for paraphrase class.
+    pub paraphrase_precision: f64,
+    /// Recall for paraphrase class.
+    pub paraphrase_recall: f64,
+    /// F1 score for paraphrase class.
+    pub paraphrase_f1: f64,
 }
 
-impl Default for IntentDetectionMetrics {
+impl Default for ParaphraseDetectionMetrics {
     fn default() -> Self {
         Self {
             total_queries: 0,
-            correct_intent: 0,
+            correct_paraphrase: 0,
             correct_context: 0,
             misclassified: 0,
             accuracy: 0.0,
             per_domain_accuracy: HashMap::new(),
-            intent_precision: 0.0,
-            intent_recall: 0.0,
-            intent_f1: 0.0,
+            paraphrase_precision: 0.0,
+            paraphrase_recall: 0.0,
+            paraphrase_f1: 0.0,
         }
     }
 }
 
-/// Results from a single intent detection test.
+/// Results from a single paraphrase detection test.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IntentDetectionResult {
+pub struct ParaphraseDetectionResult {
     /// Query text.
     pub query: String,
     /// Expected direction.
@@ -151,10 +151,10 @@ pub struct ContextMatchingResult {
 pub struct AsymmetricRetrievalMetrics {
     /// Total queries evaluated.
     pub total_queries: usize,
-    /// Queries where intent→context scored higher.
-    pub intent_to_context_wins: usize,
-    /// Queries where context→intent scored higher.
-    pub context_to_intent_wins: usize,
+    /// Queries where paraphrase→context scored higher.
+    pub paraphrase_to_context_wins: usize,
+    /// Queries where context→paraphrase scored higher.
+    pub context_to_paraphrase_wins: usize,
     /// Ties (equal scores).
     pub ties: usize,
     /// Observed asymmetry ratio (should be ~1.5 = 1.2/0.8).
@@ -163,10 +163,10 @@ pub struct AsymmetricRetrievalMetrics {
     pub expected_asymmetry_ratio: f64,
     /// Whether formula is compliant with Constitution.
     pub formula_compliant: bool,
-    /// Direction modifier: intent→context.
-    pub intent_to_context_modifier: f32,
-    /// Direction modifier: context→intent.
-    pub context_to_intent_modifier: f32,
+    /// Direction modifier: paraphrase→context.
+    pub paraphrase_to_context_modifier: f32,
+    /// Direction modifier: context→paraphrase.
+    pub context_to_paraphrase_modifier: f32,
     /// Direction modifier: same direction.
     pub same_direction_modifier: f32,
     /// E10 contribution percentage.
@@ -177,16 +177,16 @@ impl Default for AsymmetricRetrievalMetrics {
     fn default() -> Self {
         Self {
             total_queries: 0,
-            intent_to_context_wins: 0,
-            context_to_intent_wins: 0,
+            paraphrase_to_context_wins: 0,
+            context_to_paraphrase_wins: 0,
             ties: 0,
             observed_asymmetry_ratio: 0.0,
             // E5-base-v2 handles asymmetry via prefixes - expected ratio is 1.0
             expected_asymmetry_ratio: 1.0,
             formula_compliant: false,
             // Neutral modifiers - E5-base-v2 handles asymmetry via query:/passage: prefixes
-            intent_to_context_modifier: 1.0,
-            context_to_intent_modifier: 1.0,
+            paraphrase_to_context_modifier: 1.0,
+            context_to_paraphrase_modifier: 1.0,
             same_direction_modifier: 1.0,
             e10_contribution_percentage: 0.0,
         }
@@ -198,10 +198,10 @@ impl Default for AsymmetricRetrievalMetrics {
 pub struct AsymmetricRetrievalResult {
     /// Base cosine similarity.
     pub base_similarity: f64,
-    /// Similarity with intent→context direction.
-    pub intent_to_context_similarity: f64,
-    /// Similarity with context→intent direction.
-    pub context_to_intent_similarity: f64,
+    /// Similarity with paraphrase→context direction.
+    pub paraphrase_to_context_similarity: f64,
+    /// Similarity with context→paraphrase direction.
+    pub context_to_paraphrase_similarity: f64,
     /// Observed ratio.
     pub observed_ratio: f64,
     /// Whether this test passed.
@@ -311,18 +311,18 @@ pub fn compute_ndcg_at_k(results: &[(String, f64)], expected: &[String], k: usiz
     }
 }
 
-/// Compute intent detection metrics from results.
-pub fn compute_intent_detection_metrics(
-    results: &[IntentDetectionResult],
-) -> IntentDetectionMetrics {
+/// Compute paraphrase detection metrics from results.
+pub fn compute_paraphrase_detection_metrics(
+    results: &[ParaphraseDetectionResult],
+) -> ParaphraseDetectionMetrics {
     let total = results.len();
     if total == 0 {
-        return IntentDetectionMetrics::default();
+        return ParaphraseDetectionMetrics::default();
     }
 
-    let correct_intent = results
+    let correct_paraphrase = results
         .iter()
-        .filter(|r| r.correct && r.expected == "intent")
+        .filter(|r| r.correct && r.expected == "paraphrase")
         .count();
     let correct_context = results
         .iter()
@@ -330,7 +330,7 @@ pub fn compute_intent_detection_metrics(
         .count();
     let misclassified = results.iter().filter(|r| !r.correct).count();
 
-    let accuracy = (correct_intent + correct_context) as f64 / total as f64;
+    let accuracy = (correct_paraphrase + correct_context) as f64 / total as f64;
 
     // Per-domain accuracy
     let mut domain_correct: HashMap<String, usize> = HashMap::new();
@@ -351,42 +351,42 @@ pub fn compute_intent_detection_metrics(
         })
         .collect();
 
-    // Precision/Recall/F1 for intent class
-    let predicted_intent = results.iter().filter(|r| r.detected == "intent").count();
-    let actual_intent = results.iter().filter(|r| r.expected == "intent").count();
-    let true_positive_intent = results
+    // Precision/Recall/F1 for paraphrase class
+    let predicted_paraphrase = results.iter().filter(|r| r.detected == "paraphrase").count();
+    let actual_paraphrase = results.iter().filter(|r| r.expected == "paraphrase").count();
+    let true_positive_paraphrase = results
         .iter()
-        .filter(|r| r.detected == "intent" && r.expected == "intent")
+        .filter(|r| r.detected == "paraphrase" && r.expected == "paraphrase")
         .count();
 
-    let intent_precision = if predicted_intent > 0 {
-        true_positive_intent as f64 / predicted_intent as f64
+    let paraphrase_precision = if predicted_paraphrase > 0 {
+        true_positive_paraphrase as f64 / predicted_paraphrase as f64
     } else {
         0.0
     };
 
-    let intent_recall = if actual_intent > 0 {
-        true_positive_intent as f64 / actual_intent as f64
+    let paraphrase_recall = if actual_paraphrase > 0 {
+        true_positive_paraphrase as f64 / actual_paraphrase as f64
     } else {
         0.0
     };
 
-    let intent_f1 = if intent_precision + intent_recall > 0.0 {
-        2.0 * intent_precision * intent_recall / (intent_precision + intent_recall)
+    let paraphrase_f1 = if paraphrase_precision + paraphrase_recall > 0.0 {
+        2.0 * paraphrase_precision * paraphrase_recall / (paraphrase_precision + paraphrase_recall)
     } else {
         0.0
     };
 
-    IntentDetectionMetrics {
+    ParaphraseDetectionMetrics {
         total_queries: total,
-        correct_intent,
+        correct_paraphrase,
         correct_context,
         misclassified,
         accuracy,
         per_domain_accuracy,
-        intent_precision,
-        intent_recall,
-        intent_f1,
+        paraphrase_precision,
+        paraphrase_recall,
+        paraphrase_f1,
     }
 }
 
@@ -462,15 +462,15 @@ pub fn compute_asymmetric_retrieval_metrics(
         return AsymmetricRetrievalMetrics::default();
     }
 
-    let intent_to_context_wins = results
+    let paraphrase_to_context_wins = results
         .iter()
-        .filter(|r| r.intent_to_context_similarity > r.context_to_intent_similarity)
+        .filter(|r| r.paraphrase_to_context_similarity > r.context_to_paraphrase_similarity)
         .count();
-    let context_to_intent_wins = results
+    let context_to_paraphrase_wins = results
         .iter()
-        .filter(|r| r.context_to_intent_similarity > r.intent_to_context_similarity)
+        .filter(|r| r.context_to_paraphrase_similarity > r.paraphrase_to_context_similarity)
         .count();
-    let ties = total - intent_to_context_wins - context_to_intent_wins;
+    let ties = total - paraphrase_to_context_wins - context_to_paraphrase_wins;
 
     // Compute observed asymmetry ratio
     let avg_ratio: f64 = results.iter().map(|r| r.observed_ratio).sum::<f64>() / total as f64;
@@ -481,19 +481,19 @@ pub fn compute_asymmetric_retrieval_metrics(
     let formula_compliant = (avg_ratio - expected_ratio).abs() < tolerance;
 
     // E10 contribution percentage
-    let e10_contribution_percentage = (intent_to_context_wins as f64 / total as f64) * 100.0;
+    let e10_contribution_percentage = (paraphrase_to_context_wins as f64 / total as f64) * 100.0;
 
     AsymmetricRetrievalMetrics {
         total_queries: total,
-        intent_to_context_wins,
-        context_to_intent_wins,
+        paraphrase_to_context_wins,
+        context_to_paraphrase_wins,
         ties,
         observed_asymmetry_ratio: avg_ratio,
         expected_asymmetry_ratio: expected_ratio,
         formula_compliant,
         // Neutral modifiers - E5-base-v2 handles asymmetry via query:/passage: prefixes
-        intent_to_context_modifier: 1.0,
-        context_to_intent_modifier: 1.0,
+        paraphrase_to_context_modifier: 1.0,
+        context_to_paraphrase_modifier: 1.0,
         same_direction_modifier: 1.0,
         e10_contribution_percentage,
     }
@@ -562,15 +562,15 @@ mod tests {
         let results = vec![
             AsymmetricRetrievalResult {
                 base_similarity: 0.8,
-                intent_to_context_similarity: 0.8, // 0.8 * 1.0 (neutral)
-                context_to_intent_similarity: 0.8, // 0.8 * 1.0 (neutral)
+                paraphrase_to_context_similarity: 0.8, // 0.8 * 1.0 (neutral)
+                context_to_paraphrase_similarity: 0.8, // 0.8 * 1.0 (neutral)
                 observed_ratio: 1.0,
                 passed: true,
             },
             AsymmetricRetrievalResult {
                 base_similarity: 0.6,
-                intent_to_context_similarity: 0.6,
-                context_to_intent_similarity: 0.6,
+                paraphrase_to_context_similarity: 0.6,
+                context_to_paraphrase_similarity: 0.6,
                 observed_ratio: 1.0,
                 passed: true,
             },
@@ -589,17 +589,17 @@ mod tests {
     }
 
     #[test]
-    fn test_intent_detection_metrics() {
+    fn test_paraphrase_detection_metrics() {
         let results = vec![
-            IntentDetectionResult {
+            ParaphraseDetectionResult {
                 query: "optimize performance".to_string(),
-                expected: "intent".to_string(),
-                detected: "intent".to_string(),
+                expected: "paraphrase".to_string(),
+                detected: "paraphrase".to_string(),
                 correct: true,
                 domain: "performance".to_string(),
                 confidence: Some(0.9),
             },
-            IntentDetectionResult {
+            ParaphraseDetectionResult {
                 query: "system is slow".to_string(),
                 expected: "context".to_string(),
                 detected: "context".to_string(),
@@ -607,9 +607,9 @@ mod tests {
                 domain: "performance".to_string(),
                 confidence: Some(0.85),
             },
-            IntentDetectionResult {
+            ParaphraseDetectionResult {
                 query: "fix the bug".to_string(),
-                expected: "intent".to_string(),
+                expected: "paraphrase".to_string(),
                 detected: "context".to_string(),
                 correct: false,
                 domain: "bugfix".to_string(),
@@ -617,14 +617,14 @@ mod tests {
             },
         ];
 
-        let metrics = compute_intent_detection_metrics(&results);
+        let metrics = compute_paraphrase_detection_metrics(&results);
 
         assert_eq!(metrics.total_queries, 3);
-        assert_eq!(metrics.correct_intent, 1);
+        assert_eq!(metrics.correct_paraphrase, 1);
         assert_eq!(metrics.correct_context, 1);
         assert_eq!(metrics.misclassified, 1);
         assert!((metrics.accuracy - 2.0 / 3.0).abs() < 1e-6);
 
-        println!("[VERIFIED] Intent detection metrics: accuracy={:.2}", metrics.accuracy);
+        println!("[VERIFIED] Paraphrase detection metrics: accuracy={:.2}", metrics.accuracy);
     }
 }

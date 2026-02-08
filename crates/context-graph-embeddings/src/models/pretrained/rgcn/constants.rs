@@ -28,7 +28,7 @@ pub const RELATION_NAMES: [&str; NUM_RELATIONS] = [
     "EntityShared",
     "CausalChain",
     "GraphConnected",
-    "IntentAligned",
+    "ParaphraseAligned",
     "KeywordOverlap",
     "MultiAgreement",
 ];

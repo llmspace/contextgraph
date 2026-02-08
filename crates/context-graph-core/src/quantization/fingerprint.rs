@@ -706,9 +706,8 @@ pub fn dequantize_fingerprint(
         e9_hdc,
         // E10: Using new dual format after dequantization
         // (quantization loses dual distinction, reconstruct symmetrically when loaded)
-        e10_multimodal_as_intent: e10_multimodal.clone(),
+        e10_multimodal_paraphrase: e10_multimodal.clone(),
         e10_multimodal_as_context: e10_multimodal,
-        e10_multimodal: Vec::new(), // Using new dual format
         e11_entity,
         e12_late_interaction,
         e13_splade,
@@ -785,7 +784,7 @@ mod tests {
             *v = (i as f32 / 1024.0) * 2.0 - 1.0;
         }
         // E10 now uses dual vectors for asymmetric paraphrase/context similarity
-        for (i, v) in fp.e10_multimodal_as_intent.iter_mut().enumerate() {
+        for (i, v) in fp.e10_multimodal_paraphrase.iter_mut().enumerate() {
             *v = (i as f32 / 768.0) * 2.0 - 1.0;
         }
         for (i, v) in fp.e10_multimodal_as_context.iter_mut().enumerate() {

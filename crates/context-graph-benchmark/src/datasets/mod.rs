@@ -20,7 +20,7 @@ pub mod topic_clusters;
 pub use causal::{CausalBenchmarkDataset, CausalDatasetConfig, CausalDatasetGenerator, CausalDomain};
 pub use multimodal::{
     E10DatasetStats, E10MultimodalBenchmarkDataset, E10MultimodalDatasetConfig,
-    E10MultimodalDatasetGenerator, IntentDirection, IntentDocument, IntentDomain, IntentQuery,
+    E10MultimodalDatasetGenerator, ParaphraseDirection, ParaphraseDocument, IntentDomain, ParaphraseQuery,
 };
 pub use generator::{DatasetGenerator, GeneratorConfig};
 pub use ground_truth::GroundTruth;

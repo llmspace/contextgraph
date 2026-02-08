@@ -1,12 +1,12 @@
-//! E10 Multimodal (Intent/Context) Embedder Benchmark
+//! E10 Multimodal (Paraphrase/Context) Embedder Benchmark
 //!
-//! Tests E10 Multimodal asymmetric similarity with intent/context embeddings.
-//! Uses dual vectors (as_intent, as_context) for asymmetric retrieval evaluation.
+//! Tests E10 Multimodal asymmetric similarity with paraphrase/context embeddings.
+//! Uses dual vectors (as_paraphrase, as_context) for asymmetric retrieval evaluation.
 //!
 //! ## Key Features
 //!
-//! - **Intent Detection**: Test intent vs context direction classification
-//! - **Context Matching**: Evaluate intent→context retrieval (MRR, P@K)
+//! - **Paraphrase Detection**: Test paraphrase vs context direction classification
+//! - **Context Matching**: Evaluate paraphrase→context retrieval (MRR, P@K)
 //! - **Asymmetric Validation**: Verify direction handling (E5-base-v2 provides natural asymmetry via prefixes)
 //! - **Ablation Study**: Compare E1+E10 vs E1 only vs full 13-space
 //! - **Blend Analysis**: Test `blendWithSemantic` parameter behavior
@@ -48,7 +48,7 @@ struct Args {
     max_samples: usize,
     seed: u64,
     num_documents: usize,
-    num_intent_queries: usize,
+    num_paraphrase_queries: usize,
     num_context_queries: usize,
     skip_ablation: bool,
     blend_values: Vec<f64>,
@@ -62,7 +62,7 @@ impl Default for Args {
             max_samples: 1000,
             seed: 42,
             num_documents: 500,
-            num_intent_queries: 50,
+            num_paraphrase_queries: 50,
             num_context_queries: 50,
             skip_ablation: false,
             blend_values: vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
@@ -94,12 +94,12 @@ fn parse_args() -> Args {
                     .parse()
                     .expect("--num-documents must be a number");
             }
-            "--num-intent-queries" => {
-                args.num_intent_queries = argv
+            "--num-paraphrase-queries" => {
+                args.num_paraphrase_queries = argv
                     .next()
-                    .expect("--num-intent-queries requires a value")
+                    .expect("--num-paraphrase-queries requires a value")
                     .parse()
-                    .expect("--num-intent-queries must be a number");
+                    .expect("--num-paraphrase-queries must be a number");
             }
             "--num-context-queries" => {
                 args.num_context_queries = argv
@@ -139,9 +139,9 @@ fn parse_args() -> Args {
 fn print_usage() {
     println!(
         r#"
-E10 Multimodal (Intent/Context) Embedder Benchmark
+E10 Multimodal (Paraphrase/Context) Embedder Benchmark
 
-Tests E10's dual intent/context embeddings for asymmetric similarity.
+Tests E10's dual paraphrase/context embeddings for asymmetric similarity.
 E5-base-v2 provides natural asymmetry via query:/passage: prefixes - neutral modifiers (1.0/1.0).
 
 Usage: multimodal-bench [OPTIONS]
@@ -150,7 +150,7 @@ Options:
     --output, -o <PATH>           Output JSON file [default: benchmark_results/multimodal_benchmark.json]
     --max-samples, -n <N>         Maximum samples [default: 1000]
     --num-documents <N>           Number of documents to generate [default: 500]
-    --num-intent-queries <N>      Number of intent queries [default: 50]
+    --num-paraphrase-queries <N>  Number of paraphrase queries [default: 50]
     --num-context-queries <N>     Number of context queries [default: 50]
     --seed <N>                    Random seed [default: 42]
     --skip-ablation               Skip ablation study (faster)
@@ -158,10 +158,10 @@ Options:
     --help, -h                    Print this help message
 
 Benchmark Phases:
-  1. Intent Detection    - Classify queries as intent vs context
-  2. Context Matching    - Evaluate intent→context retrieval (MRR, P@K)
-  3. Asymmetric Valid.   - Verify direction handling (E5-base-v2 provides natural asymmetry)
-  4. Ablation Study      - Compare E1+E10 vs E1 only vs full 13-space
+  1. Paraphrase Detection - Classify queries as paraphrase vs context
+  2. Context Matching     - Evaluate paraphrase→context retrieval (MRR, P@K)
+  3. Asymmetric Valid.    - Verify direction handling (E5-base-v2 provides natural asymmetry)
+  4. Ablation Study       - Compare E1+E10 vs E1 only vs full 13-space
 "#
     );
 }
@@ -184,16 +184,16 @@ struct BenchmarkMetadata {
     seed: u64,
     max_samples: usize,
     num_documents: usize,
-    num_intent_queries: usize,
+    num_paraphrase_queries: usize,
     num_context_queries: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct BenchmarkSummary {
-    // Intent Detection
-    intent_detection_accuracy: f64,
-    intent_precision: f64,
-    intent_recall: f64,
+    // Paraphrase Detection
+    paraphrase_detection_accuracy: f64,
+    paraphrase_precision: f64,
+    paraphrase_recall: f64,
 
     // Context Matching
     mrr: f64,
@@ -204,8 +204,8 @@ struct BenchmarkSummary {
 
     // Asymmetric Validation
     asymmetry_ratio: f64,
-    intent_to_context_modifier: f32,
-    context_to_intent_modifier: f32,
+    paraphrase_to_context_modifier: f32,
+    context_to_paraphrase_modifier: f32,
     formula_compliant: bool,
 
     // Ablation (if run)
@@ -227,7 +227,7 @@ struct BenchmarkSummary {
 // ============================================================================
 
 fn main() {
-    println!("E10 Multimodal (Intent/Context) Embedder Benchmark");
+    println!("E10 Multimodal (Paraphrase/Context) Embedder Benchmark");
     println!("===================================================\n");
 
     let args = parse_args();
@@ -236,7 +236,7 @@ fn main() {
     // Print configuration
     println!("Configuration:");
     println!("  Documents: {}", args.num_documents);
-    println!("  Intent queries: {}", args.num_intent_queries);
+    println!("  Paraphrase queries: {}", args.num_paraphrase_queries);
     println!("  Context queries: {}", args.num_context_queries);
     println!("  Seed: {}", args.seed);
     println!("  Run ablation: {}", !args.skip_ablation);
@@ -246,12 +246,12 @@ fn main() {
     let config = E10MultimodalBenchmarkConfig {
         dataset: E10MultimodalDatasetConfig {
             num_documents: args.num_documents,
-            num_intent_queries: args.num_intent_queries,
+            num_paraphrase_queries: args.num_paraphrase_queries,
             num_context_queries: args.num_context_queries,
             seed: args.seed,
             ..Default::default()
         },
-        run_intent_detection: true,
+        run_paraphrase_detection: true,
         run_context_matching: true,
         run_asymmetric_validation: true,
         run_ablation: !args.skip_ablation,
@@ -280,7 +280,7 @@ fn main() {
             seed: args.seed,
             max_samples: args.max_samples,
             num_documents: args.num_documents,
-            num_intent_queries: args.num_intent_queries,
+            num_paraphrase_queries: args.num_paraphrase_queries,
             num_context_queries: args.num_context_queries,
         },
         results: results.clone(),
@@ -317,21 +317,21 @@ fn main() {
 }
 
 fn print_phase_results(results: &E10MultimodalBenchmarkResults, verbose: bool) {
-    // Phase 1: Intent Detection
-    println!("\n=== Phase 1: Intent Detection ===");
-    let intent = &results.metrics.intent_detection;
-    println!("  Total queries: {}", intent.total_queries);
-    println!("  Accuracy: {:.1}%", intent.accuracy * 100.0);
-    println!("  Intent precision: {:.3}", intent.intent_precision);
-    println!("  Intent recall: {:.3}", intent.intent_recall);
-    println!("  Intent F1: {:.3}", intent.intent_f1);
-    println!("  Correct intent: {}", intent.correct_intent);
-    println!("  Correct context: {}", intent.correct_context);
-    println!("  Misclassified: {}", intent.misclassified);
+    // Phase 1: Paraphrase Detection
+    println!("\n=== Phase 1: Paraphrase Detection ===");
+    let para = &results.metrics.paraphrase_detection;
+    println!("  Total queries: {}", para.total_queries);
+    println!("  Accuracy: {:.1}%", para.accuracy * 100.0);
+    println!("  Paraphrase precision: {:.3}", para.paraphrase_precision);
+    println!("  Paraphrase recall: {:.3}", para.paraphrase_recall);
+    println!("  Paraphrase F1: {:.3}", para.paraphrase_f1);
+    println!("  Correct paraphrase: {}", para.correct_paraphrase);
+    println!("  Correct context: {}", para.correct_context);
+    println!("  Misclassified: {}", para.misclassified);
 
     if verbose {
         println!("  Per-domain accuracy:");
-        for (domain, acc) in &intent.per_domain_accuracy {
+        for (domain, acc) in &para.per_domain_accuracy {
             println!("    {}: {:.1}%", domain, acc * 100.0);
         }
     }
@@ -352,15 +352,15 @@ fn print_phase_results(results: &E10MultimodalBenchmarkResults, verbose: bool) {
     println!("\n=== Phase 3: Asymmetric Validation ===");
     let asym = &results.metrics.asymmetric_retrieval;
     println!("  Total queries: {}", asym.total_queries);
-    println!("  Intent→Context modifier: {}", asym.intent_to_context_modifier);
-    println!("  Context→Intent modifier: {}", asym.context_to_intent_modifier);
+    println!("  Paraphrase→Context modifier: {}", asym.paraphrase_to_context_modifier);
+    println!("  Context→Paraphrase modifier: {}", asym.context_to_paraphrase_modifier);
     println!("  Observed ratio: {:.2} (expected 1.0 - E5-base-v2 handles asymmetry via prefixes)", asym.observed_asymmetry_ratio);
     println!("  Formula compliant: {}", if asym.formula_compliant { "YES" } else { "NO" });
 
     if verbose {
         println!("  Wins breakdown:");
-        println!("    Intent→Context wins: {}", asym.intent_to_context_wins);
-        println!("    Context→Intent wins: {}", asym.context_to_intent_wins);
+        println!("    Paraphrase→Context wins: {}", asym.paraphrase_to_context_wins);
+        println!("    Context→Paraphrase wins: {}", asym.context_to_paraphrase_wins);
         println!("    Ties: {}", asym.ties);
         println!("    E10 contribution: {:.1}%", asym.e10_contribution_percentage);
     }
@@ -395,7 +395,7 @@ fn print_phase_results(results: &E10MultimodalBenchmarkResults, verbose: bool) {
     println!("\n=== Timings ===");
     let timings = &results.timings;
     println!("  Dataset generation: {}ms", timings.dataset_generation_ms);
-    println!("  Intent detection: {}ms", timings.intent_detection_ms);
+    println!("  Paraphrase detection: {}ms", timings.paraphrase_detection_ms);
     println!("  Context matching: {}ms", timings.context_matching_ms);
     println!("  Asymmetric validation: {}ms", timings.asymmetric_validation_ms);
     if let Some(ablation_ms) = timings.ablation_ms {
@@ -408,15 +408,15 @@ fn verify_formula_compliance(results: &E10MultimodalBenchmarkResults) -> bool {
     let asym = &results.metrics.asymmetric_retrieval;
 
     // E5-base-v2 handles asymmetry via prefixes - neutral modifiers (1.0/1.0), ratio ~1.0
-    let i2c_ok = (asym.intent_to_context_modifier - 1.0).abs() < 0.001;
-    let c2i_ok = (asym.context_to_intent_modifier - 1.0).abs() < 0.001;
+    let i2c_ok = (asym.paraphrase_to_context_modifier - 1.0).abs() < 0.001;
+    let c2i_ok = (asym.context_to_paraphrase_modifier - 1.0).abs() < 0.001;
     let ratio_ok = (asym.observed_asymmetry_ratio - 1.0).abs() < 0.1;
 
     i2c_ok && c2i_ok && ratio_ok
 }
 
 fn build_summary(results: &E10MultimodalBenchmarkResults, formula_compliant: bool) -> BenchmarkSummary {
-    let intent = &results.metrics.intent_detection;
+    let para = &results.metrics.paraphrase_detection;
     let context = &results.metrics.context_matching;
     let asym = &results.metrics.asymmetric_retrieval;
 
@@ -434,15 +434,15 @@ fn build_summary(results: &E10MultimodalBenchmarkResults, formula_compliant: boo
     // - Direction detection works
     let mrr_passes = context.mrr > 0.6;
     let asymmetry_passes = formula_compliant;
-    let intent_passes = intent.accuracy > 0.7;
+    let paraphrase_passes = para.accuracy > 0.7;
 
-    let all_passed = mrr_passes && asymmetry_passes && intent_passes;
+    let all_passed = mrr_passes && asymmetry_passes && paraphrase_passes;
 
     BenchmarkSummary {
-        // Intent Detection
-        intent_detection_accuracy: intent.accuracy,
-        intent_precision: intent.intent_precision,
-        intent_recall: intent.intent_recall,
+        // Paraphrase Detection
+        paraphrase_detection_accuracy: para.accuracy,
+        paraphrase_precision: para.paraphrase_precision,
+        paraphrase_recall: para.paraphrase_recall,
 
         // Context Matching
         mrr: context.mrr,
@@ -453,8 +453,8 @@ fn build_summary(results: &E10MultimodalBenchmarkResults, formula_compliant: boo
 
         // Asymmetric Validation
         asymmetry_ratio: asym.observed_asymmetry_ratio,
-        intent_to_context_modifier: asym.intent_to_context_modifier,
-        context_to_intent_modifier: asym.context_to_intent_modifier,
+        paraphrase_to_context_modifier: asym.paraphrase_to_context_modifier,
+        context_to_paraphrase_modifier: asym.context_to_paraphrase_modifier,
         formula_compliant,
 
         // Ablation
@@ -475,10 +475,10 @@ fn build_summary(results: &E10MultimodalBenchmarkResults, formula_compliant: boo
 fn print_summary(summary: &BenchmarkSummary) {
     println!("\n=== Summary ===");
 
-    // Intent Detection
-    let intent_status = if summary.intent_detection_accuracy > 0.7 { "✓" } else { "✗" };
-    println!("{} Intent detection accuracy: {:.1}% (target: >70%)",
-        intent_status, summary.intent_detection_accuracy * 100.0);
+    // Paraphrase Detection
+    let paraphrase_status = if summary.paraphrase_detection_accuracy > 0.7 { "✓" } else { "✗" };
+    println!("{} Paraphrase detection accuracy: {:.1}% (target: >70%)",
+        paraphrase_status, summary.paraphrase_detection_accuracy * 100.0);
 
     // MRR
     let mrr_status = if summary.mrr > 0.6 { "✓" } else { "✗" };
@@ -487,8 +487,8 @@ fn print_summary(summary: &BenchmarkSummary) {
     // Asymmetry
     let asym_status = if summary.formula_compliant { "✓" } else { "✗" };
     println!("{} Asymmetry ratio: {:.2} (target: 1.0 ±0.1 - E5-base-v2 handles asymmetry via prefixes)", asym_status, summary.asymmetry_ratio);
-    println!("  Intent→Context: {} (expected 1.0)", summary.intent_to_context_modifier);
-    println!("  Context→Intent: {} (expected 1.0)", summary.context_to_intent_modifier);
+    println!("  Paraphrase→Context: {} (expected 1.0)", summary.paraphrase_to_context_modifier);
+    println!("  Context→Paraphrase: {} (expected 1.0)", summary.context_to_paraphrase_modifier);
 
     // Ablation
     if let (Some(e1), Some(blend), Some(contrib)) = (

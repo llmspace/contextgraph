@@ -228,7 +228,7 @@ impl TypedEdge {
 
         // E10 Paraphrase (bit 9)
         if (agreeing_embedders & (1 << 9)) != 0 {
-            return GraphLinkEdgeType::IntentAligned;
+            return GraphLinkEdgeType::ParaphraseAligned;
         }
 
         // E6 Sparse or E13 SPLADE (bits 5, 12)

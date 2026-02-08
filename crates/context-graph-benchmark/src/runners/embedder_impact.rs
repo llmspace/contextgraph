@@ -1174,8 +1174,8 @@ impl EmbedderImpactRunner {
             EmbedderIndex::E7Code => fp.e7_code.clone(),
             EmbedderIndex::E8Graph => fp.e8_graph_as_source.clone(),
             EmbedderIndex::E9HDC => fp.e9_hdc.clone(),
-            EmbedderIndex::E10Multimodal | EmbedderIndex::E10MultimodalIntent | EmbedderIndex::E10MultimodalContext => {
-                fp.e10_multimodal_as_intent.clone()
+            EmbedderIndex::E10Multimodal | EmbedderIndex::E10MultimodalParaphrase | EmbedderIndex::E10MultimodalContext => {
+                fp.e10_multimodal_paraphrase.clone()
             }
             EmbedderIndex::E11Entity => fp.e11_entity.clone(),
             // Sparse embedders - return empty (handled separately)
@@ -1262,7 +1262,7 @@ fn embedder_name(embedder: EmbedderIndex) -> &'static str {
         EmbedderIndex::E8Graph => "E8_Graph",
         EmbedderIndex::E9HDC => "E9_HDC",
         EmbedderIndex::E10Multimodal => "E10_Multimodal",
-        EmbedderIndex::E10MultimodalIntent => "E10_Multimodal_Intent",
+        EmbedderIndex::E10MultimodalParaphrase => "E10_Multimodal_Paraphrase",
         EmbedderIndex::E10MultimodalContext => "E10_Multimodal_Context",
         EmbedderIndex::E11Entity => "E11_Entity",
         EmbedderIndex::E12LateInteraction => "E12_Late_Interaction",

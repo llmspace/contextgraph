@@ -395,9 +395,8 @@ impl EmbedderImpactDatasetGenerator {
             e8_graph_as_target: embeddings.e8,
             e8_graph: Vec::new(),
             e9_hdc: embeddings.e9,
-            e10_multimodal_as_intent: embeddings.e10.clone(),
+            e10_multimodal_paraphrase: embeddings.e10.clone(),
             e10_multimodal_as_context: embeddings.e10,
-            e10_multimodal: Vec::new(),
             e11_entity: embeddings.e11,
             e12_late_interaction: self.generate_late_interaction(self.config.tokens_e12),
             e13_splade: self.generate_sparse(E13_SPLADE_VOCAB, self.config.sparse_entries_e13),
@@ -468,9 +467,8 @@ impl EmbedderImpactDatasetGenerator {
                         e8_graph_as_target: embeddings.e8,
                         e8_graph: Vec::new(),
                         e9_hdc: embeddings.e9,
-                        e10_multimodal_as_intent: embeddings.e10.clone(),
+                        e10_multimodal_paraphrase: embeddings.e10.clone(),
                         e10_multimodal_as_context: embeddings.e10,
-                        e10_multimodal: Vec::new(),
                         e11_entity: embeddings.e11,
                         e12_late_interaction: self.generate_late_interaction(self.config.tokens_e12),
                         e13_splade: self.generate_sparse(E13_SPLADE_VOCAB, self.config.sparse_entries_e13),
@@ -584,8 +582,8 @@ impl EmbedderImpactDatasetGenerator {
             EmbedderIndex::E7Code => &fp.e7_code,
             EmbedderIndex::E8Graph => &fp.e8_graph_as_source,
             EmbedderIndex::E9HDC => &fp.e9_hdc,
-            EmbedderIndex::E10Multimodal | EmbedderIndex::E10MultimodalIntent | EmbedderIndex::E10MultimodalContext => {
-                &fp.e10_multimodal_as_intent
+            EmbedderIndex::E10Multimodal | EmbedderIndex::E10MultimodalParaphrase | EmbedderIndex::E10MultimodalContext => {
+                &fp.e10_multimodal_paraphrase
             }
             EmbedderIndex::E11Entity => &fp.e11_entity,
             // E6, E12, E13 are sparse/late-interaction, return empty

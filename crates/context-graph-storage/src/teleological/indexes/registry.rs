@@ -423,7 +423,7 @@ mod tests {
         assert!(embedders.contains(&EmbedderIndex::E5CausalEffect));
 
         // Verify E10 asymmetric indexes ARE in the list (ARCH-15)
-        assert!(embedders.contains(&EmbedderIndex::E10MultimodalIntent));
+        assert!(embedders.contains(&EmbedderIndex::E10MultimodalParaphrase));
         assert!(embedders.contains(&EmbedderIndex::E10MultimodalContext));
 
         // Verify E6, E12, E13 are NOT in the list (non-HNSW)

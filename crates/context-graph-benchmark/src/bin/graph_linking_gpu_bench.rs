@@ -812,7 +812,7 @@ fn get_embedding_for_embedder(fingerprint: &SemanticFingerprint, emb_id: u8) -> 
         6 => fingerprint.e7_code.clone(),
         9 => {
             // E10: Use intent vector for symmetric K-NN
-            fingerprint.e10_multimodal_as_intent.clone()
+            fingerprint.e10_multimodal_paraphrase.clone()
         }
         10 => fingerprint.e11_entity.clone(),
         _ => Vec::new(),

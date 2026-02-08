@@ -38,7 +38,7 @@ pub struct EdgeThresholds {
     /// E8 graph connectivity threshold (default: 0.60)
     pub graph_connected: f32,
     /// E10 paraphrase similarity threshold (default: 0.70)
-    pub intent_aligned: f32,
+    pub paraphrase_aligned: f32,
     /// E6/E13 keyword overlap threshold (default: 0.50)
     pub keyword_overlap: f32,
     /// Multi-agreement threshold (default: 0.60)
@@ -61,7 +61,7 @@ impl EdgeThresholds {
             GraphLinkEdgeType::EntityShared => self.entity_shared,
             GraphLinkEdgeType::CausalChain => self.causal_chain,
             GraphLinkEdgeType::GraphConnected => self.graph_connected,
-            GraphLinkEdgeType::IntentAligned => self.intent_aligned,
+            GraphLinkEdgeType::ParaphraseAligned => self.paraphrase_aligned,
             GraphLinkEdgeType::KeywordOverlap => self.keyword_overlap,
             GraphLinkEdgeType::MultiAgreement => self.multi_agreement,
         }
@@ -81,7 +81,7 @@ impl EdgeThresholds {
             self.entity_shared,
             self.causal_chain,
             self.graph_connected,
-            self.intent_aligned,
+            self.paraphrase_aligned,
             self.keyword_overlap,
             self.multi_agreement,
         ]
@@ -105,7 +105,7 @@ pub const DEFAULT_THRESHOLDS: EdgeThresholds = EdgeThresholds {
     entity_shared: 0.65,          // E11 - entity matching
     causal_chain: 0.60,           // E5 - causal chains (asymmetric)
     graph_connected: 0.60,        // E8 - graph structure (asymmetric)
-    intent_aligned: 0.70,         // E10 - paraphrase matching
+    paraphrase_aligned: 0.70,         // E10 - paraphrase matching
     keyword_overlap: 0.50,        // E6/E13 - sparse similarity scores differently
     multi_agreement: 0.60,        // Multiple agree = strong signal
     multi_agreement_min_embedders: 3, // Need 3+ embedders to agree
@@ -155,9 +155,9 @@ impl EdgeThresholdsBuilder {
         self
     }
 
-    /// Set the intent_aligned (E10) threshold.
-    pub fn intent_aligned(mut self, threshold: f32) -> Self {
-        self.thresholds.intent_aligned = threshold;
+    /// Set the paraphrase_aligned (E10) threshold.
+    pub fn paraphrase_aligned(mut self, threshold: f32) -> Self {
+        self.thresholds.paraphrase_aligned = threshold;
         self
     }
 
@@ -203,7 +203,7 @@ mod tests {
         assert_eq!(thresholds.entity_shared, 0.65);
         assert_eq!(thresholds.causal_chain, 0.60);
         assert_eq!(thresholds.graph_connected, 0.60);
-        assert_eq!(thresholds.intent_aligned, 0.70);
+        assert_eq!(thresholds.paraphrase_aligned, 0.70);
         assert_eq!(thresholds.keyword_overlap, 0.50);
         assert_eq!(thresholds.multi_agreement, 0.60);
         assert_eq!(thresholds.multi_agreement_min_embedders, 3);
@@ -218,7 +218,7 @@ mod tests {
         assert_eq!(thresholds.get(GraphLinkEdgeType::EntityShared), 0.65);
         assert_eq!(thresholds.get(GraphLinkEdgeType::CausalChain), 0.60);
         assert_eq!(thresholds.get(GraphLinkEdgeType::GraphConnected), 0.60);
-        assert_eq!(thresholds.get(GraphLinkEdgeType::IntentAligned), 0.70);
+        assert_eq!(thresholds.get(GraphLinkEdgeType::ParaphraseAligned), 0.70);
         assert_eq!(thresholds.get(GraphLinkEdgeType::KeywordOverlap), 0.50);
         assert_eq!(thresholds.get(GraphLinkEdgeType::MultiAgreement), 0.60);
     }

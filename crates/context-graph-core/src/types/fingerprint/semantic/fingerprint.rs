@@ -209,21 +209,14 @@ pub struct SemanticFingerprint {
     /// This vector encodes the text for paraphrase detection in asymmetric retrieval.
     /// For asymmetric similarity: query paraphrase vector is compared against doc context vector.
     /// Example: "User wants to fix the bug" → captures the expressed meaning.
-    pub e10_multimodal_as_intent: Vec<f32>,
+    pub e10_multimodal_paraphrase: Vec<f32>,
 
     /// E10: Multimodal (CLIP/MPNet) - 768D dense embedding (as context).
     ///
     /// This vector encodes the text as providing context in relationships.
-    /// For asymmetric similarity: query_as_context is compared against doc_as_intent.
+    /// For asymmetric similarity: query_as_context is compared against doc_as_paraphrase.
     /// Example: "The database connection failed" → captures background context.
     pub e10_multimodal_as_context: Vec<f32>,
-
-    /// E10: Multimodal - Legacy single vector (deprecated, kept for backward compatibility).
-    ///
-    /// New code should use `e10_multimodal_as_intent` and `e10_multimodal_as_context` instead.
-    /// This field is populated during deserialization of old fingerprints.
-    #[serde(default)]
-    pub e10_multimodal: Vec<f32>,
 
     /// E11: Entity (KEPLER for knowledge graph) - 768D dense embedding.
     pub e11_entity: Vec<f32>,
@@ -264,9 +257,8 @@ impl SemanticFingerprint {
             e8_graph_as_target: vec![0.0; E8_DIM],
             e8_graph: Vec::new(), // Legacy field, empty by default
             e9_hdc: vec![0.0; E9_DIM],
-            e10_multimodal_as_intent: vec![0.0; E10_DIM],
+            e10_multimodal_paraphrase: vec![0.0; E10_DIM],
             e10_multimodal_as_context: vec![0.0; E10_DIM],
-            e10_multimodal: Vec::new(), // Legacy field, empty by default
             e11_entity: vec![0.0; E11_DIM],
             e12_late_interaction: Vec::new(),
             e13_splade: SparseVector::empty(),
@@ -438,18 +430,13 @@ impl SemanticFingerprint {
 
     /// Get the active E10 multimodal vector for standard operations.
     ///
-    /// Returns `e10_multimodal_as_intent` if populated, otherwise falls back to
-    /// the legacy `e10_multimodal` field for backward compatibility.
+    /// Returns the `e10_multimodal_paraphrase` vector.
     ///
     /// This is the default E10 vector used for symmetric similarity comparisons
     /// (when paraphrase/context direction is unknown or not relevant).
     #[inline]
     pub fn e10_active_vector(&self) -> &[f32] {
-        if !self.e10_multimodal_as_intent.is_empty() {
-            &self.e10_multimodal_as_intent
-        } else {
-            &self.e10_multimodal
-        }
+        &self.e10_multimodal_paraphrase
     }
 
     /// Get E10 multimodal embedding (paraphrase side).
@@ -457,12 +444,8 @@ impl SemanticFingerprint {
     /// Use this for asymmetric similarity when the query represents expressed meaning.
     /// (e.g., "User wants to accomplish X")
     #[inline]
-    pub fn get_e10_as_intent(&self) -> &[f32] {
-        if !self.e10_multimodal_as_intent.is_empty() {
-            &self.e10_multimodal_as_intent
-        } else {
-            &self.e10_multimodal
-        }
+    pub fn get_e10_as_paraphrase(&self) -> &[f32] {
+        &self.e10_multimodal_paraphrase
     }
 
     /// Get E10 multimodal embedding encoded as providing context.
@@ -471,49 +454,16 @@ impl SemanticFingerprint {
     /// (e.g., "The background situation is Y")
     #[inline]
     pub fn get_e10_as_context(&self) -> &[f32] {
-        if !self.e10_multimodal_as_context.is_empty() {
-            &self.e10_multimodal_as_context
-        } else {
-            &self.e10_multimodal
-        }
+        &self.e10_multimodal_as_context
     }
 
     /// Check if this fingerprint has asymmetric E10 multimodal vectors.
     ///
-    /// Returns `true` if both `e10_multimodal_as_intent` and `e10_multimodal_as_context`
-    /// are populated, `false` if only the legacy `e10_multimodal` field is used.
+    /// Returns `true` if both `e10_multimodal_paraphrase` and `e10_multimodal_as_context`
+    /// are populated.
     #[inline]
     pub fn has_asymmetric_e10(&self) -> bool {
-        !self.e10_multimodal_as_intent.is_empty() && !self.e10_multimodal_as_context.is_empty()
-    }
-
-    /// Migrate a legacy fingerprint to the new dual E10 format.
-    ///
-    /// If the fingerprint has only the legacy `e10_multimodal` field populated,
-    /// this method copies it to both `e10_multimodal_as_intent` and `e10_multimodal_as_context`.
-    ///
-    /// This is useful when loading old fingerprints that need to work with
-    /// asymmetric similarity computation.
-    pub fn migrate_legacy_e10(&mut self) {
-        if !self.e10_multimodal.is_empty()
-            && self.e10_multimodal_as_intent.is_empty()
-            && self.e10_multimodal_as_context.is_empty()
-        {
-            // Copy legacy E10 to both intent and context vectors
-            self.e10_multimodal_as_intent = self.e10_multimodal.clone();
-            self.e10_multimodal_as_context = self.e10_multimodal.clone();
-        }
-    }
-
-    /// Check if this fingerprint uses the legacy single E10 format.
-    ///
-    /// Returns `true` if the fingerprint has only `e10_multimodal` populated
-    /// and both `e10_multimodal_as_intent` and `e10_multimodal_as_context` are empty.
-    #[inline]
-    pub fn is_legacy_e10_format(&self) -> bool {
-        !self.e10_multimodal.is_empty()
-            && self.e10_multimodal_as_intent.is_empty()
-            && self.e10_multimodal_as_context.is_empty()
+        !self.e10_multimodal_paraphrase.is_empty() && !self.e10_multimodal_as_context.is_empty()
     }
 
     /// Compute total storage size in bytes (heap allocations only).
@@ -530,9 +480,8 @@ impl SemanticFingerprint {
             + self.e8_graph_as_target.len()
             + self.e8_graph.len() // Legacy field
             + self.e9_hdc.len()
-            + self.e10_multimodal_as_intent.len()
+            + self.e10_multimodal_paraphrase.len()
             + self.e10_multimodal_as_context.len()
-            + self.e10_multimodal.len() // Legacy field
             + self.e11_entity.len())
             * std::mem::size_of::<f32>();
 
@@ -652,9 +601,8 @@ impl SemanticFingerprint {
     /// - Both e8_graph_as_source and e8_graph_as_target populated (new format)
     /// - Only e8_graph populated (legacy format)
     ///
-    /// For E10 Multimodal, accepts either:
-    /// - Both e10_multimodal_as_intent and e10_multimodal_as_context populated (new format)
-    /// - Only e10_multimodal populated (legacy format)
+    /// For E10 Multimodal:
+    /// - Both e10_multimodal_paraphrase and e10_multimodal_as_context must be populated
     ///
     /// # Returns
     ///
@@ -670,10 +618,9 @@ impl SemanticFingerprint {
             && self.e8_graph_as_target.len() == E8_DIM)
             || self.e8_graph.len() == E8_DIM;
 
-        // E10 check: either new dual vectors OR legacy single vector
-        let e10_complete = (self.e10_multimodal_as_intent.len() == E10_DIM
-            && self.e10_multimodal_as_context.len() == E10_DIM)
-            || self.e10_multimodal.len() == E10_DIM;
+        // E10 check: both paraphrase and context vectors must be populated
+        let e10_complete = self.e10_multimodal_paraphrase.len() == E10_DIM
+            && self.e10_multimodal_as_context.len() == E10_DIM;
 
         self.e1_semantic.len() == E1_DIM
             && self.e2_temporal_recent.len() == E2_DIM
@@ -815,9 +762,8 @@ impl PartialEq for SemanticFingerprint {
             && self.e8_graph_as_target == other.e8_graph_as_target
             && self.e8_graph == other.e8_graph
             && self.e9_hdc == other.e9_hdc
-            && self.e10_multimodal_as_intent == other.e10_multimodal_as_intent
+            && self.e10_multimodal_paraphrase == other.e10_multimodal_paraphrase
             && self.e10_multimodal_as_context == other.e10_multimodal_as_context
-            && self.e10_multimodal == other.e10_multimodal
             && self.e11_entity == other.e11_entity
             && self.e12_late_interaction == other.e12_late_interaction
             && self.e13_splade == other.e13_splade

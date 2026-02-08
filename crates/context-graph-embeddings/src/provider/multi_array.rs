@@ -1018,7 +1018,7 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
         let e9_vec = r9?;
 
         // E10: embed_dual returns (intent_vec, context_vec) for asymmetric similarity (E10 Upgrade)
-        let (e10_intent_vec, e10_context_vec) = r10?;
+        let (e10_paraphrase_vec, e10_context_vec) = r10?;
 
         let e11_vec = r11?;
         let e12_tokens = r12?;
@@ -1042,9 +1042,8 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
             e8_graph: Vec::new(), // Empty - using new dual format
             e9_hdc: e9_vec,
             // E10: Using new dual format (E10 Upgrade)
-            e10_multimodal_as_intent: e10_intent_vec,
+            e10_multimodal_paraphrase: e10_paraphrase_vec,
             e10_multimodal_as_context: e10_context_vec,
-            e10_multimodal: Vec::new(), // Empty - using new dual format
             e11_entity: e11_vec,
             e12_late_interaction: e12_tokens,
             e13_splade: e13_sparse,
@@ -1205,7 +1204,7 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
         let e9_vec = r9?;
 
         // E10: embed_dual returns (intent_vec, context_vec) for asymmetric similarity (E10 Upgrade)
-        let (e10_intent_vec, e10_context_vec) = r10?;
+        let (e10_paraphrase_vec, e10_context_vec) = r10?;
 
         let e11_vec = r11?;
         let e12_tokens = r12?;
@@ -1229,9 +1228,8 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
             e8_graph: Vec::new(), // Empty - using new dual format
             e9_hdc: e9_vec,
             // E10: Using new dual format (E10 Upgrade)
-            e10_multimodal_as_intent: e10_intent_vec,
+            e10_multimodal_paraphrase: e10_paraphrase_vec,
             e10_multimodal_as_context: e10_context_vec,
-            e10_multimodal: Vec::new(), // Empty - using new dual format
             e11_entity: e11_vec,
             e12_late_interaction: e12_tokens,
             e13_splade: e13_sparse,
@@ -1387,7 +1385,7 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
                     let e7_vec = r7?;
                     let (e8_source_vec, e8_target_vec) = r8?;
                     let e9_vec = r9?;
-                    let (e10_intent_vec, e10_context_vec) = r10?;
+                    let (e10_paraphrase_vec, e10_context_vec) = r10?;
                     let e11_vec = r11?;
                     let e12_tokens = r12?;
                     let e13_sparse = r13?;
@@ -1408,9 +1406,8 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
                         e8_graph_as_target: e8_target_vec,
                         e8_graph: Vec::new(),
                         e9_hdc: e9_vec,
-                        e10_multimodal_as_intent: e10_intent_vec,
+                        e10_multimodal_paraphrase: e10_paraphrase_vec,
                         e10_multimodal_as_context: e10_context_vec,
-                        e10_multimodal: Vec::new(),
                         e11_entity: e11_vec,
                         e12_late_interaction: e12_tokens,
                         e13_splade: e13_sparse,

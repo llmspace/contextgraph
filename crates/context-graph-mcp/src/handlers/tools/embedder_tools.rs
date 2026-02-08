@@ -856,7 +856,7 @@ impl Handlers {
                 }
                 EmbedderId::E10 => {
                     // Asymmetric: paraphrase + context variants
-                    let paraphrase_vec = &sem.e10_multimodal_as_intent;
+                    let paraphrase_vec = &sem.e10_multimodal_paraphrase;
                     let context = &sem.e10_multimodal_as_context;
                     let active = sem.e10_active_vector();
                     let p = !active.is_empty();

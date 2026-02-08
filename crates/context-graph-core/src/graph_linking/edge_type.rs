@@ -14,7 +14,7 @@
 //! | EntityShared | E11 | Shared entities (KEPLER) |
 //! | CausalChain | E5 | Causal relationship (asymmetric) |
 //! | GraphConnected | E8 | Graph connectivity (asymmetric) |
-//! | IntentAligned | E10 | Paraphrase (same meaning) |
+//! | ParaphraseAligned | E10 | Paraphrase (same meaning) |
 //! | KeywordOverlap | E6, E13 | Keyword/lexical similarity |
 //! | MultiAgreement | 3+ embedders | Multiple embedders agree |
 
@@ -71,7 +71,7 @@ pub enum GraphLinkEdgeType {
 
     /// Same meaning via E10 (CLIP multimodal) - paraphrase detection.
     /// Two memories express the same concept using different words.
-    IntentAligned = 5,
+    ParaphraseAligned = 5,
 
     /// Keyword/lexical overlap via E6 (SPLADE) or E13 (SPLADE v3).
     /// Two memories share exact keywords or expanded terms.
@@ -117,7 +117,7 @@ impl GraphLinkEdgeType {
             Self::EntityShared => Some(10),    // E11
             Self::CausalChain => Some(4),      // E5
             Self::GraphConnected => Some(7),   // E8
-            Self::IntentAligned => Some(9),    // E10
+            Self::ParaphraseAligned => Some(9),    // E10
             Self::KeywordOverlap => Some(5),   // E6 (or E13=12)
             Self::MultiAgreement => None,      // No single primary
         }
@@ -133,7 +133,7 @@ impl GraphLinkEdgeType {
             Self::EntityShared => 0.65,    // E11 entity matching
             Self::CausalChain => 0.60,     // E5 causal chains
             Self::GraphConnected => 0.60,  // E8 graph structure
-            Self::IntentAligned => 0.70,   // E10 paraphrase matching
+            Self::ParaphraseAligned => 0.70,   // E10 paraphrase matching
             Self::KeywordOverlap => 0.50,  // Sparse similarity scores differently
             Self::MultiAgreement => 0.60,  // Multiple agree = strong signal
         }
@@ -147,7 +147,7 @@ impl GraphLinkEdgeType {
             Self::EntityShared => "Shared entities (E11)",
             Self::CausalChain => "Causal relationship (E5, asymmetric)",
             Self::GraphConnected => "Graph connectivity (E8, asymmetric)",
-            Self::IntentAligned => "Paraphrase aligned (E10)",
+            Self::ParaphraseAligned => "Paraphrase aligned (E10)",
             Self::KeywordOverlap => "Keyword overlap (E6/E13)",
             Self::MultiAgreement => "Multi-embedder agreement (3+)",
         }
@@ -167,7 +167,7 @@ impl GraphLinkEdgeType {
             2 => Some(Self::EntityShared),
             3 => Some(Self::CausalChain),
             4 => Some(Self::GraphConnected),
-            5 => Some(Self::IntentAligned),
+            5 => Some(Self::ParaphraseAligned),
             6 => Some(Self::KeywordOverlap),
             7 => Some(Self::MultiAgreement),
             _ => None,
@@ -182,7 +182,7 @@ impl GraphLinkEdgeType {
             Self::EntityShared,
             Self::CausalChain,
             Self::GraphConnected,
-            Self::IntentAligned,
+            Self::ParaphraseAligned,
             Self::KeywordOverlap,
             Self::MultiAgreement,
         ]
@@ -199,7 +199,7 @@ impl GraphLinkEdgeType {
             Self::SemanticSimilar,
             Self::CodeRelated,
             Self::EntityShared,
-            Self::IntentAligned,
+            Self::ParaphraseAligned,
             Self::KeywordOverlap,
             Self::MultiAgreement,
         ]
@@ -221,7 +221,7 @@ impl fmt::Display for GraphLinkEdgeType {
             Self::EntityShared => "entity_shared",
             Self::CausalChain => "causal_chain",
             Self::GraphConnected => "graph_connected",
-            Self::IntentAligned => "intent_aligned",
+            Self::ParaphraseAligned => "paraphrase_aligned",
             Self::KeywordOverlap => "keyword_overlap",
             Self::MultiAgreement => "multi_agreement",
         };
@@ -254,7 +254,7 @@ mod tests {
         assert!(!GraphLinkEdgeType::SemanticSimilar.is_asymmetric());
         assert!(!GraphLinkEdgeType::CodeRelated.is_asymmetric());
         assert!(!GraphLinkEdgeType::EntityShared.is_asymmetric());
-        assert!(!GraphLinkEdgeType::IntentAligned.is_asymmetric());
+        assert!(!GraphLinkEdgeType::ParaphraseAligned.is_asymmetric());
         assert!(!GraphLinkEdgeType::KeywordOverlap.is_asymmetric());
         assert!(!GraphLinkEdgeType::MultiAgreement.is_asymmetric());
     }
@@ -283,7 +283,7 @@ mod tests {
         assert_eq!(GraphLinkEdgeType::KeywordOverlap.primary_embedder_index(), Some(5));
         assert_eq!(GraphLinkEdgeType::CodeRelated.primary_embedder_index(), Some(6));
         assert_eq!(GraphLinkEdgeType::GraphConnected.primary_embedder_index(), Some(7));
-        assert_eq!(GraphLinkEdgeType::IntentAligned.primary_embedder_index(), Some(9));
+        assert_eq!(GraphLinkEdgeType::ParaphraseAligned.primary_embedder_index(), Some(9));
         assert_eq!(GraphLinkEdgeType::EntityShared.primary_embedder_index(), Some(10));
         assert_eq!(GraphLinkEdgeType::MultiAgreement.primary_embedder_index(), None);
     }

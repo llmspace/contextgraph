@@ -185,7 +185,7 @@ impl MultiSpaceIndex {
             e1_index.push((*id, fp.e1_semantic.clone()));
             e5_index.push((*id, fp.e5_causal.clone()));
             e7_index.push((*id, fp.e7_code.clone()));
-            e10_index.push((*id, fp.e10_multimodal.clone()));
+            e10_index.push((*id, fp.e10_multimodal_paraphrase.clone()));
         }
 
         Self {
@@ -211,7 +211,7 @@ impl MultiSpaceIndex {
             (&self.e1_index, &query_fp.e1_semantic),
             (&self.e5_index, &query_fp.e5_causal),
             (&self.e7_index, &query_fp.e7_code),
-            (&self.e10_index, &query_fp.e10_multimodal),
+            (&self.e10_index, &query_fp.e10_multimodal_paraphrase),
         ];
 
         for (index, query_vec) in spaces {

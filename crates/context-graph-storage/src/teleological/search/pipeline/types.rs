@@ -86,7 +86,7 @@ pub enum QueryType {
     Causal,
     /// Entity query - prefer E11 EntityShared edges.
     Entity,
-    /// Paraphrase query - prefer E10 IntentAligned edges.
+    /// Paraphrase query - prefer E10 ParaphraseAligned edges.
     Paraphrase,
 }
 
@@ -160,7 +160,7 @@ impl EdgeTypeRouting {
                 ),
                 QueryType::Paraphrase => matches!(
                     edge_type,
-                    GraphLinkEdgeType::IntentAligned | GraphLinkEdgeType::MultiAgreement
+                    GraphLinkEdgeType::ParaphraseAligned | GraphLinkEdgeType::MultiAgreement
                 ),
                 QueryType::General => true,
             },

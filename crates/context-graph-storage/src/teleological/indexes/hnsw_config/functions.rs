@@ -77,7 +77,7 @@ pub fn get_hnsw_config(index: EmbedderIndex) -> Option<HnswConfig> {
             DistanceMetric::AsymmetricCosine,
         )),
         // E10 asymmetric indexes for direction-aware retrieval (ARCH-15, AP-77)
-        EmbedderIndex::E10MultimodalIntent => Some(HnswConfig::default_for_dimension(
+        EmbedderIndex::E10MultimodalParaphrase => Some(HnswConfig::default_for_dimension(
             E10_DIM,
             DistanceMetric::AsymmetricCosine,
         )),
@@ -104,7 +104,7 @@ pub fn get_hnsw_config(index: EmbedderIndex) -> Option<HnswConfig> {
 ///
 /// Excludes E6Sparse, E12LateInteraction, E13Splade (non-HNSW).
 /// Includes E5CausalCause and E5CausalEffect for asymmetric retrieval (ARCH-15).
-/// Includes E10MultimodalIntent and E10MultimodalContext for asymmetric retrieval (ARCH-15).
+/// Includes E10MultimodalParaphrase and E10MultimodalContext for asymmetric retrieval (ARCH-15).
 ///
 /// # Example
 ///
@@ -203,7 +203,7 @@ mod tests {
         assert!(configs.contains_key(&EmbedderIndex::E5CausalCause));
         assert!(configs.contains_key(&EmbedderIndex::E5CausalEffect));
         // E10 asymmetric indexes included
-        assert!(configs.contains_key(&EmbedderIndex::E10MultimodalIntent));
+        assert!(configs.contains_key(&EmbedderIndex::E10MultimodalParaphrase));
         assert!(configs.contains_key(&EmbedderIndex::E10MultimodalContext));
 
         assert!(!configs.contains_key(&EmbedderIndex::E6Sparse));
@@ -222,9 +222,9 @@ mod tests {
     #[test]
     fn test_get_hnsw_config_e10_asymmetric() {
         // E10 asymmetric indexes (ARCH-15, AP-77)
-        let intent_config = get_hnsw_config(EmbedderIndex::E10MultimodalIntent).unwrap();
-        assert_eq!(intent_config.metric, DistanceMetric::AsymmetricCosine);
-        assert_eq!(intent_config.dimension, 768);
+        let paraphrase_config = get_hnsw_config(EmbedderIndex::E10MultimodalParaphrase).unwrap();
+        assert_eq!(paraphrase_config.metric, DistanceMetric::AsymmetricCosine);
+        assert_eq!(paraphrase_config.dimension, 768);
 
         let context_config = get_hnsw_config(EmbedderIndex::E10MultimodalContext).unwrap();
         assert_eq!(context_config.metric, DistanceMetric::AsymmetricCosine);

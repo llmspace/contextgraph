@@ -915,7 +915,7 @@ fn run_ablation_studies(
         ("E7_code", |fp: &SemanticFingerprint| &fp.e7_code),
         ("E8_graph", |fp: &SemanticFingerprint| &fp.e8_graph),
         ("E9_hdc", |fp: &SemanticFingerprint| &fp.e9_hdc),
-        ("E10_multimodal", |fp: &SemanticFingerprint| &fp.e10_multimodal),
+        ("E10_multimodal", |fp: &SemanticFingerprint| &fp.e10_multimodal_paraphrase),
         ("E11_entity", |fp: &SemanticFingerprint| &fp.e11_entity),
     ];
 

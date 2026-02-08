@@ -88,7 +88,7 @@ fn create_test_fingerprint_with_e12_e13(id: Uuid, token_count: usize, splade_nnz
     semantic.e8_graph_as_source = vec![0.1f32; 1024];
     semantic.e8_graph_as_target = vec![0.1f32; 1024];
     semantic.e9_hdc = vec![0.1f32; 1024];
-    semantic.e10_multimodal_as_intent = vec![0.1f32; 768];
+    semantic.e10_multimodal_paraphrase = vec![0.1f32; 768];
     semantic.e10_multimodal_as_context = vec![0.1f32; 768];
     semantic.e11_entity = vec![0.1f32; 768];
 

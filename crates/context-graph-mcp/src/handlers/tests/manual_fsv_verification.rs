@@ -28,7 +28,7 @@ use uuid::Uuid;
 
 use crate::protocol::{JsonRpcId, JsonRpcRequest};
 
-/// Source of Truth: RocksDbTeleologicalStore (persistent RocksDB with 52 column families)
+/// Source of Truth: RocksDbTeleologicalStore (persistent RocksDB with 50 column families)
 
 /// TASK-GAP-001: Create a tools/call request for PRD v6 compliant API.
 /// In PRD v6, all tool operations go through "tools/call" with name+arguments.
@@ -169,7 +169,7 @@ async fn manual_fsv_memory_store_physical_verification() {
     println!("   - E9 (hdc) dim: {}", stored_fp.semantic.e9_hdc.len());
     println!(
         "   - E10 (multimodal) dim: {}",
-        stored_fp.semantic.e10_multimodal.len()
+        stored_fp.semantic.e10_multimodal_paraphrase.len()
     );
     println!(
         "   - E11 (entity) dim: {}",

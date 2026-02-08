@@ -320,36 +320,21 @@ impl SemanticFingerprint {
 
     /// Validate E10 multimodal embeddings (768D dense for each).
     ///
-    /// Accepts either:
-    /// - New format: both e10_multimodal_as_intent and e10_multimodal_as_context have 768D
-    /// - Legacy format: only e10_multimodal has 768D (as_intent/as_context are empty)
+    /// Both e10_multimodal_paraphrase and e10_multimodal_as_context must have 768D.
     fn validate_e10(&self) -> Result<(), ValidationError> {
-        // New format: dual vectors populated
-        if !self.e10_multimodal_as_intent.is_empty() || !self.e10_multimodal_as_context.is_empty() {
-            // If either is non-empty, both must be correct
-            if self.e10_multimodal_as_intent.len() != E10_DIM {
-                return Err(ValidationError::DimensionMismatch {
-                    embedder: Embedder::Multimodal,
-                    expected: E10_DIM,
-                    actual: self.e10_multimodal_as_intent.len(),
-                });
-            }
-            if self.e10_multimodal_as_context.len() != E10_DIM {
-                return Err(ValidationError::DimensionMismatch {
-                    embedder: Embedder::Multimodal,
-                    expected: E10_DIM,
-                    actual: self.e10_multimodal_as_context.len(),
-                });
-            }
-        } else {
-            // Legacy format: only e10_multimodal populated
-            if self.e10_multimodal.len() != E10_DIM {
-                return Err(ValidationError::DimensionMismatch {
-                    embedder: Embedder::Multimodal,
-                    expected: E10_DIM,
-                    actual: self.e10_multimodal.len(),
-                });
-            }
+        if self.e10_multimodal_paraphrase.len() != E10_DIM {
+            return Err(ValidationError::DimensionMismatch {
+                embedder: Embedder::Multimodal,
+                expected: E10_DIM,
+                actual: self.e10_multimodal_paraphrase.len(),
+            });
+        }
+        if self.e10_multimodal_as_context.len() != E10_DIM {
+            return Err(ValidationError::DimensionMismatch {
+                embedder: Embedder::Multimodal,
+                expected: E10_DIM,
+                actual: self.e10_multimodal_as_context.len(),
+            });
         }
         Ok(())
     }

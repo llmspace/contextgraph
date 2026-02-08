@@ -299,10 +299,8 @@ impl MultiArrayEmbeddingProvider for StubMultiArrayProvider {
         fingerprint.e8_graph = fingerprint.e8_graph_as_source.clone();
         fingerprint.e9_hdc = Self::fill_dense_embedding(content, 1024, 8); // HDC projected
         // E10: CORE-01 FIX: Generate DISTINCT vectors for asymmetric paraphrase/context fields.
-        fingerprint.e10_multimodal_as_intent = Self::fill_dense_embedding(content, 768, 9);
+        fingerprint.e10_multimodal_paraphrase = Self::fill_dense_embedding(content, 768, 9);
         fingerprint.e10_multimodal_as_context = Self::fill_dense_embedding(content, 768, 21);
-        // Legacy field uses intent vector for backward compatibility
-        fingerprint.e10_multimodal = fingerprint.e10_multimodal_as_intent.clone();
         fingerprint.e11_entity = Self::fill_dense_embedding(content, 768, 10); // KEPLER
 
         // Fill sparse embeddings
@@ -564,7 +562,7 @@ mod tests {
         assert_eq!(fp.e7_code.len(), 1536);
         assert_eq!(fp.e8_graph.len(), 1024); // Upgraded from 384D
         assert_eq!(fp.e9_hdc.len(), 1024); // HDC projected
-        assert_eq!(fp.e10_multimodal.len(), 768);
+        assert_eq!(fp.e10_multimodal_paraphrase.len(), 768);
         assert_eq!(fp.e11_entity.len(), 768); // KEPLER
     }
 

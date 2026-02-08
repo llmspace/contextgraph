@@ -598,12 +598,7 @@ impl Handlers {
         );
         let e9_hdc =
             Self::average_dense_vectors(fingerprints.iter().map(|f| &f.semantic.e9_hdc).collect());
-        let e10_multimodal = Self::average_dense_vectors(
-            fingerprints
-                .iter()
-                .map(|f| &f.semantic.e10_multimodal)
-                .collect(),
-        );
+        // E10 legacy field removed -- compute paraphrase vector via dual vectors only
         let e11_entity = Self::average_dense_vectors(
             fingerprints
                 .iter()
@@ -629,10 +624,10 @@ impl Handlers {
             .collect();
 
         // E10: Compute dual vectors using same averaging approach
-        let e10_multimodal_as_intent = Self::average_dense_slices(
+        let e10_multimodal_paraphrase = Self::average_dense_slices(
             fingerprints
                 .iter()
-                .map(|f| f.semantic.get_e10_as_intent())
+                .map(|f| f.semantic.get_e10_as_paraphrase())
                 .filter(|v| !v.is_empty())
                 .collect(),
         );
@@ -658,9 +653,8 @@ impl Handlers {
             e8_graph_as_source,
             e8_graph_as_target,
             e9_hdc,
-            e10_multimodal_as_intent,
+            e10_multimodal_paraphrase,
             e10_multimodal_as_context,
-            e10_multimodal, // Keep for backwards compatibility
             e11_entity,
             e12_late_interaction,
             e13_splade,
@@ -730,12 +724,7 @@ impl Handlers {
         let e9_hdc = Self::intersection_dense_vectors(
             fingerprints.iter().map(|f| &f.semantic.e9_hdc).collect(),
         );
-        let e10_multimodal = Self::intersection_dense_vectors(
-            fingerprints
-                .iter()
-                .map(|f| &f.semantic.e10_multimodal)
-                .collect(),
-        );
+        // E10 legacy field removed -- compute paraphrase vector via dual vectors only
         let e11_entity = Self::intersection_dense_vectors(
             fingerprints
                 .iter()
@@ -777,10 +766,10 @@ impl Handlers {
         };
 
         // E10: Compute dual vectors using same intersection approach
-        let e10_multimodal_as_intent = Self::intersection_dense_slices(
+        let e10_multimodal_paraphrase = Self::intersection_dense_slices(
             fingerprints
                 .iter()
-                .map(|f| f.semantic.get_e10_as_intent())
+                .map(|f| f.semantic.get_e10_as_paraphrase())
                 .filter(|v| !v.is_empty())
                 .collect(),
         );
@@ -806,9 +795,8 @@ impl Handlers {
             e8_graph_as_source,
             e8_graph_as_target,
             e9_hdc,
-            e10_multimodal_as_intent,
+            e10_multimodal_paraphrase,
             e10_multimodal_as_context,
-            e10_multimodal, // Keep for backwards compatibility
             e11_entity,
             e12_late_interaction,
             e13_splade,
@@ -896,13 +884,7 @@ impl Handlers {
             fingerprints.iter().map(|f| &f.semantic.e9_hdc).collect(),
             &weights,
         );
-        let e10_multimodal = Self::weighted_average_dense_vectors(
-            fingerprints
-                .iter()
-                .map(|f| &f.semantic.e10_multimodal)
-                .collect(),
-            &weights,
-        );
+        // E10 legacy field removed -- compute paraphrase vector via dual vectors only
         let e11_entity = Self::weighted_average_dense_vectors(
             fingerprints
                 .iter()
@@ -937,10 +919,10 @@ impl Handlers {
             .clone();
 
         // E10: Compute dual vectors using same weighted average approach
-        let e10_multimodal_as_intent = Self::weighted_average_dense_slices(
+        let e10_multimodal_paraphrase = Self::weighted_average_dense_slices(
             fingerprints
                 .iter()
-                .map(|f| f.semantic.get_e10_as_intent())
+                .map(|f| f.semantic.get_e10_as_paraphrase())
                 .filter(|v| !v.is_empty())
                 .collect(),
             &weights,
@@ -968,9 +950,8 @@ impl Handlers {
             e8_graph_as_source,
             e8_graph_as_target,
             e9_hdc,
-            e10_multimodal_as_intent,
+            e10_multimodal_paraphrase,
             e10_multimodal_as_context,
-            e10_multimodal, // Keep for backwards compatibility
             e11_entity,
             e12_late_interaction,
             e13_splade,

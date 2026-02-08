@@ -18,16 +18,15 @@
 //! - `indexes`: Secondary index operations (tags, temporal, sources)
 //! - `code`: Code entity and E7 embedding storage (separate from text)
 //!
-//! # Column Families (52 total)
+//! # Column Families (50 total)
 //!
 //! Base (11): nodes, edges, embeddings, metadata, temporal, tags, sources, system,
 //!            embedder_edges, typed_edges, typed_edges_by_type
-//! Teleological (21): fingerprints, topic_profiles, e13_splade_inverted, e6_sparse_inverted,
+//! Teleological (19): fingerprints, topic_profiles, e13_splade_inverted, e6_sparse_inverted,
 //!                    e1_matryoshka_128, content, source_metadata, file_index, topic_portfolio,
 //!                    e12_late_interaction, entity_provenance, audit_log, audit_by_target,
 //!                    merge_history, importance_history, tool_call_index,
-//!                    consolidation_recommendations, embedding_registry, custom_weight_profiles,
-//!                    session_identity (legacy), ego_node (legacy)
+//!                    consolidation_recommendations, embedding_registry, custom_weight_profiles
 //! Quantized Embedder (13): emb_0..emb_12
 //! Code (5): code_entities, code_e7_embeddings, code_file_index, code_name_index, code_signature_index
 //! Causal (2): causal_relationships, causal_by_source

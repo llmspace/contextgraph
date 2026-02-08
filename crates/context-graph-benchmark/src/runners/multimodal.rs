@@ -1,12 +1,12 @@
-//! E10 Multimodal benchmark runner for evaluating intent/context embeddings.
+//! E10 Multimodal benchmark runner for evaluating paraphrase/context embeddings.
 //!
 //! This runner executes comprehensive E10 benchmarks and produces metrics
-//! for intent detection, context matching, and asymmetric retrieval.
+//! for paraphrase detection, context matching, and asymmetric retrieval.
 //!
 //! ## Benchmark Phases
 //!
-//! 1. **Intent Detection**: Accuracy of distinguishing intent from context
-//! 2. **Context Matching**: MRR/P@K for intent→context retrieval
+//! 1. **Paraphrase Detection**: Accuracy of distinguishing paraphrase from context
+//! 2. **Context Matching**: MRR/P@K for paraphrase→context retrieval
 //! 3. **Asymmetric Validation**: Verify direction handling (E5-base-v2 provides natural asymmetry via prefixes)
 //! 4. **Ablation**: Compare E1+E10 vs E1 only
 
@@ -16,13 +16,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::datasets::multimodal::{
     E10DatasetStats, E10MultimodalBenchmarkDataset, E10MultimodalDatasetConfig,
-    E10MultimodalDatasetGenerator, IntentDirection,
+    E10MultimodalDatasetGenerator, ParaphraseDirection,
 };
 use crate::metrics::multimodal::{
     compute_asymmetric_retrieval_metrics, compute_context_matching_metrics,
-    compute_intent_detection_metrics, AsymmetricRetrievalMetrics, AsymmetricRetrievalResult,
+    compute_paraphrase_detection_metrics, AsymmetricRetrievalMetrics, AsymmetricRetrievalResult,
     BlendAnalysisPoint, ContextMatchingMetrics, ContextMatchingResult, E10AblationMetrics,
-    E10MultimodalMetrics, IntentDetectionMetrics, IntentDetectionResult,
+    E10MultimodalMetrics, ParaphraseDetectionMetrics, ParaphraseDetectionResult,
 };
 
 /// Configuration for E10 multimodal benchmarks.
@@ -31,8 +31,8 @@ pub struct E10MultimodalBenchmarkConfig {
     /// Dataset configuration.
     pub dataset: E10MultimodalDatasetConfig,
 
-    /// Run intent detection benchmark.
-    pub run_intent_detection: bool,
+    /// Run paraphrase detection benchmark.
+    pub run_paraphrase_detection: bool,
 
     /// Run context matching benchmark.
     pub run_context_matching: bool,
@@ -54,7 +54,7 @@ impl Default for E10MultimodalBenchmarkConfig {
     fn default() -> Self {
         Self {
             dataset: E10MultimodalDatasetConfig::default(),
-            run_intent_detection: true,
+            run_paraphrase_detection: true,
             run_context_matching: true,
             run_asymmetric_validation: true,
             run_ablation: true,
@@ -89,8 +89,8 @@ pub struct E10BenchmarkTimings {
     /// Dataset generation time in milliseconds.
     pub dataset_generation_ms: u64,
 
-    /// Intent detection benchmark time in milliseconds.
-    pub intent_detection_ms: u64,
+    /// Paraphrase detection benchmark time in milliseconds.
+    pub paraphrase_detection_ms: u64,
 
     /// Context matching benchmark time in milliseconds.
     pub context_matching_ms: u64,
@@ -125,14 +125,14 @@ impl E10MultimodalBenchmarkRunner {
 
         let dataset_stats = dataset.stats();
 
-        // Run intent detection benchmark
-        let intent_start = Instant::now();
-        let intent_metrics = if self.config.run_intent_detection {
-            self.run_intent_detection_benchmarks(&dataset)
+        // Run paraphrase detection benchmark
+        let paraphrase_start = Instant::now();
+        let paraphrase_metrics = if self.config.run_paraphrase_detection {
+            self.run_paraphrase_detection_benchmarks(&dataset)
         } else {
-            IntentDetectionMetrics::default()
+            ParaphraseDetectionMetrics::default()
         };
-        let intent_detection_ms = intent_start.elapsed().as_millis() as u64;
+        let paraphrase_detection_ms = paraphrase_start.elapsed().as_millis() as u64;
 
         // Run context matching benchmark
         let context_start = Instant::now();
@@ -169,7 +169,7 @@ impl E10MultimodalBenchmarkRunner {
 
         E10MultimodalBenchmarkResults {
             metrics: E10MultimodalMetrics {
-                intent_detection: intent_metrics,
+                paraphrase_detection: paraphrase_metrics,
                 context_matching: context_metrics,
                 asymmetric_retrieval: asymmetric_metrics,
                 ablation: ablation_metrics,
@@ -177,7 +177,7 @@ impl E10MultimodalBenchmarkRunner {
             timings: E10BenchmarkTimings {
                 total_ms,
                 dataset_generation_ms,
-                intent_detection_ms,
+                paraphrase_detection_ms,
                 context_matching_ms,
                 asymmetric_validation_ms,
                 ablation_ms,
@@ -187,21 +187,21 @@ impl E10MultimodalBenchmarkRunner {
         }
     }
 
-    /// Run intent detection benchmarks.
-    fn run_intent_detection_benchmarks(
+    /// Run paraphrase detection benchmarks.
+    fn run_paraphrase_detection_benchmarks(
         &self,
         dataset: &E10MultimodalBenchmarkDataset,
-    ) -> IntentDetectionMetrics {
+    ) -> ParaphraseDetectionMetrics {
         let mut results = Vec::new();
 
-        // Test intent queries
-        for query in &dataset.intent_queries {
-            let detected = self.detect_intent_direction(&query.query);
-            results.push(IntentDetectionResult {
+        // Test paraphrase queries
+        for query in &dataset.paraphrase_queries {
+            let detected = self.detect_paraphrase_direction(&query.query);
+            results.push(ParaphraseDetectionResult {
                 query: query.query.clone(),
-                expected: "intent".to_string(),
+                expected: "paraphrase".to_string(),
                 detected: detected.to_string(),
-                correct: matches!(detected, IntentDirection::Intent),
+                correct: matches!(detected, ParaphraseDirection::Paraphrase),
                 domain: query.expected_domain.display_name().to_string(),
                 confidence: None,
             });
@@ -209,26 +209,26 @@ impl E10MultimodalBenchmarkRunner {
 
         // Test context queries
         for query in &dataset.context_queries {
-            let detected = self.detect_intent_direction(&query.query);
-            results.push(IntentDetectionResult {
+            let detected = self.detect_paraphrase_direction(&query.query);
+            results.push(ParaphraseDetectionResult {
                 query: query.query.clone(),
                 expected: "context".to_string(),
                 detected: detected.to_string(),
-                correct: matches!(detected, IntentDirection::Context),
+                correct: matches!(detected, ParaphraseDirection::Context),
                 domain: query.expected_domain.display_name().to_string(),
                 confidence: None,
             });
         }
 
-        compute_intent_detection_metrics(&results)
+        compute_paraphrase_detection_metrics(&results)
     }
 
-    /// Detect intent direction from query text.
-    fn detect_intent_direction(&self, query: &str) -> IntentDirection {
+    /// Detect paraphrase direction from query text.
+    fn detect_paraphrase_direction(&self, query: &str) -> ParaphraseDirection {
         let query_lower = query.to_lowercase();
 
         // Intent indicators (action-oriented language)
-        let intent_patterns = [
+        let paraphrase_patterns = [
             "find work",
             "what work was done",
             "find implementation",
@@ -269,7 +269,7 @@ impl E10MultimodalBenchmarkRunner {
             "hard to",
         ];
 
-        let intent_score: usize = intent_patterns
+        let paraphrase_score: usize = paraphrase_patterns
             .iter()
             .filter(|p| query_lower.contains(*p))
             .count();
@@ -278,11 +278,11 @@ impl E10MultimodalBenchmarkRunner {
             .filter(|p| query_lower.contains(*p))
             .count();
 
-        match intent_score.cmp(&context_score) {
-            std::cmp::Ordering::Greater => IntentDirection::Intent,
-            std::cmp::Ordering::Less => IntentDirection::Context,
-            std::cmp::Ordering::Equal if intent_score > 0 => IntentDirection::Intent,
-            _ => IntentDirection::Unknown,
+        match paraphrase_score.cmp(&context_score) {
+            std::cmp::Ordering::Greater => ParaphraseDirection::Paraphrase,
+            std::cmp::Ordering::Less => ParaphraseDirection::Context,
+            std::cmp::Ordering::Equal if paraphrase_score > 0 => ParaphraseDirection::Paraphrase,
+            _ => ParaphraseDirection::Unknown,
         }
     }
 
@@ -293,8 +293,8 @@ impl E10MultimodalBenchmarkRunner {
     ) -> ContextMatchingMetrics {
         let mut results = Vec::new();
 
-        // Simulate retrieval for intent queries
-        for query in &dataset.intent_queries {
+        // Simulate retrieval for paraphrase queries
+        for query in &dataset.paraphrase_queries {
             let expected_docs: Vec<String> = query
                 .expected_top_docs
                 .iter()
@@ -393,8 +393,8 @@ impl E10MultimodalBenchmarkRunner {
     /// circular reasoning and guaranteed MRR=1.0.
     fn compute_simulated_score(
         &self,
-        query: &crate::datasets::multimodal::IntentQuery,
-        doc: &crate::datasets::multimodal::IntentDocument,
+        query: &crate::datasets::multimodal::ParaphraseQuery,
+        doc: &crate::datasets::multimodal::ParaphraseDocument,
         _expected_docs: &[String], // Kept for signature compatibility but UNUSED
     ) -> f64 {
         // Base semantic similarity from keyword overlap
@@ -411,27 +411,27 @@ impl E10MultimodalBenchmarkRunner {
         }
 
         // Intent keyword presence boost
-        let intent_keywords = &doc.intent_keywords;
+        let paraphrase_keywords = &doc.paraphrase_keywords;
         let context_keywords = &doc.context_keywords;
         let query_lower = query.query.to_lowercase();
 
-        let has_intent_match = intent_keywords.iter()
+        let has_paraphrase_match = paraphrase_keywords.iter()
             .any(|kw| query_lower.contains(&kw.to_lowercase()));
         let has_context_match = context_keywords.iter()
             .any(|kw| query_lower.contains(&kw.to_lowercase()));
 
-        // Boost based on intent/context keyword matches
-        if has_intent_match && matches!(query.direction, IntentDirection::Intent) {
+        // Boost based on paraphrase/context keyword matches
+        if has_paraphrase_match && matches!(query.direction, ParaphraseDirection::Paraphrase) {
             score += 0.1;
         }
-        if has_context_match && matches!(query.direction, IntentDirection::Context) {
+        if has_context_match && matches!(query.direction, ParaphraseDirection::Context) {
             score += 0.1;
         }
 
         // Apply direction modifier - this is the key E10 signal
-        // intent→context: 1.2x, context→intent: 0.8x, same: 1.0x
+        // paraphrase→context: 1.2x, context→paraphrase: 0.8x, same: 1.0x
         let direction_mod =
-            IntentDirection::direction_modifier(query.direction, doc.direction);
+            ParaphraseDirection::direction_modifier(query.direction, doc.direction);
         score *= direction_mod as f64;
 
         score.clamp(0.0, 1.0)
@@ -475,26 +475,26 @@ impl E10MultimodalBenchmarkRunner {
         let test_similarities = [0.3, 0.5, 0.7, 0.9];
 
         for &base_sim in &test_similarities {
-            // Compute intent→context similarity
-            let intent_to_context_mod =
-                IntentDirection::direction_modifier(IntentDirection::Intent, IntentDirection::Context);
-            let intent_to_context_sim = base_sim * intent_to_context_mod as f64;
+            // Compute paraphrase→context similarity
+            let paraphrase_to_context_mod =
+                ParaphraseDirection::direction_modifier(ParaphraseDirection::Paraphrase, ParaphraseDirection::Context);
+            let paraphrase_to_context_sim = base_sim * paraphrase_to_context_mod as f64;
 
-            // Compute context→intent similarity
-            let context_to_intent_mod =
-                IntentDirection::direction_modifier(IntentDirection::Context, IntentDirection::Intent);
-            let context_to_intent_sim = base_sim * context_to_intent_mod as f64;
+            // Compute context→paraphrase similarity
+            let context_to_paraphrase_mod =
+                ParaphraseDirection::direction_modifier(ParaphraseDirection::Context, ParaphraseDirection::Paraphrase);
+            let context_to_paraphrase_sim = base_sim * context_to_paraphrase_mod as f64;
 
             // Compute observed ratio
-            let observed_ratio = intent_to_context_sim / context_to_intent_sim;
+            let observed_ratio = paraphrase_to_context_sim / context_to_paraphrase_sim;
 
             // Check if within tolerance of expected 1.0 (E5-base-v2 handles asymmetry via prefixes)
             let passed = (observed_ratio - 1.0).abs() < 0.01;
 
             results.push(AsymmetricRetrievalResult {
                 base_similarity: base_sim,
-                intent_to_context_similarity: intent_to_context_sim,
-                context_to_intent_similarity: context_to_intent_sim,
+                paraphrase_to_context_similarity: paraphrase_to_context_sim,
+                context_to_paraphrase_similarity: context_to_paraphrase_sim,
                 observed_ratio,
                 passed,
             });
@@ -554,7 +554,7 @@ impl E10MultimodalBenchmarkRunner {
 
     /// Compute MRR using E1-only scoring (no direction modifiers).
     fn compute_mrr_e1_only(&self, dataset: &E10MultimodalBenchmarkDataset) -> f64 {
-        let all_queries: Vec<_> = dataset.intent_queries.iter()
+        let all_queries: Vec<_> = dataset.paraphrase_queries.iter()
             .chain(dataset.context_queries.iter())
             .collect();
 
@@ -597,7 +597,7 @@ impl E10MultimodalBenchmarkRunner {
 
     /// Compute MRR using E10-only scoring (direction modifiers only, weak semantic).
     fn compute_mrr_e10_only(&self, dataset: &E10MultimodalBenchmarkDataset) -> f64 {
-        let all_queries: Vec<_> = dataset.intent_queries.iter()
+        let all_queries: Vec<_> = dataset.paraphrase_queries.iter()
             .chain(dataset.context_queries.iter())
             .collect();
 
@@ -619,7 +619,7 @@ impl E10MultimodalBenchmarkRunner {
                     }
 
                     // Direction modifier is the PRIMARY signal for E10-only
-                    let direction_mod = IntentDirection::direction_modifier(
+                    let direction_mod = ParaphraseDirection::direction_modifier(
                         query.direction,
                         doc.direction,
                     );
@@ -648,7 +648,7 @@ impl E10MultimodalBenchmarkRunner {
 
     /// Compute MRR using blended E1+E10 scoring.
     fn compute_mrr_blended(&self, dataset: &E10MultimodalBenchmarkDataset, blend: f64) -> f64 {
-        let all_queries: Vec<_> = dataset.intent_queries.iter()
+        let all_queries: Vec<_> = dataset.paraphrase_queries.iter()
             .chain(dataset.context_queries.iter())
             .collect();
 
@@ -668,7 +668,7 @@ impl E10MultimodalBenchmarkRunner {
                     }
 
                     // E10 component: direction modifiers
-                    let direction_mod = IntentDirection::direction_modifier(
+                    let direction_mod = ParaphraseDirection::direction_modifier(
                         query.direction,
                         doc.direction,
                     );
@@ -702,7 +702,7 @@ impl E10MultimodalBenchmarkRunner {
     fn compute_mrr_full_13_space(&self, dataset: &E10MultimodalBenchmarkDataset) -> f64 {
         // Full 13-space simulation: E1+E10 blend with additional signals
         // In a real benchmark, this would use all 13 embedders
-        let all_queries: Vec<_> = dataset.intent_queries.iter()
+        let all_queries: Vec<_> = dataset.paraphrase_queries.iter()
             .chain(dataset.context_queries.iter())
             .collect();
 
@@ -719,7 +719,7 @@ impl E10MultimodalBenchmarkRunner {
                     let e1_score = 0.2 + keyword_sim * 0.4;
 
                     // E10 direction
-                    let direction_mod = IntentDirection::direction_modifier(
+                    let direction_mod = ParaphraseDirection::direction_modifier(
                         query.direction,
                         doc.direction,
                     );
@@ -758,7 +758,7 @@ impl E10MultimodalBenchmarkRunner {
 
     /// Compute Precision@K for a given blend value.
     fn compute_precision_at_k(&self, dataset: &E10MultimodalBenchmarkDataset, blend: f64, k: usize) -> f64 {
-        let all_queries: Vec<_> = dataset.intent_queries.iter()
+        let all_queries: Vec<_> = dataset.paraphrase_queries.iter()
             .chain(dataset.context_queries.iter())
             .collect();
 
@@ -776,7 +776,7 @@ impl E10MultimodalBenchmarkRunner {
                         e1_score += 0.3;
                     }
 
-                    let direction_mod = IntentDirection::direction_modifier(
+                    let direction_mod = ParaphraseDirection::direction_modifier(
                         query.direction,
                         doc.direction,
                     );
@@ -812,7 +812,7 @@ mod tests {
         let config = E10MultimodalBenchmarkConfig {
             dataset: E10MultimodalDatasetConfig {
                 num_documents: 50,
-                num_intent_queries: 10,
+                num_paraphrase_queries: 10,
                 num_context_queries: 10,
                 seed: 42,
                 ..Default::default()
@@ -824,7 +824,7 @@ mod tests {
         let runner = E10MultimodalBenchmarkRunner::new(config);
         let results = runner.run();
 
-        assert!(results.metrics.intent_detection.total_queries > 0);
+        assert!(results.metrics.paraphrase_detection.total_queries > 0);
         assert!(results.metrics.context_matching.total_queries > 0);
         assert!(results.metrics.asymmetric_retrieval.total_queries > 0);
 
@@ -834,7 +834,7 @@ mod tests {
         );
         println!(
             "  Intent detection accuracy: {:.2}%",
-            results.metrics.intent_detection.accuracy * 100.0
+            results.metrics.paraphrase_detection.accuracy * 100.0
         );
         println!(
             "  Context matching MRR: {:.3}",
@@ -849,7 +849,7 @@ mod tests {
     #[test]
     fn test_asymmetric_validation() {
         let config = E10MultimodalBenchmarkConfig {
-            run_intent_detection: false,
+            run_paraphrase_detection: false,
             run_context_matching: false,
             run_asymmetric_validation: true,
             run_ablation: false,
@@ -864,8 +864,8 @@ mod tests {
         assert!(asymmetric.formula_compliant);
         assert!((asymmetric.observed_asymmetry_ratio - 1.0).abs() < 0.1);
         // Neutral modifiers - E5-base-v2 handles asymmetry via query:/passage: prefixes
-        assert_eq!(asymmetric.intent_to_context_modifier, 1.0);
-        assert_eq!(asymmetric.context_to_intent_modifier, 1.0);
+        assert_eq!(asymmetric.paraphrase_to_context_modifier, 1.0);
+        assert_eq!(asymmetric.context_to_paraphrase_modifier, 1.0);
 
         println!(
             "[VERIFIED] Asymmetric validation: ratio={:.2}, compliant={} (E5-base-v2 handles asymmetry via prefixes)",
@@ -878,12 +878,12 @@ mod tests {
         let config = E10MultimodalBenchmarkConfig {
             dataset: E10MultimodalDatasetConfig {
                 num_documents: 20,
-                num_intent_queries: 5,
+                num_paraphrase_queries: 5,
                 num_context_queries: 5,
                 seed: 42,
                 ..Default::default()
             },
-            run_intent_detection: false,
+            run_paraphrase_detection: false,
             run_context_matching: false,
             run_asymmetric_validation: false,
             run_ablation: true,

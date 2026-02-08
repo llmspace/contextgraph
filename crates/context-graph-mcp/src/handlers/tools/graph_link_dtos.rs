@@ -54,7 +54,7 @@ pub const VALID_EDGE_TYPES: [&str; 8] = [
     "entity_shared",
     "causal_chain",
     "graph_connected",
-    "intent_aligned",
+    "paraphrase_aligned",
     "keyword_overlap",
     "multi_agreement",
 ];

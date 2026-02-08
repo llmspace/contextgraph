@@ -78,7 +78,7 @@ fn create_test_fingerprint(seed: u64) -> TeleologicalFingerprint {
     }
 
     // Populate E10 (768D)
-    for v in semantic.e10_multimodal.iter_mut() {
+    for v in semantic.e10_multimodal_paraphrase.iter_mut() {
         *v = lcg_next(&mut state);
     }
 

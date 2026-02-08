@@ -264,7 +264,7 @@ impl Handlers {
     /// - entity_shared: E11 strongly agrees
     /// - causal_chain: E5 strongly agrees
     /// - graph_connected: E8 strongly agrees
-    /// - intent_aligned: E10 strongly agrees
+    /// - paraphrase_aligned: E10 strongly agrees
     /// - keyword_overlap: E6/E13 strongly agree
     /// - multi_agreement: Multiple embedders agree (weighted_agreement >= 2.5)
     ///
@@ -1184,7 +1184,7 @@ fn string_to_edge_type(s: &str) -> Option<GraphLinkEdgeType> {
         "entity_shared" => Some(GraphLinkEdgeType::EntityShared),
         "causal_chain" => Some(GraphLinkEdgeType::CausalChain),
         "graph_connected" => Some(GraphLinkEdgeType::GraphConnected),
-        "intent_aligned" => Some(GraphLinkEdgeType::IntentAligned),
+        "paraphrase_aligned" => Some(GraphLinkEdgeType::ParaphraseAligned),
         "keyword_overlap" => Some(GraphLinkEdgeType::KeywordOverlap),
         "multi_agreement" => Some(GraphLinkEdgeType::MultiAgreement),
         _ => None,
@@ -1199,7 +1199,7 @@ fn edge_type_to_string(edge_type: GraphLinkEdgeType) -> String {
         GraphLinkEdgeType::EntityShared => "entity_shared".to_string(),
         GraphLinkEdgeType::CausalChain => "causal_chain".to_string(),
         GraphLinkEdgeType::GraphConnected => "graph_connected".to_string(),
-        GraphLinkEdgeType::IntentAligned => "intent_aligned".to_string(),
+        GraphLinkEdgeType::ParaphraseAligned => "paraphrase_aligned".to_string(),
         GraphLinkEdgeType::KeywordOverlap => "keyword_overlap".to_string(),
         GraphLinkEdgeType::MultiAgreement => "multi_agreement".to_string(),
     }

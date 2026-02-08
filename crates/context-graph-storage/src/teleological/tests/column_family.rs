@@ -8,17 +8,14 @@ use crate::teleological::*;
 
 #[test]
 fn test_teleological_cf_names_count() {
-    // TASK-TELEO-006: Updated from 4 to 7 CFs
-    // TASK-STORAGE-P2-001: Updated from 7 to 8 CFs (added CF_E12_LATE_INTERACTION)
-    // TASK-CONTENT-001: Updated from 8 to 9 CFs (added CF_CONTENT)
-    // LEGACY-COMPAT: Added 2 legacy CFs (session_identity, ego_node) for backwards compat
+    // 19 active teleological CFs (no legacy CFs)
     assert_eq!(
         TELEOLOGICAL_CFS.len(),
         TELEOLOGICAL_CF_COUNT,
         "Must have exactly {} teleological column families",
         TELEOLOGICAL_CF_COUNT
     );
-    assert_eq!(TELEOLOGICAL_CF_COUNT, 21); // 19 active + 2 legacy CFs total
+    assert_eq!(TELEOLOGICAL_CF_COUNT, 19);
 }
 
 #[test]
@@ -142,22 +139,17 @@ fn test_descriptors_in_correct_order() {
 }
 
 #[test]
-fn test_get_all_teleological_cf_descriptors_returns_34() {
+fn test_get_all_teleological_cf_descriptors_returns_32() {
     use rocksdb::Cache;
     let cache = Cache::new_lru_cache(256 * 1024 * 1024);
     let descriptors = get_all_teleological_cf_descriptors(&cache);
 
-    // 21 teleological + 13 quantized embedder = 34
-    // Teleological (21): fingerprints, topic_profiles, e13_splade_inverted, e6_sparse_inverted,
-    //   e1_matryoshka_128, content, source_metadata, file_index, topic_portfolio,
-    //   e12_late_interaction, entity_provenance, audit_log, audit_by_target, merge_history,
-    //   importance_history, tool_call_index, consolidation_recommendations, embedding_registry,
-    //   custom_weight_profiles, session_identity, ego_node
+    // 19 teleological + 13 quantized embedder = 32
     // Quantized (13): emb_0 through emb_12
     assert_eq!(
         descriptors.len(),
-        34,
-        "Must return 21 teleological + 13 quantized = 34 CFs"
+        32,
+        "Must return 19 teleological + 13 quantized = 32 CFs"
     );
 }
 

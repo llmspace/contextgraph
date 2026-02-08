@@ -282,7 +282,7 @@ async fn test_inject_context_produces_all_13_embeddings_with_gpu() {
     assert_eq!(e9_dim, E9_DIM, "E9 must be {}D", E9_DIM);
 
     // E10: Multimodal (768D) - uses dual vectors for asymmetric similarity
-    let e10_intent_dim = stored_fp.semantic.e10_multimodal_as_intent.len();
+    let e10_intent_dim = stored_fp.semantic.e10_multimodal_paraphrase.len();
     let e10_context_dim = stored_fp.semantic.e10_multimodal_as_context.len();
     println!(
         "  E10 (Multimodal paraphrase): {} dims (expected {})",
@@ -294,7 +294,7 @@ async fn test_inject_context_produces_all_13_embeddings_with_gpu() {
     );
     assert_eq!(e10_intent_dim, E10_DIM, "E10 paraphrase must be {}D", E10_DIM);
     assert_eq!(e10_context_dim, E10_DIM, "E10 context must be {}D", E10_DIM);
-    assert!(stored_fp.semantic.e10_multimodal.is_empty(), "Legacy e10_multimodal should be empty");
+    // Legacy e10_multimodal field has been removed from SemanticFingerprint
 
     // E11: Entity (384D)
     let e11_dim = stored_fp.semantic.e11_entity.len();
@@ -430,9 +430,9 @@ async fn test_gpu_embeddings_are_nonzero() {
     assert!(e8_target_nonzero, "E8 (Graph target) MUST have non-zero values");
 
     // E10: Multimodal - paraphrase embedding (uses dual vectors)
-    let e10_intent_nonzero = has_nonzero_values(&stored_fp.semantic.e10_multimodal_as_intent);
+    let e10_intent_nonzero = has_nonzero_values(&stored_fp.semantic.e10_multimodal_paraphrase);
     let e10_context_nonzero = has_nonzero_values(&stored_fp.semantic.e10_multimodal_as_context);
-    let e10_intent_norm = l2_norm(&stored_fp.semantic.e10_multimodal_as_intent);
+    let e10_intent_norm = l2_norm(&stored_fp.semantic.e10_multimodal_paraphrase);
     let e10_context_norm = l2_norm(&stored_fp.semantic.e10_multimodal_as_context);
     println!(
         "  E10 (Paraphrase):  non-zero={}, L2 norm={:.6}",
@@ -466,7 +466,7 @@ async fn test_gpu_embeddings_are_nonzero() {
         ("E8 src", &stored_fp.semantic.e8_graph_as_source),
         ("E8 tgt", &stored_fp.semantic.e8_graph_as_target),
         ("E9", &stored_fp.semantic.e9_hdc),
-        ("E10 paraphrase", &stored_fp.semantic.e10_multimodal_as_intent),
+        ("E10 paraphrase", &stored_fp.semantic.e10_multimodal_paraphrase),
         ("E10 context", &stored_fp.semantic.e10_multimodal_as_context),
         ("E11", &stored_fp.semantic.e11_entity),
     ];

@@ -458,7 +458,7 @@ async fn main() {
     let e10_as_intent_count = embedded
         .fingerprints
         .values()
-        .filter(|fp| !fp.e10_multimodal_as_intent.is_empty())
+        .filter(|fp| !fp.e10_multimodal_paraphrase.is_empty())
         .count();
     let e10_as_context_count = embedded
         .fingerprints
@@ -659,7 +659,7 @@ fn verify_e10_asymmetry(embedded: &EmbeddedDataset) -> AsymmetryVerification {
     let mut distinctness_sum = 0.0f64;
 
     for fp in embedded.fingerprints.values() {
-        let intent = &fp.e10_multimodal_as_intent;
+        let intent = &fp.e10_multimodal_paraphrase;
         let context = &fp.e10_multimodal_as_context;
 
         if intent.is_empty() || context.is_empty() {
@@ -750,7 +750,7 @@ fn run_intent_retrieval(
             let sim_e1 = cosine_similarity(&query_fp.e1_semantic, &doc_fp.e1_semantic);
 
             // E10: query_as_intent vs doc_as_context (asymmetric enhancement)
-            let sim_e10 = cosine_similarity(&query_fp.e10_multimodal_as_intent, &doc_fp.e10_multimodal_as_context);
+            let sim_e10 = cosine_similarity(&query_fp.e10_multimodal_paraphrase, &doc_fp.e10_multimodal_as_context);
 
             // E1 + E10 enhanced: E1 foundation + E10 enhancement (per ARCH-16)
             // E10 adds specialized precision on top of E1's semantic foundation
@@ -852,7 +852,7 @@ fn run_context_retrieval(
             let sim_e1 = cosine_similarity(&query_fp.e1_semantic, &doc_fp.e1_semantic);
 
             // E10: query_as_context vs doc_as_intent (reverse direction for context retrieval)
-            let sim_e10 = cosine_similarity(&query_fp.e10_multimodal_as_context, &doc_fp.e10_multimodal_as_intent);
+            let sim_e10 = cosine_similarity(&query_fp.e10_multimodal_as_context, &doc_fp.e10_multimodal_paraphrase);
 
             // E1 + E10 enhanced
             let sim_enhanced = sim_e1 * 0.7 + sim_e10 * 0.3;
@@ -958,10 +958,10 @@ fn run_asymmetric_comparison(
             let Some(doc_fp) = embedded.fingerprints.get(doc_id) else { continue };
 
             // Raw Intent -> Context similarity
-            let raw_i2c = cosine_similarity(&query_fp.e10_multimodal_as_intent, &doc_fp.e10_multimodal_as_context);
+            let raw_i2c = cosine_similarity(&query_fp.e10_multimodal_paraphrase, &doc_fp.e10_multimodal_as_context);
 
             // Raw Context -> Intent similarity
-            let raw_c2i = cosine_similarity(&query_fp.e10_multimodal_as_context, &doc_fp.e10_multimodal_as_intent);
+            let raw_c2i = cosine_similarity(&query_fp.e10_multimodal_as_context, &doc_fp.e10_multimodal_paraphrase);
 
             // Apply direction modifiers per Constitution
             let modified_i2c = raw_i2c as f64 * INTENT_TO_CONTEXT_MODIFIER;
@@ -1056,7 +1056,7 @@ fn run_e10_contribution_analysis(
             }
 
             let sim_e1 = cosine_similarity(&query_fp.e1_semantic, &doc_fp.e1_semantic);
-            let sim_e10 = cosine_similarity(&query_fp.e10_multimodal_as_intent, &doc_fp.e10_multimodal_as_context);
+            let sim_e10 = cosine_similarity(&query_fp.e10_multimodal_paraphrase, &doc_fp.e10_multimodal_as_context);
 
             // Blend: (1-blend)*E1 + blend*E10
             let fused = sim_e1 * (1.0 - blend as f32) + sim_e10 * blend as f32;
@@ -1181,17 +1181,17 @@ fn compute_ablation_mrr(
                     cosine_similarity(&query_fp.e1_semantic, &doc_fp.e1_semantic)
                 }
                 AblationMode::E10Only => {
-                    cosine_similarity(&query_fp.e10_multimodal_as_intent, &doc_fp.e10_multimodal_as_context)
+                    cosine_similarity(&query_fp.e10_multimodal_paraphrase, &doc_fp.e10_multimodal_as_context)
                 }
                 AblationMode::Blend(blend) => {
                     let sim_e1 = cosine_similarity(&query_fp.e1_semantic, &doc_fp.e1_semantic);
-                    let sim_e10 = cosine_similarity(&query_fp.e10_multimodal_as_intent, &doc_fp.e10_multimodal_as_context);
+                    let sim_e10 = cosine_similarity(&query_fp.e10_multimodal_paraphrase, &doc_fp.e10_multimodal_as_context);
                     sim_e1 * (1.0 - blend as f32) + sim_e10 * blend as f32
                 }
                 AblationMode::Full13Space => {
                     // Simulate full 13-space as weighted combination
                     let sim_e1 = cosine_similarity(&query_fp.e1_semantic, &doc_fp.e1_semantic);
-                    let sim_e10 = cosine_similarity(&query_fp.e10_multimodal_as_intent, &doc_fp.e10_multimodal_as_context);
+                    let sim_e10 = cosine_similarity(&query_fp.e10_multimodal_paraphrase, &doc_fp.e10_multimodal_as_context);
                     // Full space gives more weight to E1 as foundation
                     0.6 * sim_e1 + 0.2 * sim_e10 + 0.2 * (sim_e1 + sim_e10) / 2.0
                 }
@@ -1240,16 +1240,16 @@ fn compute_ablation_precision(
                     cosine_similarity(&query_fp.e1_semantic, &doc_fp.e1_semantic)
                 }
                 AblationMode::E10Only => {
-                    cosine_similarity(&query_fp.e10_multimodal_as_intent, &doc_fp.e10_multimodal_as_context)
+                    cosine_similarity(&query_fp.e10_multimodal_paraphrase, &doc_fp.e10_multimodal_as_context)
                 }
                 AblationMode::Blend(blend) => {
                     let sim_e1 = cosine_similarity(&query_fp.e1_semantic, &doc_fp.e1_semantic);
-                    let sim_e10 = cosine_similarity(&query_fp.e10_multimodal_as_intent, &doc_fp.e10_multimodal_as_context);
+                    let sim_e10 = cosine_similarity(&query_fp.e10_multimodal_paraphrase, &doc_fp.e10_multimodal_as_context);
                     sim_e1 * (1.0 - blend as f32) + sim_e10 * blend as f32
                 }
                 AblationMode::Full13Space => {
                     let sim_e1 = cosine_similarity(&query_fp.e1_semantic, &doc_fp.e1_semantic);
-                    let sim_e10 = cosine_similarity(&query_fp.e10_multimodal_as_intent, &doc_fp.e10_multimodal_as_context);
+                    let sim_e10 = cosine_similarity(&query_fp.e10_multimodal_paraphrase, &doc_fp.e10_multimodal_as_context);
                     0.6 * sim_e1 + 0.2 * sim_e10 + 0.2 * (sim_e1 + sim_e10) / 2.0
                 }
             };

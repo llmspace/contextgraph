@@ -463,7 +463,7 @@ fn embedder_short_name(embedder: EmbedderIndex) -> &'static str {
         EmbedderIndex::E8Graph => "E8_Graph",
         EmbedderIndex::E9HDC => "E9_HDC",
         EmbedderIndex::E10Multimodal => "E10_Multi",
-        EmbedderIndex::E10MultimodalIntent => "E10_Intent",
+        EmbedderIndex::E10MultimodalParaphrase => "E10_Paraphrase",
         EmbedderIndex::E10MultimodalContext => "E10_Context",
         EmbedderIndex::E11Entity => "E11_Entity",
         EmbedderIndex::E12LateInteraction => "E12_LateInt",

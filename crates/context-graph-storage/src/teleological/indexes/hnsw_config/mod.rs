@@ -87,7 +87,7 @@ mod tests {
         let hnsw_count = EmbedderIndex::all_hnsw().len();
         assert_eq!(hnsw_count, 15);
         println!("  - EmbedderIndex: 15 HNSW + 3 non-HNSW = 18 variants");
-        println!("  - Includes E5CausalCause, E5CausalEffect, E10MultimodalIntent, E10MultimodalContext (ARCH-15)");
+        println!("  - Includes E5CausalCause, E5CausalEffect, E10MultimodalParaphrase, E10MultimodalContext (ARCH-15)");
         println!("  - DistanceMetric: 5 variants");
 
         println!("Struct Verification:");

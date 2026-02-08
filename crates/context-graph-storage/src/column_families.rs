@@ -344,7 +344,7 @@ pub fn get_column_family_descriptors(block_cache: &Cache) -> Vec<ColumnFamilyDes
 /// # Returns
 /// Vector of `ColumnFamilyDescriptor`s:
 /// - 11 base CFs (nodes, edges, embeddings, metadata, temporal, tags, sources, system, graph linking)
-/// - 21 Teleological CFs (fingerprints, audit_log, provenance, etc.)
+/// - 19 Teleological CFs (fingerprints, audit_log, provenance, etc.)
 /// - 13 quantized embedder CFs (emb_0 through emb_12)
 /// - 5 code CFs (code_entities, code_e7_embeddings, etc.)
 /// - 2 causal CFs (causal_relationships, causal_by_source)
@@ -367,11 +367,11 @@ pub fn get_all_column_family_descriptors(block_cache: &Cache) -> Vec<ColumnFamil
 }
 
 /// Total number of column families in a fully configured Context Graph database.
-/// Base (11: 8 original + 3 graph linking) + Teleological (21: 19 active + 2 legacy) + Quantized Embedder (13) + Code (5) + Causal (2) = 52
-/// Teleological 21 = 5 original + 1 content + 1 source_metadata + 1 file_index + 1 topic_portfolio
+/// Base (11: 8 original + 3 graph linking) + Teleological (19) + Quantized Embedder (13) + Code (5) + Causal (2) = 50
+/// Teleological 19 = 5 original + 1 content + 1 source_metadata + 1 file_index + 1 topic_portfolio
 ///   + 1 e12_late_interaction + 1 entity_provenance + 2 audit log + 2 merge/importance history
-///   + 1 tool call index + 1 consolidation recommendations + 1 embedding registry + 1 custom weight profiles + 2 legacy
-pub const TOTAL_COLUMN_FAMILIES: usize = 52;
+///   + 1 tool call index + 1 consolidation recommendations + 1 embedding registry + 1 custom weight profiles
+pub const TOTAL_COLUMN_FAMILIES: usize = 50;
 
 #[cfg(test)]
 mod tests {
@@ -648,8 +648,8 @@ mod tests {
         // PRD v6: Autonomous module removed - topics emerge from clustering, not goal hierarchies
         // Teleological: 15 active + 2 legacy = 17 (includes 2 audit log CFs)
         assert_eq!(
-            TOTAL_COLUMN_FAMILIES, 52,
-            "Total column families should be 52 (11 base + 21 teleological + 13 quantized + 5 code + 2 causal)"
+            TOTAL_COLUMN_FAMILIES, 50,
+            "Total column families should be 50 (11 base + 19 teleological + 13 quantized + 5 code + 2 causal)"
         );
     }
 

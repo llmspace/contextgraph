@@ -479,7 +479,7 @@ impl CategoryWeights {
             | EmbedderIndex::E6Sparse
             | EmbedderIndex::E7Code
             | EmbedderIndex::E10Multimodal
-            | EmbedderIndex::E10MultimodalIntent
+            | EmbedderIndex::E10MultimodalParaphrase
             | EmbedderIndex::E10MultimodalContext
             | EmbedderIndex::E12LateInteraction
             | EmbedderIndex::E13Splade => self.semantic,

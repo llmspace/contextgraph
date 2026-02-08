@@ -149,14 +149,14 @@ pub struct GraphMetrics {
 /// Multimodal embedder metrics (E10).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MultimodalMetrics {
-    /// Intent detection accuracy.
-    pub intent_accuracy: f64,
-    /// Intent precision.
-    pub intent_precision: f64,
-    /// Intent recall.
-    pub intent_recall: f64,
-    /// Intent F1.
-    pub intent_f1: f64,
+    /// Paraphrase detection accuracy.
+    pub paraphrase_accuracy: f64,
+    /// Paraphrase precision.
+    pub paraphrase_precision: f64,
+    /// Paraphrase recall.
+    pub paraphrase_recall: f64,
+    /// Paraphrase F1.
+    pub paraphrase_f1: f64,
     /// Asymmetric ratio (target: 1.5 ± 0.15).
     pub asymmetry_ratio: f64,
     /// E10 contribution percentage.
@@ -554,22 +554,22 @@ impl BenchmarkResultsAggregator {
 
         let results = json.get("results").unwrap_or(&json);
 
-        metrics.intent_accuracy = results.get("intent_detection_accuracy")
-            .or(results.get("intent_accuracy"))
+        metrics.paraphrase_accuracy = results.get("paraphrase_detection_accuracy")
+            .or(results.get("paraphrase_accuracy"))
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
 
-        metrics.intent_precision = results.get("intent_precision")
+        metrics.paraphrase_precision = results.get("paraphrase_precision")
             .or(results.get("precision"))
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
 
-        metrics.intent_recall = results.get("intent_recall")
+        metrics.paraphrase_recall = results.get("paraphrase_recall")
             .or(results.get("recall"))
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
 
-        metrics.intent_f1 = results.get("intent_f1")
+        metrics.paraphrase_f1 = results.get("paraphrase_f1")
             .or(results.get("f1"))
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);

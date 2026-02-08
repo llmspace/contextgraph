@@ -427,11 +427,9 @@ impl BackgroundGraphBuilder {
                 }
             }
             9 => {
-                // E10 multimodal - use as_intent for K-NN building
-                if !fp.semantic.e10_multimodal_as_intent.is_empty() {
-                    Some(fp.semantic.e10_multimodal_as_intent.clone())
-                } else if !fp.semantic.e10_multimodal.is_empty() {
-                    Some(fp.semantic.e10_multimodal.clone())
+                // E10 multimodal - use paraphrase vector for K-NN building
+                if !fp.semantic.e10_multimodal_paraphrase.is_empty() {
+                    Some(fp.semantic.e10_multimodal_paraphrase.clone())
                 } else {
                     None
                 }

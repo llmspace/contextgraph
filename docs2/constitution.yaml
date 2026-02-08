@@ -17,7 +17,7 @@ metadata:
 # ═══════════════════════════════════════════════════════════════
 tech_stack:
   language: { name: Rust, edition: 2021, msrv: "1.75" }
-  storage: { name: RocksDB, crate: rust-rocksdb, column_families: 52 }
+  storage: { name: RocksDB, crate: rust-rocksdb, column_families: 50 }
   gpu_framework: { name: Candle, version: "0.9.2-alpha", features: [cuda], org: HuggingFace }
   llm_runtime: { name: llama-cpp-2, version: "0.1", format: GGUF, grammar: GBNF }
   async_runtime: { name: Tokio, version: "1.35", features: [full] }
@@ -402,11 +402,11 @@ forbidden:
   AP-CODE-04: "NEVER parse code without tree-sitter — no regex extraction"
 
 # ═══════════════════════════════════════════════════════════════
-# COLUMN FAMILIES (52 total)
+# COLUMN FAMILIES (50 total)
 # ═══════════════════════════════════════════════════════════════
 # Shared: 256MB LRU block cache, LZ4 compression (most CFs), bloom 10-bit
 column_families:
-  total: 52  # 11 base + 21 teleological + 13 quantized + 5 code + 2 causal
+  total: 50  # 11 base + 19 teleological + 13 quantized + 5 code + 2 causal
 
   base_11:
     nodes: "Memory nodes, UUID prefix key"
@@ -421,7 +421,7 @@ column_families:
     typed_edges: "[16B src][16B tgt] = 32-byte key"
     typed_edges_by_type: "[u8 type][16B src] = 17-byte key"
 
-  teleological_21:
+  teleological_19:
     # Fingerprints & Indexes (5)
     fingerprints: "~63KB per fingerprint (all 13 embeddings), 64KB blocks"
     topic_profiles: "13D vectors, 52 bytes, no compression"
@@ -447,9 +447,6 @@ column_families:
     embedding_registry: "Model version tracking per fingerprint"
     # Profiles (1)
     custom_weight_profiles: "[f32;13] profiles, JSON"
-    # Legacy (2) — kept for backwards compatibility
-    session_identity: "DEPRECATED"
-    ego_node: "DEPRECATED"
 
   quantized_13:
     # One CF per embedder (emb_0 through emb_12), quantized for fast ANN

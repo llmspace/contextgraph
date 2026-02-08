@@ -277,14 +277,12 @@ fn get_embedder_vector(fp: &SemanticFingerprint, embedder: EmbedderIndex) -> Opt
         }
         EmbedderIndex::E9HDC => Some(&fp.e9_hdc),
         EmbedderIndex::E10Multimodal => {
-            // Legacy: use intent vector as default for backwards compatibility
-            // CRITICAL FIX: fp.e10_multimodal is intentionally empty (Vec::new())
-            // Must use the dual vectors via get_e10_as_intent()
-            let intent = fp.get_e10_as_intent();
-            if !intent.is_empty() { Some(intent) } else { None }
+            // Use paraphrase vector as default E10 vector
+            let paraphrase = fp.get_e10_as_paraphrase();
+            if !paraphrase.is_empty() { Some(paraphrase) } else { None }
         }
         // E10 asymmetric indexes (ARCH-15)
-        EmbedderIndex::E10MultimodalIntent => Some(fp.get_e10_as_intent()),
+        EmbedderIndex::E10MultimodalParaphrase => Some(fp.get_e10_as_paraphrase()),
         EmbedderIndex::E10MultimodalContext => Some(fp.get_e10_as_context()),
         EmbedderIndex::E11Entity => Some(&fp.e11_entity),
         // Sparse embedders need special handling

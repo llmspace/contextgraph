@@ -275,7 +275,7 @@ async fn run_benchmark() -> Result<(), Box<dyn std::error::Error>> {
             combined.extend(fp.e1_semantic.iter().take(384).cloned());
             combined.extend(fp.e5_causal.iter().take(384).cloned());
             combined.extend(fp.e7_code.iter().take(384).cloned());
-            combined.extend(fp.e10_multimodal.iter().take(384).cloned());
+            combined.extend(fp.e10_multimodal_paraphrase.iter().take(384).cloned());
             (*uuid, combined)
         })
         .collect();
@@ -356,7 +356,7 @@ fn multi_space_similarity(a: &SemanticFingerprint, b: &SemanticFingerprint) -> f
     let e1_sim = cosine_similarity(&a.e1_semantic, &b.e1_semantic);
     let e5_sim = cosine_similarity(&a.e5_causal, &b.e5_causal);
     let e7_sim = cosine_similarity(&a.e7_code, &b.e7_code);
-    let e10_sim = cosine_similarity(&a.e10_multimodal, &b.e10_multimodal);
+    let e10_sim = cosine_similarity(&a.e10_multimodal_paraphrase, &b.e10_multimodal_paraphrase);
 
     // Weighted average (semantic embedders)
     0.35 * e1_sim + 0.25 * e5_sim + 0.25 * e7_sim + 0.15 * e10_sim

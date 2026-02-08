@@ -481,7 +481,7 @@ fn multi_space_similarity(a: &SemanticFingerprint, b: &SemanticFingerprint) -> f
     let e1_sim = cosine_similarity(&a.e1_semantic, &b.e1_semantic);
     let e5_sim = cosine_similarity(&a.e5_causal, &b.e5_causal);
     let e7_sim = cosine_similarity(&a.e7_code, &b.e7_code);
-    let e10_sim = cosine_similarity(&a.e10_multimodal, &b.e10_multimodal);
+    let e10_sim = cosine_similarity(&a.e10_multimodal_paraphrase, &b.e10_multimodal_paraphrase);
 
     // Weights based on embedder category (semantic embedders get higher weight)
     0.4 * e1_sim + 0.3 * e5_sim + 0.2 * e7_sim + 0.1 * e10_sim

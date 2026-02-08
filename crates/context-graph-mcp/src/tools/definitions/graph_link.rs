@@ -71,7 +71,7 @@ fn get_typed_edges_definition() -> ToolDefinition {
         "get_typed_edges",
         "Get typed edges from a memory. Typed edges represent relationships derived from \
          embedder agreement patterns: semantic_similar, code_related, entity_shared, \
-         causal_chain, graph_connected, intent_aligned, keyword_overlap, multi_agreement.",
+         causal_chain, graph_connected, paraphrase_aligned, keyword_overlap, multi_agreement.",
         json!({
             "type": "object",
             "required": ["memory_id"],
@@ -89,7 +89,7 @@ fn get_typed_edges_definition() -> ToolDefinition {
                         "entity_shared",
                         "causal_chain",
                         "graph_connected",
-                        "intent_aligned",
+                        "paraphrase_aligned",
                         "keyword_overlap",
                         "multi_agreement"
                     ],
@@ -149,7 +149,7 @@ fn traverse_graph_definition() -> ToolDefinition {
                         "entity_shared",
                         "causal_chain",
                         "graph_connected",
-                        "intent_aligned",
+                        "paraphrase_aligned",
                         "keyword_overlap",
                         "multi_agreement"
                     ],

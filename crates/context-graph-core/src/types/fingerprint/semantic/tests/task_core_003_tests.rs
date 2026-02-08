@@ -325,7 +325,8 @@ fn test_bincode_serialization_roundtrip() {
     assert_eq!(fp.e7_code, deserialized.e7_code);
     assert_eq!(fp.e8_graph, deserialized.e8_graph);
     assert_eq!(fp.e9_hdc, deserialized.e9_hdc);
-    assert_eq!(fp.e10_multimodal, deserialized.e10_multimodal);
+    assert_eq!(fp.e10_multimodal_paraphrase, deserialized.e10_multimodal_paraphrase);
+    assert_eq!(fp.e10_multimodal_as_context, deserialized.e10_multimodal_as_context);
     assert_eq!(fp.e11_entity, deserialized.e11_entity);
     assert_eq!(fp.e12_late_interaction, deserialized.e12_late_interaction);
     assert_eq!(fp.e13_splade, deserialized.e13_splade);

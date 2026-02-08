@@ -1,19 +1,19 @@
-//! E10 Multimodal dataset generation for benchmarking intent/context embeddings.
+//! E10 Multimodal dataset generation for benchmarking paraphrase/context embeddings.
 //!
-//! This module generates synthetic datasets with known intent/context ground truth for
+//! This module generates synthetic datasets with known paraphrase/context ground truth for
 //! evaluating E10 dual embedding effectiveness.
 //!
 //! ## Dataset Types
 //!
-//! - **Intent Detection Dataset**: Queries with known intent categories
+//! - **Paraphrase Detection Dataset**: Queries with known paraphrase categories
 //! - **Context Matching Dataset**: Documents with context situations
-//! - **Dual Pairs Dataset**: Pairs of intent/context relationships
+//! - **Dual Pairs Dataset**: Pairs of paraphrase/context relationships
 //!
 //! ## Design Philosophy (from Constitution)
 //!
 //! E10 ENHANCES E1 semantic search, not replaces it:
 //! - E1 provides semantic foundation (V_meaning)
-//! - E10 adds intent/context awareness (V_multimodality)
+//! - E10 adds paraphrase/context awareness (V_multimodality)
 //! - blendWithSemantic parameter controls E1/E10 balance
 
 use rand::prelude::*;
@@ -27,8 +27,8 @@ pub struct E10MultimodalDatasetConfig {
     /// Number of documents to generate.
     pub num_documents: usize,
 
-    /// Number of intent queries to generate.
-    pub num_intent_queries: usize,
+    /// Number of paraphrase queries to generate.
+    pub num_paraphrase_queries: usize,
 
     /// Number of context queries to generate.
     pub num_context_queries: usize,
@@ -39,19 +39,19 @@ pub struct E10MultimodalDatasetConfig {
     /// Domains to include.
     pub domains: Vec<IntentDomain>,
 
-    /// Ratio of intent to context queries.
-    pub intent_context_ratio: f64,
+    /// Ratio of paraphrase to context queries.
+    pub paraphrase_context_ratio: f64,
 }
 
 impl Default for E10MultimodalDatasetConfig {
     fn default() -> Self {
         Self {
             num_documents: 500,
-            num_intent_queries: 100,
+            num_paraphrase_queries: 100,
             num_context_queries: 100,
             seed: 42,
             domains: IntentDomain::all(),
-            intent_context_ratio: 0.5,
+            paraphrase_context_ratio: 0.5,
         }
     }
 }
@@ -93,7 +93,7 @@ impl IntentDomain {
     }
 
     /// Get intent templates for this domain.
-    pub fn intent_templates(&self) -> Vec<&'static str> {
+    pub fn paraphrase_templates(&self) -> Vec<&'static str> {
         match self {
             Self::PerformanceOptimization => vec![
                 "Optimize {component} for faster response times",
@@ -279,13 +279,13 @@ impl IntentDomain {
     }
 }
 
-/// Intent direction for asymmetric similarity.
+/// Paraphrase direction for asymmetric similarity.
 ///
 /// Following E5/E8 pattern for asymmetric similarity.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum IntentDirection {
-    /// Text represents an intent/goal (what someone wants to do)
-    Intent,
+pub enum ParaphraseDirection {
+    /// Text represents a paraphrase/goal (what someone wants to do)
+    Paraphrase,
     /// Text represents context/situation (background information)
     Context,
     /// Direction unknown
@@ -293,7 +293,7 @@ pub enum IntentDirection {
     Unknown,
 }
 
-impl IntentDirection {
+impl ParaphraseDirection {
     /// Get direction modifier when comparing query_direction to result_direction.
     ///
     /// E5-base-v2 provides natural asymmetry via "query:"/"passage:" prefixes.
@@ -302,47 +302,47 @@ impl IntentDirection {
     pub fn direction_modifier(query_direction: Self, result_direction: Self) -> f32 {
         match (query_direction, result_direction) {
             // All directions use neutral 1.0 - E5-base-v2 handles asymmetry via prefixes
-            (Self::Intent, Self::Context) => 1.0,
-            (Self::Context, Self::Intent) => 1.0,
+            (Self::Paraphrase, Self::Context) => 1.0,
+            (Self::Context, Self::Paraphrase) => 1.0,
             _ => 1.0,
         }
     }
 }
 
-impl std::fmt::Display for IntentDirection {
+impl std::fmt::Display for ParaphraseDirection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Intent => write!(f, "intent"),
+            Self::Paraphrase => write!(f, "paraphrase"),
             Self::Context => write!(f, "context"),
             Self::Unknown => write!(f, "unknown"),
         }
     }
 }
 
-/// A document with intent/context metadata for benchmarking.
+/// A document with paraphrase/context metadata for benchmarking.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IntentDocument {
+pub struct ParaphraseDocument {
     /// Unique identifier.
     pub id: Uuid,
     /// Document content.
     pub content: String,
     /// Primary intent domain.
     pub domain: IntentDomain,
-    /// Whether this document represents an intent or context.
-    pub direction: IntentDirection,
-    /// Optional intent keywords for matching.
-    pub intent_keywords: Vec<String>,
+    /// Whether this document represents a paraphrase or context.
+    pub direction: ParaphraseDirection,
+    /// Optional paraphrase keywords for matching.
+    pub paraphrase_keywords: Vec<String>,
     /// Optional context keywords for matching.
     pub context_keywords: Vec<String>,
 }
 
 /// A query for E10 benchmark evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IntentQuery {
+pub struct ParaphraseQuery {
     /// Query text.
     pub query: String,
-    /// Query direction (intent or context).
-    pub direction: IntentDirection,
+    /// Query direction (paraphrase or context).
+    pub direction: ParaphraseDirection,
     /// Expected domain for this query.
     pub expected_domain: IntentDomain,
     /// Expected top document IDs (ground truth).
@@ -357,11 +357,11 @@ pub struct IntentQuery {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct E10MultimodalBenchmarkDataset {
     /// All documents in the corpus.
-    pub documents: Vec<IntentDocument>,
-    /// Intent-based queries (query as intent, looking for context).
-    pub intent_queries: Vec<IntentQuery>,
-    /// Context-based queries (query as context, looking for intent).
-    pub context_queries: Vec<IntentQuery>,
+    pub documents: Vec<ParaphraseDocument>,
+    /// Paraphrase-based queries (query as paraphrase, looking for context).
+    pub paraphrase_queries: Vec<ParaphraseQuery>,
+    /// Context-based queries (query as context, looking for paraphrase).
+    pub context_queries: Vec<ParaphraseQuery>,
     /// Random seed used.
     pub seed: u64,
 }
@@ -373,12 +373,12 @@ pub struct E10DatasetStats {
     pub total_documents: usize,
     /// Documents per domain.
     pub documents_per_domain: std::collections::HashMap<String, usize>,
-    /// Intent documents.
-    pub intent_documents: usize,
+    /// Paraphrase documents.
+    pub paraphrase_documents: usize,
     /// Context documents.
     pub context_documents: usize,
     /// Total intent queries.
-    pub intent_queries: usize,
+    pub paraphrase_queries: usize,
     /// Total context queries.
     pub context_queries: usize,
 }
@@ -387,7 +387,7 @@ impl E10MultimodalBenchmarkDataset {
     /// Get dataset statistics.
     pub fn stats(&self) -> E10DatasetStats {
         let mut documents_per_domain = std::collections::HashMap::new();
-        let mut intent_docs = 0;
+        let mut paraphrase_docs = 0;
         let mut context_docs = 0;
 
         for doc in &self.documents {
@@ -395,18 +395,18 @@ impl E10MultimodalBenchmarkDataset {
                 .entry(doc.domain.display_name().to_string())
                 .or_insert(0) += 1;
             match doc.direction {
-                IntentDirection::Intent => intent_docs += 1,
-                IntentDirection::Context => context_docs += 1,
-                IntentDirection::Unknown => {}
+                ParaphraseDirection::Paraphrase => paraphrase_docs += 1,
+                ParaphraseDirection::Context => context_docs += 1,
+                ParaphraseDirection::Unknown => {}
             }
         }
 
         E10DatasetStats {
             total_documents: self.documents.len(),
             documents_per_domain,
-            intent_documents: intent_docs,
+            paraphrase_documents: paraphrase_docs,
             context_documents: context_docs,
-            intent_queries: self.intent_queries.len(),
+            paraphrase_queries: self.paraphrase_queries.len(),
             context_queries: self.context_queries.len(),
         }
     }
@@ -427,13 +427,13 @@ impl E10MultimodalDatasetGenerator {
 
     /// Generate the benchmark dataset.
     pub fn generate(&mut self) -> E10MultimodalBenchmarkDataset {
-        // Generate documents (half intent, half context)
+        // Generate documents (half paraphrase, half context)
         let docs_per_type = self.config.num_documents / 2;
         let mut documents = Vec::with_capacity(self.config.num_documents);
 
-        // Generate intent documents
+        // Generate paraphrase documents
         for _ in 0..docs_per_type {
-            documents.push(self.generate_intent_document());
+            documents.push(self.generate_paraphrase_document());
         }
 
         // Generate context documents
@@ -445,39 +445,39 @@ impl E10MultimodalDatasetGenerator {
         documents.shuffle(&mut self.rng);
 
         // Generate queries
-        let intent_queries = self.generate_intent_queries(&documents);
+        let paraphrase_queries = self.generate_paraphrase_queries(&documents);
         let context_queries = self.generate_context_queries(&documents);
 
         E10MultimodalBenchmarkDataset {
             documents,
-            intent_queries,
+            paraphrase_queries,
             context_queries,
             seed: self.config.seed,
         }
     }
 
-    fn generate_intent_document(&mut self) -> IntentDocument {
+    fn generate_paraphrase_document(&mut self) -> ParaphraseDocument {
         let domain = *self.config.domains.choose(&mut self.rng).unwrap();
-        let templates = domain.intent_templates();
+        let templates = domain.paraphrase_templates();
         let template = *templates.choose(&mut self.rng).unwrap();
 
         // Fill in template placeholders with generated values
         let content = self.fill_template(template);
 
-        // Extract intent keywords from template
-        let intent_keywords = self.extract_intent_keywords(&content, domain);
+        // Extract paraphrase keywords from template
+        let paraphrase_keywords = self.extract_paraphrase_keywords(&content, domain);
 
-        IntentDocument {
+        ParaphraseDocument {
             id: Uuid::new_v4(),
             content,
             domain,
-            direction: IntentDirection::Intent,
-            intent_keywords,
+            direction: ParaphraseDirection::Paraphrase,
+            paraphrase_keywords,
             context_keywords: Vec::new(),
         }
     }
 
-    fn generate_context_document(&mut self) -> IntentDocument {
+    fn generate_context_document(&mut self) -> ParaphraseDocument {
         let domain = *self.config.domains.choose(&mut self.rng).unwrap();
         let templates = domain.context_templates();
         let template = *templates.choose(&mut self.rng).unwrap();
@@ -487,12 +487,12 @@ impl E10MultimodalDatasetGenerator {
         // Extract context keywords
         let context_keywords = self.extract_context_keywords(&content, domain);
 
-        IntentDocument {
+        ParaphraseDocument {
             id: Uuid::new_v4(),
             content,
             domain,
-            direction: IntentDirection::Context,
-            intent_keywords: Vec::new(),
+            direction: ParaphraseDirection::Context,
+            paraphrase_keywords: Vec::new(),
             context_keywords,
         }
     }
@@ -567,8 +567,8 @@ impl E10MultimodalDatasetGenerator {
         result
     }
 
-    fn extract_intent_keywords(&self, _content: &str, domain: IntentDomain) -> Vec<String> {
-        // Return domain-specific intent keywords
+    fn extract_paraphrase_keywords(&self, _content: &str, domain: IntentDomain) -> Vec<String> {
+        // Return domain-specific paraphrase keywords
         match domain {
             IntentDomain::PerformanceOptimization => {
                 vec!["optimize".into(), "faster".into(), "speed".into(), "performance".into()]
@@ -627,25 +627,25 @@ impl E10MultimodalDatasetGenerator {
         }
     }
 
-    fn generate_intent_queries(&mut self, documents: &[IntentDocument]) -> Vec<IntentQuery> {
-        let mut queries = Vec::with_capacity(self.config.num_intent_queries);
+    fn generate_paraphrase_queries(&mut self, documents: &[ParaphraseDocument]) -> Vec<ParaphraseQuery> {
+        let mut queries = Vec::with_capacity(self.config.num_paraphrase_queries);
 
         // Group documents by domain and direction
-        let intent_docs: Vec<_> = documents
+        let paraphrase_docs: Vec<_> = documents
             .iter()
-            .filter(|d| matches!(d.direction, IntentDirection::Intent))
+            .filter(|d| matches!(d.direction, ParaphraseDirection::Paraphrase))
             .collect();
 
         let context_docs: Vec<_> = documents
             .iter()
-            .filter(|d| matches!(d.direction, IntentDirection::Context))
+            .filter(|d| matches!(d.direction, ParaphraseDirection::Context))
             .collect();
 
-        for _ in 0..self.config.num_intent_queries {
+        for _ in 0..self.config.num_paraphrase_queries {
             // Pick a domain
             let domain = *self.config.domains.choose(&mut self.rng).unwrap();
 
-            // Create an intent query that should match context documents
+            // Create a paraphrase query that should match context documents
             let query_text = match domain {
                 IntentDomain::PerformanceOptimization => {
                     "find work aimed at making the system faster".to_string()
@@ -673,7 +673,7 @@ impl E10MultimodalDatasetGenerator {
                 }
             };
 
-            // Expected: context documents from same domain (intent→context)
+            // Expected: context documents from same domain (paraphrase→context)
             let expected: Vec<_> = context_docs
                 .iter()
                 .filter(|d| d.domain == domain)
@@ -681,22 +681,22 @@ impl E10MultimodalDatasetGenerator {
                 .map(|d| d.id)
                 .collect();
 
-            // Anti-expected: intent documents from different domains
-            let anti: Vec<_> = intent_docs
+            // Anti-expected: paraphrase documents from different domains
+            let anti: Vec<_> = paraphrase_docs
                 .iter()
                 .filter(|d| d.domain != domain)
                 .take(2)
                 .map(|d| d.id)
                 .collect();
 
-            queries.push(IntentQuery {
+            queries.push(ParaphraseQuery {
                 query: query_text,
-                direction: IntentDirection::Intent,
+                direction: ParaphraseDirection::Paraphrase,
                 expected_domain: domain,
                 expected_top_docs: expected,
                 anti_expected_docs: anti,
                 e1_limitation: format!(
-                    "E1 may match any {} related text, not distinguish intent vs context",
+                    "E1 may match any {} related text, not distinguish paraphrase vs context",
                     domain.display_name()
                 ),
             });
@@ -705,23 +705,23 @@ impl E10MultimodalDatasetGenerator {
         queries
     }
 
-    fn generate_context_queries(&mut self, documents: &[IntentDocument]) -> Vec<IntentQuery> {
+    fn generate_context_queries(&mut self, documents: &[ParaphraseDocument]) -> Vec<ParaphraseQuery> {
         let mut queries = Vec::with_capacity(self.config.num_context_queries);
 
-        let intent_docs: Vec<_> = documents
+        let paraphrase_docs: Vec<_> = documents
             .iter()
-            .filter(|d| matches!(d.direction, IntentDirection::Intent))
+            .filter(|d| matches!(d.direction, ParaphraseDirection::Paraphrase))
             .collect();
 
         let context_docs: Vec<_> = documents
             .iter()
-            .filter(|d| matches!(d.direction, IntentDirection::Context))
+            .filter(|d| matches!(d.direction, ParaphraseDirection::Context))
             .collect();
 
         for _ in 0..self.config.num_context_queries {
             let domain = *self.config.domains.choose(&mut self.rng).unwrap();
 
-            // Create a context query that should match intent documents
+            // Create a context query that should match paraphrase documents
             let query_text = match domain {
                 IntentDomain::PerformanceOptimization => {
                     "system is slow, what can be done".to_string()
@@ -749,8 +749,8 @@ impl E10MultimodalDatasetGenerator {
                 }
             };
 
-            // Expected: intent documents from same domain (context→intent)
-            let expected: Vec<_> = intent_docs
+            // Expected: paraphrase documents from same domain (context→paraphrase)
+            let expected: Vec<_> = paraphrase_docs
                 .iter()
                 .filter(|d| d.domain == domain)
                 .take(3)
@@ -765,9 +765,9 @@ impl E10MultimodalDatasetGenerator {
                 .map(|d| d.id)
                 .collect();
 
-            queries.push(IntentQuery {
+            queries.push(ParaphraseQuery {
                 query: query_text,
-                direction: IntentDirection::Context,
+                direction: ParaphraseDirection::Context,
                 expected_domain: domain,
                 expected_top_docs: expected,
                 anti_expected_docs: anti,
@@ -790,7 +790,7 @@ mod tests {
     fn test_dataset_generation() {
         let config = E10MultimodalDatasetConfig {
             num_documents: 100,
-            num_intent_queries: 20,
+            num_paraphrase_queries: 20,
             num_context_queries: 20,
             seed: 42,
             ..Default::default()
@@ -800,45 +800,45 @@ mod tests {
         let dataset = generator.generate();
 
         assert_eq!(dataset.documents.len(), 100);
-        assert_eq!(dataset.intent_queries.len(), 20);
+        assert_eq!(dataset.paraphrase_queries.len(), 20);
         assert_eq!(dataset.context_queries.len(), 20);
 
-        // Verify mix of intent and context documents
-        let intent_count = dataset
+        // Verify mix of paraphrase and context documents
+        let paraphrase_count = dataset
             .documents
             .iter()
-            .filter(|d| matches!(d.direction, IntentDirection::Intent))
+            .filter(|d| matches!(d.direction, ParaphraseDirection::Paraphrase))
             .count();
         let context_count = dataset
             .documents
             .iter()
-            .filter(|d| matches!(d.direction, IntentDirection::Context))
+            .filter(|d| matches!(d.direction, ParaphraseDirection::Context))
             .count();
 
-        assert!(intent_count > 0);
+        assert!(paraphrase_count > 0);
         assert!(context_count > 0);
 
-        println!("[VERIFIED] Dataset generated with {} docs, {} intent, {} context",
-            dataset.documents.len(), intent_count, context_count);
+        println!("[VERIFIED] Dataset generated with {} docs, {} paraphrase, {} context",
+            dataset.documents.len(), paraphrase_count, context_count);
     }
 
     #[test]
     fn test_direction_modifiers() {
-        // intent→context: 1.0 (E5-base-v2 handles asymmetry via prefixes)
+        // paraphrase→context: 1.0 (E5-base-v2 handles asymmetry via prefixes)
         assert_eq!(
-            IntentDirection::direction_modifier(IntentDirection::Intent, IntentDirection::Context),
+            ParaphraseDirection::direction_modifier(ParaphraseDirection::Paraphrase, ParaphraseDirection::Context),
             1.0
         );
 
-        // context→intent: 1.0 (neutral - E5-base-v2 handles asymmetry via prefixes)
+        // context→paraphrase: 1.0 (neutral - E5-base-v2 handles asymmetry via prefixes)
         assert_eq!(
-            IntentDirection::direction_modifier(IntentDirection::Context, IntentDirection::Intent),
+            ParaphraseDirection::direction_modifier(ParaphraseDirection::Context, ParaphraseDirection::Paraphrase),
             1.0
         );
 
         // same direction: 1.0
         assert_eq!(
-            IntentDirection::direction_modifier(IntentDirection::Intent, IntentDirection::Intent),
+            ParaphraseDirection::direction_modifier(ParaphraseDirection::Paraphrase, ParaphraseDirection::Paraphrase),
             1.0
         );
 
@@ -862,7 +862,7 @@ mod tests {
     fn test_queries_have_ground_truth() {
         let config = E10MultimodalDatasetConfig {
             num_documents: 200,
-            num_intent_queries: 20,
+            num_paraphrase_queries: 20,
             num_context_queries: 20,
             seed: 42,
             ..Default::default()
@@ -872,7 +872,7 @@ mod tests {
         let dataset = generator.generate();
 
         // Verify queries have expected docs
-        for query in &dataset.intent_queries {
+        for query in &dataset.paraphrase_queries {
             // Some queries may have empty expected_top_docs if no matching docs exist
             // This is acceptable for small datasets
             assert!(query.expected_top_docs.len() <= 3);

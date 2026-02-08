@@ -2,14 +2,11 @@
 //!
 //! All keys use fixed-size formats for efficient range scans.
 //!
-//! # Key Formats (TASK-CONTENT-001, TASK-SESSION-04)
+//! # Key Formats (TASK-CONTENT-001)
 //!
 //! | CF | Key Format | Size |
 //! |----|------------|------|
 //! | content | fingerprint_id UUID | 16 bytes |
-//! | session_identity | `s:{session_id}` | 2 + variable |
-//! | session_identity | `latest` (pointer) | 6 bytes |
-//! | session_identity | `t:{timestamp_ms_be}` | 10 bytes |
 //!
 //! # FAIL FAST Policy
 //!

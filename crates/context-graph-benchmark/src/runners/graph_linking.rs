@@ -605,7 +605,7 @@ impl GraphLinkingBenchmarkRunner {
                 edges.push("GraphConnected".to_string());
             }
             if intent_agree {
-                edges.push("IntentAligned".to_string());
+                edges.push("ParaphraseAligned".to_string());
             }
 
             // Multi-agreement if 4+ types

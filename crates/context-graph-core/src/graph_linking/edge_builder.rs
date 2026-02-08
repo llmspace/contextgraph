@@ -372,7 +372,7 @@ impl EdgeBuilder {
 
         // Paraphrase aligned: E10 high
         if scores[9] >= thresholds[9] {
-            return GraphLinkEdgeType::IntentAligned;
+            return GraphLinkEdgeType::ParaphraseAligned;
         }
 
         // Keyword overlap: E6 or E13 high

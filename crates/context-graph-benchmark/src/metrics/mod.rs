@@ -39,7 +39,7 @@ pub use causal::{
 pub use multimodal::{
     AsymmetricRetrievalMetrics, AsymmetricRetrievalResult, BlendAnalysisPoint,
     ContextMatchingMetrics, ContextMatchingResult, E10AblationMetrics, E10MultimodalMetrics,
-    IntentDetectionMetrics, IntentDetectionResult,
+    ParaphraseDetectionMetrics, ParaphraseDetectionResult,
 };
 pub use clustering::ClusteringMetrics;
 pub use divergence::DivergenceMetrics;
