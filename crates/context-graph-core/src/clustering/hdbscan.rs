@@ -592,8 +592,7 @@ impl HDBSCANClusterer {
                 });
                 labels[i] = cluster_id;
 
-                // Compute probability based on relative position in cluster
-                // Higher probability for points closer to cluster center
+                // Probability scales with cluster size: larger clusters yield higher confidence
                 probabilities[i] = 1.0 - (1.0 / cluster_size as f32).min(0.5);
             } else {
                 labels[i] = -1; // Noise

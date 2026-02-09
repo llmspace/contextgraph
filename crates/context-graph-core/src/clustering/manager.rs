@@ -43,7 +43,7 @@
 //! assert!(result.is_ok());
 //! ```
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use uuid::Uuid;
 
@@ -476,21 +476,21 @@ impl MultiSpaceClusterManager {
         self.synthesize_topics()?;
 
         // --- Provenance: mega-topic detection ---
-        let total_fingerprints = self.spaces.iter().map(|s| s.memory_ids.len()).max().unwrap_or(0);
-        if total_fingerprints > 10 {
+        let max_space_size = self.spaces.iter().map(|s| s.memory_ids.len()).max().unwrap_or(0);
+        if max_space_size > 10 {
             for topic in self.topics.values() {
-                if topic.member_count() > total_fingerprints / 2 {
+                if topic.member_count() > max_space_size / 2 {
                     tracing::warn!(
                         topic_id = %topic.id,
                         member_count = topic.member_count(),
-                        total_fingerprints = total_fingerprints,
-                        pct = (topic.member_count() * 100) / total_fingerprints.max(1),
+                        max_space_size = max_space_size,
+                        pct = (topic.member_count() * 100) / max_space_size.max(1),
                         total_topics = self.topics.len(),
                         "Mega-topic: absorbs {}% of all memories \
                          (provenance: {} topics from {} fingerprints)",
-                        (topic.member_count() * 100) / total_fingerprints.max(1),
+                        (topic.member_count() * 100) / max_space_size.max(1),
                         self.topics.len(),
-                        total_fingerprints
+                        max_space_size
                     );
                 }
             }
@@ -704,13 +704,23 @@ impl MultiSpaceClusterManager {
                     continue;
                 };
 
-                if let Ok(result) = comparator.compare(fp_a, fp_b) {
-                    for (k, sim) in result.per_embedder.iter().enumerate() {
-                        if let Some(s) = sim {
-                            strengths[k] += *s;
+                match comparator.compare(fp_a, fp_b) {
+                    Ok(result) => {
+                        for (k, sim) in result.per_embedder.iter().enumerate() {
+                            if let Some(s) = sim {
+                                strengths[k] += *s;
+                            }
                         }
+                        pair_count += 1;
                     }
-                    pair_count += 1;
+                    Err(e) => {
+                        tracing::warn!(
+                            member_a = %members[i],
+                            member_b = %members[j],
+                            error = %e,
+                            "Fingerprint comparison failed during topic profile computation"
+                        );
+                    }
                 }
             }
         }
@@ -762,6 +772,33 @@ impl MultiSpaceClusterManager {
             return Ok(());
         }
 
+        // Compute per-space cluster counts once (reused for both discriminating filter and split ordering).
+        // Spaces with only 1 cluster provide zero discriminative information —
+        // saying "everything is the same" is not evidence of topical agreement.
+        let space_cluster_counts: HashMap<Embedder, usize> = Embedder::all().enumerate()
+            .map(|(i, embedder)| {
+                let non_noise_clusters: HashSet<i32> = self.spaces[i]
+                    .memberships
+                    .values()
+                    .map(|m| m.cluster_id)
+                    .filter(|&cid| cid >= 0)
+                    .collect();
+                (embedder, non_noise_clusters.len())
+            })
+            .collect();
+
+        // Discriminating = has 2+ non-noise clusters AND non-zero topic weight (excludes temporal E2-E4)
+        let discriminating_spaces: HashSet<Embedder> = space_cluster_counts.iter()
+            .filter(|(e, &count)| count >= 2 && category_for(**e).topic_weight() > 0.0)
+            .map(|(e, _)| *e)
+            .collect();
+
+        tracing::info!(
+            discriminating_count = discriminating_spaces.len(),
+            discriminating = ?discriminating_spaces,
+            "Topic synthesis: spaces with >= 2 clusters (non-discriminating spaces excluded from agreement)"
+        );
+
         // Find edges: pairs with weighted_agreement >= TOPIC_THRESHOLD (2.5)
         let mut edges: Vec<(usize, usize)> = Vec::new();
 
@@ -771,6 +808,7 @@ impl MultiSpaceClusterManager {
                     &memory_ids[i],
                     &memory_ids[j],
                     &mem_clusters,
+                    &discriminating_spaces,
                 );
                 if wa >= TOPIC_THRESHOLD {
                     edges.push((i, j));
@@ -807,44 +845,142 @@ impl MultiSpaceClusterManager {
             components.entry(root).or_default().push(memory_ids[i]);
         }
 
-        // MAX-TOPIC-SIZE: Break mega-components via E1 sub-clustering.
+        // MAX-TOPIC-SIZE: Recursively break mega-components via multi-space re-clustering.
         // Union-Find's transitive closure can merge unrelated memories (A~B, B~C → A~C).
-        // If a component exceeds 40% of all memories, split by E1 (Semantic) cluster IDs.
-        let max_component_size = (n * 2) / 5; // 40% of total
+        // If a component exceeds 40% of all memories, try HDBSCAN re-clustering in each
+        // discriminating space until one splits the component. This works because different
+        // spaces see different boundaries (E1 may merge cooking+marine, but E7 or E10
+        // may separate them). The process repeats recursively until no mega-components remain.
+        // Integer 40%: (4*2)/5=1, (5*2)/5=2, etc. — threshold scales conservatively for small n.
+        let max_component_size = (n * 2) / 5;
         let mut final_components: HashMap<usize, Vec<Uuid>> = HashMap::new();
+        // Synthetic root IDs for split sub-components, starting past all real indices [0..n)
         let mut next_root = n;
 
-        for (root, members) in components {
-            if members.len() > max_component_size && members.len() > 10 {
-                tracing::info!(
-                    component_size = members.len(),
-                    max_allowed = max_component_size,
-                    "Splitting mega-component into sub-topics via E1 clusters"
-                );
+        // Build member_id -> embedding index lookup for each space
+        let space_id_to_idx: Vec<HashMap<&Uuid, usize>> = self.spaces.iter()
+            .map(|state| {
+                state.memory_ids.iter().enumerate().map(|(i, id)| (id, i)).collect()
+            })
+            .collect();
 
-                // Sub-cluster: group by E1 (Semantic) cluster assignment
-                let mut sub_groups: HashMap<i32, Vec<Uuid>> = HashMap::new();
-                for member_id in &members {
-                    let cluster_id = mem_clusters
-                        .get(member_id)
-                        .and_then(|clusters| clusters.get(&Embedder::Semantic))
-                        .copied()
-                        .unwrap_or(-1); // Noise cluster
-                    sub_groups.entry(cluster_id).or_default().push(*member_id);
-                }
+        // Ordered list of spaces to try for splitting (most discriminating first).
+        // Temporal embedders already excluded from discriminating_spaces above.
+        let split_spaces: Vec<Embedder> = {
+            let mut spaces: Vec<(Embedder, usize)> = discriminating_spaces.iter()
+                .map(|&e| (e, *space_cluster_counts.get(&e).unwrap_or(&0)))
+                .collect();
+            spaces.sort_by(|a, b| b.1.cmp(&a.1)); // most clusters first
+            spaces.into_iter().map(|(e, _)| e).collect()
+        };
 
-                if sub_groups.len() > 1 {
-                    for (_, sub_members) in sub_groups {
-                        final_components.insert(next_root, sub_members);
-                        next_root += 1;
+        tracing::info!(
+            split_spaces = ?split_spaces,
+            "Mega-component splitting will try spaces in order of discrimination"
+        );
+
+        // Work queue: components that still need to be checked for splitting
+        let mut work_queue: Vec<(usize, Vec<Uuid>)> = components.into_iter().collect();
+        const MAX_SPLIT_ROUNDS: usize = 5;
+        let mut split_rounds = 0;
+
+        while !work_queue.is_empty() && split_rounds < MAX_SPLIT_ROUNDS {
+            let mut next_queue: Vec<(usize, Vec<Uuid>)> = Vec::new();
+            let mut any_split = false;
+
+            for (root, members) in work_queue {
+                if members.len() > max_component_size && members.len() >= 5 {
+                    // Try each discriminating space until one splits this component
+                    let mut did_split = false;
+
+                    for &space in &split_spaces {
+                        let space_state = &self.spaces[space.index()];
+                        let id_to_idx = &space_id_to_idx[space.index()];
+
+                        let mut sub_embeddings: Vec<Vec<f32>> = Vec::new();
+                        let mut sub_ids: Vec<Uuid> = Vec::new();
+                        for member_id in &members {
+                            if let Some(&idx) = id_to_idx.get(member_id) {
+                                sub_embeddings.push(space_state.embeddings[idx].clone());
+                                sub_ids.push(*member_id);
+                            }
+                        }
+
+                        if sub_embeddings.len() < 5 {
+                            continue;
+                        }
+
+                        let clusterer = HDBSCANClusterer::for_space(space);
+                        let sub_result = clusterer.fit(&sub_embeddings, &sub_ids, space);
+
+                        match sub_result {
+                            Ok(memberships) => {
+                                let mut sub_groups: HashMap<i32, Vec<Uuid>> = HashMap::new();
+                                for m in &memberships {
+                                    sub_groups.entry(m.cluster_id).or_default().push(m.memory_id);
+                                }
+                                let noise = sub_groups.remove(&-1).unwrap_or_default();
+                                if sub_groups.len() >= 2 {
+                                    tracing::info!(
+                                        space = ?space,
+                                        component_size = members.len(),
+                                        sub_clusters = sub_groups.len(),
+                                        noise_points = noise.len(),
+                                        split_round = split_rounds,
+                                        "Mega-component split via {:?} into {} sub-topics",
+                                        space,
+                                        sub_groups.len()
+                                    );
+                                    any_split = true;
+                                    did_split = true;
+                                    for (_, sub_members) in sub_groups {
+                                        next_queue.push((next_root, sub_members));
+                                        next_root += 1;
+                                    }
+                                    // Noise from sub-clustering becomes singleton components.
+                                    // These won't form topics (< 2 members) and are effectively
+                                    // unassigned — acceptable loss for better topic purity.
+                                    for noise_id in noise {
+                                        final_components.insert(next_root, vec![noise_id]);
+                                        next_root += 1;
+                                    }
+                                    break; // this space worked, stop trying others
+                                }
+                            }
+                            Err(e) => {
+                                tracing::debug!(
+                                    space = ?space, error = %e,
+                                    "Re-clustering failed in space (trying next)"
+                                );
+                            }
+                        }
+                    }
+
+                    if !did_split {
+                        tracing::info!(
+                            component_size = members.len(),
+                            "No discriminating space could split mega-component"
+                        );
+                        final_components.insert(root, members);
                     }
                 } else {
-                    // E1 didn't split — keep the mega-component
                     final_components.insert(root, members);
                 }
-            } else {
-                final_components.insert(root, members);
             }
+
+            work_queue = next_queue;
+            if !any_split {
+                for (root, members) in work_queue.drain(..) {
+                    final_components.insert(root, members);
+                }
+                break;
+            }
+            split_rounds += 1;
+        }
+
+        // Flush remaining work_queue items that weren't processed (hit MAX_SPLIT_ROUNDS)
+        for (root, members) in work_queue {
+            final_components.insert(root, members);
         }
 
         // Create topics from groups with >= 2 members
@@ -889,6 +1025,7 @@ impl MultiSpaceClusterManager {
         mem_a: &Uuid,
         mem_b: &Uuid,
         mem_clusters: &HashMap<Uuid, HashMap<Embedder, i32>>,
+        discriminating_spaces: &HashSet<Embedder>,
     ) -> f32 {
         let Some(clusters_a) = mem_clusters.get(mem_a) else {
             return 0.0;
@@ -899,6 +1036,12 @@ impl MultiSpaceClusterManager {
 
         let mut weighted = 0.0f32;
         for embedder in Embedder::all() {
+            // Skip spaces that produced only 1 cluster — they provide zero
+            // discriminative power (every pair would trivially "agree").
+            if !discriminating_spaces.contains(&embedder) {
+                continue;
+            }
+
             let ca = clusters_a.get(&embedder).copied().unwrap_or(-1);
             let cb = clusters_b.get(&embedder).copied().unwrap_or(-1);
 
