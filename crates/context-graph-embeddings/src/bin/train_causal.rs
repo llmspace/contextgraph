@@ -224,21 +224,22 @@ fn main() {
 
     // Build training data
     println!("\nPreparing training data...");
-    let mut all_pairs = seed_training_pairs();
-    println!("Seed pairs: {}", all_pairs.len());
+    let seed_pairs = seed_training_pairs();
+    println!("Seed pairs: {}", seed_pairs.len());
 
-    // Load additional data if provided
+    // Expand seed pairs programmatically (reversed + cross-domain negatives)
+    let mut all_pairs = expand_seed_pairs(&seed_pairs);
+    println!("Expanded seed pairs: {}", all_pairs.len());
+
+    // Append external data directly (already real pairs, no expansion needed)
     if let Some(ref data_path) = args.data_path {
         let extra = load_jsonl_pairs(data_path);
         all_pairs.extend(extra);
     }
-
-    // Expand seed pairs programmatically
-    let expanded = expand_seed_pairs(&all_pairs);
-    println!("Expanded pairs: {}", expanded.len());
+    println!("Total pairs: {}", all_pairs.len());
 
     // Split train/eval (80/20)
-    let mut rng_pairs = expanded;
+    let mut rng_pairs = all_pairs;
     use rand::seq::SliceRandom;
     use rand::SeedableRng;
     let mut rng = rand::rngs::StdRng::seed_from_u64(args.seed);

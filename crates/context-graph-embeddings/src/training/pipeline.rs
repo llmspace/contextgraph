@@ -13,7 +13,7 @@ use tokenizers::Tokenizer;
 use crate::error::{EmbeddingError, EmbeddingResult};
 use crate::models::pretrained::causal::config::CAUSAL_DIMENSION;
 use crate::models::pretrained::causal::forward::{
-    gpu_forward_dual_trainable_tensor, gpu_forward_with_lora_tensor,
+    gpu_forward_base_tensor, gpu_forward_with_lora_tensor, l2_normalize,
 };
 use crate::models::pretrained::causal::weights::{NomicWeights, TrainableProjection};
 use crate::training::data::{CausalDataLoader, CausalTrainingPair, TrainingBatch};
@@ -157,11 +157,14 @@ impl CausalTrainingPipeline {
         })
     }
 
-    /// Embed a batch of texts using LoRA-augmented forward + trainable projection.
+    /// Embed a batch of texts using forward + trainable projection.
     ///
     /// The `projection` parameter must be the SAME projection whose Var tensors
     /// are registered with the optimizer. This ensures gradients computed by
     /// `loss.backward()` flow to the correct Var objects.
+    ///
+    /// When `use_lora` is true, uses LoRA-augmented encoder (Stages 2-3).
+    /// When false, uses base encoder only (Stage 1 warm-up, saves VRAM).
     ///
     /// Returns (cause_tensors [N, D], effect_tensors [N, D]) with preserved grad graph.
     pub fn embed_batch_dual(
@@ -170,20 +173,35 @@ impl CausalTrainingPipeline {
         weights: &NomicWeights,
         tokenizer: &Tokenizer,
         projection: &TrainableProjection,
+        use_lora: bool,
     ) -> EmbeddingResult<(Tensor, Tensor)> {
         let mut cause_vecs = Vec::new();
         let mut effect_vecs = Vec::new();
 
         for pair in &batch.pairs {
-            let (cause, effect) = gpu_forward_dual_trainable_tensor(
-                &pair.cause_text,
-                weights,
-                tokenizer,
-                &self.lora,
-                projection,
-            )?;
-            cause_vecs.push(cause);
-            effect_vecs.push(effect);
+            // Use document prefix for diverse text-dependent embeddings.
+            // Causal instruction prefixes compress all vectors to the same direction,
+            // making contrastive learning impossible. The projection heads learn
+            // the cause/effect separation instead.
+            let cause_prefixed = format!("search_document: {}", &pair.cause_text);
+            let cause_emb = if use_lora {
+                gpu_forward_with_lora_tensor(&cause_prefixed, weights, tokenizer, &self.lora)?
+            } else {
+                gpu_forward_base_tensor(&cause_prefixed, weights, tokenizer)?
+            };
+            let cause_proj = projection.project_cause_trainable(&cause_emb)?;
+            let cause_norm = l2_normalize(&cause_proj)?;
+            cause_vecs.push(cause_norm);
+
+            let effect_prefixed = format!("search_document: {}", &pair.effect_text);
+            let effect_emb = if use_lora {
+                gpu_forward_with_lora_tensor(&effect_prefixed, weights, tokenizer, &self.lora)?
+            } else {
+                gpu_forward_base_tensor(&effect_prefixed, weights, tokenizer)?
+            };
+            let effect_proj = projection.project_effect_trainable(&effect_emb)?;
+            let effect_norm = l2_normalize(&effect_proj)?;
+            effect_vecs.push(effect_norm);
         }
 
         // Stack individual [1, D] tensors into [N, D]
@@ -238,6 +256,7 @@ impl CausalTrainingPipeline {
         weights: &NomicWeights,
         tokenizer: &Tokenizer,
         use_multitask: bool,
+        use_lora: bool,
     ) -> EmbeddingResult<(LossComponents, usize)> {
         data_loader.shuffle_epoch();
 
@@ -253,7 +272,7 @@ impl CausalTrainingPipeline {
 
             // Use trainer's projection so gradients flow to optimizer-tracked Vars
             let (cause_vecs, effect_vecs) =
-                self.embed_batch_dual(&batch, weights, tokenizer, trainer.projection())?;
+                self.embed_batch_dual(&batch, weights, tokenizer, trainer.projection(), use_lora)?;
             let confidences = Tensor::from_slice(
                 &batch.soft_labels(),
                 batch.len(),
@@ -399,6 +418,7 @@ impl CausalTrainingPipeline {
         weights: &NomicWeights,
         tokenizer: &Tokenizer,
         projection: &TrainableProjection,
+        use_lora: bool,
     ) -> EmbeddingResult<EvaluationMetrics> {
         eval_loader.shuffle_epoch();
 
@@ -414,7 +434,7 @@ impl CausalTrainingPipeline {
             }
 
             let (cause_vecs, effect_vecs) =
-                self.embed_batch_dual(&batch, weights, tokenizer, projection)?;
+                self.embed_batch_dual(&batch, weights, tokenizer, projection, use_lora)?;
 
             // Detach from grad graph for evaluation (saves VRAM)
             let cause_vecs = cause_vecs.detach();
@@ -478,6 +498,7 @@ impl CausalTrainingPipeline {
         tokenizer: &Tokenizer,
         num_epochs: u32,
         use_multitask: bool,
+        use_lora: bool,
     ) -> EmbeddingResult<StageResult> {
         tracing::info!(
             "=== Stage {} starting ({} epochs, multitask={}) ===",
@@ -493,7 +514,7 @@ impl CausalTrainingPipeline {
 
         for epoch in 1..=num_epochs {
             let (loss, num_batches) =
-                self.train_epoch(trainer, train_loader, weights, tokenizer, use_multitask)?;
+                self.train_epoch(trainer, train_loader, weights, tokenizer, use_multitask, use_lora)?;
             final_loss = loss.clone();
             epochs_completed = epoch;
 
@@ -512,7 +533,7 @@ impl CausalTrainingPipeline {
 
             // Evaluate periodically
             if epoch % self.config.eval_every == 0 || epoch == num_epochs {
-                let metrics = self.evaluate(eval_loader, weights, tokenizer, trainer.projection())?;
+                let metrics = self.evaluate(eval_loader, weights, tokenizer, trainer.projection(), use_lora)?;
                 tracing::info!("Stage {} Eval: {}", stage, metrics.summary());
 
                 let is_better = best_metrics
@@ -595,10 +616,11 @@ impl CausalTrainingPipeline {
         tokenizer: &Tokenizer,
         best_spread: &mut f32,
         projection: &TrainableProjection,
+        use_lora: bool,
     ) {
         let snapshot_start = std::time::Instant::now();
 
-        match self.evaluate(eval_loader, weights, tokenizer, projection) {
+        match self.evaluate(eval_loader, weights, tokenizer, projection, use_lora) {
             Ok(metrics) => {
                 let snapshot = serde_json::json!({
                     "timestamp": chrono::Utc::now().to_rfc3339(),
@@ -743,6 +765,7 @@ impl CausalTrainingPipeline {
                 tokenizer,
                 self.config.stage1_epochs,
                 false, // No multi-task in Stage 1 (projection warm-up only)
+                false, // No LoRA in Stage 1 (saves VRAM for projection-only warm-up)
             )?;
 
             if let Some(ref m) = stage1_result.best_metrics {
@@ -753,7 +776,7 @@ impl CausalTrainingPipeline {
 
             // Benchmark snapshot after stage 1 (use trainer's projection before it's dropped)
             let mut snapshot_eval = CausalDataLoader::new(eval_pairs.clone(), self.config.batch_size, self.config.seed + 100);
-            self.log_benchmark_snapshot(1, &mut snapshot_eval, weights, tokenizer, &mut best_spread, trainer.projection());
+            self.log_benchmark_snapshot(1, &mut snapshot_eval, weights, tokenizer, &mut best_spread, trainer.projection(), false);
 
             // Explicitly drop trainer to free optimizer state + Var tensors before Stage 2
             drop(trainer);
@@ -819,11 +842,13 @@ impl CausalTrainingPipeline {
                 tokenizer,
                 self.config.stage2_epochs,
                 true, // Multi-task active in Stage 2
+                true, // LoRA active in Stage 2
             )?;
 
             if let Some(ref m) = stage2_result.best_metrics {
                 let is_better = best_overall.as_ref()
-                    .map(|best| m.directional_accuracy > best.directional_accuracy)
+                    .map(|best| m.directional_accuracy > best.directional_accuracy
+                        || (m.directional_accuracy == best.directional_accuracy && best_stage < 2))
                     .unwrap_or(true);
                 if is_better {
                     best_overall = Some(m.clone());
@@ -832,9 +857,15 @@ impl CausalTrainingPipeline {
             }
             stages.push(stage2_result);
 
+            // Always save final projection at end of stage (guards against eval-metric ties
+            // that prevent checkpoint updates during training)
+            let final_path = self.config.output_dir.join("projection_stage2_best.safetensors");
+            trainer.projection().save_trained(&final_path)?;
+            tracing::info!("Stage 2 final projection saved to {}", final_path.display());
+
             // Benchmark snapshot after stage 2 (use trainer's projection before it's dropped)
             let mut snapshot_eval = CausalDataLoader::new(eval_pairs.clone(), self.config.batch_size, self.config.seed + 101);
-            self.log_benchmark_snapshot(2, &mut snapshot_eval, weights, tokenizer, &mut best_spread, trainer.projection());
+            self.log_benchmark_snapshot(2, &mut snapshot_eval, weights, tokenizer, &mut best_spread, trainer.projection(), true);
 
             // Explicitly drop trainer to free optimizer state + Var tensors before Stage 3
             drop(trainer);
@@ -904,11 +935,13 @@ impl CausalTrainingPipeline {
                 tokenizer,
                 self.config.stage3_epochs,
                 true, // Multi-task active in Stage 3
+                true, // LoRA active in Stage 3
             )?;
 
             if let Some(ref m) = stage3_result.best_metrics {
                 let is_better = best_overall.as_ref()
-                    .map(|best| m.directional_accuracy > best.directional_accuracy)
+                    .map(|best| m.directional_accuracy > best.directional_accuracy
+                        || (m.directional_accuracy == best.directional_accuracy && best_stage < 3))
                     .unwrap_or(true);
                 if is_better {
                     best_overall = Some(m.clone());
@@ -917,9 +950,14 @@ impl CausalTrainingPipeline {
             }
             stages.push(stage3_result);
 
+            // Always save final projection at end of stage (guards against eval-metric ties)
+            let final_path = self.config.output_dir.join("projection_stage3_best.safetensors");
+            trainer.projection().save_trained(&final_path)?;
+            tracing::info!("Stage 3 final projection saved to {}", final_path.display());
+
             // Final benchmark snapshot after stage 3 (use trainer's projection before it's dropped)
             let mut snapshot_eval = CausalDataLoader::new(eval_pairs.clone(), self.config.batch_size, self.config.seed + 102);
-            self.log_benchmark_snapshot(3, &mut snapshot_eval, weights, tokenizer, &mut best_spread, trainer.projection());
+            self.log_benchmark_snapshot(3, &mut snapshot_eval, weights, tokenizer, &mut best_spread, trainer.projection(), true);
         }
 
         let total_epochs: u32 = stages.iter().map(|s| s.epochs_completed).sum();

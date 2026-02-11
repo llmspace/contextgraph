@@ -32,7 +32,7 @@ use super::weights::NomicWeights;
 use encoder::run_encoder;
 pub use encoder::run_encoder_with_lora;
 pub use ops::layer_norm;
-use ops::{l2_normalize, mean_pooling};
+pub use ops::{l2_normalize, mean_pooling};
 
 /// GPU-accelerated forward pass for NomicBERT.
 ///
@@ -226,6 +226,67 @@ pub fn gpu_forward_dual(
 // LoRA-Augmented Forward Pass (Training Mode)
 // =============================================================================
 
+/// GPU forward pass without LoRA, returning a Tensor.
+///
+/// Preserves the computation graph through projection heads for autograd.
+/// Uses base encoder only (no LoRA overhead). For Stage 1 warm-up.
+/// Returns [1, 768] tensor (NOT detached from grad graph).
+pub fn gpu_forward_base_tensor(
+    text: &str,
+    weights: &NomicWeights,
+    tokenizer: &Tokenizer,
+) -> EmbeddingResult<Tensor> {
+    let device = weights.device;
+    let config = &weights.config;
+
+    let encoding = tokenizer
+        .encode(text, true)
+        .map_err(|e| EmbeddingError::TokenizationError {
+            model_id: ModelId::Causal,
+            message: format!("CausalModel tokenization failed: {}", e),
+        })?;
+
+    let token_ids: Vec<u32> = encoding.get_ids().to_vec();
+    let attention_mask: Vec<f32> = encoding
+        .get_attention_mask()
+        .iter()
+        .map(|&m| m as f32)
+        .collect();
+
+    let max_len = config.max_position_embeddings.min(super::config::CAUSAL_MAX_TOKENS);
+    let seq_len = token_ids.len().min(max_len);
+    let token_ids = &token_ids[..seq_len];
+    let attention_mask = &attention_mask[..seq_len];
+
+    let input_ids = Tensor::from_slice(token_ids, (1, seq_len), device).map_err(|e| {
+        EmbeddingError::GpuError {
+            message: format!("CausalModel input_ids tensor failed: {}", e),
+        }
+    })?;
+
+    let attention_mask_tensor =
+        Tensor::from_slice(attention_mask, (1, seq_len), device).map_err(|e| {
+            EmbeddingError::GpuError {
+                message: format!("CausalModel attention_mask tensor failed: {}", e),
+            }
+        })?;
+
+    let token_type_ids: Vec<u32> = vec![0u32; seq_len];
+    let token_type_tensor =
+        Tensor::from_slice(&token_type_ids, (1, seq_len), device).map_err(|e| {
+            EmbeddingError::GpuError {
+                message: format!("CausalModel token_type tensor failed: {}", e),
+            }
+        })?;
+
+    let embeddings = compute_embeddings(&input_ids, &token_type_tensor, weights, seq_len)?;
+
+    let hidden_states = run_encoder(embeddings, &attention_mask_tensor, weights)?;
+
+    let pooled = mean_pooling(&hidden_states, &attention_mask_tensor)?;
+    l2_normalize(&pooled)
+}
+
 /// GPU forward pass with LoRA adapters, returning a Tensor.
 ///
 /// Preserves the computation graph through LoRA parameters for autograd.
@@ -280,7 +341,9 @@ pub fn gpu_forward_with_lora_tensor(
         })?;
 
     let embeddings = compute_embeddings(&input_ids, &token_type_tensor, weights, seq_len)?;
+
     let hidden_states = run_encoder_with_lora(embeddings, &attention_mask_tensor, weights, lora_layers)?;
+
     let pooled = mean_pooling(&hidden_states, &attention_mask_tensor)?;
     l2_normalize(&pooled)
 }

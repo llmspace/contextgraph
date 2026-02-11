@@ -117,7 +117,7 @@ impl EmbeddingProvider for SyntheticProvider {
 /// tokio runtime to bridge from the synchronous `EmbeddingProvider` trait.
 #[cfg(feature = "real-embeddings")]
 pub struct GpuProvider {
-    model: std::sync::Arc<context_graph_embeddings::models::pretrained::causal::model::CausalModel>,
+    model: std::sync::Arc<context_graph_embeddings::models::pretrained::CausalModel>,
     runtime: tokio::runtime::Runtime,
 }
 
@@ -128,7 +128,7 @@ impl GpuProvider {
     /// Automatically loads trained LoRA + projection weights from
     /// `{model_path}/trained/` if available. Falls back to base model.
     pub fn new(model_path: &std::path::Path) -> Result<Self, Box<dyn std::error::Error>> {
-        use context_graph_embeddings::models::pretrained::causal::model::CausalModel;
+        use context_graph_embeddings::models::pretrained::CausalModel;
         use context_graph_embeddings::traits::SingleModelConfig;
 
         let runtime = tokio::runtime::Runtime::new()?;
@@ -153,8 +153,23 @@ impl GpuProvider {
 #[cfg(feature = "real-embeddings")]
 impl EmbeddingProvider for GpuProvider {
     fn e5_score(&self, cause_text: &str, effect_text: &str) -> f32 {
-        let cause_emb = self.e5_embedding(cause_text);
-        let effect_emb = self.e5_embedding(effect_text);
+        // Asymmetric embedding: cause text as cause variant, effect text as effect variant.
+        // This is the core of E5's value — the projection heads map cause and effect
+        // into different subspaces so cosine(cause_vec, effect_vec) measures causal fit.
+        let cause_emb = match self.runtime.block_on(self.model.embed_as_cause(cause_text)) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!("GPU cause embedding failed for '{}...': {}", &cause_text[..cause_text.len().min(50)], e);
+                panic!("E5 GPU embedding failed — cannot produce valid benchmark scores: {}", e);
+            }
+        };
+        let effect_emb = match self.runtime.block_on(self.model.embed_as_effect(effect_text)) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!("GPU effect embedding failed for '{}...': {}", &effect_text[..effect_text.len().min(50)], e);
+                panic!("E5 GPU embedding failed — cannot produce valid benchmark scores: {}", e);
+            }
+        };
         cosine_similarity(&cause_emb, &effect_emb).max(0.0)
     }
 
@@ -162,8 +177,8 @@ impl EmbeddingProvider for GpuProvider {
         match self.runtime.block_on(self.model.embed_as_cause(text)) {
             Ok(emb) => emb,
             Err(e) => {
-                tracing::warn!("GPU embedding failed, falling back to zeros: {}", e);
-                vec![0.0f32; 768]
+                tracing::error!("GPU embedding failed for '{}...': {}", &text[..text.len().min(50)], e);
+                panic!("E5 GPU embedding failed — cannot produce valid benchmark data: {}", e);
             }
         }
     }
@@ -172,8 +187,8 @@ impl EmbeddingProvider for GpuProvider {
         match self.runtime.block_on(self.model.embed_dual(text)) {
             Ok((cause, effect)) => (cause, effect),
             Err(e) => {
-                tracing::warn!("GPU dual embedding failed: {}", e);
-                (vec![0.0f32; 768], vec![0.0f32; 768])
+                tracing::error!("GPU dual embedding failed for '{}...': {}", &text[..text.len().min(50)], e);
+                panic!("E5 GPU dual embedding failed — cannot produce valid benchmark data: {}", e);
             }
         }
     }

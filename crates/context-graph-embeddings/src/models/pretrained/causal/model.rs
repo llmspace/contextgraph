@@ -521,8 +521,13 @@ impl EmbeddingModel for CausalModel {
             })?;
 
         match &*state {
-            ModelState::Loaded { weights, tokenizer, .. } => {
-                let vector = gpu_forward(&text_content, weights, tokenizer)?;
+            ModelState::Loaded { weights, tokenizer, trained } => {
+                let vector = if let Some(ts) = trained {
+                    // Use trained LoRA + projection (cause direction by default for single embed)
+                    gpu_forward_single_trained(&text_content, weights, tokenizer, &ts.lora, &ts.projection, true)?
+                } else {
+                    gpu_forward(&text_content, weights, tokenizer)?
+                };
                 let latency_us = start.elapsed().as_micros() as u64;
                 Ok(ModelEmbedding::new(ModelId::Causal, vector, latency_us))
             }

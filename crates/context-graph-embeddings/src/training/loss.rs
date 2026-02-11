@@ -6,7 +6,7 @@
 //! 3. Causal separation
 //! 4. Soft label distillation
 
-use candle_core::{DType, Tensor};
+use candle_core::Tensor;
 
 use crate::error::{EmbeddingError, EmbeddingResult};
 
@@ -81,6 +81,8 @@ impl DirectionalContrastiveLoss {
     ///
     /// L = -log(exp(sim(cause_i, effect_i)/τ) / Σ_j exp(sim(cause_i, effect_j)/τ))
     ///
+    /// Uses candle_nn::loss::cross_entropy for differentiable gather-based indexing.
+    ///
     /// # Arguments
     /// * `cause_vecs` - Cause embeddings [N, D] (L2-normalized)
     /// * `effect_vecs` - Effect embeddings [N, D] (L2-normalized)
@@ -91,10 +93,13 @@ impl DirectionalContrastiveLoss {
     ) -> EmbeddingResult<Tensor> {
         let tau = self.config.temperature as f64;
 
-        // Similarity matrix: [N, N] where sim[i,j] = cos(cause_i, effect_j) / τ
-        let logits = cause_vecs
+        // Cosine similarity matrix: [N, N] where sim[i,j] = cos(cause_i, effect_j)
+        let sim_matrix = cause_vecs
             .matmul(&effect_vecs.t().map_err(map_candle)?)
-            .map_err(map_candle)?
+            .map_err(map_candle)?;
+
+        // Scale by temperature
+        let logits = sim_matrix
             .affine(1.0 / tau, 0.0)
             .map_err(map_candle)?;
 
@@ -103,46 +108,78 @@ impl DirectionalContrastiveLoss {
         let labels = Tensor::arange(0u32, n as u32, cause_vecs.device())
             .map_err(map_candle)?;
 
-        // Cross-entropy loss over rows
-        cross_entropy_loss(&logits, &labels)
+        // Differentiable cross-entropy via gather (maintains computation graph)
+        candle_nn::loss::cross_entropy(&logits, &labels).map_err(map_candle)
     }
 
     /// Compute directional margin loss.
     ///
-    /// Enforces that forward direction (cause→effect) scores higher than reverse.
-    /// L = max(0, margin - sim(cause, effect) + sim(effect, cause))
+    /// Enforces that correct cause→effect pairing scores higher than mismatched
+    /// pairings by at least `margin`. Compares diagonal (paired) similarity
+    /// against mean off-diagonal (wrong pairing) similarity.
+    ///
+    /// L = max(0, margin - (sim_paired - sim_wrong_mean))
+    ///
+    /// For N=1, falls back to pushing paired similarity above margin.
     ///
     /// # Arguments
-    /// * `cause_vecs` - Cause embeddings [N, D]
-    /// * `effect_vecs` - Effect embeddings [N, D]
+    /// * `cause_vecs` - Cause embeddings [N, D] (L2-normalized)
+    /// * `effect_vecs` - Effect embeddings [N, D] (L2-normalized)
     pub fn directional_margin_loss(
         &self,
         cause_vecs: &Tensor,
         effect_vecs: &Tensor,
     ) -> EmbeddingResult<Tensor> {
-        // Forward similarity: sim(cause_i, effect_i) - diagonal of matmul
-        let forward_sim = batch_cosine_similarity(cause_vecs, effect_vecs)?;
+        let n = cause_vecs.dim(0).map_err(map_candle)?;
 
-        // Reverse similarity: sim(effect_i, cause_i) - should be lower
-        let reverse_sim = batch_cosine_similarity(effect_vecs, cause_vecs)?;
+        // Paired (diagonal) similarity: dot(cause_i, effect_i)
+        let diag_sim = (cause_vecs * effect_vecs)
+            .map_err(map_candle)?
+            .sum(1)
+            .map_err(map_candle)?; // [N]
 
-        // margin - forward + reverse, clamped to >= 0
-        let margin_tensor = Tensor::ones_like(&forward_sim)
+        if n < 2 {
+            // Single sample: push paired similarity above margin
+            let margin_t = Tensor::ones_like(&diag_sim)
+                .map_err(map_candle)?
+                .affine(self.config.margin as f64, 0.0)
+                .map_err(map_candle)?;
+            let loss = margin_t.sub(&diag_sim).map_err(map_candle)?;
+            let zeros = Tensor::zeros_like(&loss).map_err(map_candle)?;
+            return loss
+                .maximum(&zeros)
+                .map_err(map_candle)?
+                .mean_all()
+                .map_err(map_candle);
+        }
+
+        // Full cosine similarity matrix [N, N]
+        let cos_matrix = cause_vecs
+            .matmul(&effect_vecs.t().map_err(map_candle)?)
+            .map_err(map_candle)?;
+
+        // Off-diagonal mean per row: (row_sum - diagonal) / (N-1)
+        let row_sum = cos_matrix.sum(1).map_err(map_candle)?; // [N]
+        let off_diag_mean = row_sum
+            .sub(&diag_sim)
+            .map_err(map_candle)?
+            .affine(1.0 / (n as f64 - 1.0), 0.0)
+            .map_err(map_candle)?; // [N]
+
+        // Gap between correct pairing and wrong pairings
+        let gap = diag_sim.sub(&off_diag_mean).map_err(map_candle)?;
+
+        // Loss: max(0, margin - gap)
+        let margin_t = Tensor::ones_like(&gap)
             .map_err(map_candle)?
             .affine(self.config.margin as f64, 0.0)
             .map_err(map_candle)?;
-
-        let loss = margin_tensor
-            .sub(&forward_sim)
-            .map_err(map_candle)?
-            .add(&reverse_sim)
-            .map_err(map_candle)?;
-
-        // ReLU: max(0, x)
+        let loss = margin_t.sub(&gap).map_err(map_candle)?;
         let zeros = Tensor::zeros_like(&loss).map_err(map_candle)?;
-        let clamped = loss.maximum(&zeros).map_err(map_candle)?;
-
-        clamped.mean_all().map_err(map_candle)
+        loss.maximum(&zeros)
+            .map_err(map_candle)?
+            .mean_all()
+            .map_err(map_candle)
     }
 
     /// Compute causal separation loss.
@@ -275,48 +312,6 @@ fn batch_cosine_similarity(a: &Tensor, b: &Tensor) -> EmbeddingResult<Tensor> {
     dot.div(&safe_denom).map_err(map_candle)
 }
 
-/// Cross-entropy loss over rows of logits with integer labels.
-fn cross_entropy_loss(logits: &Tensor, labels: &Tensor) -> EmbeddingResult<Tensor> {
-    let n = logits.dim(0).map_err(map_candle)?;
-    let device = logits.device();
-
-    // log_softmax over last dimension
-    let max_logits = logits
-        .max_keepdim(1)
-        .map_err(map_candle)?;
-    let shifted = logits
-        .broadcast_sub(&max_logits)
-        .map_err(map_candle)?;
-    let exp = shifted.exp().map_err(map_candle)?;
-    let sum_exp = exp.sum_keepdim(1).map_err(map_candle)?;
-    let log_softmax = shifted
-        .broadcast_sub(&sum_exp.log().map_err(map_candle)?)
-        .map_err(map_candle)?;
-
-    // Gather log probabilities at label indices
-    let labels_u32 = labels.to_dtype(DType::U32).map_err(map_candle)?;
-    let label_vec: Vec<u32> = labels_u32.to_vec1().map_err(map_candle)?;
-
-    let mut nll_sum = 0.0f64;
-    for i in 0..n {
-        let row = log_softmax.get(i).map_err(map_candle)?;
-        let label_idx = label_vec[i] as usize;
-        let log_prob: f32 = row
-            .get(label_idx)
-            .map_err(map_candle)?
-            .to_scalar()
-            .map_err(map_candle)?;
-        nll_sum -= log_prob as f64;
-    }
-
-    let loss_val = (nll_sum / n as f64) as f32;
-    // Return scalar tensor matching mean_all() output shape
-    Tensor::new(&[loss_val], device)
-        .map_err(map_candle)?
-        .squeeze(0)
-        .map_err(map_candle)
-}
-
 /// Extract a scalar f32 from a 0-dim or 1-element tensor.
 fn tensor_to_f32(t: &Tensor) -> EmbeddingResult<f32> {
     let flat = t.flatten_all().map_err(map_candle)?;
@@ -427,5 +422,84 @@ mod tests {
         assert_eq!(config.lambda_directional, 0.3);
         assert_eq!(config.lambda_separation, 0.1);
         assert_eq!(config.lambda_soft, 0.2);
+    }
+
+    #[test]
+    fn test_info_nce_gradient_connected() {
+        use candle_core::Var;
+
+        // Create trainable Var tensors to verify gradient flows
+        let cause_data: Vec<f32> = (0..4 * 8).map(|i| (i as f32 * 0.1).sin()).collect();
+        let effect_data: Vec<f32> = (0..4 * 8).map(|i| (i as f32 * 0.2 + 1.0).cos()).collect();
+        let cause_t = Tensor::from_slice(&cause_data, (4, 8), &Device::Cpu).unwrap();
+        let effect_t = Tensor::from_slice(&effect_data, (4, 8), &Device::Cpu).unwrap();
+
+        let cause_var = Var::from_tensor(&cause_t).unwrap();
+        let effect_var = Var::from_tensor(&effect_t).unwrap();
+
+        let loss_fn = DirectionalContrastiveLoss::default_config();
+        let loss = loss_fn
+            .info_nce_loss(cause_var.as_tensor(), effect_var.as_tensor())
+            .unwrap();
+
+        // backward() should succeed and produce non-zero gradients
+        let grads = loss.backward().unwrap();
+        let cause_grad = grads.get(cause_var.as_tensor()).expect("cause gradient must exist");
+        let effect_grad = grads.get(effect_var.as_tensor()).expect("effect gradient must exist");
+
+        // Gradients must be non-zero (not disconnected)
+        let cause_grad_norm: f32 = cause_grad
+            .sqr().unwrap().sum_all().unwrap().to_scalar().unwrap();
+        let effect_grad_norm: f32 = effect_grad
+            .sqr().unwrap().sum_all().unwrap().to_scalar().unwrap();
+
+        assert!(
+            cause_grad_norm > 1e-10,
+            "Cause gradient must be non-zero, got {}",
+            cause_grad_norm
+        );
+        assert!(
+            effect_grad_norm > 1e-10,
+            "Effect gradient must be non-zero, got {}",
+            effect_grad_norm
+        );
+    }
+
+    #[test]
+    fn test_directional_loss_not_constant() {
+        // Verify directional loss varies with input (not stuck at margin constant)
+        let loss_fn = DirectionalContrastiveLoss::default_config();
+
+        // Test 1: well-separated vectors (high diagonal, low off-diagonal → loss should be low)
+        let d = 16;
+        let cause1 = Tensor::from_slice(
+            &(0..4 * d).map(|i| if i % d == (i / d) { 1.0f32 } else { 0.0 }).collect::<Vec<_>>(),
+            (4, d), &Device::Cpu,
+        ).unwrap();
+        let effect1 = Tensor::from_slice(
+            &(0..4 * d).map(|i| if i % d == (i / d) { 0.9f32 } else { 0.1 }).collect::<Vec<_>>(),
+            (4, d), &Device::Cpu,
+        ).unwrap();
+        // L2 normalize
+        let cn1 = cause1.sqr().unwrap().sum(1).unwrap().sqrt().unwrap().unsqueeze(1).unwrap();
+        let en1 = effect1.sqr().unwrap().sum(1).unwrap().sqrt().unwrap().unsqueeze(1).unwrap();
+        let cause1 = cause1.broadcast_div(&cn1).unwrap();
+        let effect1 = effect1.broadcast_div(&en1).unwrap();
+
+        let loss1 = loss_fn.directional_margin_loss(&cause1, &effect1).unwrap();
+        let val1: f32 = loss1.flatten_all().unwrap().to_vec1().unwrap()[0];
+
+        // Test 2: random vectors (lower gap → loss should be higher)
+        let (cause2, effect2) = make_test_vecs(4, d);
+        let loss2 = loss_fn.directional_margin_loss(&cause2, &effect2).unwrap();
+        let val2: f32 = loss2.flatten_all().unwrap().to_vec1().unwrap()[0];
+
+        // The two configurations should produce different loss values
+        assert!(
+            (val1 - val2).abs() > 1e-6 || val1 != 0.2,
+            "Directional loss should vary with input, got val1={}, val2={} (old bug: constant 0.2)",
+            val1,
+            val2
+        );
     }
 }

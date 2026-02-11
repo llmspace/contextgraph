@@ -1,7 +1,7 @@
 //! Encoder layer and SwiGLU FFN forward pass for NomicBERT model.
 //!
 //! Key differences from standard BERT:
-//! - SwiGLU FFN: output = fc2(SiLU(fc11(x)) * fc12(x)) instead of GELU(fc1(x)) * fc2(x)
+//! - SwiGLU FFN: output = fc2(fc11(x) * SiLU(fc12(x))) instead of GELU(fc1(x)) * fc2(x)
 //! - No biases in FFN projections
 //! - Rotary position embeddings applied in attention (not here)
 
@@ -262,7 +262,7 @@ fn encoder_layer_forward_with_lora(
 
 /// SwiGLU FFN forward pass.
 ///
-/// output = fc2(SiLU(fc11(x)) * fc12(x))
+/// output = fc2(fc11(x) * SiLU(fc12(x)))
 /// where SiLU(x) = x * sigmoid(x)
 fn ffn_forward(
     hidden_states: &Tensor,
@@ -348,13 +348,13 @@ fn ffn_forward(
             ),
         })?;
 
-    // SiLU(gate) * up
+    // fc11(x) * SiLU(fc12(x)) — NomicBERT SwiGLU: fc11 is value/up, fc12 is gate
     let activated = gate
-        .silu()
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!("CausalModel layer {} SiLU failed: {}", layer_idx, e),
-        })?
-        .mul(&up)
+        .mul(
+            &up.silu().map_err(|e| EmbeddingError::GpuError {
+                message: format!("CausalModel layer {} SiLU failed: {}", layer_idx, e),
+            })?,
+        )
         .map_err(|e| EmbeddingError::GpuError {
             message: format!(
                 "CausalModel layer {} SwiGLU mul failed: {}",

@@ -730,6 +730,13 @@ impl ProductionMultiArrayProvider {
         e3_model.load().await?;
         e4_model.load().await?;
         e5_causal_model.load().await?; // E5 loaded directly
+        // Load trained LoRA + projection weights if available (fine-tuned E5)
+        let trained_dir = models_dir.join("causal").join("trained");
+        match e5_causal_model.load_trained_weights(&trained_dir) {
+            Ok(true) => tracing::info!("E5 causal: trained LoRA + projection loaded from {}", trained_dir.display()),
+            Ok(false) => tracing::info!("E5 causal: using base model (no trained weights in {})", trained_dir.display()),
+            Err(e) => tracing::warn!("E5 causal: failed to load trained weights, using base model: {}", e),
+        }
         e6_model.load().await?;
         e7_model.load().await?;
         e8_graph_model.load().await?; // E8 loaded directly for dual embedding

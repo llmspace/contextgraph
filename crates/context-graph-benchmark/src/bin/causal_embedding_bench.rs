@@ -50,6 +50,15 @@ struct Args {
     /// Model name for report metadata.
     #[arg(long, default_value = "nomic-embed-text-v1.5 (untuned)")]
     model_name: String,
+
+    /// Use GPU (real CausalModel) instead of synthetic scores.
+    /// Requires `real-embeddings` feature and CUDA GPU.
+    #[arg(long)]
+    gpu: bool,
+
+    /// Path to CausalModel weights directory (used with --gpu).
+    #[arg(long, default_value = "models/causal")]
+    model_path: PathBuf,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -112,11 +121,31 @@ fn main() -> anyhow::Result<()> {
         tracing::info!("  {}: {} pairs", domain, count);
     }
 
+    // Configure embedding provider
+    let provider: std::sync::Arc<dyn context_graph_benchmark::causal_bench::provider::EmbeddingProvider> = if args.gpu {
+        #[cfg(feature = "real-embeddings")]
+        {
+            use context_graph_benchmark::causal_bench::provider::EmbeddingProvider;
+            tracing::info!("Loading GPU provider from {}", args.model_path.display());
+            let gpu = context_graph_benchmark::causal_bench::provider::GpuProvider::new(&args.model_path)
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
+            tracing::info!("GPU provider ready ({})", if gpu.is_gpu() { "trained" } else { "base" });
+            std::sync::Arc::new(gpu)
+        }
+        #[cfg(not(feature = "real-embeddings"))]
+        {
+            anyhow::bail!("--gpu requires the `real-embeddings` feature. Rebuild with: cargo build --release --features real-embeddings");
+        }
+    } else {
+        std::sync::Arc::new(context_graph_benchmark::causal_bench::provider::SyntheticProvider::new())
+    };
+
     // Configure benchmark
     let config = phases::BenchConfig {
         data_dir: args.data_dir.clone(),
         quick: args.quick,
         verbose: args.verbose,
+        provider,
         ..Default::default()
     };
 

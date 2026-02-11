@@ -11,12 +11,13 @@
 //! 8. Performance profiling
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use super::data_loader::{BenchmarkPair, BenchmarkQuery};
 use super::metrics::{self, PhaseBenchmarkResult};
+use super::provider::EmbeddingProvider;
 
 /// Configuration for benchmark run.
-#[derive(Debug, Clone)]
 pub struct BenchConfig {
     /// Path to dataset directory.
     pub data_dir: std::path::PathBuf,
@@ -28,6 +29,8 @@ pub struct BenchConfig {
     pub causal_gate_threshold: f32,
     /// E5 weight in causal_reasoning profile.
     pub e5_weight: f32,
+    /// Embedding provider (GPU or synthetic).
+    pub provider: Arc<dyn EmbeddingProvider>,
 }
 
 impl Default for BenchConfig {
@@ -36,9 +39,23 @@ impl Default for BenchConfig {
             data_dir: std::path::PathBuf::from("data/causal_benchmark"),
             quick: false,
             verbose: false,
-            causal_gate_threshold: 0.94,
+            causal_gate_threshold: 0.50,
             e5_weight: 0.10,
+            provider: Arc::new(super::provider::SyntheticProvider::new()),
         }
+    }
+}
+
+impl std::fmt::Debug for BenchConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BenchConfig")
+            .field("data_dir", &self.data_dir)
+            .field("quick", &self.quick)
+            .field("verbose", &self.verbose)
+            .field("causal_gate_threshold", &self.causal_gate_threshold)
+            .field("e5_weight", &self.e5_weight)
+            .field("provider", &self.provider.name())
+            .finish()
     }
 }
 
@@ -180,26 +197,29 @@ fn directions_match(predicted: &str, expected: &str) -> bool {
 pub fn phase2_e5_quality(
     causal_pairs: &[BenchmarkPair],
     non_causal_pairs: &[BenchmarkPair],
-    verbose: bool,
+    config: &BenchConfig,
 ) -> PhaseBenchmarkResult {
     let start = std::time::Instant::now();
 
-    // Generate synthetic E5-like scores based on known E5 behavior:
-    // E5 scores cluster 0.93-0.98 for ALL causal text (compression issue)
-    // Non-causal text scores slightly lower: 0.90-0.95
     let mut all_scores = Vec::new();
     let mut all_vectors = Vec::new();
 
-    for pair in causal_pairs {
-        let score = synthetic_e5_score(pair, true);
-        all_scores.push(score);
-        all_vectors.push(synthetic_embedding(pair, 768));
-    }
-
-    for pair in non_causal_pairs {
-        let score = synthetic_e5_score(pair, false);
-        all_scores.push(score);
-        all_vectors.push(synthetic_embedding(pair, 768));
+    if config.provider.is_gpu() {
+        // GPU mode: use real model embeddings
+        for pair in causal_pairs.iter().chain(non_causal_pairs.iter()) {
+            all_scores.push(provider_e5_score(config.provider.as_ref(), pair));
+            all_vectors.push(provider_e5_embedding(config.provider.as_ref(), pair));
+        }
+    } else {
+        // Synthetic mode: simulate E5 compression
+        for pair in causal_pairs {
+            all_scores.push(synthetic_e5_score(pair, true));
+            all_vectors.push(synthetic_embedding(pair, 768));
+        }
+        for pair in non_causal_pairs {
+            all_scores.push(synthetic_e5_score(pair, false));
+            all_vectors.push(synthetic_embedding(pair, 768));
+        }
     }
 
     let spread = metrics::score_spread(&all_scores);
@@ -207,12 +227,12 @@ pub fn phase2_e5_quality(
 
     // Standalone accuracy: for each causal pair, check if E5 ranks correct
     // match above random. With compressed scores, this will be low.
-    let standalone_acc = compute_standalone_accuracy(causal_pairs);
+    let standalone_acc = compute_standalone_accuracy(causal_pairs, config);
 
     // Cause-effect vector distance
-    let ce_distance = compute_cause_effect_distance(causal_pairs);
+    let ce_distance = compute_cause_effect_distance(causal_pairs, config);
 
-    if verbose {
+    if config.verbose {
         tracing::info!("  E5 score range: {:.4}-{:.4}",
             all_scores.iter().cloned().fold(f32::INFINITY, f32::min),
             all_scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max));
@@ -236,6 +256,20 @@ pub fn phase2_e5_quality(
 
     let duration = start.elapsed().as_millis() as u64;
     metrics::make_phase_result(2, "E5 Embedding Quality", phase_metrics, targets, duration)
+}
+
+/// Compute E5 score for a pair using the configured provider.
+///
+/// For GPU provider: computes real cosine similarity between cause/effect embeddings.
+/// For synthetic provider: produces deterministic hash-based scores simulating E5 compression.
+fn provider_e5_score(provider: &dyn EmbeddingProvider, pair: &BenchmarkPair) -> f32 {
+    provider.e5_score(&pair.cause_text, &pair.effect_text)
+}
+
+/// Compute E5 embedding for a pair using the configured provider.
+fn provider_e5_embedding(provider: &dyn EmbeddingProvider, pair: &BenchmarkPair) -> Vec<f32> {
+    let text = format!("{} {}", pair.cause_text, pair.effect_text);
+    provider.e5_embedding(&text)
 }
 
 fn synthetic_e5_score(pair: &BenchmarkPair, is_causal: bool) -> f32 {
@@ -263,60 +297,93 @@ fn synthetic_embedding(pair: &BenchmarkPair, dim: usize) -> Vec<f32> {
     vec
 }
 
-fn compute_standalone_accuracy(pairs: &[BenchmarkPair]) -> f32 {
+fn compute_standalone_accuracy(pairs: &[BenchmarkPair], config: &BenchConfig) -> f32 {
     if pairs.len() < 2 {
         return 0.0;
     }
-    // Simulate E5-only retrieval: with compressed scores, accuracy is near-random
-    // For untuned model, expect ~0% as documented
-    let mut correct = 0usize;
-    for (i, query_pair) in pairs.iter().enumerate() {
-        let query_score = synthetic_e5_score(query_pair, true);
-        let mut best_idx = 0;
-        let mut best_diff = f32::INFINITY;
-        for (j, cand_pair) in pairs.iter().enumerate() {
-            if i == j {
-                continue;
+
+    if config.provider.is_gpu() {
+        // GPU mode: use real embeddings for similarity-based retrieval
+        let embeddings: Vec<Vec<f32>> = pairs
+            .iter()
+            .map(|p| config.provider.e5_embedding(&format!("{} {}", p.cause_text, p.effect_text)))
+            .collect();
+
+        let mut correct = 0usize;
+        for (i, _) in pairs.iter().enumerate() {
+            let mut best_idx = 0;
+            let mut best_sim = f32::NEG_INFINITY;
+            for (j, _) in pairs.iter().enumerate() {
+                if i == j { continue; }
+                let sim = metrics::cosine_similarity(&embeddings[i], &embeddings[j]);
+                if sim > best_sim {
+                    best_sim = sim;
+                    best_idx = j;
+                }
             }
-            let cand_score = synthetic_e5_score(cand_pair, true);
-            let diff = (query_score - cand_score).abs();
-            if diff < best_diff {
-                best_diff = diff;
-                best_idx = j;
+            if pairs[best_idx].domain == pairs[i].domain {
+                correct += 1;
             }
         }
-        // In same domain = "correct" (simplified)
-        if pairs[best_idx].domain == query_pair.domain {
-            correct += 1;
+        correct as f32 / pairs.len() as f32
+    } else {
+        // Synthetic mode: score-proximity based
+        let mut correct = 0usize;
+        for (i, query_pair) in pairs.iter().enumerate() {
+            let query_score = synthetic_e5_score(query_pair, true);
+            let mut best_idx = 0;
+            let mut best_diff = f32::INFINITY;
+            for (j, cand_pair) in pairs.iter().enumerate() {
+                if i == j { continue; }
+                let cand_score = synthetic_e5_score(cand_pair, true);
+                let diff = (query_score - cand_score).abs();
+                if diff < best_diff {
+                    best_diff = diff;
+                    best_idx = j;
+                }
+            }
+            if pairs[best_idx].domain == query_pair.domain {
+                correct += 1;
+            }
         }
+        correct as f32 / pairs.len() as f32
     }
-    correct as f32 / pairs.len() as f32
 }
 
-fn compute_cause_effect_distance(pairs: &[BenchmarkPair]) -> f32 {
+fn compute_cause_effect_distance(pairs: &[BenchmarkPair], config: &BenchConfig) -> f32 {
     if pairs.is_empty() {
         return 0.0;
     }
-    // With E5 compression, cause and effect vectors are very similar (>0.98 cosine)
+
     let mut total_sim = 0.0f32;
-    for pair in pairs {
-        let cause_vec = synthetic_embedding(
-            &BenchmarkPair {
-                cause_text: pair.cause_text.clone(),
-                effect_text: String::new(),
-                ..pair.clone()
-            },
-            768,
-        );
-        let effect_vec = synthetic_embedding(
-            &BenchmarkPair {
-                cause_text: String::new(),
-                effect_text: pair.effect_text.clone(),
-                ..pair.clone()
-            },
-            768,
-        );
-        total_sim += metrics::cosine_similarity(&cause_vec, &effect_vec);
+    if config.provider.is_gpu() {
+        // GPU mode: use real dual embeddings
+        for pair in pairs {
+            let text = format!("{} {}", pair.cause_text, pair.effect_text);
+            let (cause_vec, effect_vec) = config.provider.e5_dual_embeddings(&text);
+            total_sim += metrics::cosine_similarity(&cause_vec, &effect_vec);
+        }
+    } else {
+        // Synthetic mode: different hash seeds for cause vs effect text
+        for pair in pairs {
+            let cause_vec = synthetic_embedding(
+                &BenchmarkPair {
+                    cause_text: pair.cause_text.clone(),
+                    effect_text: String::new(),
+                    ..pair.clone()
+                },
+                768,
+            );
+            let effect_vec = synthetic_embedding(
+                &BenchmarkPair {
+                    cause_text: String::new(),
+                    effect_text: pair.effect_text.clone(),
+                    ..pair.clone()
+                },
+                768,
+            );
+            total_sim += metrics::cosine_similarity(&cause_vec, &effect_vec);
+        }
     }
     total_sim / pairs.len() as f32
 }
@@ -404,7 +471,7 @@ pub fn phase3_direction_modifiers(
 pub fn phase4_ablation(
     queries: &[BenchmarkQuery],
     pairs: &[BenchmarkPair],
-    verbose: bool,
+    config: &BenchConfig,
 ) -> PhaseBenchmarkResult {
     let start = std::time::Instant::now();
 
@@ -415,24 +482,24 @@ pub fn phase4_ablation(
 
     for query in queries {
         // With E5 (multi_space, causal_reasoning profile)
-        let match_with = simulate_search(query, pairs, true, false);
+        let match_with = simulate_search(query, pairs, true, false, config);
         if match_with == query.expected_top1_id {
             with_e5_correct += 1;
         }
 
         // Without E5 (E5 weight zeroed)
-        let match_without = simulate_search(query, pairs, false, false);
+        let match_without = simulate_search(query, pairs, false, false, config);
         if match_without == query.expected_top1_id {
             without_e5_correct += 1;
         }
 
         // E5 only
-        let match_e5only = simulate_search(query, pairs, false, true);
+        let match_e5only = simulate_search(query, pairs, false, true, config);
         if match_e5only == query.expected_top1_id {
             e5_only_correct += 1;
         }
 
-        if verbose {
+        if config.verbose {
             tracing::info!(
                 "  {} with_e5={} without_e5={} e5_only={}",
                 query.id,
@@ -449,9 +516,6 @@ pub fn phase4_ablation(
     let acc_e5only = e5_only_correct as f32 / n;
     let delta = metrics::ablation_delta(acc_with, acc_without);
 
-    // Simulate RRF contribution based on E5 weight in causal_reasoning profile.
-    // E5 weight = 0.10 out of total normalized weights. Actual contribution
-    // depends on score distribution; compute from simulated scores.
     let e5_rrf_pct = if n > 0.0 { (acc_e5only * 100.0) as f64 } else { 0.0 };
 
     let mut phase_metrics = HashMap::new();
@@ -475,8 +539,9 @@ fn simulate_search(
     pairs: &[BenchmarkPair],
     with_e5: bool,
     e5_only: bool,
+    config: &BenchConfig,
 ) -> String {
-    // Simplified search simulation based on domain matching and text overlap
+    // Search simulation: E1 approximated by domain+keyword match, E5 from provider.
     let query_lower = query.query.to_lowercase();
     let mut best_id = String::new();
     let mut best_score = f32::NEG_INFINITY;
@@ -485,11 +550,10 @@ fn simulate_search(
         let mut score = 0.0f32;
 
         if !e5_only {
-            // E1 semantic score: domain + keyword match
+            // E1 semantic approximation: domain + keyword match
             if pair.domain == query.expected_domain {
                 score += 0.4;
             }
-            // Simple word overlap
             let cause_words: Vec<&str> = pair.cause_text.split_whitespace().collect();
             let overlap = cause_words
                 .iter()
@@ -499,9 +563,9 @@ fn simulate_search(
         }
 
         if with_e5 || e5_only {
-            // E5 score: compressed, barely discriminative
-            let e5_score = synthetic_e5_score(pair, pair.is_causal());
-            let e5_weight = if e5_only { 1.0 } else { 0.10 };
+            // E5 score from configured provider (GPU or synthetic)
+            let e5_score = config.provider.e5_score(&pair.cause_text, &pair.effect_text);
+            let e5_weight = if e5_only { 1.0 } else { config.e5_weight };
             score += e5_score * e5_weight;
         }
 
@@ -527,21 +591,32 @@ fn simulate_search(
 pub fn phase5_causal_gate(
     causal_pairs: &[BenchmarkPair],
     non_causal_pairs: &[BenchmarkPair],
-    threshold: f32,
-    verbose: bool,
+    config: &BenchConfig,
 ) -> PhaseBenchmarkResult {
+    let threshold = config.causal_gate_threshold;
     let start = std::time::Instant::now();
 
     let mut scores = Vec::new();
     let mut labels = Vec::new();
 
-    for pair in causal_pairs {
-        scores.push(synthetic_e5_score(pair, true));
-        labels.push(true);
-    }
-    for pair in non_causal_pairs {
-        scores.push(synthetic_e5_score(pair, false));
-        labels.push(false);
+    if config.provider.is_gpu() {
+        for pair in causal_pairs {
+            scores.push(provider_e5_score(config.provider.as_ref(), pair));
+            labels.push(true);
+        }
+        for pair in non_causal_pairs {
+            scores.push(provider_e5_score(config.provider.as_ref(), pair));
+            labels.push(false);
+        }
+    } else {
+        for pair in causal_pairs {
+            scores.push(synthetic_e5_score(pair, true));
+            labels.push(true);
+        }
+        for pair in non_causal_pairs {
+            scores.push(synthetic_e5_score(pair, false));
+            labels.push(false);
+        }
     }
 
     let (tpr, tnr) = metrics::causal_gate_tpr_tnr(&scores, &labels, threshold);
@@ -562,7 +637,7 @@ pub fn phase5_causal_gate(
         .sum::<f32>()
         / non_causal_pairs.len().max(1) as f32;
 
-    if verbose {
+    if config.verbose {
         tracing::info!("  Causal mean score: {:.4}", causal_mean);
         tracing::info!("  Non-causal mean score: {:.4}", non_causal_mean);
         tracing::info!("  Score gap: {:.4}", causal_mean - non_causal_mean);
@@ -595,7 +670,7 @@ pub fn phase5_causal_gate(
 pub fn phase6_e2e_retrieval(
     queries: &[BenchmarkQuery],
     pairs: &[BenchmarkPair],
-    verbose: bool,
+    config: &BenchConfig,
 ) -> PhaseBenchmarkResult {
     let start = std::time::Instant::now();
 
@@ -603,11 +678,11 @@ pub fn phase6_e2e_retrieval(
     let mut expected_top1 = Vec::new();
 
     for query in queries {
-        // Simulate full multi-space search
-        let results = simulate_ranked_search(query, pairs);
+        // Full multi-space search simulation (E1 proxy + E5 from provider)
+        let results = simulate_ranked_search(query, pairs, config);
         expected_top1.push(query.expected_top1_id.clone());
 
-        if verbose && results.first() != Some(&query.expected_top1_id) {
+        if config.verbose && results.first() != Some(&query.expected_top1_id) {
             tracing::info!(
                 "  {} MISS: got {} expected {}",
                 query.id,
@@ -651,14 +726,18 @@ pub fn phase6_e2e_retrieval(
     metrics::make_phase_result(6, "End-to-End Retrieval", phase_metrics, targets, duration)
 }
 
-fn simulate_ranked_search(query: &BenchmarkQuery, pairs: &[BenchmarkPair]) -> Vec<String> {
+fn simulate_ranked_search(
+    query: &BenchmarkQuery,
+    pairs: &[BenchmarkPair],
+    config: &BenchConfig,
+) -> Vec<String> {
     let query_lower = query.query.to_lowercase();
     let mut scored: Vec<(String, f32)> = pairs
         .iter()
         .map(|pair| {
             let mut score = 0.0f32;
 
-            // Domain match
+            // E1 semantic approximation: domain + keyword overlap
             if pair.domain == query.expected_domain {
                 score += 0.35;
             }
@@ -679,8 +758,9 @@ fn simulate_ranked_search(query: &BenchmarkQuery, pairs: &[BenchmarkPair]) -> Ve
                 .count();
             score += overlap as f32 * 0.06;
 
-            // E5 contribution (minimal with compression)
-            score += synthetic_e5_score(pair, pair.is_causal()) * 0.10;
+            // E5 contribution from configured provider (GPU or synthetic)
+            let e5 = config.provider.e5_score(&pair.cause_text, &pair.effect_text);
+            score += e5 * config.e5_weight;
 
             // Deterministic noise for variety
             score += hash_to_float(&format!("{}_{}", query.id, pair.id)) * 0.02;
@@ -704,7 +784,7 @@ pub fn phase7_cross_domain(
     queries: &[BenchmarkQuery],
     train_pairs: &[BenchmarkPair],
     held_out_pairs: &[BenchmarkPair],
-    verbose: bool,
+    config: &BenchConfig,
 ) -> PhaseBenchmarkResult {
     let start = std::time::Instant::now();
 
@@ -726,7 +806,7 @@ pub fn phase7_cross_domain(
     // Train domain accuracy
     let mut train_correct = 0usize;
     for q in &train_queries {
-        let result = simulate_search(q, train_pairs, true, false);
+        let result = simulate_search(q, train_pairs, true, false, config);
         if result == q.expected_top1_id {
             train_correct += 1;
         }
@@ -740,7 +820,7 @@ pub fn phase7_cross_domain(
     // Held-out domain accuracy
     let mut held_out_correct = 0usize;
     for q in &held_out_queries {
-        let result = simulate_search(q, held_out_pairs, true, false);
+        let result = simulate_search(q, held_out_pairs, true, false, config);
         if result == q.expected_top1_id {
             held_out_correct += 1;
         }
@@ -753,7 +833,7 @@ pub fn phase7_cross_domain(
 
     let gap = metrics::cross_domain_gap(train_acc, held_out_acc);
 
-    if verbose {
+    if config.verbose {
         tracing::info!("  Train domains: {:?}", train_domains);
         tracing::info!("  Held-out domains: {:?}", held_out_domains);
         tracing::info!("  Train accuracy: {:.4} ({}/{})", train_acc, train_correct, train_queries.len());
@@ -894,32 +974,22 @@ pub fn run_all_phases(
     results.push(phase1_query_intent(queries, config.verbose));
 
     tracing::info!("=== Phase 2: E5 Embedding Quality ({} causal + {} non-causal) ===", causal_pairs.len(), non_causal_pairs.len());
-    results.push(phase2_e5_quality(&causal_pairs, &non_causal_pairs, config.verbose));
+    results.push(phase2_e5_quality(&causal_pairs, &non_causal_pairs, config));
 
     tracing::info!("=== Phase 3: Direction Modifiers ({} forward pairs) ===", forward_pairs.len());
     results.push(phase3_direction_modifiers(&forward_pairs, config.verbose));
 
     tracing::info!("=== Phase 4: Ablation Analysis ({} queries × {} pairs) ===", queries.len(), pairs.len());
-    results.push(phase4_ablation(queries, pairs, config.verbose));
+    results.push(phase4_ablation(queries, pairs, config));
 
     tracing::info!("=== Phase 5: Causal Gate ({} causal + {} non-causal) ===", causal_pairs.len(), non_causal_pairs.len());
-    results.push(phase5_causal_gate(
-        &causal_pairs,
-        &non_causal_pairs,
-        config.causal_gate_threshold,
-        config.verbose,
-    ));
+    results.push(phase5_causal_gate(&causal_pairs, &non_causal_pairs, config));
 
     tracing::info!("=== Phase 6: End-to-End Retrieval ({} queries) ===", queries.len());
-    results.push(phase6_e2e_retrieval(queries, pairs, config.verbose));
+    results.push(phase6_e2e_retrieval(queries, pairs, config));
 
     tracing::info!("=== Phase 7: Cross-Domain ({} train + {} held-out) ===", train_pairs.len(), held_out_pairs.len());
-    results.push(phase7_cross_domain(
-        queries,
-        &train_pairs,
-        &held_out_pairs,
-        config.verbose,
-    ));
+    results.push(phase7_cross_domain(queries, &train_pairs, &held_out_pairs, config));
 
     tracing::info!("=== Phase 8: Performance ({} pairs) ===", pairs.len());
     results.push(phase8_performance(pairs, config.verbose));
@@ -945,17 +1015,12 @@ pub fn run_single_phase(
 
     match phase {
         1 => Some(phase1_query_intent(queries, config.verbose)),
-        2 => Some(phase2_e5_quality(&causal_pairs, &non_causal_pairs, config.verbose)),
+        2 => Some(phase2_e5_quality(&causal_pairs, &non_causal_pairs, config)),
         3 => Some(phase3_direction_modifiers(&forward_pairs, config.verbose)),
-        4 => Some(phase4_ablation(queries, pairs, config.verbose)),
-        5 => Some(phase5_causal_gate(
-            &causal_pairs,
-            &non_causal_pairs,
-            config.causal_gate_threshold,
-            config.verbose,
-        )),
-        6 => Some(phase6_e2e_retrieval(queries, pairs, config.verbose)),
-        7 => Some(phase7_cross_domain(queries, &train_pairs, &held_out_pairs, config.verbose)),
+        4 => Some(phase4_ablation(queries, pairs, config)),
+        5 => Some(phase5_causal_gate(&causal_pairs, &non_causal_pairs, config)),
+        6 => Some(phase6_e2e_retrieval(queries, pairs, config)),
+        7 => Some(phase7_cross_domain(queries, &train_pairs, &held_out_pairs, config)),
         8 => Some(phase8_performance(pairs, config.verbose)),
         _ => None,
     }
@@ -1092,7 +1157,7 @@ mod tests {
         let pairs = sample_pairs();
         let causal: Vec<_> = pairs.iter().filter(|p| p.is_causal()).cloned().collect();
         let non_causal: Vec<_> = pairs.iter().filter(|p| !p.is_causal()).cloned().collect();
-        let result = phase2_e5_quality(&causal, &non_causal, false);
+        let result = phase2_e5_quality(&causal, &non_causal, &BenchConfig::default());
         assert_eq!(result.phase, 2);
         assert!(result.metrics.contains_key("spread"));
     }
