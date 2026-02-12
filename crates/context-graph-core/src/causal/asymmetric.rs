@@ -63,10 +63,14 @@ pub mod causal_gate {
     /// Maximum E5 score to consider content "definitely non-causal"
     /// Calibrated: non-causal mean=0.140, this catches ~85% of non-causal content
     pub const NON_CAUSAL_THRESHOLD: f32 = 0.22;
-    /// Boost applied to results that pass the causal gate (for causal queries)
-    pub const CAUSAL_BOOST: f32 = 1.05;
-    /// Demotion applied to results that fail the causal gate (for causal queries)
-    pub const NON_CAUSAL_DEMOTION: f32 = 0.90;
+    /// Boost applied to results that pass the causal gate (for causal queries).
+    /// Increased from 1.05 to 1.10 — the 98% TNR gives confidence in gate accuracy,
+    /// and a stronger boost ensures causal content outranks non-causal noise.
+    pub const CAUSAL_BOOST: f32 = 1.10;
+    /// Demotion applied to results that fail the causal gate (for causal queries).
+    /// Increased from 0.90 to 0.85 — stronger demotion of non-causal content
+    /// ensures it drops below genuinely causal results in ranking.
+    pub const NON_CAUSAL_DEMOTION: f32 = 0.85;
 }
 
 /// Apply E5 causal gating to a result score.
@@ -94,6 +98,44 @@ pub fn apply_causal_gate(original_score: f32, e5_score: f32, is_causal_query: bo
         original_score * causal_gate::NON_CAUSAL_DEMOTION
     } else {
         original_score
+    }
+}
+
+/// Infer causal direction from a fingerprint's E5 dual vectors.
+///
+/// Compares the L2 norms of the cause and effect projections.
+/// Content that is cause-oriented will have a stronger cause vector;
+/// content that is effect-oriented will have a stronger effect vector.
+///
+/// # Arguments
+///
+/// * `fp` - Semantic fingerprint with E5 cause/effect vectors
+///
+/// # Returns
+///
+/// - `Cause` if cause vector norm > effect * 1.1 (10% threshold)
+/// - `Effect` if effect vector norm > cause * 1.1
+/// - `Unknown` if roughly equal or vectors are empty
+pub fn infer_direction_from_fingerprint(
+    fp: &crate::types::fingerprint::SemanticFingerprint,
+) -> CausalDirection {
+    let cause_vec = fp.get_e5_as_cause();
+    let effect_vec = fp.get_e5_as_effect();
+
+    if cause_vec.is_empty() || effect_vec.is_empty() {
+        return CausalDirection::Unknown;
+    }
+
+    let cause_mag_sq: f32 = cause_vec.iter().map(|x| x * x).sum();
+    let effect_mag_sq: f32 = effect_vec.iter().map(|x| x * x).sum();
+
+    // Use 10% threshold for significance (1.1^2 = 1.21)
+    if cause_mag_sq > effect_mag_sq * 1.21 {
+        CausalDirection::Cause
+    } else if effect_mag_sq > cause_mag_sq * 1.21 {
+        CausalDirection::Effect
+    } else {
+        CausalDirection::Unknown
     }
 }
 

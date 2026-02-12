@@ -21,6 +21,7 @@
 use serde_json::json;
 use tracing::{debug, error, info, warn};
 
+use context_graph_core::causal::asymmetric::{detect_causal_query_intent, CausalDirection};
 use context_graph_core::traits::{CausalDirectionHint, CausalHint, EmbeddingMetadata};
 use context_graph_core::types::audit::{AuditOperation, AuditRecord};
 use context_graph_core::types::fingerprint::TeleologicalFingerprint;
@@ -221,6 +222,18 @@ impl Handlers {
                     None
                 }
             };
+
+            // Gap 4: E5 pre-filter — skip memories without causal language indicators
+            // before sending to LLM pair analysis. Saves LLM inference time by filtering
+            // non-causal content before expensive pair generation.
+            let content_causal_signal = detect_causal_query_intent(&content);
+            if content_causal_signal == CausalDirection::Unknown {
+                debug!(
+                    memory_id = %uuid,
+                    "trigger_causal_discovery: E5 pre-filter skipped non-causal memory"
+                );
+                continue;
+            }
 
             memories_for_analysis.push(MemoryForGraphAnalysis {
                 id: *uuid,
@@ -510,6 +523,8 @@ impl Handlers {
         let mut source_e5_fallback_count = 0;
         let mut e8_fallback_count = 0;
         let mut e11_fallback_count = 0;
+        // Gap 4: E5 pre-filter counter — tracks memories skipped as non-causal
+        let mut e5_prefilter_skipped = 0usize;
         // Per-relationship detail accumulator for response
         let mut relationship_details: Vec<serde_json::Value> = Vec::new();
         let start_time = std::time::Instant::now();
@@ -523,6 +538,19 @@ impl Handlers {
                     continue;
                 }
             };
+
+            // Gap 4: E5 pre-filter — skip memories without causal language indicators
+            // before expensive LLM extraction. Uses keyword-based intent detection
+            // (97.5% accuracy) to avoid wasting LLM calls on non-causal content.
+            let content_causal_signal = detect_causal_query_intent(&content);
+            if content_causal_signal == CausalDirection::Unknown {
+                debug!(
+                    memory_id = %memory_id,
+                    "trigger_causal_discovery_extract: E5 pre-filter skipped non-causal memory"
+                );
+                e5_prefilter_skipped += 1;
+                continue;
+            }
 
             // Extract all causal relationships from this memory
             let extracted = provider.extract_all_relationships(&content).await;
@@ -847,6 +875,7 @@ impl Handlers {
             source_e5_fallbacks = source_e5_fallback_count,
             e8_fallbacks = e8_fallback_count,
             e11_fallbacks = e11_fallback_count,
+            e5_prefilter_skipped = e5_prefilter_skipped,
             duration_ms = duration.as_millis(),
             "trigger_causal_discovery_extract: Complete"
         );
@@ -888,6 +917,7 @@ impl Handlers {
                     "e11Fallbacks": e11_fallback_count,
                     "total": source_e5_fallback_count + e8_fallback_count + e11_fallback_count
                 },
+                "e5PrefilterSkipped": e5_prefilter_skipped,
                 "llmStatus": llm_status,
                 "durationMs": duration.as_millis(),
                 "dryRun": false

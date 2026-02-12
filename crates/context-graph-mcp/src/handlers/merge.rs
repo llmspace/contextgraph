@@ -23,6 +23,9 @@ use sha2::{Digest, Sha256};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
+use context_graph_core::causal::asymmetric::{
+    infer_direction_from_fingerprint, CausalDirection,
+};
 use context_graph_core::types::fingerprint::{
     SemanticFingerprint, SparseVector, TeleologicalFingerprint,
 };
@@ -494,13 +497,53 @@ impl Handlers {
 
     /// Check fingerprint compatibility (AP-11: merge_concepts without priors_vibe_check).
     ///
-    /// Uses E1 semantic similarity as a compatibility check.
+    /// Uses E1 semantic similarity and E5 causal direction as compatibility checks.
+    /// Gap 5: Rejects merges where fingerprints have opposing causal directions
+    /// (one Cause-dominant, one Effect-dominant), which would destroy directional
+    /// distinction and degrade search_causes/search_effects results.
     fn check_fingerprint_compatibility(
         &self,
         fingerprints: &[TeleologicalFingerprint],
     ) -> Result<(), String> {
         if fingerprints.len() < 2 {
             return Ok(()); // Nothing to compare
+        }
+
+        // Gap 5: Check E5 causal direction compatibility before merging.
+        // Memories with opposing causal roles should not be merged because
+        // averaging their cause/effect vectors destroys directional signal.
+        let directions: Vec<(usize, CausalDirection)> = fingerprints
+            .iter()
+            .enumerate()
+            .map(|(i, fp)| (i, infer_direction_from_fingerprint(&fp.semantic)))
+            .collect();
+
+        let has_cause = directions.iter().any(|(_, d)| *d == CausalDirection::Cause);
+        let has_effect = directions.iter().any(|(_, d)| *d == CausalDirection::Effect);
+
+        if has_cause && has_effect {
+            let cause_ids: Vec<String> = directions
+                .iter()
+                .filter(|(_, d)| *d == CausalDirection::Cause)
+                .map(|(i, _)| fingerprints[*i].id.to_string())
+                .collect();
+            let effect_ids: Vec<String> = directions
+                .iter()
+                .filter(|(_, d)| *d == CausalDirection::Effect)
+                .map(|(i, _)| fingerprints[*i].id.to_string())
+                .collect();
+
+            error!(
+                cause_ids = ?cause_ids,
+                effect_ids = ?effect_ids,
+                "merge_concepts: Opposing causal directions detected — merge would destroy E5 directional signal"
+            );
+            return Err(format!(
+                "Cannot merge memories with opposing causal directions: {} are cause-oriented, {} are effect-oriented. \
+                 Merging would destroy E5 directional distinction. Use force_merge=true to override.",
+                cause_ids.join(", "),
+                effect_ids.join(", "),
+            ));
         }
 
         // Check semantic similarity spread using E1 embeddings

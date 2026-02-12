@@ -29,8 +29,8 @@ use sha2::{Digest, Sha256};
 use tracing::{debug, error, info, warn};
 
 use context_graph_core::causal::asymmetric::{
-    apply_causal_gate, compute_e5_asymmetric_fingerprint_similarity, detect_causal_query_intent,
-    CausalDirection,
+    apply_causal_gate, causal_gate, compute_e5_asymmetric_fingerprint_similarity,
+    detect_causal_query_intent, CausalDirection,
 };
 use context_graph_core::types::audit::{AuditOperation, AuditRecord};
 use context_graph_core::teleological::matrix_search::embedder_names;
@@ -1386,6 +1386,32 @@ impl Handlers {
                         }
 
                         // =============================================================
+                        // Gap 7: Per-result causal gate transparency
+                        // =============================================================
+                        // When asymmetric E5 was applied, show each result's gate details:
+                        // e5Score, action (boost/demote/none), and score delta.
+                        if asymmetric_applied {
+                            let query_is_cause = matches!(causal_direction, CausalDirection::Cause);
+                            let e5_sim = compute_e5_asymmetric_fingerprint_similarity(
+                                &query_embedding,
+                                &r.fingerprint.semantic,
+                                query_is_cause,
+                            );
+                            let (action, score_delta) = if e5_sim >= causal_gate::CAUSAL_THRESHOLD {
+                                ("boost", r.similarity - (r.similarity / causal_gate::CAUSAL_BOOST))
+                            } else if e5_sim <= causal_gate::NON_CAUSAL_THRESHOLD {
+                                ("demote", r.similarity - (r.similarity / causal_gate::NON_CAUSAL_DEMOTION))
+                            } else {
+                                ("none", 0.0)
+                            };
+                            entry["causalGate"] = json!({
+                                "e5Score": e5_sim,
+                                "action": action,
+                                "scoreDelta": score_delta
+                            });
+                        }
+
+                        // =============================================================
                         // GAP-6: Embedder breakdown when requested
                         // =============================================================
                         if include_embedder_breakdown {
@@ -2212,20 +2238,20 @@ mod tests {
 
     #[test]
     fn test_causal_gate_boost_above_threshold() {
-        // E5 score above CAUSAL_THRESHOLD (0.30) → 1.05x boost on causal query
+        // E5 score above CAUSAL_THRESHOLD (0.30) → 1.10x boost on causal query
         let result = apply_causal_gate(0.80, 0.60, true);
         let expected = 0.80 * causal_gate::CAUSAL_BOOST;
         assert!((result - expected).abs() < 1e-6, "got {result}, expected {expected}");
-        println!("[VERIFIED] causal gate boost: 0.80 * 1.05 = {result}");
+        println!("[VERIFIED] causal gate boost: 0.80 * 1.10 = {result}");
     }
 
     #[test]
     fn test_causal_gate_demotion_below_threshold() {
-        // E5 score below NON_CAUSAL_THRESHOLD (0.22) → 0.90x demotion on causal query
+        // E5 score below NON_CAUSAL_THRESHOLD (0.22) → 0.85x demotion on causal query
         let result = apply_causal_gate(0.80, 0.20, true);
         let expected = 0.80 * causal_gate::NON_CAUSAL_DEMOTION;
         assert!((result - expected).abs() < 1e-6, "got {result}, expected {expected}");
-        println!("[VERIFIED] causal gate demotion: 0.80 * 0.90 = {result}");
+        println!("[VERIFIED] causal gate demotion: 0.80 * 0.85 = {result}");
     }
 
     #[test]

@@ -264,15 +264,27 @@ fn search_filtered_multi_space_sync(
             });
         }
 
-        let embedder = EmbedderIndex::from_index(idx);
-        if !embedder.uses_hnsw() {
-            debug!("Skipping non-HNSW embedder {:?} in filtered multi-space", embedder);
+        let base_embedder = EmbedderIndex::from_index(idx);
+        if !base_embedder.uses_hnsw() {
+            debug!("Skipping non-HNSW embedder {:?} in filtered multi-space", base_embedder);
             continue;
         }
 
-        let query_vec = match get_query_vector_for_embedder(query, idx) {
-            Some(v) => v,
-            None => continue,
+        // Direction-aware E5 routing (Gap 1 fix): use directional index when causal direction known
+        let (embedder, query_vec) = if idx == 4 {
+            match options.causal_direction {
+                CausalDirection::Cause => (EmbedderIndex::E5CausalEffect, query.get_e5_as_cause()),
+                CausalDirection::Effect => (EmbedderIndex::E5CausalCause, query.get_e5_as_effect()),
+                _ => match get_query_vector_for_embedder(query, idx) {
+                    Some(v) => (base_embedder, v),
+                    None => continue,
+                },
+            }
+        } else {
+            match get_query_vector_for_embedder(query, idx) {
+                Some(v) => (base_embedder, v),
+                None => continue,
+            }
         };
 
         if let Some(index) = index_registry.get(embedder) {
@@ -287,6 +299,12 @@ fn search_filtered_multi_space_sync(
                     embedder_rankings.push(EmbedderRanking::new(embedder_names[idx], weights[idx], ranked));
                 }
             }
+        } else if idx == 4 && !matches!(options.causal_direction, CausalDirection::Unknown) {
+            warn!(
+                direction = ?options.causal_direction,
+                index = ?embedder,
+                "Direction-aware E5 HNSW index not found in registry; falling back to no E5 results"
+            );
         }
     }
 
@@ -526,9 +544,18 @@ fn search_multi_space_sync(
         embedder_rankings.push(EmbedderRanking::new("E1", weights[0], e1_ranked));
     }
 
-    // E5 Causal
-    if let Some(e5_index) = index_registry.get(EmbedderIndex::E5Causal) {
-        if let Ok(e5_candidates) = e5_index.search(query.e5_active_vector(), k, None) {
+    // E5 Causal — direction-aware HNSW retrieval (Gap 1 fix)
+    // When causal direction is known, query the directional HNSW index:
+    //   Cause-seeking: query E5CausalEffect with cause vector (find memories whose effect matches our cause)
+    //   Effect-seeking: query E5CausalCause with effect vector (find memories whose cause matches our effect)
+    //   Unknown: legacy E5Causal with active vector
+    let (e5_hnsw_idx, e5_query_vec) = match options.causal_direction {
+        CausalDirection::Cause => (EmbedderIndex::E5CausalEffect, query.get_e5_as_cause()),
+        CausalDirection::Effect => (EmbedderIndex::E5CausalCause, query.get_e5_as_effect()),
+        _ => (EmbedderIndex::E5Causal, query.e5_active_vector()),
+    };
+    if let Some(e5_index) = index_registry.get(e5_hnsw_idx) {
+        if let Ok(e5_candidates) = e5_index.search(e5_query_vec, k, None) {
             let e5_ranked: Vec<(Uuid, f32)> = e5_candidates
                 .into_iter()
                 .filter(|(id, _)| options.include_deleted || !is_soft_deleted_sync(soft_deleted, id))
@@ -539,6 +566,12 @@ fn search_multi_space_sync(
                 embedder_rankings.push(EmbedderRanking::new("E5", weights[4], e5_ranked));
             }
         }
+    } else if !matches!(options.causal_direction, CausalDirection::Unknown) {
+        warn!(
+            direction = ?options.causal_direction,
+            index = ?e5_hnsw_idx,
+            "Direction-aware E5 HNSW index not found in registry; falling back to no E5 results"
+        );
     }
 
     // E7 Code
@@ -721,18 +754,29 @@ fn search_pipeline_sync(
         return Err(CoreError::IndexError("E1 Semantic index not found".into()));
     }
 
-    // E5 Causal
-    if let Some(e5_index) = index_registry.get(EmbedderIndex::E5Causal) {
-        match e5_index.search(query.e5_active_vector(), recall_k / 2, None) {
+    // E5 Causal — direction-aware HNSW retrieval for pipeline search (Gap 1 fix)
+    let (e5_pipeline_idx, e5_pipeline_vec) = match options.causal_direction {
+        CausalDirection::Cause => (EmbedderIndex::E5CausalEffect, query.get_e5_as_cause()),
+        CausalDirection::Effect => (EmbedderIndex::E5CausalCause, query.get_e5_as_effect()),
+        _ => (EmbedderIndex::E5Causal, query.e5_active_vector()),
+    };
+    if let Some(e5_index) = index_registry.get(e5_pipeline_idx) {
+        match e5_index.search(e5_pipeline_vec, recall_k / 2, None) {
             Ok(e5_candidates) => {
                 let e5_count = e5_candidates.len();
                 candidate_ids.extend(e5_candidates.into_iter().map(|(id, _)| id));
-                debug!("Stage 1: E5 Causal returned {} additional candidates", e5_count);
+                debug!("Stage 1: E5 Causal ({:?}) returned {} additional candidates", e5_pipeline_idx, e5_count);
             }
             Err(e) => {
                 warn!("Stage 1: E5 Causal search failed: {}, continuing without E5 candidates", e);
             }
         }
+    } else if !matches!(options.causal_direction, CausalDirection::Unknown) {
+        warn!(
+            direction = ?options.causal_direction,
+            index = ?e5_pipeline_idx,
+            "Direction-aware E5 HNSW index not found in registry; falling back to no E5 candidates"
+        );
     }
 
     // E7 Code

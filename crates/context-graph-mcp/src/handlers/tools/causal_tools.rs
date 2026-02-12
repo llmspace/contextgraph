@@ -19,7 +19,7 @@ use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use context_graph_core::causal::asymmetric::{
-    compute_e5_asymmetric_fingerprint_similarity, CausalDirection,
+    apply_causal_gate, compute_e5_asymmetric_fingerprint_similarity, CausalDirection,
 };
 use context_graph_core::causal::chain::rank_causes_by_abduction;
 use context_graph_core::traits::{SearchStrategy, TeleologicalSearchOptions};
@@ -174,7 +174,23 @@ impl Handlers {
                 .map(|r| (r.fingerprint.id, r.fingerprint.semantic.clone()))
                 .collect();
 
-            let abduction_results = rank_causes_by_abduction(fp, &candidate_pairs);
+            let mut abduction_results = rank_causes_by_abduction(fp, &candidate_pairs);
+
+            // Apply causal gate AFTER abduction ranking (Gap 2 fix).
+            // rank_causes_by_abduction computes its own 80%E1+20%E5 scores,
+            // so the gate must be applied to the abduction scores, not the
+            // pre-ranking similarity (which would be discarded).
+            for result in abduction_results.iter_mut() {
+                if let Some((_, stored_fp)) = candidate_pairs.iter().find(|(id, _)| *id == result.cause_id) {
+                    let e5_sim = compute_e5_asymmetric_fingerprint_similarity(
+                        fp, stored_fp, true,
+                    );
+                    result.score = apply_causal_gate(result.score, e5_sim, true);
+                }
+            }
+            abduction_results.sort_by(|a, b| {
+                b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             let memory_causes: Vec<CauseSearchResult> = abduction_results
                 .into_iter()
@@ -516,7 +532,23 @@ impl Handlers {
                 .map(|r| (r.fingerprint.id, r.fingerprint.semantic.clone()))
                 .collect();
 
-            let prediction_results = rank_effects_by_prediction(fp, &candidate_pairs);
+            let mut prediction_results = rank_effects_by_prediction(fp, &candidate_pairs);
+
+            // Apply causal gate AFTER prediction ranking (Gap 2 fix).
+            // rank_effects_by_prediction computes its own 80%E1+20%E5 scores,
+            // so the gate must be applied to the prediction scores, not the
+            // pre-ranking similarity (which would be discarded).
+            for result in prediction_results.iter_mut() {
+                if let Some((_, stored_fp)) = candidate_pairs.iter().find(|(id, _)| *id == result.effect_id) {
+                    let e5_sim = compute_e5_asymmetric_fingerprint_similarity(
+                        fp, stored_fp, true,
+                    );
+                    result.score = apply_causal_gate(result.score, e5_sim, true);
+                }
+            }
+            prediction_results.sort_by(|a, b| {
+                b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             let memory_effects: Vec<EffectSearchResult> = prediction_results
                 .into_iter()

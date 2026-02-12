@@ -7,6 +7,9 @@ use serde_json::json;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
+use context_graph_core::causal::asymmetric::{
+    infer_direction_from_fingerprint, CausalDirection,
+};
 use context_graph_core::types::audit::{AuditOperation, AuditRecord};
 
 use crate::handlers::Handlers;
@@ -28,15 +31,18 @@ struct MemoryContent {
     #[allow(dead_code)] // Populated from storage; used by future text-based consolidation strategies
     text: String,
     access_count: u32,
+    /// Gap 5: E5 causal direction for this memory (Cause, Effect, or Unknown)
+    causal_direction: CausalDirection,
 }
 
 impl MemoryContent {
-    fn new(id: MemoryId, embedding: Vec<f32>, text: String) -> Self {
+    fn new(id: MemoryId, embedding: Vec<f32>, text: String, causal_direction: CausalDirection) -> Self {
         Self {
             id,
             embedding,
             text,
             access_count: 0,
+            causal_direction,
         }
     }
 
@@ -93,6 +99,24 @@ impl ConsolidationService {
         pairs
             .iter()
             .filter_map(|pair| {
+                // Gap 5: Reject pairs with opposing E5 causal directions.
+                // Merging cause-oriented with effect-oriented memories destroys
+                // the directional signal used by search_causes/search_effects.
+                let dir_a = pair.first.causal_direction;
+                let dir_b = pair.second.causal_direction;
+                if (dir_a == CausalDirection::Cause && dir_b == CausalDirection::Effect)
+                    || (dir_a == CausalDirection::Effect && dir_b == CausalDirection::Cause)
+                {
+                    debug!(
+                        first = %pair.first.id.0,
+                        second = %pair.second.id.0,
+                        dir_a = ?dir_a,
+                        dir_b = ?dir_b,
+                        "consolidation: Skipping pair with opposing causal directions"
+                    );
+                    return None;
+                }
+
                 // MCP-05 FIX: Use cosine similarity instead of raw dot product.
                 // Dot product can exceed 1.0 for non-normalized embeddings.
                 let sim = cosine_similarity(&pair.first.embedding, &pair.second.embedding);
@@ -271,7 +295,10 @@ impl Handlers {
 
             let text = content_texts.get(idx).and_then(|c| c.clone()).unwrap_or_default();
 
-            let content = MemoryContent::new(MemoryId(fp.id), embedding, text)
+            // Gap 5: Infer E5 causal direction for consolidation direction-check
+            let direction = infer_direction_from_fingerprint(&fp.semantic);
+
+            let content = MemoryContent::new(MemoryId(fp.id), embedding, text, direction)
                 .with_access_count(fp.access_count as u32);
 
             memory_contents.push(content);
