@@ -9,7 +9,7 @@
 //!
 //! - `e1_only`: E1-only HNSW search (fast, simple queries)
 //! - `multi_space`: Weighted RRF fusion of E1 + enhancers (default - uses weight profiles)
-//! - `pipeline`: Full 3-stage retrieval (E13 recall → E1 dense → E12 rerank)
+//! - `pipeline`: Multi-stage retrieval (E13 sparse recall → multi-space scoring)
 //!
 //! E1 is the foundation (ARCH-12). Other embedders ENHANCE E1 by finding blind spots.
 //! Weight profiles control how much each embedder contributes (e.g., code_search boosts E7).
@@ -43,6 +43,7 @@ use crate::weights::get_weight_profile;
 use crate::protocol::JsonRpcId;
 use crate::protocol::JsonRpcResponse;
 
+use super::helpers::ToolErrorKind;
 use super::super::Handlers;
 
 // Validation constants for store_memory rationale (merged from inject_context)
@@ -566,18 +567,21 @@ impl Handlers {
         // Parse strategy parameter (default: multi_space for optimal blind spot detection)
         // - e1_only: E1-only HNSW search (fast, simple queries)
         // - multi_space: Weighted RRF fusion of E1 + enhancers (default - uses weight profiles)
-        // - pipeline: Full 3-stage retrieval (E13 recall → E1 dense → E12 rerank)
+        // - pipeline: Multi-stage retrieval (E13 sparse recall → multi-space scoring)
         //
         // E1 is the foundation (ARCH-12). Other embedders ENHANCE E1 by finding blind spots.
-        let strategy = args
-            .get("strategy")
-            .and_then(|v| v.as_str())
-            .map(|s| match s {
-                "e1_only" => SearchStrategy::E1Only,
-                "pipeline" => SearchStrategy::Pipeline,
-                _ => SearchStrategy::MultiSpace, // "multi_space" or unknown defaults to multi-space
-            })
-            .unwrap_or(SearchStrategy::MultiSpace); // Default to multi-space for optimal results
+        let strategy = match args.get("strategy").and_then(|v| v.as_str()) {
+            Some("e1_only") => SearchStrategy::E1Only,
+            Some("pipeline") => SearchStrategy::Pipeline,
+            Some("multi_space") | None => SearchStrategy::MultiSpace,
+            Some(unknown) => {
+                return self.tool_error_typed(
+                    id,
+                    ToolErrorKind::Validation,
+                    &format!("Unknown strategy '{}'. Valid: e1_only, multi_space, pipeline", unknown),
+                );
+            }
+        };
 
         // TASK-MULTISPACE: Parse weight profile (default: "semantic_search")
         let weight_profile = args
@@ -665,17 +669,18 @@ impl Handlers {
             .unwrap_or(0.0);
 
         // Parse decayFunction (linear, exponential, step, none)
-        let decay_function_str = args
-            .get("decayFunction")
-            .and_then(|v| v.as_str())
-            .unwrap_or("linear")
-            .to_string();
-        let decay_function = match decay_function_str.to_lowercase().as_str() {
-            "linear" => context_graph_core::traits::DecayFunction::Linear,
-            "exponential" => context_graph_core::traits::DecayFunction::Exponential,
-            "step" => context_graph_core::traits::DecayFunction::Step,
-            "none" | "no_decay" => context_graph_core::traits::DecayFunction::NoDecay,
-            _ => context_graph_core::traits::DecayFunction::Linear,
+        let decay_function = match args.get("decayFunction").and_then(|v| v.as_str()) {
+            Some("linear") | None => context_graph_core::traits::DecayFunction::Linear,
+            Some("exponential") => context_graph_core::traits::DecayFunction::Exponential,
+            Some("step") => context_graph_core::traits::DecayFunction::Step,
+            Some("none") | Some("no_decay") => context_graph_core::traits::DecayFunction::NoDecay,
+            Some(unknown) => {
+                return self.tool_error_typed(
+                    id,
+                    ToolErrorKind::Validation,
+                    &format!("Unknown decayFunction '{}'. Valid: linear, exponential, step, none, no_decay", unknown),
+                );
+            }
         };
 
         // Parse decayHalfLifeSecs (for exponential decay)
@@ -732,18 +737,20 @@ impl Handlers {
             .unwrap_or(context_graph_core::traits::SequenceDirection::Both);
 
         // Parse temporalScale (micro, meso, macro, long, archival)
-        let temporal_scale = args
-            .get("temporalScale")
-            .and_then(|v| v.as_str())
-            .map(|s| match s.to_lowercase().as_str() {
-                "micro" => context_graph_core::traits::TemporalScale::Micro,
-                "meso" => context_graph_core::traits::TemporalScale::Meso,
-                "macro" => context_graph_core::traits::TemporalScale::Macro,
-                "long" => context_graph_core::traits::TemporalScale::Long,
-                "archival" => context_graph_core::traits::TemporalScale::Archival,
-                _ => context_graph_core::traits::TemporalScale::Meso,
-            })
-            .unwrap_or(context_graph_core::traits::TemporalScale::Meso);
+        let temporal_scale = match args.get("temporalScale").and_then(|v| v.as_str()) {
+            Some("meso") | None => context_graph_core::traits::TemporalScale::Meso,
+            Some("micro") => context_graph_core::traits::TemporalScale::Micro,
+            Some("macro") => context_graph_core::traits::TemporalScale::Macro,
+            Some("long") => context_graph_core::traits::TemporalScale::Long,
+            Some("archival") => context_graph_core::traits::TemporalScale::Archival,
+            Some(unknown) => {
+                return self.tool_error_typed(
+                    id,
+                    ToolErrorKind::Validation,
+                    &format!("Unknown temporalScale '{}'. Valid: micro, meso, macro, long, archival", unknown),
+                );
+            }
+        };
 
         // =========================================================================
         // CONVERSATION CONTEXT PARAMETERS (E4 Sequence Integration)
@@ -765,10 +772,17 @@ impl Handlers {
             .unwrap_or(0) as u32;
 
         // Parse sessionScope (current, all, recent)
-        let session_scope = args
-            .get("sessionScope")
-            .and_then(|v| v.as_str())
-            .unwrap_or("all");
+        let session_scope = match args.get("sessionScope").and_then(|v| v.as_str()) {
+            Some(s @ ("current" | "recent" | "all")) => s,
+            None => "all",
+            Some(unknown) => {
+                return self.tool_error_typed(
+                    id,
+                    ToolErrorKind::Validation,
+                    &format!("Unknown sessionScope '{}'. Valid: current, recent, all", unknown),
+                );
+            }
+        };
 
         // Auto-select sequence_navigation profile if conversationContext is used
         // This ensures E4 (V_ordering) is prioritized for sequence-based retrieval
@@ -937,13 +951,14 @@ impl Handlers {
                 options = options.with_last_hours(24);
                 debug!("Applying 'recent' session scope (last 24h)");
             }
-            "all" | _ => {
+            "all" => {
                 // No session filtering - search all memories
                 // But still allow explicit sessionId to override
                 if let Some(ref sid) = session_id {
                     options = options.with_session_filter(sid);
                 }
             }
+            _ => unreachable!("sessionScope validated above")
         }
 
         // Apply periodic boost if configured
@@ -1118,17 +1133,21 @@ impl Handlers {
 
                 // TASK-CONTENT-003: Hydrate content if requested
                 // Batch retrieve content for all results to minimize I/O
+                // FAIL FAST: Return tool_error on retrieval failure — no silent degradation
                 let contents: Vec<Option<String>> = if include_content && !results.is_empty() {
                     match self.teleological_store.get_content_batch(&ids).await {
                         Ok(c) => c,
                         Err(e) => {
-                            warn!(
+                            error!(
                                 error = %e,
                                 result_count = results.len(),
-                                "search_graph: Content hydration failed. Results will not include content."
+                                "search_graph: Content hydration failed"
                             );
-                            // Return None for all - graceful degradation
-                            vec![None; ids.len()]
+                            return self.tool_error_typed(
+                                id,
+                                ToolErrorKind::Storage,
+                                &format!("Content retrieval failed for {} results: {}", results.len(), e),
+                            );
                         }
                     }
                 } else {
@@ -1138,17 +1157,21 @@ impl Handlers {
 
                 // Batch retrieve source metadata for all results
                 // Source metadata enables context injection to show file paths for MDFileChunk memories
+                // FAIL FAST: Return tool_error on retrieval failure — no silent degradation
                 let source_metadata: Vec<Option<context_graph_core::types::SourceMetadata>> = if !results.is_empty() {
                     match self.teleological_store.get_source_metadata_batch(&ids).await {
                         Ok(m) => m,
                         Err(e) => {
-                            warn!(
+                            error!(
                                 error = %e,
                                 result_count = results.len(),
-                                "search_graph: Source metadata retrieval failed. Results will not include source info."
+                                "search_graph: Source metadata retrieval failed"
                             );
-                            // Return None for all - graceful degradation
-                            vec![None; ids.len()]
+                            return self.tool_error_typed(
+                                id,
+                                ToolErrorKind::Storage,
+                                &format!("Source metadata retrieval failed for {} results: {}", results.len(), e),
+                            );
                         }
                     }
                 } else {
@@ -1163,16 +1186,19 @@ impl Handlers {
                     SearchStrategy::Pipeline => "pipeline",
                 };
 
-                // PHASE-2-PROVENANCE: Pre-compute query analysis once (outside the loop)
-                // so we can include it in each result's provenance without re-analyzing.
-                let query_analysis = if include_provenance {
-                    Some(context_graph_core::retrieval::QueryClassification {
-                        detected_type: String::new(),
-                        detection_patterns: Vec::new(),
-                    })
-                } else {
-                    None
-                };
+                // P6: Resolve weight profile ONCE before per-result loop.
+                // Was: custom_profiles.read() acquired per-embedder per-result (50*13*3 = ~1,950 locks/search).
+                // Now: single lock acquisition, then direct array indexing.
+                let resolved_weights: [f32; 13] = custom_weights
+                    .or_else(|| effective_weight_profile.as_ref()
+                        .and_then(|p| self.custom_profiles.read().get(p).copied()))
+                    .or_else(|| effective_weight_profile.as_ref()
+                        .and_then(|p| get_weight_profile(p)))
+                    .unwrap_or([1.0 / 13.0; 13]);
+
+                // PHASE-2-PROVENANCE: Query classification is not yet implemented.
+                // Set to None until real classification (causal, code, entity, etc.) is wired.
+                let query_analysis: Option<context_graph_core::retrieval::QueryClassification> = None;
 
                 let results_json: Vec<_> = results
                     .iter()
@@ -1283,6 +1309,7 @@ impl Handlers {
                                 .filter(|&&s| s > 0.0)
                                 .count();
 
+                            // P6: Use pre-resolved weights (no lock per-embedder)
                             let breakdown: Vec<serde_json::Value> = r.embedder_scores.iter()
                                 .enumerate()
                                 .filter(|(_, &score)| score > 0.0)
@@ -1291,15 +1318,7 @@ impl Handlers {
                                     let rank = r.embedder_scores.iter()
                                         .filter(|&&s| s > score)
                                         .count();
-                                    let weight = custom_weights
-                                        .map(|w| w[idx])
-                                        .or_else(|| effective_weight_profile.as_ref()
-                                            .and_then(|p| self.custom_profiles.read().get(p).copied())
-                                            .map(|w| w[idx]))
-                                        .or_else(|| effective_weight_profile.as_ref()
-                                            .and_then(|p| get_weight_profile(p))
-                                            .map(|w| w[idx]))
-                                        .unwrap_or(1.0 / 13.0);
+                                    let weight = resolved_weights[idx];
                                     let rrf_contribution = weight / (60.0 + rank as f32 + 1.0);
                                     if rrf_contribution > max_rrf {
                                         max_rrf = rrf_contribution;
@@ -1327,55 +1346,50 @@ impl Handlers {
                         // PHASE-2-PROVENANCE: Add provenance when requested
                         // =============================================================
                         if include_provenance {
-                            if let Some(ref analysis) = query_analysis {
-                                // Build per-embedder contributions from existing embedder_scores
-                                let contributions: Vec<serde_json::Value> = r.embedder_scores.iter()
-                                    .enumerate()
-                                    .filter(|(_, &score)| score > 0.0)
-                                    .map(|(idx, &score)| {
-                                        let name = embedder_names::name(idx);
-                                        // Compute approximate rank: count embedders with higher score
-                                        let approx_rank = r.embedder_scores.iter()
-                                            .filter(|&&s| s > score)
-                                            .count();
-                                        // Get weight: custom_weights > custom profile > built-in profile > uniform
-                                        let weight = custom_weights
-                                            .map(|w| w[idx])
-                                            .or_else(|| effective_weight_profile.as_ref()
-                                                .and_then(|p| self.custom_profiles.read().get(p).copied())
-                                                .map(|w| w[idx]))
-                                            .or_else(|| effective_weight_profile.as_ref()
-                                                .and_then(|p| get_weight_profile(p))
-                                                .map(|w| w[idx]))
-                                            .unwrap_or(1.0 / 13.0);
-                                        // Compute RRF contribution (matches breakdown formula)
-                                        let rrf_contrib = weight / (60.0 + approx_rank as f32 + 1.0);
-                                        json!({
-                                            "embedder": name,
-                                            "similarity": score,
-                                            "rank": approx_rank,
-                                            "rrfContribution": rrf_contrib,
-                                            "weight": weight
-                                        })
+                            // P6: Reuse pre-resolved weights for provenance (was duplicate of breakdown)
+                            let contributions: Vec<serde_json::Value> = r.embedder_scores.iter()
+                                .enumerate()
+                                .filter(|(_, &score)| score > 0.0)
+                                .map(|(idx, &score)| {
+                                    let name = embedder_names::name(idx);
+                                    // Compute approximate rank: count embedders with higher score
+                                    let approx_rank = r.embedder_scores.iter()
+                                        .filter(|&&s| s > score)
+                                        .count();
+                                    // P6: Use pre-resolved weights (no lock per-embedder)
+                                    let weight = resolved_weights[idx];
+                                    // Compute RRF contribution (matches breakdown formula)
+                                    let rrf_contrib = weight / (60.0 + approx_rank as f32 + 1.0);
+                                    json!({
+                                        "embedder": name,
+                                        "similarity": score,
+                                        "rank": approx_rank,
+                                        "rrfContribution": rrf_contrib,
+                                        "weight": weight
                                     })
-                                    .collect();
+                                })
+                                .collect();
 
-                                // Build query classification from pre-computed analysis
-                                let query_class = json!({
-                                    "detectedType": analysis.detected_type,
-                                    "detectionPatterns": analysis.detection_patterns,
-                                });
+                            let mut provenance = json!({
+                                "strategy": strategy_name,
+                                "weightProfile": effective_weight_profile.as_deref().unwrap_or("default"),
+                                "embedderContributions": contributions,
+                                "consensusScore": agreement_count as f32 / 13.0,
+                                "primaryEmbedder": embedder_names::name(r.dominant_embedder()),
+                                "isBlindSpotDiscovery": !blind_spots.is_empty() && agreement_count <= 1
+                            });
 
-                                entry["provenance"] = json!({
-                                    "strategy": strategy_name,
-                                    "weightProfile": effective_weight_profile.as_deref().unwrap_or("default"),
-                                    "queryClassification": query_class,
-                                    "embedderContributions": contributions,
-                                    "consensusScore": agreement_count as f32 / 13.0,
-                                    "primaryEmbedder": embedder_names::name(r.dominant_embedder()),
-                                    "isBlindSpotDiscovery": !blind_spots.is_empty() && agreement_count <= 1
-                                });
+                            // Include query classification only if actually populated
+                            if let Some(ref analysis) = query_analysis {
+                                if !analysis.detected_type.is_empty() {
+                                    provenance["queryClassification"] = json!({
+                                        "detectedType": analysis.detected_type,
+                                        "detectionPatterns": analysis.detection_patterns,
+                                    });
+                                }
                             }
+
+                            entry["provenance"] = provenance;
                         }
 
                         entry
@@ -1414,7 +1428,7 @@ impl Handlers {
                 let temporal_config = if temporal_weight > 0.0 {
                     Some(json!({
                         "temporalWeight": temporal_weight,
-                        "decayFunction": decay_function_str,
+                        "decayFunction": format!("{:?}", decay_function),
                         "decayHalfLifeSecs": decay_half_life,
                         "lastHours": last_hours,
                         "lastDays": last_days,
@@ -1436,14 +1450,8 @@ impl Handlers {
                 // Per GAP-1: Make it transparent which of the 13 embedders
                 // participated in RRF fusion vs. which weights were ignored.
                 {
-                    let default_profile = get_weight_profile("semantic_search")
-                        .unwrap_or([1.0 / 13.0; 13]);
-                    let mut resolved_weights = custom_weights
-                        .or_else(|| effective_weight_profile.as_ref()
-                            .and_then(|p| self.custom_profiles.read().get(p).copied()))
-                        .or_else(|| effective_weight_profile.as_ref()
-                            .and_then(|p| get_weight_profile(p)))
-                        .unwrap_or(default_profile);
+                    // P6: Reuse pre-resolved weights (single lock acquisition above)
+                    let mut resolved_weights = resolved_weights;
 
                     // Apply exclude_embedders to resolved_weights (mirrors resolve_weights_sync)
                     if !exclude_embedder_names.is_empty() {

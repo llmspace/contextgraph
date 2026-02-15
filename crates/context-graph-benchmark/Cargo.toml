@@ -8,7 +8,7 @@ license.workspace = true
 
 [features]
 default = []
-test-utils = ["context-graph-core/test-utils"]
+# test-utils removed: context-graph-core already has features = ["test-utils"] in [dependencies]
 real-embeddings = [
     "dep:context-graph-embeddings",
     "dep:context-graph-mcp",

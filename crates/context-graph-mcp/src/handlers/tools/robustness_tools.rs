@@ -30,7 +30,6 @@
 
 use std::collections::HashSet;
 
-use serde_json::json;
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
@@ -44,6 +43,7 @@ use super::robustness_dtos::{
     SearchRobustRequest, SearchRobustResponse,
 };
 
+use super::helpers::ToolErrorKind;
 use super::super::Handlers;
 
 impl Handlers {
@@ -441,7 +441,13 @@ impl Handlers {
             "search_robust: Completed blind-spot detection search"
         );
 
-        self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "search_robust: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 }
 

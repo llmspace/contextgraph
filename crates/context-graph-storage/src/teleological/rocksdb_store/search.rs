@@ -910,16 +910,18 @@ fn search_pipeline_sync(
                 // Use ScoreWeightedRRF when requested: E5 contribution preserves score magnitude
                 let fused = fuse_rankings(&embedder_rankings, options.fusion_strategy, stage2_k * 2);
 
-                let candidate_map: HashMap<Uuid, ([f32; 13], SemanticFingerprint)> = candidate_data
+                let mut candidate_map: HashMap<Uuid, ([f32; 13], SemanticFingerprint)> = candidate_data
                     .into_iter()
                     .map(|(id, scores, semantic)| (id, (scores, semantic)))
                     .collect();
 
+                // P7: Use remove() to take ownership instead of get()+clone().
+                // Avoids cloning ~63KB SemanticFingerprint per result.
                 fused
                     .into_iter()
                     .filter_map(|f| {
-                        candidate_map.get(&f.doc_id).map(|(scores, semantic)| {
-                            (f.doc_id, f.fused_score, *scores, semantic.clone())
+                        candidate_map.remove(&f.doc_id).map(|(scores, semantic)| {
+                            (f.doc_id, f.fused_score, scores, semantic)
                         })
                     })
                     .filter(|(_, score, _, _)| *score >= options.min_similarity)
@@ -1100,15 +1102,23 @@ fn search_sparse_sync(
         doc_ids: Vec<Uuid>,
         idf: f32,
     }
+
+    // P8: Batch-read all posting lists via multi_get_cf (was: per-term sequential get_cf).
+    // For 100-term sparse queries, reduces from 100 individual reads to 1 batch read.
+    let term_keys: Vec<[u8; 2]> = sparse_query.indices.iter()
+        .map(|&term_id| e13_splade_inverted_key(term_id))
+        .collect();
+    let results = db.multi_get_cf(
+        term_keys.iter().map(|k| (cf, k.as_slice()))
+    );
+
     let mut term_data: Vec<TermData> = Vec::with_capacity(sparse_query.nnz());
-
-    for (i, &term_id) in sparse_query.indices.iter().enumerate() {
-        let term_key = e13_splade_inverted_key(term_id);
+    for (i, result) in results.into_iter().enumerate() {
         let query_weight = sparse_query.values[i];
-
-        if let Some(data) = db.get_cf(cf, term_key).map_err(|e| {
+        let data = result.map_err(|e| {
             CoreError::StorageError(format!("Failed to get E13 SPLADE term: {}", e))
-        })? {
+        })?;
+        if let Some(data) = data {
             let doc_ids = deserialize_memory_id_list(&data)?;
             let df = doc_ids.len() as f32;
             let idf = ((total_docs - df + 0.5) / (df + 0.5) + 1.0).ln();

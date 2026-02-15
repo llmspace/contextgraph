@@ -42,6 +42,7 @@ use super::graph_link_dtos::{
     UnifiedNeighborMetadata, UnifiedNeighborResult, RRF_K, SEMANTIC_EMBEDDER_INDICES,
 };
 
+use super::helpers::ToolErrorKind;
 use super::super::Handlers;
 
 impl Handlers {
@@ -284,7 +285,13 @@ impl Handlers {
             return self.tool_result(id, diagnostic);
         }
 
-        self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "get_memory_neighbors: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// get_typed_edges tool implementation.
@@ -526,7 +533,13 @@ impl Handlers {
             "get_typed_edges: Completed typed edge query via EdgeRepository"
         );
 
-        self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "get_typed_edges: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// traverse_graph tool implementation.
@@ -800,7 +813,13 @@ impl Handlers {
             "traverse_graph: Completed graph traversal via EdgeRepository"
         );
 
-        self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "traverse_graph: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// get_unified_neighbors tool implementation.
@@ -1172,7 +1191,13 @@ impl Handlers {
             "get_unified_neighbors: Completed unified neighbor search via EdgeRepository"
         );
 
-        self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "get_unified_neighbors: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 }
 

@@ -15,6 +15,7 @@
 
 use super::helpers::*;
 use serde_json::json;
+use serial_test::serial;
 use tempfile::TempDir;
 
 /// Test that empty stdin produces INVALID_INPUT exit code
@@ -22,6 +23,7 @@ use tempfile::TempDir;
 /// # Scenario:
 /// Pipe empty string to shell script, expect exit code 4
 #[tokio::test]
+#[serial]
 async fn test_e2e_empty_stdin_error() {
     // PREREQUISITE: Verify scripts exist
     if let Err(e) = verify_all_scripts_exist() {
@@ -94,6 +96,7 @@ async fn test_e2e_empty_stdin_error() {
 /// - Wrong JSON type (array vs object) → EXIT_SESSION_NOT_FOUND (5) from jq
 /// Both are acceptable error behaviors per TASK-HOOKS-017.
 #[tokio::test]
+#[serial]
 async fn test_e2e_invalid_json_error() {
     // PREREQUISITE: Verify scripts exist
     if let Err(e) = verify_all_scripts_exist() {
@@ -236,6 +239,7 @@ async fn test_e2e_invalid_json_error() {
 /// The CLI may auto-generate a session_id if not provided,
 /// making this valid input. This test documents the actual behavior.
 #[tokio::test]
+#[serial]
 async fn test_e2e_missing_session_id_behavior() {
     // PREREQUISITE: Verify scripts exist
     if let Err(e) = verify_all_scripts_exist() {
@@ -306,6 +310,7 @@ async fn test_e2e_missing_session_id_behavior() {
 /// 2. Then execute a valid hook
 /// 3. Verify the system recovers and processes the valid hook correctly
 #[tokio::test]
+#[serial]
 async fn test_e2e_hook_error_recovery() {
     // PREREQUISITE: Verify scripts exist
     if let Err(e) = verify_all_scripts_exist() {
@@ -402,6 +407,7 @@ async fn test_e2e_hook_error_recovery() {
 /// This test verifies that our test infrastructure properly detects timeouts.
 /// Actual shell scripts should complete well within their budgets.
 #[tokio::test]
+#[serial]
 async fn test_e2e_shell_script_timeout() {
     // PREREQUISITE: Verify scripts exist
     if let Err(e) = verify_all_scripts_exist() {
@@ -502,6 +508,7 @@ async fn test_e2e_shell_script_timeout() {
 /// # Scenario:
 /// Verify that error conditions produce structured JSON in stderr
 #[tokio::test]
+#[serial]
 async fn test_e2e_structured_error_output() {
     // PREREQUISITE: Verify scripts exist
     if let Err(e) = verify_all_scripts_exist() {
@@ -582,6 +589,7 @@ async fn test_e2e_structured_error_output() {
 /// # Scenario:
 /// Attempt to use an invalid database path and verify proper error handling
 #[tokio::test]
+#[serial]
 async fn test_e2e_database_error_handling() {
     // PREREQUISITE: Verify scripts exist
     if let Err(e) = verify_all_scripts_exist() {

@@ -280,24 +280,32 @@ async fn test_detect_topics_insufficient_memories() {
     let response = handlers.dispatch(request).await;
 
     // Per constitution min_cluster_size: 3
-    // With 0 memories, should return INSUFFICIENT_MEMORIES error
+    // With 0 memories, tool_error_typed returns success with isError: true
     assert!(
-        response.error.is_some(),
-        "detect_topics with 0 memories should return JSON-RPC error"
+        response.error.is_none(),
+        "Tool errors use isError in result body, not JSON-RPC error"
     );
 
-    let error = response.error.as_ref().unwrap();
+    let result = response.result.expect("Must have result");
+    let is_error = result.get("isError").unwrap().as_bool().unwrap();
+    assert!(is_error, "isError must be true for insufficient memories");
+
+    let error_code = result.get("errorCode").unwrap().as_i64().unwrap() as i32;
     assert_eq!(
-        error.code,
-        error_codes::INSUFFICIENT_MEMORIES,
-        "Error code must be INSUFFICIENT_MEMORIES (-32021)"
+        error_code,
+        error_codes::INVALID_PARAMS,
+        "Error code must be INVALID_PARAMS (-32602) from ToolErrorKind::Validation"
     );
+
+    // Verify error message mentions minimum requirement
+    let content = result.get("content").unwrap().as_array().unwrap();
+    let text = content[0].get("text").unwrap().as_str().unwrap();
     assert!(
-        error.message.contains("3"),
+        text.contains("3"),
         "Error message should mention minimum of 3 memories"
     );
 
-    println!("[PASS] detect_topics returns INSUFFICIENT_MEMORIES when < 3 memories");
+    println!("[PASS] detect_topics returns VALIDATION_ERROR when < 3 memories");
 }
 
 #[tokio::test]
@@ -313,10 +321,15 @@ async fn test_detect_topics_force_parameter() {
     let response = handlers.dispatch(request).await;
 
     // Still fails due to insufficient memories, but force is parsed
+    // tool_error_typed returns success with isError: true
     assert!(
-        response.error.is_some(),
-        "Still fails due to insufficient memories"
+        response.error.is_none(),
+        "Tool errors use isError in result body, not JSON-RPC error"
     );
+
+    let result = response.result.expect("Must have result");
+    let is_error = result.get("isError").unwrap().as_bool().unwrap();
+    assert!(is_error, "isError must be true for insufficient memories");
 
     println!("[PASS] detect_topics accepts force parameter");
 }

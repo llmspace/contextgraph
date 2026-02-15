@@ -19,8 +19,10 @@ use context_graph_core::error::{CoreError, CoreResult};
 use context_graph_core::traits::TeleologicalStorageBackend;
 use context_graph_core::types::fingerprint::TeleologicalFingerprint;
 
+use crate::column_families::cf_names;
 use crate::teleological::column_families::{
     CF_FINGERPRINTS, CF_TOPIC_PORTFOLIO, QUANTIZED_EMBEDDER_CFS, TELEOLOGICAL_CFS,
+    CODE_CFS, CAUSAL_CFS,
 };
 use crate::teleological::schema::parse_fingerprint_key;
 use crate::teleological::serialization::deserialize_teleological_fingerprint;
@@ -177,28 +179,28 @@ impl RocksDbTeleologicalStore {
         Ok(count)
     }
 
-    /// Get storage size in bytes.
+    /// Get storage size in bytes across ALL 51 column families.
     pub(crate) fn storage_size_bytes_internal(&self) -> usize {
         let mut total = 0usize;
 
-        for cf_name in TELEOLOGICAL_CFS {
-            if let Ok(cf) = self.get_cf(cf_name) {
-                if let Ok(Some(size)) = self
-                    .db
-                    .property_int_value_cf(cf, "rocksdb.estimate-live-data-size")
-                {
-                    total += size as usize;
-                }
-            }
-        }
+        // Iterate ALL CF groups: base(11) + teleological(20) + quantized(13) + code(5) + causal(2) = 51
+        let all_cf_arrays: &[&[&str]] = &[
+            cf_names::ALL,
+            TELEOLOGICAL_CFS,
+            QUANTIZED_EMBEDDER_CFS,
+            CODE_CFS,
+            CAUSAL_CFS,
+        ];
 
-        for cf_name in QUANTIZED_EMBEDDER_CFS {
-            if let Ok(cf) = self.get_cf(cf_name) {
-                if let Ok(Some(size)) = self
-                    .db
-                    .property_int_value_cf(cf, "rocksdb.estimate-live-data-size")
-                {
-                    total += size as usize;
+        for cf_names_arr in all_cf_arrays {
+            for cf_name in *cf_names_arr {
+                if let Ok(cf) = self.get_cf(cf_name) {
+                    if let Ok(Some(size)) = self
+                        .db
+                        .property_int_value_cf(cf, "rocksdb.estimate-live-data-size")
+                    {
+                        total += size as usize;
+                    }
                 }
             }
         }
@@ -217,43 +219,39 @@ impl RocksDbTeleologicalStore {
 // ============================================================================
 
 impl RocksDbTeleologicalStore {
-    /// Flush all column families (internal async wrapper).
+    /// Flush ALL 51 column families (internal async wrapper).
     ///
     /// Uses `spawn_blocking` to move flush I/O to Tokio's blocking thread pool.
+    /// Covers base(11) + teleological(20) + quantized(13) + code(5) + causal(2) = 51 CFs.
     pub(crate) async fn flush_async(&self) -> CoreResult<()> {
-        debug!("Flushing all column families");
+        debug!("Flushing all 51 column families");
 
         let db = Arc::clone(&self.db);
 
         tokio::task::spawn_blocking(move || -> CoreResult<()> {
-            for cf_name in TELEOLOGICAL_CFS {
-                let cf = db.cf_handle(cf_name).ok_or_else(|| {
-                    TeleologicalStoreError::ColumnFamilyNotFound {
-                        name: cf_name.to_string(),
-                    }
-                })?;
-                db.flush_cf(cf)
-                    .map_err(|e| TeleologicalStoreError::RocksDbOperation {
-                        operation: "flush",
-                        cf: cf_name,
-                        key: None,
-                        source: e,
-                    })?;
-            }
+            let all_cf_arrays: &[&[&str]] = &[
+                cf_names::ALL,
+                TELEOLOGICAL_CFS,
+                QUANTIZED_EMBEDDER_CFS,
+                CODE_CFS,
+                CAUSAL_CFS,
+            ];
 
-            for cf_name in QUANTIZED_EMBEDDER_CFS {
-                let cf = db.cf_handle(cf_name).ok_or_else(|| {
-                    TeleologicalStoreError::ColumnFamilyNotFound {
-                        name: cf_name.to_string(),
-                    }
-                })?;
-                db.flush_cf(cf)
-                    .map_err(|e| TeleologicalStoreError::RocksDbOperation {
-                        operation: "flush",
-                        cf: cf_name,
-                        key: None,
-                        source: e,
+            for cf_names_arr in all_cf_arrays {
+                for cf_name in *cf_names_arr {
+                    let cf = db.cf_handle(cf_name).ok_or_else(|| {
+                        TeleologicalStoreError::ColumnFamilyNotFound {
+                            name: cf_name.to_string(),
+                        }
                     })?;
+                    db.flush_cf(cf)
+                        .map_err(|e| TeleologicalStoreError::RocksDbOperation {
+                            operation: "flush",
+                            cf: cf_name,
+                            key: None,
+                            source: e,
+                        })?;
+                }
             }
 
             Ok(())
@@ -261,7 +259,7 @@ impl RocksDbTeleologicalStore {
         .await
         .map_err(|e| CoreError::Internal(format!("spawn_blocking failed: {}", e)))??;
 
-        info!("Flushed all column families");
+        info!("Flushed all 51 column families");
         Ok(())
     }
 
@@ -291,7 +289,46 @@ impl RocksDbTeleologicalStore {
             })?;
 
         info!("Created checkpoint at {:?}", checkpoint_path);
+
+        // Auto-cleanup: keep only the N most recent checkpoints
+        const MAX_CHECKPOINTS: usize = 5;
+        if let Err(e) = Self::cleanup_old_checkpoints(&self.path, MAX_CHECKPOINTS) {
+            warn!(error = %e, "Checkpoint cleanup failed (non-fatal)");
+        }
+
         Ok(checkpoint_path)
+    }
+
+    /// Remove old checkpoints, keeping only the `keep` most recent ones.
+    fn cleanup_old_checkpoints(db_path: &std::path::Path, keep: usize) -> CoreResult<()> {
+        let checkpoint_dir = db_path.join("checkpoints");
+        if !checkpoint_dir.exists() {
+            return Ok(());
+        }
+
+        let mut entries: Vec<_> = std::fs::read_dir(&checkpoint_dir)
+            .map_err(|e| CoreError::StorageError(format!("Failed to read checkpoint directory: {}", e)))?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .collect();
+
+        if entries.len() <= keep {
+            return Ok(());
+        }
+
+        // Sort by name (timestamp-based names sort chronologically)
+        entries.sort_by_key(|e| e.file_name());
+
+        // Remove oldest entries (keep the last `keep`)
+        let to_remove = entries.len() - keep;
+        for entry in entries.into_iter().take(to_remove) {
+            info!("Removing old checkpoint: {:?}", entry.path());
+            if let Err(e) = std::fs::remove_dir_all(entry.path()) {
+                warn!(path = ?entry.path(), error = %e, "Failed to remove old checkpoint");
+            }
+        }
+
+        Ok(())
     }
 
     /// Restore from checkpoint (internal async wrapper).
@@ -361,15 +398,20 @@ impl RocksDbTeleologicalStore {
             }
         }
 
-        // Now compact RocksDB column families
-        for cf_name in TELEOLOGICAL_CFS {
-            let cf = self.get_cf(cf_name)?;
-            self.db.compact_range_cf(cf, None::<&[u8]>, None::<&[u8]>);
-        }
+        // Now compact ALL 51 RocksDB column families
+        let all_cf_arrays: &[&[&str]] = &[
+            cf_names::ALL,
+            TELEOLOGICAL_CFS,
+            QUANTIZED_EMBEDDER_CFS,
+            CODE_CFS,
+            CAUSAL_CFS,
+        ];
 
-        for cf_name in QUANTIZED_EMBEDDER_CFS {
-            let cf = self.get_cf(cf_name)?;
-            self.db.compact_range_cf(cf, None::<&[u8]>, None::<&[u8]>);
+        for cf_names_arr in all_cf_arrays {
+            for cf_name in *cf_names_arr {
+                let cf = self.get_cf(cf_name)?;
+                self.db.compact_range_cf(cf, None::<&[u8]>, None::<&[u8]>);
+            }
         }
 
         // Drain remaining soft-deleted tracking (entries that were successfully hard-deleted

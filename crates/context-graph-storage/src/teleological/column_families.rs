@@ -1010,13 +1010,13 @@ pub fn quantized_embedder_cf_options(cache: &Cache) -> Options {
     opts
 }
 
-/// Get all 19 teleological column family descriptors.
+/// Get all 20 teleological column family descriptors.
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 19 `ColumnFamilyDescriptor`s for teleological storage.
+/// Vector of 20 `ColumnFamilyDescriptor`s for teleological storage.
 pub fn get_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     vec![
         ColumnFamilyDescriptor::new(CF_FINGERPRINTS, fingerprint_cf_options(cache)),
@@ -1095,14 +1095,14 @@ pub fn get_quantized_embedder_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyD
 
 /// Get ALL teleological + quantized embedder column family descriptors.
 ///
-/// Returns 32 descriptors total: 19 teleological + 13 quantized embedder.
+/// Returns 33 descriptors total: 20 teleological + 13 quantized embedder.
 /// Use this when opening a database that needs both fingerprint and per-embedder storage.
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 32 `ColumnFamilyDescriptor`s.
+/// Vector of 33 `ColumnFamilyDescriptor`s.
 ///
 /// # Example
 /// ```ignore
@@ -1111,7 +1111,7 @@ pub fn get_quantized_embedder_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyD
 ///
 /// let cache = Cache::new_lru_cache(256 * 1024 * 1024); // 256MB
 /// let descriptors = get_all_teleological_cf_descriptors(&cache);
-/// assert_eq!(descriptors.len(), 32); // 19 teleological + 13 embedder
+/// assert_eq!(descriptors.len(), 33); // 20 teleological + 13 embedder
 /// ```
 pub fn get_all_teleological_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     let mut descriptors = get_teleological_cf_descriptors(cache);
@@ -1432,13 +1432,13 @@ pub fn get_causal_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
 
 /// Get ALL column family descriptors (teleological + embedder + code + causal).
 ///
-/// Returns 39 descriptors total: 19 teleological + 13 quantized embedder + 5 code + 2 causal.
+/// Returns 40 descriptors total: 20 teleological + 13 quantized embedder + 5 code + 2 causal.
 ///
 /// # Arguments
 /// * `cache` - Shared block cache (recommended: 256MB via `Cache::new_lru_cache`)
 ///
 /// # Returns
-/// Vector of 39 `ColumnFamilyDescriptor`s.
+/// Vector of 40 `ColumnFamilyDescriptor`s.
 pub fn get_all_cf_descriptors(cache: &Cache) -> Vec<ColumnFamilyDescriptor> {
     let mut descriptors = get_all_teleological_cf_descriptors(cache);
     descriptors.extend(get_code_cf_descriptors(cache));

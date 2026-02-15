@@ -13,9 +13,6 @@ default = []
 llm = ["dep:llama-cpp-2"]
 # Enable CUDA acceleration via llama-cpp-2 (RTX 5090 optimized)
 cuda = ["llm", "llama-cpp-2/cuda"]
-# Test mode: allows placeholder embeddings when CausalModel unavailable
-# In production (without this feature), missing model = fail fast
-test-mode = []
 
 [dependencies]
 # Workspace dependencies
@@ -54,3 +51,4 @@ sha2 = "0.10"
 tokio-test = "0.4"
 tempfile = "3"
 tracing-subscriber = "0.3"
+serial_test = "3"

@@ -27,10 +27,10 @@ use uuid::Uuid;
 
 use context_graph_core::types::fingerprint::TeleologicalFingerprint;
 
-use crate::column_families::get_all_column_family_descriptors;
+use crate::column_families::{cf_names, get_all_column_family_descriptors};
 use crate::teleological::column_families::{
     CF_CONTENT, CF_E12_LATE_INTERACTION, CF_E1_MATRYOSHKA_128, CF_FINGERPRINTS, CF_SOURCE_METADATA,
-    QUANTIZED_EMBEDDER_CFS, TELEOLOGICAL_CFS,
+    QUANTIZED_EMBEDDER_CFS, TELEOLOGICAL_CFS, CODE_CFS, CAUSAL_CFS,
 };
 use crate::teleological::indexes::EmbedderIndexRegistry;
 
@@ -51,7 +51,7 @@ use super::types::{TeleologicalStoreConfig, TeleologicalStoreError, Teleological
 /// RocksDB-backed storage for TeleologicalFingerprints.
 ///
 /// Implements the `TeleologicalMemoryStore` trait with persistent storage
-/// across 17 column families for efficient indexing and retrieval.
+/// across 51 column families (11 base + 20 teleological + 13 quantized + 5 code + 2 causal).
 ///
 /// # Thread Safety
 ///
@@ -124,7 +124,7 @@ pub struct RocksDbTeleologicalStore {
 impl RocksDbTeleologicalStore {
     /// Open a teleological store at the specified path with default configuration.
     ///
-    /// Creates the database and all 17 column families if they don't exist.
+    /// Creates the database and all 51 column families if they don't exist.
     /// **Automatically detects and removes stale lock files.**
     pub fn open<P: AsRef<Path>>(path: P) -> TeleologicalStoreResult<Self> {
         Self::open_with_config(path, TeleologicalStoreConfig::default())
@@ -180,7 +180,7 @@ impl RocksDbTeleologicalStore {
             db_opts.set_manual_wal_flush(true);
         }
 
-        // TASK-GRAPHLINK: Get ALL column families (39 total: 11 base + 28 teleological)
+        // Get ALL column families (51 total: 11 base + 20 teleological + 13 quantized + 5 code + 2 causal)
         // This includes the graph edge CFs (embedder_edges, typed_edges, typed_edges_by_type)
         // required for K-NN graph-based retrieval. NO FALLBACKS - database must have all CFs.
         let cf_descriptors = get_all_column_family_descriptors(&cache);
@@ -1032,13 +1032,20 @@ impl RocksDbTeleologicalStore {
         *self.fingerprint_count.write() = None;
     }
 
-    /// Health check: verify all column families are accessible.
+    /// Health check: verify ALL 51 column families are accessible.
     pub fn health_check(&self) -> TeleologicalStoreResult<()> {
-        for cf_name in TELEOLOGICAL_CFS {
-            self.get_cf(cf_name)?;
-        }
-        for cf_name in QUANTIZED_EMBEDDER_CFS {
-            self.get_cf(cf_name)?;
+        let all_cf_arrays: &[&[&str]] = &[
+            cf_names::ALL,
+            TELEOLOGICAL_CFS,
+            QUANTIZED_EMBEDDER_CFS,
+            CODE_CFS,
+            CAUSAL_CFS,
+        ];
+
+        for cf_names_arr in all_cf_arrays {
+            for cf_name in *cf_names_arr {
+                self.get_cf(cf_name)?;
+            }
         }
         Ok(())
     }

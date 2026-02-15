@@ -51,6 +51,7 @@ use super::graph_dtos::{
     DiscoveryMetadata, ValidateGraphLinkRequest, ValidateGraphLinkResponse,
 };
 
+use super::helpers::ToolErrorKind;
 use super::super::Handlers;
 
 impl Handlers {
@@ -289,7 +290,13 @@ impl Handlers {
         );
 
         // PHASE-2-PROVENANCE: Add retrieval provenance when requested
-        let mut response_json = serde_json::to_value(response).unwrap_or_else(|_| json!({}));
+        let mut response_json = match serde_json::to_value(&response) {
+            Ok(v) => v,
+            Err(e) => {
+                error!(error = %e, "search_connections: Response serialization failed");
+                return self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e));
+            }
+        };
         if include_provenance {
             response_json["retrievalProvenance"] = json!({
                 "connectionScoringMethod": "asymmetric_e8_similarity",
@@ -551,7 +558,13 @@ impl Handlers {
             "get_graph_path: Completed path traversal"
         );
 
-        self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "get_graph_path: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 }
 
@@ -807,7 +820,13 @@ impl Handlers {
             }
         }
 
-        self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "discover_graph_relationships: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// validate_graph_link tool implementation.
@@ -943,7 +962,13 @@ impl Handlers {
                         }
                     }
 
-                    self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+                    match serde_json::to_value(&response) {
+                        Ok(v) => self.tool_result(id, v),
+                        Err(e) => {
+                            error!(error = %e, "validate_graph_link: Response serialization failed");
+                            self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+                        }
+                    }
                 }
                 Err(e) => {
                     error!(error = %e, "validate_graph_link: LLM validation failed");
@@ -1014,7 +1039,13 @@ impl Handlers {
                         }
                     }
 
-                    self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+                    match serde_json::to_value(&response) {
+                        Ok(v) => self.tool_result(id, v),
+                        Err(e) => {
+                            error!(error = %e, "validate_graph_link: Response serialization failed");
+                            self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+                        }
+                    }
                 }
                 Err(e) => {
                     error!(error = %e, "validate_graph_link: LLM analysis failed");

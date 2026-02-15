@@ -1,14 +1,13 @@
 //! Graph embedding model using sentence-transformers/paraphrase-MiniLM-L6-v2.
 //!
-//! This model (E8) produces 384D vectors optimized for knowledge graph embeddings,
+//! This model (E8) produces 1024D vectors optimized for knowledge graph embeddings,
 //! including entity and relation encoding for graph structure understanding.
 //!
 //! # Dimension
 //!
-//! - Native output: 384D (final dimension, no projection needed)
+//! - Native output: 1024D (E8_DIM, final dimension)
 //!
-//! GraphModel uses 384D directly (unlike CodeModel which uses 1536D via Qodo-Embed)
-//! as this is the native MiniLM embedding dimension.
+//! GraphModel uses 1024D for asymmetric source/target graph embeddings.
 //!
 //! # Asymmetric Dual Embeddings
 //!

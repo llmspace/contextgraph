@@ -90,7 +90,7 @@ pub struct GraphDiscoveryService {
 }
 
 impl GraphDiscoveryService {
-    /// Create a new graph discovery service (test mode only).
+    /// Create a new graph discovery service without a model.
     ///
     /// # Arguments
     /// * `shared_llm` - Shared CausalDiscoveryLLM from causal-agent
@@ -98,26 +98,21 @@ impl GraphDiscoveryService {
     /// # Warning
     ///
     /// This constructor creates an E8Activator WITHOUT a GraphModel.
-    /// In production (without `test-mode` feature), embedding operations will fail.
-    /// Use `with_models()` for production deployments.
+    /// Embedding operations will fail. Use `with_models()` for production deployments.
     #[allow(deprecated)]
     pub fn new(shared_llm: Arc<CausalDiscoveryLLM>) -> Self {
         Self::with_config(shared_llm, GraphDiscoveryConfig::default())
     }
 
-    /// Create with custom configuration (test mode only).
+    /// Create with custom configuration but no model.
     ///
     /// # Warning
     ///
     /// This constructor creates an E8Activator WITHOUT a GraphModel.
-    /// In production (without `test-mode` feature), embedding operations will fail.
-    /// Use `with_models()` for production deployments.
-    #[cfg_attr(
-        not(feature = "test-mode"),
-        deprecated(
-            since = "0.1.0",
-            note = "Use with_models() for production. This constructor creates E8Activator without GraphModel."
-        )
+    /// Embedding operations will fail. Use `with_models()` for production deployments.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use with_models() for production. This constructor creates E8Activator without GraphModel."
     )]
     pub fn with_config(shared_llm: Arc<CausalDiscoveryLLM>, config: GraphDiscoveryConfig) -> Self {
         let graph_llm = Arc::new(GraphRelationshipLLM::new(shared_llm));

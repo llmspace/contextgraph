@@ -13,9 +13,8 @@
 //! - AP-02: All comparisons within E5 space (no cross-embedder)
 //! - FAIL FAST: All errors propagate immediately with logging
 
-use serde_json::json;
 use std::collections::HashSet;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use context_graph_core::causal::asymmetric::{
@@ -34,6 +33,7 @@ use super::causal_dtos::{
     SourceInfo, ABDUCTIVE_DAMPENING,
 };
 
+use super::helpers::ToolErrorKind;
 use super::super::Handlers;
 
 impl Handlers {
@@ -239,21 +239,30 @@ impl Handlers {
                 }
 
                 // Retrieve the relationship to get source_fingerprint_id
-                if let Ok(Some(rel)) = self.teleological_store.get_causal_relationship(*rel_id).await {
-                    all_causes.push(CauseSearchResult {
-                        cause_id: rel.source_fingerprint_id,
-                        score,
-                        raw_similarity: *similarity,
-                        causal_direction: Some(rel.mechanism_type.clone()),
-                        content: None,
-                        source: None,
-                        result_source: if search_scope == "all" {
-                            Some("causal_relationship".to_string())
-                        } else {
-                            None
-                        },
-                    });
-                }
+                let rel = match self.teleological_store.get_causal_relationship(*rel_id).await {
+                    Ok(Some(rel)) => rel,
+                    Ok(None) => {
+                        warn!(rel_id = %rel_id, "search_causes: Causal relationship not found, skipping");
+                        continue;
+                    }
+                    Err(e) => {
+                        error!(rel_id = %rel_id, error = %e, "search_causes: Failed to retrieve causal relationship");
+                        return self.tool_error_typed(id, ToolErrorKind::Storage, &format!("Failed to retrieve causal relationship {}: {}", rel_id, e));
+                    }
+                };
+                all_causes.push(CauseSearchResult {
+                    cause_id: rel.source_fingerprint_id,
+                    score,
+                    raw_similarity: *similarity,
+                    causal_direction: Some(rel.mechanism_type.clone()),
+                    content: None,
+                    source: None,
+                    result_source: if search_scope == "all" {
+                        Some("causal_relationship".to_string())
+                    } else {
+                        None
+                    },
+                });
             }
         }
 
@@ -384,7 +393,13 @@ impl Handlers {
             "search_causes: Completed abductive search"
         );
 
-        self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "search_causes: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// search_effects tool implementation.
@@ -584,21 +599,30 @@ impl Handlers {
                     continue;
                 }
 
-                if let Ok(Some(rel)) = self.teleological_store.get_causal_relationship(*rel_id).await {
-                    all_effects.push(EffectSearchResult {
-                        effect_id: rel.source_fingerprint_id,
-                        score,
-                        raw_similarity: *similarity,
-                        causal_direction: Some(rel.mechanism_type.clone()),
-                        content: None,
-                        source: None,
-                        result_source: if search_scope == "all" {
-                            Some("causal_relationship".to_string())
-                        } else {
-                            None
-                        },
-                    });
-                }
+                let rel = match self.teleological_store.get_causal_relationship(*rel_id).await {
+                    Ok(Some(rel)) => rel,
+                    Ok(None) => {
+                        warn!(rel_id = %rel_id, "search_effects: Causal relationship not found, skipping");
+                        continue;
+                    }
+                    Err(e) => {
+                        error!(rel_id = %rel_id, error = %e, "search_effects: Failed to retrieve causal relationship");
+                        return self.tool_error_typed(id, ToolErrorKind::Storage, &format!("Failed to retrieve causal relationship {}: {}", rel_id, e));
+                    }
+                };
+                all_effects.push(EffectSearchResult {
+                    effect_id: rel.source_fingerprint_id,
+                    score,
+                    raw_similarity: *similarity,
+                    causal_direction: Some(rel.mechanism_type.clone()),
+                    content: None,
+                    source: None,
+                    result_source: if search_scope == "all" {
+                        Some("causal_relationship".to_string())
+                    } else {
+                        None
+                    },
+                });
             }
         }
 
@@ -718,7 +742,13 @@ impl Handlers {
             "search_effects: Completed predictive search"
         );
 
-        self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "search_effects: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// get_causal_chain tool implementation.
@@ -961,7 +991,13 @@ impl Handlers {
             "get_causal_chain: Completed chain traversal"
         );
 
-        self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "get_causal_chain: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 }
 

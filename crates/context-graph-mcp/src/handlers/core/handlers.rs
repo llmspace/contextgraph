@@ -1,6 +1,6 @@
 //! Handlers struct definition and constructors.
 //!
-//! PRD v6 Section 10 - Handlers for all 12 MCP tools.
+//! PRD v6 Section 10 - Handlers for 55 MCP tools (51 without LLM feature).
 //!
 //! TASK-INTEG-TOPIC: Added clustering dependencies for topic tools integration.
 //! E4-FIX: Added session sequence counter for proper E4 (V_ordering) embeddings.
@@ -28,10 +28,10 @@ use crate::protocol::{JsonRpcId, JsonRpcResponse};
 
 /// Request handlers for MCP protocol.
 ///
-/// PRD v6 Section 10 - Supports all 12 MCP tools:
-/// - Core: inject_context, store_memory, get_memetic_status, search_graph, trigger_consolidation
-/// - Topic: get_topic_portfolio, get_topic_stability, detect_topics, get_divergence_alerts
-/// - Curation: merge_concepts, forget_concept, boost_importance
+/// Supports 55 MCP tools with LLM feature (51 without) across 18 tool categories:
+/// core, merge, curation, topic, file_watcher, sequence, causal, causal_discovery,
+/// keyword, code, graph, robustness, entity, embedder, temporal, graph_link,
+/// maintenance, provenance.
 pub struct Handlers {
     /// Teleological memory store - stores TeleologicalFingerprint with 13 embeddings.
     pub(in crate::handlers) teleological_store: Arc<dyn TeleologicalMemoryStore>,
@@ -130,101 +130,6 @@ pub struct Handlers {
 }
 
 impl Handlers {
-    /// Create handlers with all dependencies explicitly provided.
-    ///
-    /// NO FALLBACKS - Requires graph_discovery_service. LLM must be loaded.
-    ///
-    /// # Arguments
-    /// * `teleological_store` - Store for TeleologicalFingerprint
-    /// * `multi_array_provider` - 13-embedding generator
-    /// * `layer_status_provider` - Provider for layer status information
-    /// * `cluster_manager` - Multi-space cluster manager for topic detection
-    /// * `graph_discovery_service` - REQUIRED LLM-based graph relationship discovery
-    #[cfg(feature = "llm")]
-    #[allow(dead_code)]
-    pub fn with_all(
-        teleological_store: Arc<dyn TeleologicalMemoryStore>,
-        multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
-        layer_status_provider: Arc<dyn LayerStatusProvider>,
-        cluster_manager: Arc<RwLock<MultiSpaceClusterManager>>,
-        graph_discovery_service: Arc<GraphDiscoveryService>,
-    ) -> Self {
-        info!("Creating Handlers with_all - NO FALLBACKS, LLM required");
-        Self {
-            teleological_store,
-            multi_array_provider,
-            layer_status_provider,
-            cluster_manager,
-            // E4-FIX: Initialize session sequence counter and session ID
-            session_sequence_counter: Arc::new(AtomicU64::new(0)),
-            current_session_id: Arc::new(RwLock::new(None)),
-            // E7-WIRING: Code pipeline disabled by default in with_all
-            code_store: None,
-            code_embedding_provider: None,
-            // TASK-GRAPHLINK: Graph linking disabled by default
-            edge_repository: None,
-            graph_builder: None,
-            // GRAPH-AGENT: REQUIRED - NO FALLBACKS
-            graph_discovery_service,
-            // CAUSAL-HINT: Disabled by default
-            causal_hint_provider: None,
-            // NAV-GAP: Empty custom profiles
-            custom_profiles: Arc::new(RwLock::new(HashMap::new())),
-            // INLINE-CAUSAL: Disabled by default
-            causal_discovery_llm: None,
-            causal_model: None,
-        }
-    }
-
-    /// Create handlers with all dependencies including code embedding pipeline.
-    ///
-    /// E7-WIRING: Extended constructor for full code embedding support.
-    /// NO FALLBACKS - Requires graph_discovery_service. LLM must be loaded.
-    ///
-    /// # Arguments
-    /// * `teleological_store` - Store for TeleologicalFingerprint
-    /// * `multi_array_provider` - 13-embedding generator
-    /// * `layer_status_provider` - Provider for layer status information
-    /// * `cluster_manager` - Multi-space cluster manager for topic detection
-    /// * `code_store` - Code storage backend for code entities
-    /// * `code_embedding_provider` - E7 code embedding provider
-    /// * `graph_discovery_service` - REQUIRED LLM-based graph relationship discovery
-    #[cfg(feature = "llm")]
-    #[allow(dead_code)]
-    pub fn with_code_pipeline(
-        teleological_store: Arc<dyn TeleologicalMemoryStore>,
-        multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
-        layer_status_provider: Arc<dyn LayerStatusProvider>,
-        cluster_manager: Arc<RwLock<MultiSpaceClusterManager>>,
-        code_store: Arc<dyn CodeStorage>,
-        code_embedding_provider: Arc<dyn CodeEmbeddingProvider>,
-        graph_discovery_service: Arc<GraphDiscoveryService>,
-    ) -> Self {
-        info!("Creating Handlers with_code_pipeline - NO FALLBACKS, LLM required");
-        Self {
-            teleological_store,
-            multi_array_provider,
-            layer_status_provider,
-            cluster_manager,
-            session_sequence_counter: Arc::new(AtomicU64::new(0)),
-            current_session_id: Arc::new(RwLock::new(None)),
-            code_store: Some(code_store),
-            code_embedding_provider: Some(code_embedding_provider),
-            // TASK-GRAPHLINK: Graph linking disabled by default in with_code_pipeline
-            edge_repository: None,
-            graph_builder: None,
-            // GRAPH-AGENT: REQUIRED - NO FALLBACKS
-            graph_discovery_service,
-            // CAUSAL-HINT: Disabled by default
-            causal_hint_provider: None,
-            // NAV-GAP: Empty custom profiles
-            custom_profiles: Arc::new(RwLock::new(HashMap::new())),
-            // INLINE-CAUSAL: Disabled by default
-            causal_discovery_llm: None,
-            causal_model: None,
-        }
-    }
-
     /// Create handlers with graph linking enabled.
     ///
     /// TASK-GRAPHLINK: Constructor for graph linking support with K-NN edges.

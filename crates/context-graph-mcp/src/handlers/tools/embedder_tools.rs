@@ -45,6 +45,7 @@ use super::embedder_dtos::{
     SearchCrossEmbedderAnomaliesResponse, UniqueFind,
 };
 
+use super::helpers::ToolErrorKind;
 use super::super::Handlers;
 
 impl Handlers {
@@ -257,10 +258,13 @@ impl Handlers {
             }
         }
 
-        self.tool_result(
-            id,
-            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
-        )
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "search_by_embedder: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// get_embedder_clusters tool implementation.
@@ -311,20 +315,26 @@ impl Handlers {
             cm.total_memories() == 0
         };
         if needs_clustering {
-            if let Ok(fingerprints) = self.teleological_store.scan_fingerprints_for_clustering(None).await {
-                if !fingerprints.is_empty() {
-                    info!(
-                        count = fingerprints.len(),
-                        "get_embedder_clusters: Auto-loading fingerprints and clustering"
-                    );
-                    let mut cm = self.cluster_manager.write();
-                    cm.clear_all_spaces();
-                    for (fp_id, cluster_array) in &fingerprints {
-                        let _ = cm.insert(*fp_id, cluster_array);
-                    }
-                    if let Err(e) = cm.recluster() {
-                        warn!(error = %e, "get_embedder_clusters: Auto-recluster failed");
-                    }
+            let fingerprints = match self.teleological_store.scan_fingerprints_for_clustering(None).await {
+                Ok(fp) => fp,
+                Err(e) => {
+                    error!(error = %e, "get_embedder_clusters: Failed to scan fingerprints");
+                    return self.tool_error_typed(id, ToolErrorKind::Storage, &format!("Failed to scan fingerprints for clustering: {}", e));
+                }
+            };
+            if !fingerprints.is_empty() {
+                info!(
+                    count = fingerprints.len(),
+                    "get_embedder_clusters: Auto-loading fingerprints and clustering"
+                );
+                let mut cm = self.cluster_manager.write();
+                cm.clear_all_spaces();
+                for (fp_id, cluster_array) in &fingerprints {
+                    let _ = cm.insert(*fp_id, cluster_array);
+                }
+                if let Err(e) = cm.recluster() {
+                    error!(error = %e, "get_embedder_clusters: Auto-recluster failed");
+                    return self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Auto-recluster failed: {}", e));
                 }
             }
         }
@@ -367,14 +377,19 @@ impl Handlers {
             let mut sample_snippets = None;
 
             if request.include_samples && !members.is_empty() {
-                if let Ok(contents) = self.teleological_store.get_content_batch(members).await {
-                    let snippets: Vec<String> = contents.iter()
-                        .filter_map(|opt| opt.as_ref())
-                        .map(|s| if s.len() > 100 { format!("{}...", &s[..100]) } else { s.clone() })
-                        .collect();
-                    if !snippets.is_empty() {
-                        sample_snippets = Some(snippets);
+                let contents = match self.teleological_store.get_content_batch(members).await {
+                    Ok(c) => c,
+                    Err(e) => {
+                        error!(error = %e, "get_embedder_clusters: Failed to retrieve cluster sample content");
+                        return self.tool_error_typed(id, ToolErrorKind::Storage, &format!("Failed to retrieve cluster sample content: {}", e));
                     }
+                };
+                let snippets: Vec<String> = contents.iter()
+                    .filter_map(|opt| opt.as_ref())
+                    .map(|s| if s.len() > 100 { format!("{}...", &s[..s.floor_char_boundary(100)]) } else { s.clone() })
+                    .collect();
+                if !snippets.is_empty() {
+                    sample_snippets = Some(snippets);
                 }
                 sample_ids = Some(members.clone());
             }
@@ -416,7 +431,13 @@ impl Handlers {
             "get_embedder_clusters: Completed"
         );
 
-        self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "get_embedder_clusters: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// compare_embedder_views tool implementation.
@@ -649,10 +670,13 @@ impl Handlers {
             }
         }
 
-        self.tool_result(
-            id,
-            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
-        )
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "compare_embedder_views: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// list_embedder_indexes tool implementation.
@@ -771,10 +795,13 @@ impl Handlers {
             "list_embedder_indexes: Listed all embedder indexes"
         );
 
-        self.tool_result(
-            id,
-            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
-        )
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "list_embedder_indexes: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// get_memory_fingerprint tool implementation.
@@ -1035,10 +1062,13 @@ impl Handlers {
             "get_memory_fingerprint: Completed fingerprint introspection"
         );
 
-        self.tool_result(
-            id,
-            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
-        )
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "get_memory_fingerprint: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// create_weight_profile tool implementation.
@@ -1114,10 +1144,13 @@ impl Handlers {
             "create_weight_profile: Profile created"
         );
 
-        self.tool_result(
-            id,
-            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
-        )
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "create_weight_profile: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// search_cross_embedder_anomalies tool implementation.
@@ -1284,10 +1317,13 @@ impl Handlers {
             }
         }
 
-        self.tool_result(
-            id,
-            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
-        )
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "search_cross_embedder_anomalies: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
 }

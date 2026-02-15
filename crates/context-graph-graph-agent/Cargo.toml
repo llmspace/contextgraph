@@ -16,9 +16,6 @@ cuda = ["llm", "context-graph-causal-agent/cuda"]
 # Test utilities - provides stub constructors that panic on usage
 # Use for tests that need Handlers but don't actually call graph discovery
 test-utils = []
-# Test mode: allows placeholder embeddings when GraphModel unavailable
-# In production (without this feature), missing model = fail fast
-test-mode = []
 
 [dependencies]
 # Workspace dependencies
@@ -50,3 +47,15 @@ tokio-test = "0.4"
 tempfile = "3"
 tracing-subscriber = "0.3"
 context-graph-test-utils = { path = "../context-graph-test-utils" }
+
+[[example]]
+name = "benchmark_graph"
+required-features = ["llm"]
+
+[[example]]
+name = "benchmark_graph_code"
+required-features = ["llm"]
+
+[[example]]
+name = "benchmark_graph_multi"
+required-features = ["llm"]

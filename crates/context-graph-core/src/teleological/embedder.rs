@@ -100,7 +100,7 @@ pub enum Embedder {
     Emotional = 7,
     /// E9: HDC projected from 10K-bit hyperdimensional (1024D dense)
     Hdc = 8,
-    /// E10: Multimodal via CLIP (768D dense)
+    /// E10: Paraphrase via e5-base-v2 (768D dense, text-only — historically labeled "Multimodal")
     Multimodal = 9,
     /// E11: Entity via KEPLER (768D dense)
     Entity = 10,

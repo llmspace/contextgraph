@@ -18,8 +18,15 @@
 use crate::tools::types::ToolDefinition;
 use serde_json::json;
 
-/// Returns causal discovery tool definitions (2 tools).
+/// Returns causal discovery tool definitions.
+/// Without `llm` feature: 0 tools (causal discovery requires LLM).
+/// With `llm` feature: 2 tools (trigger_causal_discovery, get_causal_discovery_status).
 pub fn definitions() -> Vec<ToolDefinition> {
+    #[cfg(not(feature = "llm"))]
+    {
+        return Vec::new();
+    }
+    #[cfg(feature = "llm")]
     vec![
         // trigger_causal_discovery - Manual trigger for causal analysis
         ToolDefinition::new(
@@ -105,9 +112,13 @@ mod tests {
 
     #[test]
     fn test_causal_discovery_tool_count() {
+        #[cfg(feature = "llm")]
         assert_eq!(definitions().len(), 2);
+        #[cfg(not(feature = "llm"))]
+        assert_eq!(definitions().len(), 0);
     }
 
+    #[cfg(feature = "llm")]
     #[test]
     fn test_trigger_causal_discovery_schema() {
         let tools = definitions();
@@ -145,6 +156,7 @@ mod tests {
         assert!(props.contains_key("dryRun"));
     }
 
+    #[cfg(feature = "llm")]
     #[test]
     fn test_trigger_defaults() {
         let tools = definitions();
@@ -168,6 +180,7 @@ mod tests {
         assert_eq!(props["dryRun"]["default"], false);
     }
 
+    #[cfg(feature = "llm")]
     #[test]
     fn test_session_scope_enum() {
         let tools = definitions();
@@ -189,6 +202,7 @@ mod tests {
         assert!(scope_enum.contains(&json!("recent")));
     }
 
+    #[cfg(feature = "llm")]
     #[test]
     fn test_status_schema() {
         let tools = definitions();
@@ -208,6 +222,7 @@ mod tests {
         assert!(props.contains_key("includeGraphStats"));
     }
 
+    #[cfg(feature = "llm")]
     #[test]
     fn test_trigger_mentions_llm() {
         let tools = definitions();
@@ -222,6 +237,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "llm")]
     #[test]
     fn test_trigger_mentions_vram() {
         let tools = definitions();
@@ -236,6 +252,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "llm")]
     #[test]
     fn test_trigger_mentions_e5() {
         let tools = definitions();

@@ -186,13 +186,10 @@ pub struct CausalDiscoveryService {
 }
 
 impl CausalDiscoveryService {
-    /// Create a new service with the given configuration (test mode only).
-    #[cfg_attr(
-        not(feature = "test-mode"),
-        deprecated(
-            since = "0.1.0",
-            note = "Use with_models() for production. This constructor creates E5EmbedderActivator without CausalModel."
-        )
+    /// Create a new service with the given configuration (no model).
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use with_models() for production. This constructor creates E5EmbedderActivator without CausalModel."
     )]
     pub async fn new(config: CausalDiscoveryConfig) -> CausalAgentResult<Self> {
         let llm = CausalDiscoveryLLM::with_config(config.llm_config.clone())?;
@@ -920,57 +917,44 @@ mod tests {
         assert!(!service.is_running());
     }
 
+    #[allow(deprecated)]
+    fn default_service() -> CausalDiscoveryService {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            CausalDiscoveryService::new(CausalDiscoveryConfig::default()).await.unwrap()
+        })
+    }
+
     #[test]
     fn test_adaptive_interval_empty() {
-        let config = CausalDiscoveryConfig::default();
-        #[allow(deprecated)]
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let service = rt.block_on(async {
-            CausalDiscoveryService::new(config).await.unwrap()
-        });
-
+        let service = default_service();
         let metrics = CycleMetrics {
             memories_harvested: 0,
             ..Default::default()
         };
-        let interval = service.compute_next_interval(&metrics);
-        assert_eq!(interval, Duration::from_secs(600));
+        assert_eq!(service.compute_next_interval(&metrics), Duration::from_secs(600));
     }
 
     #[test]
     fn test_adaptive_interval_no_discovery() {
-        let config = CausalDiscoveryConfig::default();
-        #[allow(deprecated)]
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let service = rt.block_on(async {
-            CausalDiscoveryService::new(config).await.unwrap()
-        });
-
+        let service = default_service();
         let metrics = CycleMetrics {
             memories_harvested: 50,
             relationships_discovered: 0,
             ..Default::default()
         };
-        let interval = service.compute_next_interval(&metrics);
-        assert_eq!(interval, Duration::from_secs(300));
+        assert_eq!(service.compute_next_interval(&metrics), Duration::from_secs(300));
     }
 
     #[test]
     fn test_adaptive_interval_heavy() {
-        let config = CausalDiscoveryConfig::default();
-        #[allow(deprecated)]
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let service = rt.block_on(async {
-            CausalDiscoveryService::new(config).await.unwrap()
-        });
-
+        let service = default_service();
         let metrics = CycleMetrics {
             memories_harvested: 50,
             relationships_discovered: 10,
             ..Default::default()
         };
-        let interval = service.compute_next_interval(&metrics);
-        assert_eq!(interval, Duration::from_secs(30));
+        assert_eq!(service.compute_next_interval(&metrics), Duration::from_secs(30));
     }
 
     #[test]

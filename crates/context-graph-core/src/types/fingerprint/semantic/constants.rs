@@ -13,7 +13,7 @@
 //! | E7 | Qodo-Embed | 1536 |
 //! | E8 | e5-large-v2 (Graph) | 1024 |
 //! | E9 | HDC (projected) | 1024 |
-//! | E10 | CLIP | 768 |
+//! | E10 | e5-base-v2 (Paraphrase) | 768 |
 //! | E11 | KEPLER (Entity) | 768 |
 //! | E12 | ColBERT (Late-Interaction) | 128 per token |
 //! | E13 | SPLADE v3 (Sparse) | 30522 vocab |
@@ -54,7 +54,7 @@ pub const E8_DIM: usize = 1024;
 /// projected dimension that is stored in SemanticFingerprint.
 pub const E9_DIM: usize = 1024;
 
-/// E10: Multimodal (CLIP) embedding dimension.
+/// E10: Paraphrase (e5-base-v2, text-only) embedding dimension.
 pub const E10_DIM: usize = 768;
 
 /// E11: Entity (KEPLER for knowledge graph) embedding dimension.

@@ -157,25 +157,34 @@ async fn test_fsv_forget_concept_not_found() {
     let response = handlers.dispatch(request).await;
 
     // VERIFY ERROR RESPONSE
+    // tool_error_typed returns JsonRpcResponse::success with isError: true in result body
     assert!(
-        response.error.is_some(),
-        "forget_concept must return JSON-RPC error for non-existent memory"
+        response.error.is_none(),
+        "Tool errors use isError in result body, not JSON-RPC error"
     );
 
-    let error = response.error.as_ref().unwrap();
-    println!("ERROR: code={}, message={}", error.code, error.message);
+    let result = response.result.expect("Must have result");
+    let is_error = result.get("isError").unwrap().as_bool().unwrap();
+    assert!(is_error, "isError must be true for non-existent memory");
 
+    let error_code = result.get("errorCode").unwrap().as_i64().unwrap() as i32;
+    println!("ERROR: errorCode={}", error_code);
     assert_eq!(
-        error.code,
-        error_codes::FINGERPRINT_NOT_FOUND,
-        "Error code must be FINGERPRINT_NOT_FOUND (-32010)"
+        error_code,
+        error_codes::NODE_NOT_FOUND,
+        "Error code must be NODE_NOT_FOUND (-32002) from ToolErrorKind::NotFound"
     );
+
+    // Verify error message in content text
+    let content = result.get("content").unwrap().as_array().unwrap();
+    let text = content[0].get("text").unwrap().as_str().unwrap();
+    println!("ERROR text: {}", text);
     assert!(
-        error.message.contains(&non_existent_id.to_string()),
+        text.contains(&non_existent_id.to_string()),
         "Error message must mention the node_id"
     );
 
-    println!("[FSV PASS] forget_concept returns FINGERPRINT_NOT_FOUND for non-existent memory");
+    println!("[FSV PASS] forget_concept returns NOT_FOUND for non-existent memory");
 }
 
 /// FSV Test: Verify forget_concept validation rejects invalid UUID
@@ -457,25 +466,34 @@ async fn test_fsv_boost_importance_not_found() {
     let response = handlers.dispatch(request).await;
 
     // VERIFY ERROR RESPONSE
+    // tool_error_typed returns JsonRpcResponse::success with isError: true in result body
     assert!(
-        response.error.is_some(),
-        "boost_importance must return JSON-RPC error for non-existent memory"
+        response.error.is_none(),
+        "Tool errors use isError in result body, not JSON-RPC error"
     );
 
-    let error = response.error.as_ref().unwrap();
-    println!("ERROR: code={}, message={}", error.code, error.message);
+    let result = response.result.expect("Must have result");
+    let is_error = result.get("isError").unwrap().as_bool().unwrap();
+    assert!(is_error, "isError must be true for non-existent memory");
 
+    let error_code = result.get("errorCode").unwrap().as_i64().unwrap() as i32;
+    println!("ERROR: errorCode={}", error_code);
     assert_eq!(
-        error.code,
-        error_codes::FINGERPRINT_NOT_FOUND,
-        "Error code must be FINGERPRINT_NOT_FOUND (-32010)"
+        error_code,
+        error_codes::NODE_NOT_FOUND,
+        "Error code must be NODE_NOT_FOUND (-32002) from ToolErrorKind::NotFound"
     );
+
+    // Verify error message in content text
+    let content = result.get("content").unwrap().as_array().unwrap();
+    let text = content[0].get("text").unwrap().as_str().unwrap();
+    println!("ERROR text: {}", text);
     assert!(
-        error.message.contains(&non_existent_id.to_string()),
+        text.contains(&non_existent_id.to_string()),
         "Error message must mention the node_id"
     );
 
-    println!("[FSV PASS] boost_importance returns FINGERPRINT_NOT_FOUND for non-existent memory");
+    println!("[FSV PASS] boost_importance returns NOT_FOUND for non-existent memory");
 }
 
 /// FSV Test: Verify boost_importance validates delta range [-1.0, 1.0]

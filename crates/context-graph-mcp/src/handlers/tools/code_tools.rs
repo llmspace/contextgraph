@@ -21,7 +21,6 @@
 //! search_code can also search directly against code entities stored via
 //! the AST chunker. This provides more accurate results for code-specific queries.
 
-use serde_json::json;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -35,6 +34,7 @@ use super::code_dtos::{
     SearchCodeRequest, SearchCodeResponse, CodeEntityResult,
 };
 
+use super::helpers::ToolErrorKind;
 use super::super::Handlers;
 
 impl Handlers {
@@ -305,7 +305,13 @@ impl Handlers {
             "search_code: Completed code-enhanced search"
         );
 
-        self.tool_result(id, serde_json::to_value(response).unwrap_or_else(|_| json!({})))
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "search_code: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// Search CodeStore for code entities using full 13-embedder fingerprint.

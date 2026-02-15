@@ -101,29 +101,38 @@ async fn test_fsv_detect_topics_insufficient_memories() {
     let response = handlers.dispatch(request).await;
 
     // VERIFY ERROR RESPONSE
+    // tool_error_typed returns success with isError: true in result body
     assert!(
-        response.error.is_some(),
-        "detect_topics must return JSON-RPC error for insufficient memories"
+        response.error.is_none(),
+        "Tool errors use isError in result body, not JSON-RPC error"
     );
 
-    let error = response.error.as_ref().unwrap();
-    println!("ERROR: code={}, message={}", error.code, error.message);
+    let result = response.result.expect("Must have result");
+    let is_error = result.get("isError").unwrap().as_bool().unwrap();
+    assert!(is_error, "isError must be true for insufficient memories");
 
+    let error_code = result.get("errorCode").unwrap().as_i64().unwrap() as i32;
+    println!("ERROR: errorCode={}", error_code);
     assert_eq!(
-        error.code,
-        error_codes::INSUFFICIENT_MEMORIES,
-        "Error code must be INSUFFICIENT_MEMORIES (-32021)"
+        error_code,
+        error_codes::INVALID_PARAMS,
+        "Error code must be INVALID_PARAMS (-32602) from ToolErrorKind::Validation"
     );
+
+    // Verify error message in content text
+    let content = result.get("content").unwrap().as_array().unwrap();
+    let text = content[0].get("text").unwrap().as_str().unwrap();
+    println!("ERROR text: {}", text);
     assert!(
-        error.message.contains("3"),
+        text.contains("3"),
         "Error message must mention minimum of 3 memories"
     );
     assert!(
-        error.message.contains("0") || error.message.contains(&count.to_string()),
+        text.contains("0") || text.contains(&count.to_string()),
         "Error message must mention current count"
     );
 
-    println!("[FSV PASS] detect_topics returns INSUFFICIENT_MEMORIES with < 3 memories");
+    println!("[FSV PASS] detect_topics returns VALIDATION_ERROR with < 3 memories");
 }
 
 /// FSV Test: Verify get_topic_stability returns valid metrics

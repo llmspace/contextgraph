@@ -11,9 +11,11 @@
 use crate::tools::types::ToolDefinition;
 use serde_json::json;
 
-/// Returns graph tool definitions (4 tools).
+/// Returns graph tool definitions.
+/// Without `llm` feature: 2 tools (search_connections, get_graph_path).
+/// With `llm` feature: 4 tools (+ discover_graph_relationships, validate_graph_link).
 pub fn definitions() -> Vec<ToolDefinition> {
-    vec![
+    let mut tools = vec![
         // search_connections - Find connected memories
         ToolDefinition::new(
             "search_connections",
@@ -108,8 +110,12 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "additionalProperties": false
             }),
         ),
+    ];
+
+    #[cfg(feature = "llm")]
+    {
         // discover_graph_relationships - LLM-based relationship discovery
-        ToolDefinition::new(
+        tools.push(ToolDefinition::new(
             "discover_graph_relationships",
             "Discover graph relationships between memories using LLM analysis with asymmetric E8 embeddings. \
              Uses the graph-agent with shared CausalDiscoveryLLM (Qwen2.5-3B) for relationship detection. \
@@ -175,9 +181,9 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 },
                 "additionalProperties": false
             }),
-        ),
+        ));
         // validate_graph_link - Single-pair LLM validation
-        ToolDefinition::new(
+        tools.push(ToolDefinition::new(
             "validate_graph_link",
             "Validate a proposed graph link between two memories using LLM analysis with asymmetric E8 embeddings. \
              Uses the graph-agent with shared CausalDiscoveryLLM (Qwen2.5-3B) for validation. \
@@ -212,8 +218,10 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 },
                 "additionalProperties": false
             }),
-        ),
-    ]
+        ));
+    }
+
+    tools
 }
 
 #[cfg(test)]
@@ -222,7 +230,10 @@ mod tests {
 
     #[test]
     fn test_graph_tool_count() {
+        #[cfg(feature = "llm")]
         assert_eq!(definitions().len(), 4);
+        #[cfg(not(feature = "llm"))]
+        assert_eq!(definitions().len(), 2);
     }
 
     #[test]

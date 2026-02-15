@@ -20,9 +20,6 @@ use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use uuid::Uuid;
 
-#[cfg(feature = "test-mode")]
-use tracing::debug;
-
 use context_graph_embeddings::models::GraphModel;
 
 use crate::error::{GraphAgentError, GraphAgentResult};
@@ -182,35 +179,30 @@ impl Default for GraphStorage {
 /// 2. Generates asymmetric E8 embeddings using GraphModel
 /// 3. Stores edges in the graph
 ///
-/// # Production vs Test Mode
-///
-/// In production (without `test-mode` feature), GraphModel is REQUIRED.
+/// GraphModel is REQUIRED for embedding generation.
 /// Use `with_model()` to create activator with real embedding capability.
-/// In test mode, placeholder embeddings are allowed when GraphModel is unavailable.
 pub struct E8Activator {
     config: ActivatorConfig,
     graph: Arc<RwLock<GraphStorage>>,
     stats: RwLock<ActivationStats>,
     /// Graph model for generating real E8 embeddings.
-    /// When None, behavior depends on `test-mode` feature:
-    /// - Without feature: fail fast with error
-    /// - With feature: use placeholder embeddings
+    /// When None, activate_relationship() will fail fast with an error.
     graph_model: Option<Arc<GraphModel>>,
 }
 
 impl E8Activator {
-    /// Create a new E8 activator (test mode only, no real embeddings).
+    /// Create a new E8 activator without a model.
     ///
-    /// In production (without `test-mode` feature), this will fail when
-    /// `activate_relationship` is called. Use `with_model()` instead.
+    /// `activate_relationship` will fail without a GraphModel.
+    /// Use `with_model()` for production use.
     pub fn new() -> Self {
         Self::with_config(ActivatorConfig::default())
     }
 
-    /// Create with custom configuration (test mode only, no real embeddings).
+    /// Create with custom configuration but no model.
     ///
-    /// In production (without `test-mode` feature), this will fail when
-    /// `activate_relationship` is called. Use `with_model()` instead.
+    /// `activate_relationship` will fail without a GraphModel.
+    /// Use `with_model()` for production use.
     pub fn with_config(config: ActivatorConfig) -> Self {
         Self {
             config,
@@ -220,10 +212,10 @@ impl E8Activator {
         }
     }
 
-    /// Create with shared graph storage (test mode only, no real embeddings).
+    /// Create with shared graph storage but no model.
     ///
-    /// In production (without `test-mode` feature), this will fail when
-    /// `activate_relationship` is called. Use `with_model()` instead.
+    /// `activate_relationship` will fail without a GraphModel.
+    /// Use `with_model()` for production use.
     pub fn with_graph(graph: Arc<RwLock<GraphStorage>>) -> Self {
         Self {
             config: ActivatorConfig::default(),
@@ -277,7 +269,7 @@ impl E8Activator {
     /// Tuple of (source_embedding, target_embedding) - 1024D asymmetric vectors
     ///
     /// # Errors
-    /// Returns error if GraphModel is not available and test-mode feature is not enabled.
+    /// Returns error if GraphModel is not available.
     pub async fn activate_relationship(
         &self,
         source_id: Uuid,
@@ -346,8 +338,7 @@ impl E8Activator {
     /// Generate E8 asymmetric embeddings for source and target roles.
     ///
     /// When a real GraphModel is available, uses embed_dual() for genuine asymmetric embeddings.
-    /// In test-mode, falls back to placeholder embeddings for testing without GPU.
-    /// In production (without test-mode feature), fails fast if GraphModel unavailable.
+    /// Without a GraphModel, fails fast -- use `with_model()` to provide one.
     async fn generate_e8_embeddings(
         &self,
         content: &str,
@@ -364,67 +355,13 @@ impl E8Activator {
             }
             None => {
                 // Production mode: fail fast - GraphModel is required
-                #[cfg(not(feature = "test-mode"))]
-                {
-                    return Err(GraphAgentError::ConfigError {
-                        message: "GraphModel required in production but not available. \
-                                  Use E8Activator::with_model() or enable test-mode feature."
-                            .to_string(),
-                    });
-                }
-
-                // Test mode: allow placeholder embeddings
-                #[cfg(feature = "test-mode")]
-                {
-                    debug!("Using placeholder E8 embeddings (test-mode, no GraphModel)");
-                    self.generate_placeholder_embeddings(content)
-                }
+                return Err(GraphAgentError::ConfigError {
+                    message: "GraphModel required in production but not available. \
+                              Use E8Activator::with_model()."
+                        .to_string(),
+                });
             }
         }
-    }
-
-    /// Generate placeholder embeddings for testing.
-    ///
-    /// Creates deterministic 1024D vectors based on content hash.
-    /// Source and target vectors differ by using different seeds.
-    #[cfg(feature = "test-mode")]
-    fn generate_placeholder_embeddings(
-        &self,
-        content: &str,
-    ) -> GraphAgentResult<(Vec<f32>, Vec<f32>)> {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        fn hash_to_vec(content: &str, seed: &str, dim: usize) -> Vec<f32> {
-            let mut hasher = DefaultHasher::new();
-            content.hash(&mut hasher);
-            seed.hash(&mut hasher);
-            let hash = hasher.finish();
-
-            let mut embedding = Vec::with_capacity(dim);
-            let mut current = hash;
-            let mut sum_sq = 0.0f32;
-
-            for _ in 0..dim {
-                current = current.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-                let val = ((current >> 32) as f32 / u32::MAX as f32) * 2.0 - 1.0;
-                embedding.push(val);
-                sum_sq += val * val;
-            }
-
-            // L2 normalize
-            let norm = sum_sq.sqrt();
-            if norm > f32::EPSILON {
-                for val in &mut embedding {
-                    *val /= norm;
-                }
-            }
-            embedding
-        }
-
-        let source_vec = hash_to_vec(content, "source", 1024);
-        let target_vec = hash_to_vec(content, "target", 1024);
-        Ok((source_vec, target_vec))
     }
 
     /// Add edges to the graph based on relationship direction.
@@ -559,8 +496,7 @@ mod tests {
         assert_eq!(activator.stats().skipped_low_confidence, 1);
     }
 
-    // Test that activation fails fast in production mode without GraphModel
-    #[cfg(not(feature = "test-mode"))]
+    // Test that activation fails fast without GraphModel
     #[tokio::test]
     async fn test_e8_activator_fails_fast_without_model() {
         let activator = E8Activator::new(); // No model
@@ -580,79 +516,14 @@ mod tests {
             .activate_relationship(Uuid::new_v4(), Uuid::new_v4(), "source", "target", &analysis)
             .await;
 
-        // Should fail because GraphModel is required in production
+        // Should fail because GraphModel is required
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(
-            err.contains("GraphModel required") || err.contains("production"),
+            err.contains("GraphModel required"),
             "Error should mention GraphModel requirement: {}",
             err
         );
-    }
-
-    // Test that placeholder embeddings work in test-mode
-    #[cfg(feature = "test-mode")]
-    #[tokio::test]
-    async fn test_activate_success_test_mode() {
-        let activator = E8Activator::new();
-        let analysis = GraphAnalysisResult {
-            has_connection: true,
-            direction: GraphLinkDirection::AConnectsB,
-            relationship_type: RelationshipType::Imports,
-            category: RelationshipCategory::Dependency,
-            domain: ContentDomain::Code,
-            confidence: 0.85,
-            description: "A imports B".to_string(),
-            raw_response: None,
-            llm_provenance: None,
-        };
-
-        let result = activator
-            .activate_relationship(Uuid::new_v4(), Uuid::new_v4(), "source content", "target content", &analysis)
-            .await;
-
-        assert!(result.is_ok(), "Should use placeholder embeddings in test-mode: {:?}", result);
-        let (source_emb, target_emb) = result.unwrap();
-
-        // Verify dimensions
-        assert_eq!(source_emb.len(), 1024, "E8 embeddings should be 1024D");
-        assert_eq!(target_emb.len(), 1024, "E8 embeddings should be 1024D");
-
-        // Source and target should be different (asymmetric)
-        assert_ne!(source_emb, target_emb, "Source and target embeddings should differ");
-
-        // Verify non-zero
-        let source_sum: f32 = source_emb.iter().map(|x| x.abs()).sum();
-        let target_sum: f32 = target_emb.iter().map(|x| x.abs()).sum();
-        assert!(source_sum > 0.0, "Source embedding should be non-zero");
-        assert!(target_sum > 0.0, "Target embedding should be non-zero");
-
-        let stats = activator.stats();
-        assert_eq!(stats.edges_created, 1);
-        assert_eq!(stats.embeddings_generated, 2);
-    }
-
-    #[cfg(feature = "test-mode")]
-    #[tokio::test]
-    async fn test_activate_bidirectional_test_mode() {
-        let activator = E8Activator::new();
-        let analysis = GraphAnalysisResult {
-            has_connection: true,
-            direction: GraphLinkDirection::Bidirectional,
-            relationship_type: RelationshipType::References,
-            category: RelationshipCategory::Reference,
-            domain: ContentDomain::General,
-            confidence: 0.9,
-            description: "Mutual reference".to_string(),
-            raw_response: None,
-        };
-
-        let result = activator
-            .activate_relationship(Uuid::new_v4(), Uuid::new_v4(), "a", "b", &analysis)
-            .await;
-
-        assert!(result.is_ok());
-        assert_eq!(activator.stats().edges_created, 2);
     }
 
     #[test]

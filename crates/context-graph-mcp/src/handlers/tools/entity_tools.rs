@@ -49,7 +49,6 @@
 //! - FAIL FAST: All errors propagate immediately with robust logging
 
 use context_graph_embeddings::models::KeplerModel;
-use serde_json::json;
 use std::collections::HashSet;
 use std::time::Instant;
 use tracing::{debug, error, info};
@@ -73,6 +72,7 @@ use super::entity_dtos::{
     ValidateKnowledgeResponse, UNCERTAIN_THRESHOLD, VALID_THRESHOLD,
 };
 
+use super::helpers::ToolErrorKind;
 use super::super::Handlers;
 
 // ============================================================================
@@ -456,10 +456,13 @@ impl Handlers {
             "extract_entities: Completed entity extraction"
         );
 
-        self.tool_result(
-            id,
-            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
-        )
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "extract_entities: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     // ========================================================================
@@ -798,10 +801,13 @@ impl Handlers {
             "search_by_entities: Completed entity-aware search"
         );
 
-        self.tool_result(
-            id,
-            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
-        )
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "search_by_entities: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     // ========================================================================
@@ -985,10 +991,13 @@ impl Handlers {
             "infer_relationship: Completed TransE inference"
         );
 
-        self.tool_result(
-            id,
-            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
-        )
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "infer_relationship: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// find_related_entities tool implementation.
@@ -1201,10 +1210,13 @@ impl Handlers {
             "find_related_entities: Completed TransE entity prediction"
         );
 
-        self.tool_result(
-            id,
-            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
-        )
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "find_related_entities: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     /// validate_knowledge tool implementation.
@@ -1297,51 +1309,64 @@ impl Handlers {
         let mut supporting_memories: Vec<Uuid> = Vec::new();
         let mut contradicting_memories: Vec<Uuid> = Vec::new();
 
-        // Search for memories containing both entities
+        // Search for memories containing both entities — fail fast on any infrastructure error
         let search_query = format!("{} {} {}", subject, predicate, object);
-        if let Ok(query_fingerprint) = self.embed_query(id.clone(), &search_query, "validate_knowledge").await {
+        let query_fingerprint = match self.embed_query(id.clone(), &search_query, "validate_knowledge").await {
+            Ok(fp) => fp,
+            Err(resp) => return resp,
+        };
 
-            let options = TeleologicalSearchOptions::quick(20)
-                .with_strategy(SearchStrategy::E1Only)
-                .with_min_similarity(0.3);
+        let options = TeleologicalSearchOptions::quick(20)
+            .with_strategy(SearchStrategy::E1Only)
+            .with_min_similarity(0.3);
 
-            if let Ok(candidates) = self
-                .teleological_store
-                .search_semantic(&query_fingerprint, options)
-                .await
-            {
-                let candidate_ids: Vec<Uuid> = candidates.iter().map(|c| c.fingerprint.id).collect();
+        let candidates = match self
+            .teleological_store
+            .search_semantic(&query_fingerprint, options)
+            .await
+        {
+            Ok(c) => c,
+            Err(e) => {
+                error!(error = %e, "validate_knowledge: Evidence search failed");
+                return self.tool_error_typed(id, ToolErrorKind::Storage, &format!("Evidence search failed: {}", e));
+            }
+        };
 
-                if let Ok(contents) = self.teleological_store.get_content_batch(&candidate_ids).await
+        let candidate_ids: Vec<Uuid> = candidates.iter().map(|c| c.fingerprint.id).collect();
+
+        let contents = match self.teleological_store.get_content_batch(&candidate_ids).await {
+            Ok(c) => c,
+            Err(e) => {
+                error!(error = %e, "validate_knowledge: Evidence content retrieval failed");
+                return self.tool_error_typed(id, ToolErrorKind::Storage, &format!("Evidence content retrieval failed: {}", e));
+            }
+        };
+
+        for (i, candidate) in candidates.iter().enumerate() {
+            let cand_id = candidate.fingerprint.id;
+            if let Some(Some(text)) = contents.get(i) {
+                // Check if both subject and object are mentioned
+                let text_lower = text.to_lowercase();
+                let subject_lower = subject.to_lowercase();
+                let object_lower = object.to_lowercase();
+
+                if text_lower.contains(&subject_lower)
+                    && text_lower.contains(&object_lower)
                 {
-                    for (i, candidate) in candidates.iter().enumerate() {
-                        let cand_id = candidate.fingerprint.id;
-                        if let Some(Some(text)) = contents.get(i) {
-                            // Check if both subject and object are mentioned
-                            let text_lower = text.to_lowercase();
-                            let subject_lower = subject.to_lowercase();
-                            let object_lower = object.to_lowercase();
+                    // Compute E11 TransE score to determine if supporting or contradicting
+                    // Per KEPLER paper: valid triples score > -5.0, invalid < -10.0
+                    let cand_e11 = &candidate.fingerprint.semantic.e11_entity;
+                    let cand_score =
+                        KeplerModel::transe_score(h, r, cand_e11);
 
-                            if text_lower.contains(&subject_lower)
-                                && text_lower.contains(&object_lower)
-                            {
-                                // Compute E11 TransE score to determine if supporting or contradicting
-                                // Per KEPLER paper: valid triples score > -5.0, invalid < -10.0
-                                let cand_e11 = &candidate.fingerprint.semantic.e11_entity;
-                                let cand_score =
-                                    KeplerModel::transe_score(h, r, cand_e11);
-
-                                if cand_score > VALID_THRESHOLD {
-                                    // Good TransE alignment (> -5.0) - supporting
-                                    supporting_memories.push(cand_id);
-                                } else if cand_score < UNCERTAIN_THRESHOLD {
-                                    // Poor TransE alignment (< -10.0) - potentially contradicting
-                                    contradicting_memories.push(cand_id);
-                                }
-                                // Note: scores in [-10.0, -5.0] are uncertain - don't categorize
-                            }
-                        }
+                    if cand_score > VALID_THRESHOLD {
+                        // Good TransE alignment (> -5.0) - supporting
+                        supporting_memories.push(cand_id);
+                    } else if cand_score < UNCERTAIN_THRESHOLD {
+                        // Poor TransE alignment (< -10.0) - potentially contradicting
+                        contradicting_memories.push(cand_id);
                     }
+                    // Note: scores in [-10.0, -5.0] are uncertain - don't categorize
                 }
             }
         }
@@ -1437,10 +1462,13 @@ impl Handlers {
             "validate_knowledge: Completed hybrid TransE + evidence validation"
         );
 
-        self.tool_result(
-            id,
-            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
-        )
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "validate_knowledge: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 
     // ========================================================================
@@ -1523,16 +1551,19 @@ impl Handlers {
 
         if memories.is_empty() {
             info!("get_entity_graph: No memories found to scan");
-            return self.tool_result(
-                id,
-                serde_json::to_value(GetEntityGraphResponse {
-                    nodes: vec![],
-                    edges: vec![],
-                    center_entity: None,
-                    total_memories_scanned: 0,
-                })
-                .unwrap_or_else(|_| json!({})),
-            );
+            let empty_response = GetEntityGraphResponse {
+                nodes: vec![],
+                edges: vec![],
+                center_entity: None,
+                total_memories_scanned: 0,
+            };
+            return match serde_json::to_value(&empty_response) {
+                Ok(v) => self.tool_result(id, v),
+                Err(e) => {
+                    error!(error = %e, "get_entity_graph: Response serialization failed");
+                    self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+                }
+            };
         }
 
         // Get content for entity extraction
@@ -1713,9 +1744,12 @@ impl Handlers {
             "get_entity_graph: Completed entity graph construction"
         );
 
-        self.tool_result(
-            id,
-            serde_json::to_value(response).unwrap_or_else(|_| json!({})),
-        )
+        match serde_json::to_value(&response) {
+            Ok(v) => self.tool_result(id, v),
+            Err(e) => {
+                error!(error = %e, "get_entity_graph: Response serialization failed");
+                self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Response serialization failed: {}", e))
+            }
+        }
     }
 }

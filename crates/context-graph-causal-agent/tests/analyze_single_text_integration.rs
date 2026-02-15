@@ -4,6 +4,7 @@
 //! These tests require the Hermes 2 Pro model to be loaded.
 
 use context_graph_causal_agent::{CausalDiscoveryLLM, CausalDirectionHint, LlmConfig};
+use serial_test::serial;
 use std::path::PathBuf;
 
 /// Get the absolute path to the models directory
@@ -34,6 +35,7 @@ fn create_llm_config() -> LlmConfig {
 /// Input: "High cortisol levels cause memory impairment in the hippocampus."
 /// Expected: is_causal=true, direction=Cause, confidence>=0.7
 #[tokio::test]
+#[serial]
 async fn test_2_1_causal_content_analysis() {
     println!("\n=== Test 2.1: Causal Content Analysis ===");
 
@@ -80,6 +82,7 @@ async fn test_2_1_causal_content_analysis() {
 /// Input: "The weather in Paris is pleasant during spring."
 /// Expected: is_causal=false, confidence < 0.5
 #[tokio::test]
+#[serial]
 async fn test_2_2_non_causal_content_analysis() {
     println!("\n=== Test 2.2: Non-Causal Content Analysis ===");
 
@@ -122,6 +125,7 @@ async fn test_2_2_non_causal_content_analysis() {
 /// Input: "Memory impairment results from prolonged stress exposure."
 /// Expected: is_causal=true, direction=Effect, confidence>=0.6
 #[tokio::test]
+#[serial]
 async fn test_2_3_effect_direction_content() {
     println!("\n=== Test 2.3: Effect-Direction Content ===");
 
@@ -191,6 +195,7 @@ fn test_2_4_bias_factors() {
 ///
 /// Verify proper error when LLM is not loaded
 #[tokio::test]
+#[serial]
 async fn test_2_5_llm_not_loaded_error() {
     println!("\n=== Test 2.5: LLM Not Loaded Error ===");
 

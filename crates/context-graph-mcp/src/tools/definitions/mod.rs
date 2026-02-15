@@ -102,12 +102,17 @@ mod tests {
 
     #[test]
     fn test_total_tool_count() {
-        // 55 tools:
+        // Without LLM: 51 tools
+        // With LLM (default): 55 tools (+2 causal_discovery, +2 graph LLM)
         // core: 4, merge: 1, curation: 2, topic: 4, file_watcher: 4, sequence: 4,
-        // causal: 4, causal_discovery: 2, keyword: 1, code: 1, graph: 4,
-        // robustness: 1, entity: 6, embedder: 7, temporal: 2, graph_link: 4,
-        // maintenance: 1, provenance: 3
+        // causal: 4, keyword: 1, code: 1, robustness: 1, entity: 6, embedder: 7,
+        // temporal: 2, graph_link: 4, maintenance: 1, provenance: 3
+        // = 49 base + graph: 2 (non-LLM)
+        // + LLM: causal_discovery: 2, graph LLM: 2 = 4 extra
+        #[cfg(feature = "llm")]
         assert_eq!(get_tool_definitions().len(), 55);
+        #[cfg(not(feature = "llm"))]
+        assert_eq!(get_tool_definitions().len(), 51);
     }
 
     #[test]
@@ -144,14 +149,11 @@ mod tests {
             // Causal tools (2) - E5 Priority 1 enhancement
             "search_causes",
             "get_causal_chain",
-            // Causal discovery tools (2) - E5 LLM-based relationship discovery
-            "trigger_causal_discovery",
-            "get_causal_discovery_status",
             // Keyword tools (1) - E6 keyword search enhancement
             "search_by_keywords",
             // Code tools (1) - E7 code search enhancement
             "search_code",
-            // Graph tools (2) - E8 upgrade (Phase 4)
+            // Graph tools (2 base) - E8 upgrade (Phase 4)
             "search_connections",
             "get_graph_path",
             // Robustness tools (1) - E9 typo-tolerant search
@@ -189,6 +191,20 @@ mod tests {
 
         for name in expected {
             assert!(names.contains(&name), "Missing tool: {}", name);
+        }
+
+        // LLM-dependent tools only present when llm feature is enabled
+        #[cfg(feature = "llm")]
+        {
+            let llm_tools = [
+                "trigger_causal_discovery",
+                "get_causal_discovery_status",
+                "discover_graph_relationships",
+                "validate_graph_link",
+            ];
+            for name in llm_tools {
+                assert!(names.contains(&name), "Missing LLM tool: {}", name);
+            }
         }
     }
 

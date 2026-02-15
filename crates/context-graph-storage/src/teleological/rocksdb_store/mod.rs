@@ -1,7 +1,7 @@
 //! RocksDB-backed TeleologicalMemoryStore implementation.
 //!
 //! This module provides a persistent storage implementation for TeleologicalFingerprints
-//! using RocksDB with 17 column families for efficient indexing and retrieval.
+//! using RocksDB with 51 column families (11 base + 20 teleological + 13 quantized + 5 code + 2 causal).
 //!
 //! # Column Families Used
 //!

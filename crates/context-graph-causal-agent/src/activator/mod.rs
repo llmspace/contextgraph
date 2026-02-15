@@ -96,7 +96,7 @@ pub struct E5EmbedderActivator {
     causal_graph: Arc<RwLock<CausalGraph>>,
 
     /// Real E5 CausalModel for asymmetric embeddings.
-    /// When None, falls back to hash-based placeholders (testing mode).
+    /// When None, activate_relationship() will fail fast with an error.
     causal_model: Option<Arc<CausalModel>>,
 
     /// Statistics.
@@ -235,8 +235,7 @@ impl E5EmbedderActivator {
     /// Generate E5 asymmetric embeddings for cause and effect with direction awareness.
     ///
     /// When a real CausalModel is available, uses embed_dual() for genuine asymmetric embeddings.
-    /// In test-mode, falls back to hash-based placeholders for testing without GPU.
-    /// In production (without test-mode feature), fails fast if CausalModel unavailable.
+    /// Without a CausalModel, fails fast -- use `with_model()` to provide one.
     ///
     /// # Arguments
     /// * `cause_content` - Text content positioned as cause (A in A→B)
@@ -247,7 +246,7 @@ impl E5EmbedderActivator {
     /// DirectionalEmbeddings with appropriate vectors for the detected direction
     ///
     /// # Errors
-    /// Returns error if CausalModel is not available and test-mode feature is not enabled.
+    /// Returns error if CausalModel is not available.
     async fn generate_e5_embeddings(
         &self,
         cause_content: &str,
@@ -263,21 +262,11 @@ impl E5EmbedderActivator {
             }
             None => {
                 // Production mode: fail fast - CausalModel is required
-                #[cfg(not(feature = "test-mode"))]
-                {
-                    return Err(CausalAgentError::ConfigError {
-                        message: "CausalModel required in production but not available. \
-                                  Use E5EmbedderActivator::with_model() or enable test-mode feature."
-                            .to_string(),
-                    });
-                }
-
-                // Test mode: allow placeholder embeddings
-                #[cfg(feature = "test-mode")]
-                {
-                    debug!("Using hash-based placeholder embeddings (test-mode, no CausalModel)");
-                    self.generate_placeholder_embeddings(cause_content, effect_content, direction)
-                }
+                return Err(CausalAgentError::ConfigError {
+                    message: "CausalModel required in production but not available. \
+                              Use E5EmbedderActivator::with_model()."
+                        .to_string(),
+                });
             }
         }
     }
@@ -397,82 +386,6 @@ impl E5EmbedderActivator {
                 })
             }
         }
-    }
-
-    /// Generate placeholder embeddings based on content hash.
-    ///
-    /// Used for testing when no real CausalModel is available.
-    #[cfg(feature = "test-mode")]
-    fn generate_placeholder_embeddings(
-        &self,
-        cause_content: &str,
-        effect_content: &str,
-        direction: &CausalLinkDirection,
-    ) -> CausalAgentResult<DirectionalEmbeddings> {
-        match direction {
-            CausalLinkDirection::ACausesB => {
-                let cause_vec = self.hash_to_embedding(cause_content, 768, true);
-                let effect_vec = self.hash_to_embedding(effect_content, 768, false);
-                Ok(DirectionalEmbeddings::forward(cause_vec, effect_vec))
-            }
-            CausalLinkDirection::BCausesA => {
-                let cause_vec = self.hash_to_embedding(effect_content, 768, true);
-                let effect_vec = self.hash_to_embedding(cause_content, 768, false);
-                Ok(DirectionalEmbeddings::backward(cause_vec, effect_vec))
-            }
-            CausalLinkDirection::Bidirectional => {
-                let a_cause = self.hash_to_embedding(cause_content, 768, true);
-                let a_effect = self.hash_to_embedding(cause_content, 768, false);
-                let b_cause = self.hash_to_embedding(effect_content, 768, true);
-                let b_effect = self.hash_to_embedding(effect_content, 768, false);
-                Ok(DirectionalEmbeddings::bidirectional(
-                    a_cause, a_effect, b_cause, b_effect,
-                ))
-            }
-            CausalLinkDirection::NoCausalLink => Err(CausalAgentError::ConfigError {
-                message: "Cannot generate embeddings for non-causal relationship".to_string(),
-            }),
-        }
-    }
-
-    /// Generate a deterministic embedding from content hash.
-    ///
-    /// This is a placeholder for testing until CausalModel integration.
-    #[cfg(feature = "test-mode")]
-    fn hash_to_embedding(&self, content: &str, dim: usize, is_cause: bool) -> Vec<f32> {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let mut hasher = DefaultHasher::new();
-        content.hash(&mut hasher);
-        if is_cause {
-            "cause".hash(&mut hasher);
-        } else {
-            "effect".hash(&mut hasher);
-        }
-        let hash = hasher.finish();
-
-        // Generate pseudo-random normalized vector
-        let mut embedding = Vec::with_capacity(dim);
-        let mut current = hash;
-        let mut sum_sq = 0.0f32;
-
-        for _ in 0..dim {
-            current = current.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-            let val = ((current >> 32) as f32 / u32::MAX as f32) * 2.0 - 1.0;
-            embedding.push(val);
-            sum_sq += val * val;
-        }
-
-        // Normalize
-        let norm = sum_sq.sqrt();
-        if norm > f32::EPSILON {
-            for val in &mut embedding {
-                *val /= norm;
-            }
-        }
-
-        embedding
     }
 
     /// Add an edge to the causal graph.
@@ -605,45 +518,6 @@ fn truncate_name(content: &str, max_len: usize) -> String {
 mod tests {
     use super::*;
 
-    // This test requires test-mode feature for placeholder embeddings
-    #[cfg(feature = "test-mode")]
-    #[tokio::test]
-    async fn test_activate_relationship() {
-        let graph = Arc::new(RwLock::new(CausalGraph::new()));
-        let activator = E5EmbedderActivator::new(graph.clone());
-
-        let cause_id = Uuid::new_v4();
-        let effect_id = Uuid::new_v4();
-
-        let analysis = CausalAnalysisResult {
-            has_causal_link: true,
-            direction: CausalLinkDirection::ACausesB,
-            confidence: 0.85,
-            mechanism: "Direct causation".to_string(),
-            mechanism_type: None,
-            raw_response: None,
-            llm_provenance: None,
-        };
-
-        let result = activator
-            .activate_relationship(
-                cause_id,
-                effect_id,
-                "The bug caused the crash",
-                "The crash affected users",
-                &analysis,
-            )
-            .await;
-
-        assert!(result.is_ok());
-
-        // Check graph has the edge
-        let graph = graph.read();
-        assert!(graph.has_node(cause_id));
-        assert!(graph.has_node(effect_id));
-        assert!(graph.has_direct_cause(cause_id, effect_id));
-    }
-
     #[tokio::test]
     async fn test_skip_low_confidence() {
         let graph = Arc::new(RwLock::new(CausalGraph::new()));
@@ -684,29 +558,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "test-mode")]
-    #[test]
-    fn test_hash_to_embedding() {
-        let graph = Arc::new(RwLock::new(CausalGraph::new()));
-        let activator = E5EmbedderActivator::new(graph);
-
-        let emb1 = activator.hash_to_embedding("test content", 768, true);
-        let emb2 = activator.hash_to_embedding("test content", 768, true);
-        let emb3 = activator.hash_to_embedding("test content", 768, false);
-
-        // Same input = same output
-        assert_eq!(emb1, emb2);
-
-        // Different role = different output
-        assert_ne!(emb1, emb3);
-
-        // Check normalization
-        let norm: f32 = emb1.iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!((norm - 1.0).abs() < 0.001);
-    }
-
-    // Test fail-fast behavior when CausalModel is not available in production mode
-    #[cfg(not(feature = "test-mode"))]
+    // Test fail-fast behavior when CausalModel is not available
     #[tokio::test]
     async fn test_e5_activator_fails_fast_without_model() {
         let graph = Arc::new(RwLock::new(CausalGraph::new()));
@@ -732,58 +584,13 @@ mod tests {
             )
             .await;
 
-        // Should fail because CausalModel is required in production
+        // Should fail because CausalModel is required
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(
-            err.contains("CausalModel required") || err.contains("production"),
+            err.contains("CausalModel required"),
             "Error should mention CausalModel requirement: {}",
             err
         );
-    }
-
-    // Test that placeholder embeddings work in test-mode
-    #[cfg(feature = "test-mode")]
-    #[tokio::test]
-    async fn test_e5_activator_uses_placeholders_in_test_mode() {
-        let graph = Arc::new(RwLock::new(CausalGraph::new()));
-        let activator = E5EmbedderActivator::new(graph.clone()); // No model
-
-        let cause_id = Uuid::new_v4();
-        let effect_id = Uuid::new_v4();
-
-        let analysis = CausalAnalysisResult {
-            has_causal_link: true,
-            direction: CausalLinkDirection::ACausesB,
-            confidence: 0.85,
-            mechanism: "Direct causation".to_string(),
-            mechanism_type: None,
-            raw_response: None,
-            llm_provenance: None,
-        };
-
-        let result = activator
-            .activate_relationship(
-                cause_id,
-                effect_id,
-                "Cause content",
-                "Effect content",
-                &analysis,
-            )
-            .await;
-
-        // Should succeed with placeholder embeddings in test-mode
-        assert!(
-            result.is_ok(),
-            "Should use placeholder embeddings in test-mode: {:?}",
-            result
-        );
-
-        let (cause_emb, effect_emb) = result.unwrap();
-        assert_eq!(cause_emb.len(), 768, "E5 embeddings should be 768D");
-        assert_eq!(effect_emb.len(), 768, "E5 embeddings should be 768D");
-
-        // Cause and effect should be different
-        assert_ne!(cause_emb, effect_emb, "Cause and effect embeddings should differ");
     }
 }
