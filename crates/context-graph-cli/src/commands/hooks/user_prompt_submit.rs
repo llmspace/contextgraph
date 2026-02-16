@@ -40,15 +40,22 @@ const MAX_MEMORIES_TO_RETRIEVE: u32 = 5;
 /// E11 finds what E1 misses - keep separate budget to ensure E11 contributions visible
 const MAX_E11_MEMORIES_TO_RETRIEVE: u32 = 3;
 
-/// Token budget for memory context (~500 tokens, ~4 chars/token)
-const MEMORY_CONTEXT_BUDGET_CHARS: usize = 2000;
+/// Default token budget for memory context (~500 tokens, ~4 chars/token).
+/// R14: Adaptive — scales to 3000 chars for complex prompts (>500 chars).
+const MEMORY_CONTEXT_BUDGET_DEFAULT: usize = 2000;
+
+/// Expanded budget for complex prompts (>500 chars).
+const MEMORY_CONTEXT_BUDGET_EXPANDED: usize = 3000;
+
+/// Prompt length threshold for expanded budget.
+const COMPLEX_PROMPT_THRESHOLD: usize = 500;
 
 /// Minimum query length to trigger memory search (avoid noise from very short prompts)
 const MIN_QUERY_LENGTH_FOR_SEARCH: usize = 10;
 
 /// Minimum similarity score for memories to be included in context injection.
 /// Filters out low-relevance matches (e.g., pre-compaction markers, generic hook logs).
-const MIN_MEMORY_SIMILARITY: f32 = 0.3;
+const MIN_MEMORY_SIMILARITY: f32 = 0.4;
 
 // ============================================================================
 // Identity Marker Types
@@ -198,8 +205,8 @@ pub async fn execute(args: PromptSubmitArgs) -> HookResult<HookOutput> {
         "PROMPT_SUBMIT: identity marker detected"
     );
 
-    // 4. Evaluate conversation context
-    let context_summary = evaluate_context(&context);
+    // 4. Evaluate conversation context (used for logging, not injected per R3)
+    let _context_summary = evaluate_context(&context);
 
     // 5. Create MCP client once for all operations
     let client = McpClient::new();
@@ -224,10 +231,18 @@ pub async fn execute(args: PromptSubmitArgs) -> HookResult<HookOutput> {
         }
     };
 
-    // 7. Search knowledge graph for relevant memories via MCP (E1 semantic search)
+    // 7. R8: Detect code patterns for pipeline strategy selection
+    let search_strategy = if looks_like_code(&prompt) {
+        info!("PROMPT_SUBMIT: R8 code patterns detected, using pipeline strategy");
+        Some("pipeline")
+    } else {
+        None // default multi_space
+    };
+
+    // 7b. Search knowledge graph for relevant memories via MCP
     //    Also cache them for pre_tool_use to access without network calls
     let retrieved_memories = if mcp_available {
-        search_memories_for_prompt_with_client(&client, &args.session_id, &prompt).await
+        search_memories_for_prompt_with_client(&client, &args.session_id, &prompt, search_strategy).await
     } else {
         Vec::new()
     };
@@ -271,18 +286,30 @@ pub async fn execute(args: PromptSubmitArgs) -> HookResult<HookOutput> {
         );
     }
 
-    // 9. Fetch recent conversation context (last N turns with position labels)
-    //    Uses the new get_conversation_context MCP tool for E4-based sequence retrieval
-    let recent_turns = if mcp_available {
-        fetch_recent_conversation_context_with_client(&client).await
+    // 9. R10: Causal intent detection — E5 search for "why"/"because" prompts
+    let causal_memories = if mcp_available && has_causal_intent(&prompt) {
+        info!("PROMPT_SUBMIT: R10 causal intent detected, adding E5 causal search");
+        match client
+            .search_causal_fast(&prompt, "effect", Some(3), true)
+            .await
+        {
+            Ok(result) => {
+                let causal = parse_search_results(&result);
+                info!(
+                    causal_count = causal.len(),
+                    "PROMPT_SUBMIT: R10 E5 causal search returned {} results",
+                    causal.len()
+                );
+                causal
+            }
+            Err(e) => {
+                warn!(error = %e, "PROMPT_SUBMIT: R10 E5 causal search failed, continuing");
+                Vec::new()
+            }
+        }
     } else {
         Vec::new()
     };
-
-    debug!(
-        turn_count = recent_turns.len(),
-        "PROMPT_SUBMIT: recent conversation turns retrieved"
-    );
 
     // 10. Check for divergence alerts (potential contradictions)
     //    Only if MCP is available and we have enough time budget remaining
@@ -316,19 +343,56 @@ pub async fn execute(args: PromptSubmitArgs) -> HookResult<HookOutput> {
         );
     }
 
-    // 11. Generate context injection string with memories, E11 discoveries, recent turns, and alerts
+    // 11. R10: Merge causal memories into retrieved memories (deduplicated)
+    let mut retrieved_memories = retrieved_memories;
+    if !causal_memories.is_empty() {
+        let existing_ids: std::collections::HashSet<String> = retrieved_memories
+            .iter()
+            .map(|m| m.id.clone())
+            .collect();
+        for cm in causal_memories {
+            if !existing_ids.contains(&cm.id) {
+                retrieved_memories.push(cm);
+            }
+        }
+    }
+
+    // 11b. R9: Deduplicate E11 results against E1+causal by fingerprintId
+    let e1_ids: std::collections::HashSet<&str> = retrieved_memories
+        .iter()
+        .map(|m| m.id.as_str())
+        .collect();
+    let e11_deduped: Vec<&E11DiscoveredMemory> = e11_discovered_memories
+        .iter()
+        .filter(|m| !e1_ids.contains(m.id.as_str()))
+        .collect();
+
+    if e11_discovered_memories.len() != e11_deduped.len() {
+        info!(
+            before = e11_discovered_memories.len(),
+            after = e11_deduped.len(),
+            "PROMPT_SUBMIT: R9 deduplication removed {} E11 results already in E1",
+            e11_discovered_memories.len() - e11_deduped.len()
+        );
+    }
+
+    // 12. R14: Adaptive memory context budget based on prompt complexity
+    let memory_budget = if prompt.len() > COMPLEX_PROMPT_THRESHOLD {
+        MEMORY_CONTEXT_BUDGET_EXPANDED
+    } else {
+        MEMORY_CONTEXT_BUDGET_DEFAULT
+    };
+
+    // 13. Generate context injection string (R3: slim format — only actionable content)
     let context_injection = generate_context_injection(
-        &snapshot,
-        identity_marker,
-        &context_summary,
         &retrieved_memories,
         &extracted_entities,
-        &e11_discovered_memories,
-        &recent_turns,
+        &e11_deduped,
         &divergence_alerts,
+        memory_budget,
     );
 
-    // 12. Build output structures
+    // 14. Build output structures
     let coherence = compute_coherence(&snapshot);
     let coherence_state = build_coherence_state(&snapshot);
     let stability_classification = StabilityClassification::from_value(coherence);
@@ -438,6 +502,68 @@ fn load_snapshot_from_cache(session_id: &str) -> SessionSnapshot {
 // Prompt Analysis
 // ============================================================================
 
+// ============================================================================
+// R8: Code Pattern Detection for Pipeline Strategy Selection
+// ============================================================================
+
+/// Code-pattern indicators for pipeline strategy selection.
+/// When a prompt contains code, the pipeline strategy (E13→E1→E12) provides
+/// better precision than the default multi_space strategy.
+const CODE_INDICATORS: &[&str] = &[
+    "::", "fn ", "def ", "function ", "class ", "impl ", "struct ",
+    "pub fn", "async fn", "pub struct", "pub enum",
+    "import ", "from ", "require(", "use ",
+    "->", "=>", "||", "&&",
+];
+
+/// R8: Detect if a prompt contains significant code patterns.
+/// Returns true if the prompt looks like it contains code snippets or
+/// references to code constructs.
+fn looks_like_code(prompt: &str) -> bool {
+    // Count backticks (code fences)
+    let backtick_count = prompt.matches('`').count();
+    if backtick_count >= 2 {
+        return true;
+    }
+
+    // Count brackets (code-like syntax)
+    let bracket_count = prompt.matches('{').count()
+        + prompt.matches('}').count()
+        + prompt.matches('[').count()
+        + prompt.matches(']').count();
+    if bracket_count >= 4 {
+        return true;
+    }
+
+    // Count code-specific keywords
+    let lower = prompt.to_lowercase();
+    let keyword_hits = CODE_INDICATORS
+        .iter()
+        .filter(|kw| lower.contains(&kw.to_lowercase()))
+        .count();
+
+    // 2+ code indicators → code-heavy prompt
+    keyword_hits >= 2
+}
+
+// ============================================================================
+// R10: Causal Intent Detection for E5 Search
+// ============================================================================
+
+/// Causal intent keywords that trigger E5 causal search.
+const CAUSAL_KEYWORDS: &[&str] = &[
+    "why", "because", "caused by", "root cause", "leads to",
+    "resulted in", "due to", "reason for", "consequence",
+    "what caused", "what led to",
+];
+
+/// R10: Detect causal intent in user prompt.
+/// Returns true if the user is asking about causes/effects.
+fn has_causal_intent(prompt: &str) -> bool {
+    let lower = prompt.to_lowercase();
+    CAUSAL_KEYWORDS.iter().any(|kw| lower.contains(kw))
+}
+
 /// Detect identity markers in the prompt text.
 pub fn detect_identity_marker(prompt: &str) -> IdentityMarkerType {
     let lower = prompt.to_lowercase();
@@ -476,6 +602,7 @@ pub fn detect_identity_marker(prompt: &str) -> IdentityMarkerType {
 
 /// Summary of conversation context evaluation
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // R3: Fields no longer injected but struct used in evaluate_context + tests
 pub struct ContextSummary {
     /// Number of messages in context
     pub message_count: usize,
@@ -524,6 +651,7 @@ pub struct RetrievedMemory {
     /// Similarity score to the query [0.0, 1.0]
     pub similarity: f32,
     /// Dominant embedder that matched (e.g., "E1_Semantic")
+    #[allow(dead_code)] // R3: No longer in slim injection but part of parsed data
     pub dominant_embedder: String,
     /// Source metadata - where this memory originated
     pub source: Option<SourceInfo>,
@@ -585,6 +713,7 @@ pub struct ExtractedEntity {
     /// Canonical ID (normalized form)
     pub canonical_id: String,
     /// Entity type (ProgrammingLanguage, Framework, Database, etc.)
+    #[allow(dead_code)] // R3: Not in slim injection but part of parsed data
     pub entity_type: String,
 }
 
@@ -599,6 +728,7 @@ pub struct E11DiscoveredMemory {
     /// Combined score (E1 + E11 + entity Jaccard)
     pub score: f32,
     /// E11 entity similarity component
+    #[allow(dead_code)] // R3: Not in slim injection but part of parsed data
     pub e11_similarity: f32,
     /// Entities that matched
     pub matched_entities: Vec<String>,
@@ -619,6 +749,7 @@ pub struct DivergenceAlert {
 /// A recent conversation turn from the session timeline.
 /// Includes position label for user clarity (e.g., "2 turns ago").
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // R3: Recent turns no longer injected but struct kept for future use
 pub struct RecentConversationTurn {
     /// Memory ID
     #[allow(dead_code)] // Part of Clone+Debug DTO
@@ -654,6 +785,7 @@ async fn search_memories_for_prompt_with_client(
     client: &McpClient,
     session_id: &str,
     prompt: &str,
+    strategy: Option<&str>,
 ) -> Vec<RetrievedMemory> {
     // Skip search for very short prompts (avoid noise)
     if prompt.len() < MIN_QUERY_LENGTH_FOR_SEARCH {
@@ -671,7 +803,7 @@ async fn search_memories_for_prompt_with_client(
     // Using fast path (800ms timeout) to stay within 2s hook budget
     // minSimilarity filters out low-relevance noise (pre-compaction markers, generic logs)
     let memories = client
-        .search_graph_fast(prompt, Some(MAX_MEMORIES_TO_RETRIEVE), true, Some(MIN_MEMORY_SIMILARITY))
+        .search_graph_fast(prompt, Some(MAX_MEMORIES_TO_RETRIEVE), true, Some(MIN_MEMORY_SIMILARITY), strategy)
         .await
         .map(|result| parse_search_results(&result))
         .unwrap_or_else(|e| {
@@ -712,10 +844,10 @@ fn parse_search_results(result: &serde_json::Value) -> Vec<RetrievedMemory> {
 
     for item in results {
         // Check budget before adding
-        if total_chars >= MEMORY_CONTEXT_BUDGET_CHARS {
+        if total_chars >= MEMORY_CONTEXT_BUDGET_DEFAULT {
             debug!(
                 total_chars,
-                budget = MEMORY_CONTEXT_BUDGET_CHARS,
+                budget = MEMORY_CONTEXT_BUDGET_DEFAULT,
                 "PROMPT_SUBMIT: Memory budget exhausted"
             );
             break;
@@ -1030,7 +1162,8 @@ async fn fetch_divergence_alerts_with_client(client: &McpClient) -> Vec<Divergen
 // ============================================================================
 
 /// Number of recent conversation turns to auto-inject for context.
-/// Per plan: "Automatically inject last 5 turns as context"
+/// R3: Recent turns removed from injection but kept for potential future use.
+#[allow(dead_code)]
 const RECENT_TURNS_TO_INJECT: u32 = 5;
 
 /// Fetch recent conversation context using the get_conversation_context MCP tool.
@@ -1043,6 +1176,7 @@ const RECENT_TURNS_TO_INJECT: u32 = 5;
 ///
 /// # Returns
 /// Vector of recent conversation turns, empty if fetch fails or no turns found.
+#[allow(dead_code)] // R3: Recent turns removed from injection
 async fn fetch_recent_conversation_context_with_client(
     client: &McpClient,
 ) -> Vec<RecentConversationTurn> {
@@ -1061,6 +1195,7 @@ async fn fetch_recent_conversation_context_with_client(
 }
 
 /// Parse MCP get_conversation_context results into RecentConversationTurn structs.
+#[allow(dead_code)] // R3: Recent turns removed from injection
 fn parse_conversation_context(result: &serde_json::Value) -> Vec<RecentConversationTurn> {
     let Some(memories) = result.get("memories").and_then(|v| v.as_array()) else {
         debug!("PROMPT_SUBMIT: No memories array in conversation context response");
@@ -1236,194 +1371,131 @@ fn parse_divergence_alerts(result: &serde_json::Value) -> Vec<DivergenceAlert> {
 // Context Injection Generation
 // ============================================================================
 
-/// Generate context injection string based on coherence state, prompt analysis, memories,
-/// E11 entity discoveries, recent conversation turns, and divergence alerts.
+/// R3: Generate slim context injection — only actionable content.
+///
+/// Removed: Coherence State, Identity Marker, Context Summary, Recent Session Context
+/// (non-actionable metadata that wastes system-reminder budget).
+///
+/// Kept: Retrieved Memories, E11 Entity Discoveries, Divergence Alerts
+/// (actionable information that helps Claude execute tasks).
+///
+/// Content truncated to 300 chars (was 500/400) to maximize density.
 fn generate_context_injection(
-    snapshot: &SessionSnapshot,
-    identity_marker: IdentityMarkerType,
-    context_summary: &ContextSummary,
     retrieved_memories: &[RetrievedMemory],
     extracted_entities: &[ExtractedEntity],
-    e11_discovered_memories: &[E11DiscoveredMemory],
-    recent_turns: &[RecentConversationTurn],
+    e11_discovered_memories: &[&E11DiscoveredMemory],
     divergence_alerts: &[DivergenceAlert],
+    memory_budget: usize,
 ) -> String {
-    let coherence = compute_coherence(snapshot);
-    let coherence_state = get_coherence_state_name(coherence);
-    let integration_desc = get_integration_description(snapshot.integration);
-    let stability_status = get_stability_status(coherence);
+    let mut injection = String::new();
+    let mut total_chars = 0usize;
 
-    let mut injection = format!(
-        "## Coherence State\n\
-         - State: {} (C={:.2})\n\
-         - Integration (r): {:.2} - {}\n\
-         - Stability: {} (coherence={:.2})\n",
-        coherence_state,
-        coherence,
-        snapshot.integration,
-        integration_desc,
-        stability_status,
-        coherence,
-    );
-
-    // Add identity marker guidance if detected
-    if identity_marker != IdentityMarkerType::None {
-        injection.push_str(&format!(
-            "\n## Identity Marker Detected\n\
-             - Type: {:?}\n\
-             - Guidance: {}\n",
-            identity_marker,
-            get_marker_guidance(identity_marker),
-        ));
-    }
-
-    // Add context summary if non-empty
-    if context_summary.message_count > 0 {
-        injection.push_str(&format!(
-            "\n## Context Summary\n\
-             - Messages: {} ({} user, {} assistant)\n\
-             - Characters: {}\n",
-            context_summary.message_count,
-            context_summary.user_message_count,
-            context_summary.assistant_message_count,
-            context_summary.total_chars,
-        ));
-    }
-
-    // Add retrieved memories from knowledge graph (E1 semantic search)
+    // Retrieved memories from knowledge graph (E1 semantic search)
     if !retrieved_memories.is_empty() {
-        injection.push_str("\n## Relevant Memories (E1 Semantic Search)\n\n");
+        injection.push_str("Retrieved Memories:\n");
 
-        for (i, memory) in retrieved_memories.iter().enumerate() {
-            injection.push_str(&format!(
-                "### Memory {} (similarity: {:.2}, via {})\n",
-                i + 1,
-                memory.similarity,
-                memory.dominant_embedder
-            ));
-
-            // Add source metadata if available (file path, chunk info, etc.)
-            if let Some(ref source) = memory.source {
-                injection.push_str(&format!("**{}**\n", source.display_string()));
+        for memory in retrieved_memories {
+            if total_chars >= memory_budget {
+                break;
             }
 
-            // Add content if available
             if let Some(ref content) = memory.content {
-                // Truncate very long content to avoid context overflow
-                let truncated = if content.len() > 500 {
-                    format!("{}...", &content[..500])
+                let truncated = if content.len() > 300 {
+                    format!("{}...", &content[..content.floor_char_boundary(300)])
                 } else {
                     content.clone()
                 };
-                injection.push_str(&truncated);
-                injection.push_str("\n\n");
-            } else {
-                injection.push_str(&format!("ID: {} (content not available)\n\n", memory.id));
+                total_chars += truncated.len();
+
+                // Source context as inline hint
+                let source_hint = memory
+                    .source
+                    .as_ref()
+                    .map(|s| s.display_string())
+                    .unwrap_or_default();
+
+                if source_hint.is_empty() {
+                    injection.push_str(&format!(
+                        "- [sim={:.2}] {}\n",
+                        memory.similarity, truncated
+                    ));
+                } else {
+                    injection.push_str(&format!(
+                        "- [sim={:.2}, {}] {}\n",
+                        memory.similarity, source_hint, truncated
+                    ));
+                }
             }
         }
-
-        injection.push_str("---\n");
     }
 
-    // Add E11 entity-discovered memories (KEPLER found these - E1 may have missed them!)
-    // This is the key E11 enhancement: surfacing entity-related content that semantic search missed
+    // E11 entity-discovered memories (R9: already deduplicated against E1)
     if !e11_discovered_memories.is_empty() {
-        injection.push_str("\n## E11 Entity Discoveries (KEPLER - May Not Appear in E1 Results)\n\n");
-
-        // Show what entities were detected
-        if !extracted_entities.is_empty() {
-            injection.push_str("**Detected entities:** ");
-            let entity_list: Vec<String> = extracted_entities
-                .iter()
-                .map(|e| format!("{} ({})", e.surface_form, e.entity_type))
-                .collect();
-            injection.push_str(&entity_list.join(", "));
-            injection.push_str("\n\n");
+        if !injection.is_empty() {
+            injection.push('\n');
         }
 
-        injection.push_str("*These memories were found via E11 entity knowledge - E1 semantic search may have missed them.*\n\n");
+        // Show detected entities inline
+        if !extracted_entities.is_empty() {
+            let entity_list: Vec<&str> = extracted_entities
+                .iter()
+                .map(|e| e.surface_form.as_str())
+                .collect();
+            injection.push_str(&format!("E11 Entity Discoveries ({}):\n", entity_list.join(", ")));
+        } else {
+            injection.push_str("E11 Entity Discoveries:\n");
+        }
 
-        for (i, memory) in e11_discovered_memories.iter().enumerate() {
-            injection.push_str(&format!(
-                "### E11 Memory {} (score: {:.2}, E11 sim: {:.2})\n",
-                i + 1,
-                memory.score,
-                memory.e11_similarity
-            ));
+        for memory in e11_discovered_memories {
+            if total_chars >= memory_budget {
+                break;
+            }
 
-            if !memory.matched_entities.is_empty() {
+            if let Some(ref content) = memory.content {
+                let truncated = if content.len() > 300 {
+                    format!("{}...", &content[..content.floor_char_boundary(300)])
+                } else {
+                    content.clone()
+                };
+                total_chars += truncated.len();
+
+                let entities_hint = if !memory.matched_entities.is_empty() {
+                    format!(" ({})", memory.matched_entities.join(", "))
+                } else {
+                    String::new()
+                };
+
                 injection.push_str(&format!(
-                    "**Matched entities:** {}\n",
-                    memory.matched_entities.join(", ")
+                    "- [score={:.2}]{} {}\n",
+                    memory.score, entities_hint, truncated
                 ));
             }
-
-            if let Some(ref content) = memory.content {
-                let truncated = if content.len() > 400 {
-                    format!("{}...", &content[..400])
-                } else {
-                    content.clone()
-                };
-                injection.push_str(&truncated);
-                injection.push_str("\n\n");
-            } else {
-                injection.push_str(&format!("ID: {} (content not available)\n\n", memory.id));
-            }
         }
-
-        injection.push_str("---\n");
     }
 
-    // Add recent conversation turns (E4-based sequential context)
-    // These provide temporal/conversational continuity from the session
-    if !recent_turns.is_empty() {
-        injection.push_str("\n## Recent Session Context (Sequential)\n\n");
-
-        for turn in recent_turns {
-            // Format: position label + source type + content preview
-            injection.push_str(&format!(
-                "**{}** [{}]:\n",
-                turn.position_label, turn.source_type
-            ));
-
-            if let Some(ref content) = turn.content {
-                // Truncate to keep context injection compact
-                let truncated = if content.len() > 200 {
-                    format!("{}...", &content[..200])
-                } else {
-                    content.clone()
-                };
-                injection.push_str(&truncated);
-                injection.push_str("\n\n");
-            }
-        }
-
-        injection.push_str("---\n");
-    }
-
-    // Add divergence alerts (contradictions/drift) if any
+    // Divergence alerts (contradictions/drift)
     if !divergence_alerts.is_empty() {
-        injection.push_str("\n## DIVERGENCE ALERTS - Potential Contradictions\n\n");
-        injection.push_str("**Be aware of the following divergence from stored knowledge:**\n\n");
+        if !injection.is_empty() {
+            injection.push('\n');
+        }
+        injection.push_str("DIVERGENCE ALERTS:\n");
 
         for alert in divergence_alerts {
             injection.push_str(&format!(
-                "- **{}** (similarity: {:.1}%): {}\n",
+                "- {} ({:.0}%): {}\n",
                 alert.embedder,
                 alert.similarity * 100.0,
                 alert.description
             ));
         }
-
-        injection.push_str("\n*These alerts indicate semantic drift or potential contradictions ");
-        injection.push_str("between current context and stored memories. Review carefully.*\n");
-        injection.push_str("---\n");
     }
 
     injection
 }
 
 /// Get coherence state name from coherence value.
+/// R3: No longer injected but used in tests.
+#[cfg(test)]
 fn get_coherence_state_name(coherence: f32) -> &'static str {
     match coherence {
         c if c >= 0.8 => "Active",
@@ -1434,6 +1506,8 @@ fn get_coherence_state_name(coherence: f32) -> &'static str {
 }
 
 /// Get integration description from value.
+/// R3: No longer injected.
+#[allow(dead_code)]
 fn get_integration_description(integration: f32) -> &'static str {
     match integration {
         r if r >= 0.8 => "Excellent synchronization",
@@ -1444,6 +1518,8 @@ fn get_integration_description(integration: f32) -> &'static str {
 }
 
 /// Get stability status from coherence value.
+/// R3: No longer injected.
+#[allow(dead_code)]
 fn get_stability_status(coherence: f32) -> &'static str {
     match coherence {
         c if c >= 0.9 => "Healthy",
@@ -1454,6 +1530,8 @@ fn get_stability_status(coherence: f32) -> &'static str {
 }
 
 /// Get guidance for identity marker type.
+/// R3: No longer injected.
+#[allow(dead_code)]
 fn get_marker_guidance(marker: IdentityMarkerType) -> &'static str {
     match marker {
         IdentityMarkerType::SelfReference => {
@@ -1554,13 +1632,14 @@ mod tests {
         );
 
         let injection = output.context_injection.unwrap();
+        // R3: Coherence State section removed — verify it's NOT present
         assert!(
-            injection.contains("Coherence State"),
-            "Must contain coherence state"
+            !injection.contains("## Coherence State"),
+            "R3: Coherence State section must be removed from injection"
         );
 
         println!("Context injection length: {} chars", injection.len());
-        println!("RESULT: PASS - Prompt processed, context injection generated");
+        println!("RESULT: PASS - Prompt processed, slim context injection generated (R3)");
     }
 
     // =========================================================================
@@ -1684,21 +1763,21 @@ mod tests {
             &injection[..injection.len().min(500)]
         );
 
-        // Verify expected sections
+        // R3: Verify removed sections are NOT present
         assert!(
-            injection.contains("## Coherence State"),
-            "Must have Coherence State section"
+            !injection.contains("## Coherence State"),
+            "R3: Coherence State must be removed"
         );
         assert!(
-            injection.contains("## Identity Marker Detected"),
-            "Must have Identity Marker section for self-reference"
+            !injection.contains("## Identity Marker"),
+            "R3: Identity Marker must be removed"
         );
         assert!(
-            injection.contains("SelfReference"),
-            "Must detect SelfReference marker"
+            !injection.contains("## Context Summary"),
+            "R3: Context Summary must be removed"
         );
 
-        println!("RESULT: PASS - Context injection contains all required sections");
+        println!("RESULT: PASS - R3: Slim context injection verified (no non-actionable sections)");
     }
 
     // =========================================================================

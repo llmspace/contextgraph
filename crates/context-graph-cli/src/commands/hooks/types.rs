@@ -845,6 +845,30 @@ pub enum HookPayload {
         #[serde(skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
     },
+
+    /// R5: PreCompact hook payload
+    /// Timeout: 20000ms per settings.json
+    /// Captures session summary before context window compression
+    PreCompact {
+        /// What triggered the compaction (e.g., "auto", "manual")
+        trigger: String,
+        /// Optional conversation summary from Claude Code
+        #[serde(skip_serializing_if = "Option::is_none")]
+        conversation_summary: Option<String>,
+    },
+
+    /// R6: TaskCompleted hook payload
+    /// Timeout: 20000ms per settings.json
+    /// Extracts learnings from completed tasks
+    TaskCompleted {
+        /// Task subject/title
+        task_subject: String,
+        /// Task ID
+        task_id: String,
+        /// Optional task result/output summary
+        #[serde(skip_serializing_if = "Option::is_none")]
+        task_result: Option<String>,
+    },
 }
 
 // =============================================================================

@@ -282,6 +282,50 @@ pub struct GenerateConfigArgs {
 }
 
 // ============================================================================
+// Pre-Compact Arguments (timeout: 20000ms)
+// ============================================================================
+
+/// Pre-compact command arguments
+/// R5: Captures session summary before context window compression.
+/// Timeout: 20000ms per settings.json
+#[derive(Args, Debug, Clone)]
+pub struct PreCompactArgs {
+    /// Session ID (REQUIRED)
+    #[arg(long)]
+    pub session_id: String,
+
+    /// Read HookInput JSON from stdin
+    #[arg(long, action = clap::ArgAction::Set, default_value = "false")]
+    pub stdin: bool,
+
+    /// Output format for response
+    #[arg(long, value_enum, default_value = "json")]
+    pub format: OutputFormat,
+}
+
+// ============================================================================
+// Task Completed Arguments (timeout: 20000ms)
+// ============================================================================
+
+/// Task completed command arguments
+/// R6: Extracts learnings from completed tasks.
+/// Timeout: 20000ms per settings.json
+#[derive(Args, Debug, Clone)]
+pub struct TaskCompletedArgs {
+    /// Session ID (REQUIRED)
+    #[arg(long)]
+    pub session_id: String,
+
+    /// Read HookInput JSON from stdin
+    #[arg(long, action = clap::ArgAction::Set, default_value = "false")]
+    pub stdin: bool,
+
+    /// Output format for response
+    #[arg(long, value_enum, default_value = "json")]
+    pub format: OutputFormat,
+}
+
+// ============================================================================
 // Hooks Commands Enum
 // ============================================================================
 
@@ -319,6 +363,18 @@ pub enum HooksCommands {
     /// CLI: context-graph-cli hooks session-end
     #[command(name = "session-end")]
     SessionEnd(SessionEndArgs),
+
+    /// R5: Handle pre-compact event (saves context before compression)
+    /// Timeout: 20000ms - Stores session summary
+    /// CLI: context-graph-cli hooks pre-compact
+    #[command(name = "pre-compact")]
+    PreCompact(PreCompactArgs),
+
+    /// R6: Handle task-completed event (extracts learnings)
+    /// Timeout: 20000ms - Stores task summary
+    /// CLI: context-graph-cli hooks task-completed
+    #[command(name = "task-completed")]
+    TaskCompleted(TaskCompletedArgs),
 
     /// Generate hook configuration files
     /// Creates shell scripts for .claude/hooks/

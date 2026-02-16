@@ -18,6 +18,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use tracing::{debug, error, info, warn};
 
+use super::memory_cache;
 use super::session_state::{store_in_cache, SessionCache, SessionSnapshot, NUM_EMBEDDERS};
 
 use super::args::SessionStartArgs;
@@ -25,6 +26,12 @@ use super::error::{HookError, HookResult};
 use super::types::{
     CoherenceState, DriftMetrics, HookInput, HookOutput, HookPayload, StabilityClassification,
 };
+
+/// Compute coherence from snapshot's integration, reflection, and differentiation metrics.
+#[inline]
+fn compute_coherence(snapshot: &SessionSnapshot) -> f32 {
+    (snapshot.integration + snapshot.reflection + snapshot.differentiation) / 3.0
+}
 
 /// Execute session-start hook.
 ///
@@ -82,8 +89,7 @@ pub async fn execute(args: SessionStartArgs) -> HookResult<HookOutput> {
 
     // 4. Build output structures
     let coherence_state = build_coherence_state(&snapshot);
-    // Use average of integration, reflection, differentiation as stability proxy
-    let stability_value = (snapshot.integration + snapshot.reflection + snapshot.differentiation) / 3.0;
+    let stability_value = compute_coherence(&snapshot);
     let stability_classification = StabilityClassification::from_value(stability_value);
 
     // 5. Build final output
@@ -102,8 +108,25 @@ pub async fn execute(args: SessionStartArgs) -> HookResult<HookOutput> {
         .with_coherence_state(coherence_state)
         .with_stability_classification(stability_classification);
 
-    if let Some(metrics) = drift_metrics {
-        output = output.with_drift_metrics(metrics);
+    if let Some(ref metrics) = drift_metrics {
+        output = output.with_drift_metrics(metrics.clone());
+
+        // R11: When drift is near-zero (session continuation), inject previous
+        // session's cached context so Claude has immediate awareness of prior work.
+        if !metrics.is_warning_drift() {
+            if let Some(prev_id) = previous_session_id.as_deref() {
+                let cached = memory_cache::get_cached_memories(prev_id);
+                if !cached.is_empty() {
+                    let summary = build_previous_session_context(prev_id, &cached);
+                    info!(
+                        prev_session = %prev_id,
+                        cached_memories = cached.len(),
+                        "SESSION_START: R11 injecting previous session context (near-zero drift)"
+                    );
+                    output = output.with_context_injection(summary);
+                }
+            }
+        }
     }
 
     Ok(output)
@@ -204,7 +227,7 @@ fn load_or_create_snapshot(
         // Try to get previous session from cache
         if let Some(cached) = SessionCache::get() {
             if cached.session_id == prev_id {
-                let prev_stability = (cached.integration + cached.reflection + cached.differentiation) / 3.0;
+                let prev_stability = compute_coherence(&cached);
                 info!(
                     session_id = %session_id,
                     previous_session_id = %prev_id,
@@ -226,7 +249,7 @@ fn load_or_create_snapshot(
 
                 snapshot.previous_session_id = Some(prev_id.to_string());
 
-                let restored_stability = (snapshot.integration + snapshot.reflection + snapshot.differentiation) / 3.0;
+                let restored_stability = compute_coherence(&snapshot);
                 info!(
                     session_id = %session_id,
                     restored_stability = restored_stability,
@@ -252,7 +275,7 @@ fn load_or_create_snapshot(
     // Update the global cache with the new snapshot
     store_in_cache(&snapshot);
 
-    let stability = (snapshot.integration + snapshot.reflection + snapshot.differentiation) / 3.0;
+    let stability = compute_coherence(&snapshot);
     info!(
         session_id = %session_id,
         stability = stability,
@@ -270,15 +293,39 @@ fn load_or_create_snapshot(
 /// The topic_stability field is computed from the average of integration,
 /// reflection, and differentiation.
 fn build_coherence_state(snapshot: &SessionSnapshot) -> CoherenceState {
-    // Compute coherence level as average of metrics
-    let coherence_level = (snapshot.integration + snapshot.reflection + snapshot.differentiation) / 3.0;
+    let coherence_level = compute_coherence(snapshot);
     CoherenceState::new(
-        coherence_level, // coherence derived from integration metrics
+        coherence_level,
         snapshot.integration,
         snapshot.reflection,
         snapshot.differentiation,
-        coherence_level, // topic_stability uses same coherence measure
+        coherence_level,
     )
+}
+
+/// R11: Build context injection from previous session's cached memories.
+///
+/// When drift is near-zero (session continuation), inject the previous session's
+/// recent memories so Claude has immediate context of prior work.
+fn build_previous_session_context(
+    prev_session_id: &str,
+    cached: &[memory_cache::CachedMemory],
+) -> String {
+    let mut context = format!(
+        "[Previous Session: {}]\nRecent context from prior session:\n",
+        prev_session_id
+    );
+
+    for mem in cached.iter().take(5) {
+        let truncated = if mem.content.len() > 200 {
+            format!("{}...", &mem.content[..mem.content.floor_char_boundary(200)])
+        } else {
+            mem.content.clone()
+        };
+        context.push_str(&format!("- {}\n", truncated));
+    }
+
+    context
 }
 
 // =============================================================================
@@ -365,9 +412,8 @@ fn compute_drift_metrics(
     current: &SessionSnapshot,
     previous: &SessionSnapshot,
 ) -> DriftMetrics {
-    // Compute stability as average of integration, reflection, differentiation
-    let current_stability = (current.integration + current.reflection + current.differentiation) / 3.0;
-    let previous_stability = (previous.integration + previous.reflection + previous.differentiation) / 3.0;
+    let current_stability = compute_coherence(current);
+    let previous_stability = compute_coherence(previous);
 
     // Stability delta: positive = improvement, negative = degradation
     let stability_delta = current_stability - previous_stability;

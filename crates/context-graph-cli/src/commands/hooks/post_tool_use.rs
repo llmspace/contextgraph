@@ -359,16 +359,22 @@ fn build_coherence_state(snapshot: &SessionSnapshot) -> CoherenceState {
 /// # Note
 /// Failure is non-fatal - we log and continue rather than failing the hook.
 async fn capture_tool_memory(tool_name: &str, tool_response: &str, tool_success: bool, session_id: &str) {
-    // Only capture successful tool executions from high-value tools
-    if !tool_success {
-        debug!(tool_name, "POST_TOOL: Skipping memory capture for failed tool");
-        return;
-    }
-
-    if !TOOLS_TO_CAPTURE.contains(&tool_name) {
-        debug!(tool_name, "POST_TOOL: Tool not in capture list, skipping");
-        return;
-    }
+    // R7: Capture both successful AND failed tool responses
+    // Failed tools get importance=0.3 with FailurePattern source type
+    // Successful tools get importance=0.4 with HookDescription source type
+    let (importance, source_label) = if tool_success {
+        // Only capture successful executions from high-value tools
+        if !TOOLS_TO_CAPTURE.contains(&tool_name) {
+            debug!(tool_name, "POST_TOOL: Tool not in capture list, skipping");
+            return;
+        }
+        (0.4, "HookDescription")
+    } else {
+        // R7: Capture failure patterns for all tools (not just TOOLS_TO_CAPTURE)
+        // so that repeated failures can be surfaced as context
+        info!(tool_name, "POST_TOOL: R7 capturing failure pattern for failed tool");
+        (0.3, "FailurePattern")
+    };
 
     // Skip trivial responses
     if tool_response.len() < MIN_RESPONSE_LENGTH_FOR_CAPTURE {
@@ -402,23 +408,38 @@ async fn capture_tool_memory(tool_name: &str, tool_response: &str, tool_success:
     // Truncate response if too long
     let content = if tool_response.len() > MAX_RESPONSE_LENGTH_FOR_CAPTURE {
         format!(
-            "[HookDescription: {} output]\n{}...\n[truncated from {} chars]",
+            "[{}: {} {}]\n{}...\n[truncated from {} chars]",
+            source_label,
             tool_name,
+            if tool_success { "output" } else { "FAILURE" },
             &tool_response[..MAX_RESPONSE_LENGTH_FOR_CAPTURE],
             tool_response.len()
         )
     } else {
-        format!("[HookDescription: {} output]\n{}", tool_name, tool_response)
+        format!(
+            "[{}: {} {}]\n{}",
+            source_label,
+            tool_name,
+            if tool_success { "output" } else { "FAILURE" },
+            tool_response
+        )
     };
 
-    let rationale = format!(
-        "Tool execution context from {} - captured for future reference",
-        tool_name
-    );
+    let rationale = if tool_success {
+        format!(
+            "Tool execution context from {} - captured for future reference",
+            tool_name
+        )
+    } else {
+        format!(
+            "R7: Tool failure pattern from {} - captured for error context surfacing",
+            tool_name
+        )
+    };
 
-    // Store via MCP inject_context (importance 0.4 - moderate, can be boosted later)
+    // Store via MCP inject_context
     // SESSION-ID-FIX: Pass session_id for proper session-scoped storage
-    match client.inject_context(&content, &rationale, 0.4, Some(session_id)).await {
+    match client.inject_context(&content, &rationale, importance, Some(session_id)).await {
         Ok(result) => {
             let fingerprint_id = result
                 .get("fingerprintId")
@@ -428,6 +449,8 @@ async fn capture_tool_memory(tool_name: &str, tool_response: &str, tool_success:
                 tool_name,
                 fingerprint_id,
                 content_len = content.len(),
+                success = tool_success,
+                source_label,
                 "POST_TOOL: Captured tool memory successfully"
             );
         }

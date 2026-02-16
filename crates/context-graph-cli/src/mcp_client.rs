@@ -367,12 +367,18 @@ impl McpClient {
     ///
     /// Uses shorter timeouts (500ms connection, 800ms request) to ensure
     /// the hook completes within its 2-second budget.
+    ///
+    /// # R8: Strategy Selection
+    /// - `strategy`: Optional search strategy override.
+    ///   "pipeline" (E13→E1→E12) for code-heavy prompts,
+    ///   "multi_space" (default) for general prompts.
     pub async fn search_graph_fast(
         &self,
         query: &str,
         top_k: Option<u32>,
         include_content: bool,
         min_similarity: Option<f32>,
+        strategy: Option<&str>,
     ) -> Result<serde_json::Value, McpClientError> {
         let mut arguments = json!({
             "query": query,
@@ -382,6 +388,11 @@ impl McpClient {
 
         if let Some(min_sim) = min_similarity {
             arguments["minSimilarity"] = json!(min_sim);
+        }
+
+        // R8: Strategy selection for code-heavy prompts
+        if let Some(strat) = strategy {
+            arguments["strategy"] = json!(strat);
         }
 
         let params = json!({
@@ -394,7 +405,39 @@ impl McpClient {
             top_k,
             include_content,
             min_similarity,
+            strategy,
             "Calling MCP search_graph (fast path)"
+        );
+
+        self.call_tool_fast(params).await
+    }
+
+    /// R10: Fast-path causal search using E5 asymmetric embeddings.
+    ///
+    /// Searches for cause→effect relationships when the user's prompt
+    /// has causal intent (e.g., "why did X happen?").
+    pub async fn search_causal_fast(
+        &self,
+        query: &str,
+        direction: &str,
+        top_k: Option<u32>,
+        include_content: bool,
+    ) -> Result<serde_json::Value, McpClientError> {
+        let params = json!({
+            "name": "search_causes",
+            "arguments": {
+                "query": query,
+                "direction": direction,
+                "topK": top_k.unwrap_or(3),
+                "includeContent": include_content
+            }
+        });
+
+        debug!(
+            query_len = query.len(),
+            direction,
+            top_k,
+            "Calling MCP search_causes (fast path) - R10 causal intent"
         );
 
         self.call_tool_fast(params).await

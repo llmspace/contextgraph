@@ -23,17 +23,44 @@ pub mod memory_cache;
 #[allow(dead_code)]
 pub mod post_tool_use;
 #[allow(dead_code)]
+pub mod pre_compact;
+#[allow(dead_code)]
 pub mod pre_tool_use;
 pub mod session_end;
 pub mod session_start;
 pub mod session_state;
+#[allow(dead_code)]
+pub mod task_completed;
 #[allow(dead_code)]
 mod types;
 pub mod user_prompt_submit;
 
 pub use args::HooksCommands;
 
+use error::HookResult;
 use tracing::error;
+use types::HookOutput;
+
+/// Convert a hook result to an exit code, printing output JSON to stdout
+/// on success or error JSON to stderr on failure.
+fn emit_hook_result(result: HookResult<HookOutput>) -> i32 {
+    match result {
+        Ok(output) => match serde_json::to_string(&output) {
+            Ok(json) => {
+                println!("{}", json);
+                0
+            }
+            Err(e) => {
+                error!(error = %e, "Failed to serialize output");
+                1
+            }
+        },
+        Err(e) => {
+            eprintln!("{}", e.to_json_error());
+            e.exit_code()
+        }
+    }
+}
 
 /// Handle hooks subcommand dispatch
 ///
@@ -46,102 +73,26 @@ use tracing::error;
 pub async fn handle_hooks_command(cmd: HooksCommands) -> i32 {
     match cmd {
         HooksCommands::SessionStart(args) => {
-            match session_start::execute(args).await {
-                Ok(output) => {
-                    // Output JSON to stdout
-                    match serde_json::to_string(&output) {
-                        Ok(json) => {
-                            println!("{}", json);
-                            0
-                        }
-                        Err(e) => {
-                            error!(error = %e, "Failed to serialize output");
-                            1
-                        }
-                    }
-                }
-                Err(e) => {
-                    // Output error JSON to stderr
-                    let error_json = e.to_json_error();
-                    eprintln!("{}", error_json);
-                    e.exit_code()
-                }
-            }
+            emit_hook_result(session_start::execute(args).await)
         }
         HooksCommands::PreTool(args) => {
-            match pre_tool_use::handle_pre_tool_use(&args) {
-                Ok(output) => {
-                    // Output JSON to stdout
-                    match serde_json::to_string(&output) {
-                        Ok(json) => {
-                            println!("{}", json);
-                            0
-                        }
-                        Err(e) => {
-                            error!(error = %e, "Failed to serialize output");
-                            1
-                        }
-                    }
-                }
-                Err(e) => {
-                    // Output error JSON to stderr
-                    let error_json = e.to_json_error();
-                    eprintln!("{}", error_json);
-                    e.exit_code()
-                }
-            }
+            emit_hook_result(pre_tool_use::handle_pre_tool_use(&args))
         }
-        HooksCommands::PostTool(args) => match post_tool_use::execute(args).await {
-            Ok(output) => match serde_json::to_string(&output) {
-                Ok(json) => {
-                    println!("{}", json);
-                    0
-                }
-                Err(e) => {
-                    error!(error = %e, "Failed to serialize output");
-                    1
-                }
-            },
-            Err(e) => {
-                let error_json = e.to_json_error();
-                eprintln!("{}", error_json);
-                e.exit_code()
-            }
-        },
-        HooksCommands::PromptSubmit(args) => match user_prompt_submit::execute(args).await {
-            Ok(output) => match serde_json::to_string(&output) {
-                Ok(json) => {
-                    println!("{}", json);
-                    0
-                }
-                Err(e) => {
-                    error!(error = %e, "Failed to serialize output");
-                    1
-                }
-            },
-            Err(e) => {
-                let error_json = e.to_json_error();
-                eprintln!("{}", error_json);
-                e.exit_code()
-            }
-        },
-        HooksCommands::SessionEnd(args) => match session_end::execute(args).await {
-            Ok(output) => match serde_json::to_string(&output) {
-                Ok(json) => {
-                    println!("{}", json);
-                    0
-                }
-                Err(e) => {
-                    error!(error = %e, "Failed to serialize output");
-                    1
-                }
-            },
-            Err(e) => {
-                let error_json = e.to_json_error();
-                eprintln!("{}", error_json);
-                e.exit_code()
-            }
-        },
+        HooksCommands::PostTool(args) => {
+            emit_hook_result(post_tool_use::execute(args).await)
+        }
+        HooksCommands::PromptSubmit(args) => {
+            emit_hook_result(user_prompt_submit::execute(args).await)
+        }
+        HooksCommands::SessionEnd(args) => {
+            emit_hook_result(session_end::execute(args).await)
+        }
+        HooksCommands::PreCompact(args) => {
+            emit_hook_result(pre_compact::execute(args).await)
+        }
+        HooksCommands::TaskCompleted(args) => {
+            emit_hook_result(task_completed::execute(args).await)
+        }
         HooksCommands::GenerateConfig(_args) => {
             error!("GenerateConfig not yet implemented");
             1
