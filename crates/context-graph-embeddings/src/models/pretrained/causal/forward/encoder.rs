@@ -8,6 +8,7 @@
 use candle_core::Tensor;
 
 use crate::error::{EmbeddingError, EmbeddingResult};
+use crate::models::attention::AttentionStrategy;
 
 use super::super::weights::{NomicEncoderLayerWeights, NomicFfnWeights, NomicWeights};
 use super::attention::{compute_rotary_freqs, self_attention_forward, self_attention_forward_with_lora};
@@ -18,6 +19,7 @@ pub fn run_encoder(
     embeddings: Tensor,
     attention_mask_tensor: &Tensor,
     weights: &NomicWeights,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<Tensor> {
     let config = &weights.config;
     let seq_len = embeddings.dim(1).map_err(|e| EmbeddingError::GpuError {
@@ -73,6 +75,7 @@ pub fn run_encoder(
             layer_idx,
             &cos,
             &sin,
+            strategy,
         )?;
     }
 
@@ -80,6 +83,7 @@ pub fn run_encoder(
 }
 
 /// Run single encoder layer: attention + SwiGLU FFN with post-norm.
+#[allow(clippy::too_many_arguments)]
 fn encoder_layer_forward(
     hidden_states: &Tensor,
     layer: &NomicEncoderLayerWeights,
@@ -88,6 +92,7 @@ fn encoder_layer_forward(
     layer_idx: usize,
     cos: &Tensor,
     sin: &Tensor,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<Tensor> {
     // Self-attention with RoPE
     let attention_output = self_attention_forward(
@@ -98,6 +103,7 @@ fn encoder_layer_forward(
         layer_idx,
         cos,
         sin,
+        strategy,
     )?;
 
     // Add & Norm (post-norm: residual + attention, then norm1)
@@ -145,6 +151,7 @@ pub fn run_encoder_with_lora(
     attention_mask_tensor: &Tensor,
     weights: &NomicWeights,
     lora_layers: &crate::training::lora::LoraLayers,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<Tensor> {
     let config = &weights.config;
     let seq_len = embeddings.dim(1).map_err(|e| EmbeddingError::GpuError {
@@ -199,6 +206,7 @@ pub fn run_encoder_with_lora(
             &cos,
             &sin,
             lora_layers,
+            strategy,
         )?;
     }
 
@@ -216,6 +224,7 @@ fn encoder_layer_forward_with_lora(
     cos: &Tensor,
     sin: &Tensor,
     lora_layers: &crate::training::lora::LoraLayers,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<Tensor> {
     let attention_output = self_attention_forward_with_lora(
         hidden_states,
@@ -226,6 +235,7 @@ fn encoder_layer_forward_with_lora(
         cos,
         sin,
         lora_layers,
+        strategy,
     )?;
 
     let attention_output =

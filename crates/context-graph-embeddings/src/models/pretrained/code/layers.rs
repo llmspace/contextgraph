@@ -8,6 +8,7 @@
 use candle_core::{DType, Tensor};
 
 use crate::error::{EmbeddingError, EmbeddingResult};
+use crate::models::attention::AttentionStrategy;
 
 use super::attention::gqa_forward;
 use super::config::QwenConfig;
@@ -107,6 +108,7 @@ pub fn decoder_layer_forward(
     rope_cache: &RopeCache,
     config: &QwenConfig,
     layer_idx: usize,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<Tensor> {
     // Pre-norm: apply RMSNorm before attention
     let normed = rms_norm(
@@ -123,6 +125,7 @@ pub fn decoder_layer_forward(
         rope_cache,
         config,
         layer_idx,
+        strategy,
     )?;
 
     // Residual connection

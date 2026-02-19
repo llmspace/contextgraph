@@ -11,6 +11,7 @@ use candle_core::{DType, Tensor};
 use tokenizers::Tokenizer;
 
 use crate::error::{EmbeddingError, EmbeddingResult};
+use crate::models::attention::AttentionStrategy;
 use crate::types::ModelId;
 
 use super::constants::CODE_MAX_TOKENS;
@@ -31,6 +32,7 @@ pub fn gpu_forward(
     text: &str,
     weights: &QwenWeights,
     tokenizer: &Tokenizer,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<Vec<f32>> {
     let device = weights.device;
     let config = &weights.config;
@@ -99,6 +101,7 @@ pub fn gpu_forward(
             &rope_cache,
             config,
             layer_idx,
+            strategy,
         )?;
     }
 

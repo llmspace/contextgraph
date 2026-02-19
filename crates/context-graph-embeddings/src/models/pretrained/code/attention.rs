@@ -6,6 +6,7 @@
 use candle_core::{DType, Tensor};
 
 use crate::error::{EmbeddingError, EmbeddingResult};
+use crate::models::attention::AttentionStrategy;
 
 use super::config::QwenConfig;
 use super::position::{apply_rope, RopeCache};
@@ -23,6 +24,7 @@ pub fn gqa_forward(
     rope_cache: &RopeCache,
     config: &QwenConfig,
     layer_idx: usize,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<Tensor> {
     let (batch_size, seq_len, hidden_size) =
         hidden_states
@@ -123,28 +125,24 @@ pub fn gqa_forward(
     let key = repeat_kv(&key, num_groups, layer_idx)?;
     let value = repeat_kv(&value, num_groups, layer_idx)?;
 
-    // K^T with contiguous() for matmul
-    let key_t = key
-        .transpose(2, 3)
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!("Qwen2 layer {} K transpose 2,3 failed: {}", layer_idx, e),
-        })?
-        .contiguous()
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!("Qwen2 layer {} K^T contiguous failed: {}", layer_idx, e),
-        })?;
-
-    // Attention scores in FP32 to prevent overflow (FP16 max ~65504)
-    // Q @ K^T can easily overflow in FP16 for longer sequences
+    // Convert Q, K, V, mask to F32 for numerical stability (FP16 max ~65504).
+    // The attention strategy operates in the dtype it receives, so we pass F32
+    // and convert the output back to the original dtype afterwards.
+    let original_dtype = query.dtype();
     let query_f32 = query
         .to_dtype(DType::F32)
         .map_err(|e| EmbeddingError::GpuError {
             message: format!("Qwen2 layer {} Q to F32 failed: {}", layer_idx, e),
         })?;
-    let key_t_f32 = key_t
+    let key_f32 = key
         .to_dtype(DType::F32)
         .map_err(|e| EmbeddingError::GpuError {
-            message: format!("Qwen2 layer {} K^T to F32 failed: {}", layer_idx, e),
+            message: format!("Qwen2 layer {} K to F32 failed: {}", layer_idx, e),
+        })?;
+    let value_f32 = value
+        .to_dtype(DType::F32)
+        .map_err(|e| EmbeddingError::GpuError {
+            message: format!("Qwen2 layer {} V to F32 failed: {}", layer_idx, e),
         })?;
     let attention_mask_f32 =
         attention_mask
@@ -153,46 +151,21 @@ pub fn gqa_forward(
                 message: format!("Qwen2 layer {} mask to F32 failed: {}", layer_idx, e),
             })?;
 
-    // Attention scores: Q @ K^T / sqrt(head_dim) in FP32
-    let scale = 1.0 / (head_dim as f64).sqrt();
-    let scores = query_f32
-        .matmul(&key_t_f32)
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!("Qwen2 layer {} QK matmul failed: {}", layer_idx, e),
-        })?
-        .affine(scale, 0.0)
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!("Qwen2 layer {} attention scale failed: {}", layer_idx, e),
-        })?;
+    // Dispatch to attention strategy (scale = sqrt(head_dim), strategy divides by it)
+    let scale = (head_dim as f64).sqrt();
+    let context = strategy.forward(
+        &query_f32,
+        &key_f32,
+        &value_f32,
+        &attention_mask_f32,
+        scale,
+    )?;
 
-    // Add attention mask (already in F32)
-    let scores =
-        scores
-            .broadcast_add(&attention_mask_f32)
-            .map_err(|e| EmbeddingError::GpuError {
-                message: format!("Qwen2 layer {} attention mask add failed: {}", layer_idx, e),
-            })?;
-
-    // Softmax in FP32 (scores already in F32)
-    let attention_probs_f32 =
-        candle_nn::ops::softmax(&scores, candle_core::D::Minus1).map_err(|e| {
-            EmbeddingError::GpuError {
-                message: format!("Qwen2 layer {} softmax failed: {}", layer_idx, e),
-            }
-        })?;
-    // Convert back to FP16 for context matmul
-    let attention_probs =
-        attention_probs_f32
-            .to_dtype(DType::F16)
-            .map_err(|e| EmbeddingError::GpuError {
-                message: format!("Qwen2 layer {} softmax to F16 failed: {}", layer_idx, e),
-            })?;
-
-    // Apply attention to values: [batch, heads, seq_len, head_dim]
-    let context = attention_probs
-        .matmul(&value)
+    // Convert context back to original dtype (FP16)
+    let context = context
+        .to_dtype(original_dtype)
         .map_err(|e| EmbeddingError::GpuError {
-            message: format!("Qwen2 layer {} context matmul failed: {}", layer_idx, e),
+            message: format!("Qwen2 layer {} context to original dtype failed: {}", layer_idx, e),
         })?;
 
     // Reshape back: [batch, seq_len, hidden_size]

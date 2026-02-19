@@ -9,6 +9,7 @@
 use candle_core::Tensor;
 
 use crate::error::{EmbeddingError, EmbeddingResult};
+use crate::models::attention::AttentionStrategy;
 
 use super::super::config::NomicConfig;
 use super::super::weights::NomicAttentionWeights;
@@ -142,6 +143,7 @@ fn apply_rotary_emb(
 }
 
 /// Self-attention forward pass with fused QKV and rotary position embeddings.
+#[allow(clippy::too_many_arguments)]
 pub fn self_attention_forward(
     hidden_states: &Tensor,
     attention: &NomicAttentionWeights,
@@ -150,6 +152,7 @@ pub fn self_attention_forward(
     layer_idx: usize,
     cos: &Tensor,
     sin: &Tensor,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<Tensor> {
     let (batch_size, seq_len, hidden_size) =
         hidden_states
@@ -207,65 +210,9 @@ pub fn self_attention_forward(
     let q = apply_rotary_emb(&q, cos, sin)?;
     let k = apply_rotary_emb(&k, cos, sin)?;
 
-    // Scaled dot-product attention: softmax(QK^T / sqrt(d)) V
+    // Scaled dot-product attention via pluggable strategy
     let scale = (head_dim as f64).sqrt();
-
-    let k_t = k
-        .transpose(2, 3)
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!(
-                "CausalModel layer {} K transpose 2,3 failed: {}",
-                layer_idx, e
-            ),
-        })?
-        .contiguous()
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!(
-                "CausalModel layer {} K^T contiguous failed: {}",
-                layer_idx, e
-            ),
-        })?;
-
-    let scores = q
-        .matmul(&k_t)
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!(
-                "CausalModel layer {} QK matmul failed: {}",
-                layer_idx, e
-            ),
-        })?;
-
-    let scores = (scores / scale).map_err(|e| EmbeddingError::GpuError {
-        message: format!(
-            "CausalModel layer {} attention scale failed: {}",
-            layer_idx, e
-        ),
-    })?;
-
-    let scores = scores
-        .broadcast_add(attention_mask)
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!(
-                "CausalModel layer {} attention mask failed: {}",
-                layer_idx, e
-            ),
-        })?;
-
-    let attn_probs =
-        candle_nn::ops::softmax(&scores, candle_core::D::Minus1).map_err(|e| {
-            EmbeddingError::GpuError {
-                message: format!("CausalModel layer {} softmax failed: {}", layer_idx, e),
-            }
-        })?;
-
-    let context = attn_probs
-        .matmul(&v)
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!(
-                "CausalModel layer {} context matmul failed: {}",
-                layer_idx, e
-            ),
-        })?;
+    let context = strategy.forward(&q, &k, &v, attention_mask, scale)?;
 
     // Reshape back: [batch, heads, seq, head_dim] → [batch, seq, hidden]
     let context = context
@@ -345,6 +292,7 @@ pub fn self_attention_forward_with_lora(
     cos: &Tensor,
     sin: &Tensor,
     lora_layers: &crate::training::lora::LoraLayers,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<Tensor> {
     let (batch_size, seq_len, hidden_size) =
         hidden_states
@@ -464,65 +412,9 @@ pub fn self_attention_forward_with_lora(
     let q = apply_rotary_emb(&q, cos, sin)?;
     let k = apply_rotary_emb(&k, cos, sin)?;
 
-    // Scaled dot-product attention: softmax(QK^T / sqrt(d)) V
+    // Scaled dot-product attention via pluggable strategy
     let scale = (head_dim as f64).sqrt();
-
-    let k_t = k
-        .transpose(2, 3)
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!(
-                "CausalModel layer {} K transpose 2,3 failed: {}",
-                layer_idx, e
-            ),
-        })?
-        .contiguous()
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!(
-                "CausalModel layer {} K^T contiguous failed: {}",
-                layer_idx, e
-            ),
-        })?;
-
-    let scores = q
-        .matmul(&k_t)
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!(
-                "CausalModel layer {} QK matmul failed: {}",
-                layer_idx, e
-            ),
-        })?;
-
-    let scores = (scores / scale).map_err(|e| EmbeddingError::GpuError {
-        message: format!(
-            "CausalModel layer {} attention scale failed: {}",
-            layer_idx, e
-        ),
-    })?;
-
-    let scores = scores
-        .broadcast_add(attention_mask)
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!(
-                "CausalModel layer {} attention mask failed: {}",
-                layer_idx, e
-            ),
-        })?;
-
-    let attn_probs =
-        candle_nn::ops::softmax(&scores, candle_core::D::Minus1).map_err(|e| {
-            EmbeddingError::GpuError {
-                message: format!("CausalModel layer {} softmax failed: {}", layer_idx, e),
-            }
-        })?;
-
-    let context = attn_probs
-        .matmul(&v)
-        .map_err(|e| EmbeddingError::GpuError {
-            message: format!(
-                "CausalModel layer {} context matmul failed: {}",
-                layer_idx, e
-            ),
-        })?;
+    let context = strategy.forward(&q, &k, &v, attention_mask, scale)?;
 
     // Reshape back: [batch, heads, seq, head_dim] → [batch, seq, hidden]
     let context = context

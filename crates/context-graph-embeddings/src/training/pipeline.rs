@@ -11,6 +11,7 @@ use candle_core::{backend::BackendDevice, Device, Tensor};
 use tokenizers::Tokenizer;
 
 use crate::error::{EmbeddingError, EmbeddingResult};
+use crate::models::attention::{self, AttentionStrategy, AttentionMode};
 use crate::models::pretrained::causal::config::CAUSAL_DIMENSION;
 use crate::models::pretrained::causal::forward::{
     gpu_forward_base_tensor, gpu_forward_with_lora_tensor, l2_normalize,
@@ -122,6 +123,9 @@ pub struct CausalTrainingPipeline {
     pub config: PipelineConfig,
     /// Device for tensor operations.
     device: Device,
+    /// Attention strategy for forward passes.
+    /// Training uses DenseAttention by default since sequences are short (512 tokens).
+    attention_strategy: Box<dyn AttentionStrategy>,
 }
 
 impl CausalTrainingPipeline {
@@ -148,12 +152,16 @@ impl CausalTrainingPipeline {
             multitask_heads.as_ref().map(|h| h.total_params()).unwrap_or(0),
         );
 
+        // Training uses dense attention since sequences are capped at 512 tokens.
+        let attention_strategy = attention::create_strategy(&AttentionMode::Dense);
+
         Ok(Self {
             lora,
             projection,
             multitask_heads,
             config,
             device,
+            attention_strategy,
         })
     }
 
@@ -184,10 +192,11 @@ impl CausalTrainingPipeline {
             // making contrastive learning impossible. The projection heads learn
             // the cause/effect separation instead.
             let cause_prefixed = format!("search_document: {}", &pair.cause_text);
+            let strategy = self.attention_strategy.as_ref();
             let cause_emb = if use_lora {
-                gpu_forward_with_lora_tensor(&cause_prefixed, weights, tokenizer, &self.lora)?
+                gpu_forward_with_lora_tensor(&cause_prefixed, weights, tokenizer, &self.lora, strategy)?
             } else {
-                gpu_forward_base_tensor(&cause_prefixed, weights, tokenizer)?
+                gpu_forward_base_tensor(&cause_prefixed, weights, tokenizer, strategy)?
             };
             let cause_proj = projection.project_cause_trainable(&cause_emb)?;
             let cause_norm = l2_normalize(&cause_proj)?;
@@ -195,9 +204,9 @@ impl CausalTrainingPipeline {
 
             let effect_prefixed = format!("search_document: {}", &pair.effect_text);
             let effect_emb = if use_lora {
-                gpu_forward_with_lora_tensor(&effect_prefixed, weights, tokenizer, &self.lora)?
+                gpu_forward_with_lora_tensor(&effect_prefixed, weights, tokenizer, &self.lora, strategy)?
             } else {
-                gpu_forward_base_tensor(&effect_prefixed, weights, tokenizer)?
+                gpu_forward_base_tensor(&effect_prefixed, weights, tokenizer, strategy)?
             };
             let effect_proj = projection.project_effect_trainable(&effect_emb)?;
             let effect_norm = l2_normalize(&effect_proj)?;
@@ -229,9 +238,10 @@ impl CausalTrainingPipeline {
         tokenizer: &Tokenizer,
     ) -> EmbeddingResult<Tensor> {
         let mut vecs = Vec::new();
+        let strategy = self.attention_strategy.as_ref();
         for text in texts {
             let prefixed = format!("{}{}", instruction, text);
-            let emb = gpu_forward_with_lora_tensor(&prefixed, weights, tokenizer, &self.lora)?;
+            let emb = gpu_forward_with_lora_tensor(&prefixed, weights, tokenizer, &self.lora, strategy)?;
             vecs.push(emb);
         }
 

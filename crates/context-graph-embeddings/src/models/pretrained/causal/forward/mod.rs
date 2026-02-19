@@ -24,6 +24,7 @@ use candle_core::Tensor;
 use tokenizers::Tokenizer;
 
 use crate::error::{EmbeddingError, EmbeddingResult};
+use crate::models::attention::AttentionStrategy;
 use crate::types::ModelId;
 
 use super::config::CAUSAL_MAX_TOKENS;
@@ -43,6 +44,7 @@ pub fn gpu_forward(
     text: &str,
     weights: &NomicWeights,
     tokenizer: &Tokenizer,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<Vec<f32>> {
     let device = weights.device;
     let config = &weights.config;
@@ -96,7 +98,7 @@ pub fn gpu_forward(
     let embeddings = compute_embeddings(&input_ids, &token_type_tensor, weights, seq_len)?;
 
     // === ENCODER LAYERS ===
-    let hidden_states = run_encoder(embeddings, &attention_mask_tensor, weights)?;
+    let hidden_states = run_encoder(embeddings, &attention_mask_tensor, weights, strategy)?;
 
     // === POOLING ===
     let pooled = mean_pooling(&hidden_states, &attention_mask_tensor)?;
@@ -212,12 +214,13 @@ pub fn gpu_forward_dual(
     text: &str,
     weights: &NomicWeights,
     tokenizer: &Tokenizer,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<(Vec<f32>, Vec<f32>)> {
     let cause_text = format!("{}{}", super::config::CAUSE_INSTRUCTION, text);
     let effect_text = format!("{}{}", super::config::EFFECT_INSTRUCTION, text);
 
-    let cause_vec = gpu_forward(&cause_text, weights, tokenizer)?;
-    let effect_vec = gpu_forward(&effect_text, weights, tokenizer)?;
+    let cause_vec = gpu_forward(&cause_text, weights, tokenizer, strategy)?;
+    let effect_vec = gpu_forward(&effect_text, weights, tokenizer, strategy)?;
 
     Ok((cause_vec, effect_vec))
 }
@@ -235,6 +238,7 @@ pub fn gpu_forward_base_tensor(
     text: &str,
     weights: &NomicWeights,
     tokenizer: &Tokenizer,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<Tensor> {
     let device = weights.device;
     let config = &weights.config;
@@ -281,7 +285,7 @@ pub fn gpu_forward_base_tensor(
 
     let embeddings = compute_embeddings(&input_ids, &token_type_tensor, weights, seq_len)?;
 
-    let hidden_states = run_encoder(embeddings, &attention_mask_tensor, weights)?;
+    let hidden_states = run_encoder(embeddings, &attention_mask_tensor, weights, strategy)?;
 
     let pooled = mean_pooling(&hidden_states, &attention_mask_tensor)?;
     l2_normalize(&pooled)
@@ -296,6 +300,7 @@ pub fn gpu_forward_with_lora_tensor(
     weights: &NomicWeights,
     tokenizer: &Tokenizer,
     lora_layers: &crate::training::lora::LoraLayers,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<Tensor> {
     let device = weights.device;
     let config = &weights.config;
@@ -342,7 +347,13 @@ pub fn gpu_forward_with_lora_tensor(
 
     let embeddings = compute_embeddings(&input_ids, &token_type_tensor, weights, seq_len)?;
 
-    let hidden_states = run_encoder_with_lora(embeddings, &attention_mask_tensor, weights, lora_layers)?;
+    let hidden_states = run_encoder_with_lora(
+        embeddings,
+        &attention_mask_tensor,
+        weights,
+        lora_layers,
+        strategy,
+    )?;
 
     let pooled = mean_pooling(&hidden_states, &attention_mask_tensor)?;
     l2_normalize(&pooled)
@@ -358,8 +369,10 @@ pub fn gpu_forward_with_lora(
     weights: &NomicWeights,
     tokenizer: &Tokenizer,
     lora_layers: &crate::training::lora::LoraLayers,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<Vec<f32>> {
-    let normalized = gpu_forward_with_lora_tensor(text, weights, tokenizer, lora_layers)?;
+    let normalized =
+        gpu_forward_with_lora_tensor(text, weights, tokenizer, lora_layers, strategy)?;
 
     normalized
         .flatten_all()
@@ -385,9 +398,10 @@ pub fn gpu_forward_dual_trained(
     tokenizer: &Tokenizer,
     lora_layers: &crate::training::lora::LoraLayers,
     projection: &super::weights::TrainableProjection,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<(Vec<f32>, Vec<f32>)> {
     let (cause_tensor, effect_tensor) = gpu_forward_dual_trainable_tensor(
-        text, weights, tokenizer, lora_layers, projection,
+        text, weights, tokenizer, lora_layers, projection, strategy,
     )?;
 
     let cause_vec: Vec<f32> = cause_tensor
@@ -423,8 +437,15 @@ pub fn gpu_forward_single_trained(
     lora_layers: &crate::training::lora::LoraLayers,
     projection: &super::weights::TrainableProjection,
     is_cause: bool,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<Vec<f32>> {
-    let emb = gpu_forward_with_lora_tensor(text_with_instruction, weights, tokenizer, lora_layers)?;
+    let emb = gpu_forward_with_lora_tensor(
+        text_with_instruction,
+        weights,
+        tokenizer,
+        lora_layers,
+        strategy,
+    )?;
 
     let projected = if is_cause {
         projection.project_cause_trainable(&emb)?
@@ -463,14 +484,27 @@ pub fn gpu_forward_dual_trainable_tensor(
     tokenizer: &Tokenizer,
     lora_layers: &crate::training::lora::LoraLayers,
     projection: &super::weights::TrainableProjection,
+    strategy: &dyn AttentionStrategy,
 ) -> EmbeddingResult<(Tensor, Tensor)> {
     // Use search_document: prefix to match training distribution.
     // Cause/effect asymmetry comes from the projection heads, not the prefix.
     let prefixed_text = format!("search_document: {}", text);
 
     // LoRA-augmented forward pass (same input for both roles; projection heads differentiate)
-    let cause_emb = gpu_forward_with_lora_tensor(&prefixed_text, weights, tokenizer, lora_layers)?;
-    let effect_emb = gpu_forward_with_lora_tensor(&prefixed_text, weights, tokenizer, lora_layers)?;
+    let cause_emb = gpu_forward_with_lora_tensor(
+        &prefixed_text,
+        weights,
+        tokenizer,
+        lora_layers,
+        strategy,
+    )?;
+    let effect_emb = gpu_forward_with_lora_tensor(
+        &prefixed_text,
+        weights,
+        tokenizer,
+        lora_layers,
+        strategy,
+    )?;
 
     // Apply trainable projections (gradients flow through Var tensors)
     let cause_proj = projection.project_cause_trainable(&cause_emb)?;

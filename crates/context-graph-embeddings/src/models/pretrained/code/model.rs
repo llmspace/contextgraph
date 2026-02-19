@@ -11,6 +11,7 @@ use tokenizers::Tokenizer;
 
 use crate::error::{EmbeddingError, EmbeddingResult};
 use crate::gpu::init_gpu;
+use crate::models::attention::{self, AttentionStrategy, resolve_attention_mode};
 use crate::traits::{EmbeddingModel, SingleModelConfig};
 use crate::types::{InputType, ModelEmbedding, ModelId, ModelInput};
 
@@ -78,6 +79,9 @@ pub struct CodeModel {
     /// Memory used by model weights (bytes).
     #[allow(dead_code)]
     pub(super) memory_size: usize,
+
+    /// Attention strategy (dense, tiled, sliding window).
+    attention_strategy: Box<dyn AttentionStrategy>,
 }
 
 impl CodeModel {
@@ -98,12 +102,23 @@ impl CodeModel {
             });
         }
 
+        let mode =
+            resolve_attention_mode(config.attention_mode.as_ref(), config.use_flash_attention);
+        let strategy = attention::create_strategy(&mode);
+
+        tracing::debug!(
+            "CodeModel attention strategy: {} (mode: {:?})",
+            strategy.name(),
+            mode,
+        );
+
         Ok(Self {
             model_state: std::sync::RwLock::new(ModelState::Unloaded),
             model_path: model_path.to_path_buf(),
             config,
             loaded: AtomicBool::new(false),
             memory_size: 0,
+            attention_strategy: strategy,
         })
     }
 
@@ -265,7 +280,8 @@ impl EmbeddingModel for CodeModel {
 
         match &*state {
             ModelState::Loaded { weights, tokenizer } => {
-                let vector = gpu_forward(&content, weights, tokenizer)?;
+                let strategy = self.attention_strategy.as_ref();
+                let vector = gpu_forward(&content, weights, tokenizer, strategy)?;
                 let latency_us = start.elapsed().as_micros() as u64;
                 Ok(ModelEmbedding::new(ModelId::Code, vector, latency_us))
             }

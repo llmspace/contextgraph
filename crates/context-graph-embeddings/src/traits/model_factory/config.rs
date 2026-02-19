@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::{EmbeddingError, EmbeddingResult};
+use crate::models::attention::AttentionMode;
 
 use super::{DevicePlacement, QuantizationMode};
 
@@ -21,6 +22,7 @@ use super::{DevicePlacement, QuantizationMode};
 ///     quantization: QuantizationMode::Fp16,
 ///     max_batch_size: 32,
 ///     use_flash_attention: true,
+///     attention_mode: None,
 /// };
 /// assert!(config.validate().is_ok());
 /// ```
@@ -39,10 +41,19 @@ pub struct SingleModelConfig {
     #[serde(default = "default_max_batch_size")]
     pub max_batch_size: usize,
 
-    /// Whether to use flash attention if available.
-    /// Flash attention reduces memory and improves speed.
+    /// Legacy flag for flash/memory-efficient attention.
+    /// Mapped to `attention_mode` internally:
+    /// - `true` → `AttentionMode::MemoryEfficient { tile_size: 256 }`
+    /// - `false` → `AttentionMode::Dense`
+    ///
+    /// Prefer setting `attention_mode` directly for new configs.
     #[serde(default = "default_use_flash_attention")]
     pub use_flash_attention: bool,
+
+    /// Attention strategy selection. When set, takes priority over `use_flash_attention`.
+    /// Defaults to `None` (uses `use_flash_attention` mapping).
+    #[serde(default)]
+    pub attention_mode: Option<AttentionMode>,
 }
 
 fn default_max_batch_size() -> usize {
@@ -60,6 +71,7 @@ impl Default for SingleModelConfig {
             quantization: QuantizationMode::None,
             max_batch_size: 32,
             use_flash_attention: true,
+            attention_mode: None,
         }
     }
 }
@@ -165,6 +177,7 @@ mod tests {
             quantization: QuantizationMode::Int8,
             max_batch_size: 64,
             use_flash_attention: false,
+            attention_mode: None,
         };
 
         let json = serde_json::to_string(&config).unwrap();

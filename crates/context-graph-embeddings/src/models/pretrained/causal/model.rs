@@ -17,6 +17,7 @@ use tokenizers::Tokenizer;
 
 use crate::error::{EmbeddingError, EmbeddingResult};
 use crate::gpu::init_gpu;
+use crate::models::attention::{self, AttentionStrategy, resolve_attention_mode};
 use crate::traits::{EmbeddingModel, SingleModelConfig};
 use crate::types::{InputType, ModelEmbedding, ModelId, ModelInput};
 
@@ -90,6 +91,9 @@ pub struct CausalModel {
 
     /// Whether model weights are loaded and ready.
     loaded: AtomicBool,
+
+    /// Attention strategy (dense, tiled, sliding window).
+    attention_strategy: Box<dyn AttentionStrategy>,
 }
 
 impl CausalModel {
@@ -123,10 +127,21 @@ impl CausalModel {
             });
         }
 
+        let mode =
+            resolve_attention_mode(config.attention_mode.as_ref(), config.use_flash_attention);
+        let strategy = attention::create_strategy(&mode);
+
+        tracing::debug!(
+            "CausalModel attention strategy: {} (mode: {:?})",
+            strategy.name(),
+            mode,
+        );
+
         Ok(Self {
             model_state: std::sync::RwLock::new(ModelState::Unloaded),
             model_path: model_path.to_path_buf(),
             loaded: AtomicBool::new(false),
+            attention_strategy: strategy,
         })
     }
 
@@ -269,6 +284,7 @@ impl CausalModel {
 
         match &*state {
             ModelState::Loaded { weights, tokenizer, trained } => {
+                let strategy = self.attention_strategy.as_ref();
                 let vec = if let Some(ref t) = trained {
                     // Use search_document: prefix to match training distribution.
                     // Training pipeline (pipeline.rs) uses "search_document: " for all texts,
@@ -277,12 +293,12 @@ impl CausalModel {
                     // shift that compresses all scores toward zero.
                     let text = format!("search_document: {}", content);
                     gpu_forward_single_trained(
-                        &text, weights, tokenizer, &t.lora, &t.projection, is_cause,
+                        &text, weights, tokenizer, &t.lora, &t.projection, is_cause, strategy,
                     )?
                 } else {
                     // No trained weights: use causal instruction prefix for base model
                     let text = format!("{}{}", instruction, content);
-                    gpu_forward(&text, weights, tokenizer)?
+                    gpu_forward(&text, weights, tokenizer, strategy)?
                 };
 
                 if vec.len() != 768 {
@@ -349,12 +365,13 @@ impl CausalModel {
                 tokenizer,
                 trained,
             } => {
+                let strategy = self.attention_strategy.as_ref();
                 let (cause_vec, effect_vec) = if let Some(ref t) = trained {
                     gpu_forward_dual_trained(
-                        content, weights, tokenizer, &t.lora, &t.projection,
+                        content, weights, tokenizer, &t.lora, &t.projection, strategy,
                     )?
                 } else {
-                    gpu_forward_dual(content, weights, tokenizer)?
+                    gpu_forward_dual(content, weights, tokenizer, strategy)?
                 };
 
                 // Validate dimensions (fail fast on implementation error)
@@ -563,11 +580,12 @@ impl EmbeddingModel for CausalModel {
 
         match &*state {
             ModelState::Loaded { weights, tokenizer, trained } => {
+                let strategy = self.attention_strategy.as_ref();
                 let vector = if let Some(ts) = trained {
                     // Use trained LoRA + projection (cause direction by default for single embed)
-                    gpu_forward_single_trained(&text_content, weights, tokenizer, &ts.lora, &ts.projection, true)?
+                    gpu_forward_single_trained(&text_content, weights, tokenizer, &ts.lora, &ts.projection, true, strategy)?
                 } else {
-                    gpu_forward(&text_content, weights, tokenizer)?
+                    gpu_forward(&text_content, weights, tokenizer, strategy)?
                 };
                 let latency_us = start.elapsed().as_micros() as u64;
                 Ok(ModelEmbedding::new(ModelId::Causal, vector, latency_us))

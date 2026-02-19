@@ -45,6 +45,7 @@
 //! }
 //! ```
 
+pub mod attention;
 pub mod custom;
 mod factory;
 mod memory_tracker;
