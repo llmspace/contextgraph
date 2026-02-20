@@ -817,6 +817,114 @@ async fn kill_process_on_port(port: u16) -> Result<()> {
     Ok(())
 }
 
+/// Kill a stale lock holder: a process that holds the PID file flock but is
+/// NOT serving on the expected daemon port.
+///
+/// This handles the critical failure mode where:
+/// 1. A previous MCP server process started (standalone or daemon)
+/// 2. Its transport layer died (TCP listener crashed, stdio disconnected)
+/// 3. The OS process stayed alive (RocksDB background threads, stuck futex)
+/// 4. The process holds flock() on mcp.pid forever
+/// 5. No new daemon can start → all Claude Code terminals lose MCP access
+///
+/// Detection: PID file exists → holder alive → NOT serving on daemon port → stale.
+/// Recovery: SIGTERM (1s grace) → SIGKILL → wait for flock release.
+///
+/// ONLY called in daemon mode. In standalone mode, PidFileGuard::acquire()
+/// handles lock contention with its existing error path.
+#[cfg(unix)]
+async fn kill_stale_lock_holder(db_path: &Path, daemon_port: u16) -> bool {
+    let pid_path = db_path.join("mcp.pid");
+
+    let pid_str = match fs::read_to_string(&pid_path) {
+        Ok(s) => s.trim().to_string(),
+        Err(_) => return false, // No PID file — nothing to do
+    };
+
+    let pid: i32 = match pid_str.parse() {
+        Ok(p) => p,
+        Err(_) => {
+            warn!("PID file contains non-numeric value '{}' — removing stale file", pid_str);
+            let _ = fs::remove_file(&pid_path);
+            return true;
+        }
+    };
+
+    let our_pid = std::process::id() as i32;
+    if pid <= 1 || pid == our_pid {
+        return false;
+    }
+
+    // Check if process is alive
+    let alive = unsafe { libc::kill(pid, 0) } == 0;
+    if !alive {
+        // Dead process — flock already released by kernel.
+        // PidFileGuard::acquire() will handle cleanup on next attempt.
+        info!("PID file holder {} is dead — lock will be reclaimable", pid);
+        return false;
+    }
+
+    // Process is alive — but is it serving on our daemon port?
+    // We already checked is_daemon_healthy() in the caller, but re-verify
+    // to avoid race conditions (daemon might have recovered between checks).
+    if is_daemon_healthy(daemon_port).await {
+        info!("PID {} is now serving on port {} — no kill needed", pid, daemon_port);
+        return false;
+    }
+
+    // Process alive, NOT serving on daemon port → it's stale.
+    // This catches both crashed daemons and orphaned standalone instances.
+    warn!(
+        "STALE LOCK DETECTED: PID {} holds flock on '{}' but is NOT serving on port {}. \
+         Sending SIGTERM for graceful shutdown.",
+        pid, pid_path.display(), daemon_port
+    );
+
+    // SIGTERM first — gives RocksDB time to flush
+    unsafe { libc::kill(pid, libc::SIGTERM); }
+
+    // Wait up to 2s for graceful shutdown
+    for i in 0..20 {
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        if unsafe { libc::kill(pid, 0) } != 0 {
+            info!("Stale PID {} terminated after SIGTERM ({}ms)", pid, (i + 1) * 100);
+            // Wait a bit more for kernel to release flock
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+            return true;
+        }
+    }
+
+    // Still alive after 2s — force kill
+    warn!("PID {} did not exit after SIGTERM (2s), sending SIGKILL", pid);
+    unsafe { libc::kill(pid, libc::SIGKILL); }
+
+    // Wait up to 1s for kernel to reap the process
+    for i in 0..10 {
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        if unsafe { libc::kill(pid, 0) } != 0 {
+            info!("Stale PID {} terminated after SIGKILL ({}ms)", pid, (i + 1) * 100);
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+            return true;
+        }
+        // Check for zombie state — flock IS released even though kill(pid,0)==0
+        let status_path = format!("/proc/{}/status", pid);
+        let is_zombie = fs::read_to_string(&status_path)
+            .map(|s| s.contains("State:\tZ") || s.contains("State:\tX"))
+            .unwrap_or(false);
+        if is_zombie {
+            info!("PID {} is zombie after SIGKILL — flock released, lock reclaimable", pid);
+            return true;
+        }
+    }
+
+    error!(
+        "FATAL: PID {} still alive after SIGKILL (1s) — OS may be stuck. \
+         Manual intervention required: kill -9 {}",
+        pid, pid
+    );
+    false
+}
+
 /// Quick TCP connect check (no protocol verification).
 /// Used only to detect if a port is in use before attempting to bind.
 async fn is_port_in_use(port: u16) -> bool {
@@ -1212,6 +1320,21 @@ async fn main() -> Result<()> {
                 }
                 tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
                 continue;
+            }
+
+            // ---- Step 2.5: Kill stale lock holder if present ----
+            // A process may hold the flock on mcp.pid but NOT serve on the daemon port.
+            // This happens when a previous daemon/standalone instance crashed internally
+            // (TCP listener died, stdio disconnected) but the OS process stayed alive
+            // (RocksDB background threads, stuck futex). We detect and kill it here
+            // so that Step 3 can acquire the lock.
+            #[cfg(unix)]
+            if uses_rocksdb {
+                if kill_stale_lock_holder(&db_path, daemon_port).await {
+                    info!("Stale lock holder removed, retrying lock acquisition (attempt {})", attempt);
+                    // Don't count this as a failed attempt — we made progress
+                    // Fall through to Step 3 instead of continue
+                }
             }
 
             // ---- Step 3: Port is free — try to acquire PID lock and start daemon ----
