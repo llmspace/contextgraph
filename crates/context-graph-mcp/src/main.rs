@@ -914,7 +914,9 @@ async fn kill_stale_lock_holder(db_path: &Path, daemon_port: u16) -> bool {
         Ok(p) => p,
         Err(_) => {
             warn!("PID file contains non-numeric value '{}' — removing stale file", pid_str);
-            let _ = fs::remove_file(&pid_path);
+            if let Err(e) = fs::remove_file(&pid_path) {
+                warn!("Failed to remove corrupt PID file {}: {}", pid_path.display(), e);
+            }
             return true;
         }
     };
@@ -1016,7 +1018,9 @@ async fn kill_stale_standalone_holder(db_path: &Path) -> bool {
         Ok(p) => p,
         Err(_) => {
             warn!("PID file contains non-numeric value '{}' — removing", pid_str);
-            let _ = fs::remove_file(&pid_path);
+            if let Err(e) = fs::remove_file(&pid_path) {
+                warn!("Failed to remove corrupt PID file {}: {}", pid_path.display(), e);
+            }
             return true;
         }
     };
@@ -1673,8 +1677,12 @@ async fn main() -> Result<()> {
         // Kill stale holders (both daemon and standalone)
         #[cfg(unix)]
         if uses_rocksdb {
-            let _ = kill_stale_lock_holder(&db_path, daemon_port).await;
-            let _ = kill_stale_standalone_holder(&db_path).await;
+            if !kill_stale_lock_holder(&db_path, daemon_port).await {
+                debug!("kill_stale_lock_holder: no stale process found or no action taken");
+            }
+            if !kill_stale_standalone_holder(&db_path).await {
+                debug!("kill_stale_standalone_holder: no stale process found or no action taken");
+            }
             // Brief pause for kernel to release flock after kill
             tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
         }

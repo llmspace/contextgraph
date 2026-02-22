@@ -245,7 +245,7 @@ impl StubMultiArrayProvider {
             })
             .collect();
 
-        SparseVector::new(indices, values).unwrap_or_else(|_| SparseVector::empty())
+        SparseVector::new(indices, values).expect("Stub sparse vector generation should always produce valid data")
     }
 
     /// Generate deterministic token embeddings for E12 (late-interaction).

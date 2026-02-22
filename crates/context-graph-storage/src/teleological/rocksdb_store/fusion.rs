@@ -46,7 +46,7 @@ use uuid::Uuid;
 /// - Rank 2: 1/(60+2) = 0.01613
 /// - Rank 10: 1/(60+10) = 0.01429
 /// - Rank 100: 1/(60+100) = 0.00625
-pub const RRF_K: f32 = 60.0;
+pub const RRF_K: i32 = 60;
 
 /// Weighted Reciprocal Rank Fusion (RRF) for combining multiple result sets.
 ///

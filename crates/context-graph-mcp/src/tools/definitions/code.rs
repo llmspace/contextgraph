@@ -73,7 +73,8 @@ fn search_code_definition() -> ToolDefinition {
                     "description": "Include AST context (scope chain, entity type) in results if available (default: false). Only affects chunks created by AST chunker."
                 }
             },
-            "required": ["query"]
+            "required": ["query"],
+            "additionalProperties": false
         }),
     )
 }

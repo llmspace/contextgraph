@@ -35,7 +35,17 @@ impl RocksDbTeleologicalStore {
         let id = fp.id;
 
         // Add to all HNSW-capable dense embedder indexes
+        // Skip E2/E3/E4 temporal indexes — never searched in multi_space or pipeline modes,
+        // and E2 vectors are always identical (AP-9 post-retrieval decay). Saves CPU + RAM.
         for embedder in EmbedderIndex::all_hnsw() {
+            if matches!(
+                embedder,
+                EmbedderIndex::E2TemporalRecent
+                    | EmbedderIndex::E3TemporalPeriodic
+                    | EmbedderIndex::E4TemporalPositional
+            ) {
+                continue;
+            }
             if let Some(index) = self.index_registry.get(embedder) {
                 let vector = Self::get_embedder_vector(&fp.semantic, embedder);
                 index.insert(id, vector)?;

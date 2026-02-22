@@ -488,8 +488,9 @@ mod tests {
     #[test]
     fn test_similarity_functions() {
         // Dense cosine similarity
+        // SRC-3: normalized to [0,1] via (raw+1)/2
         assert!((cosine_similarity(&[1.0, 0.0, 0.0], &[1.0, 0.0, 0.0]) - 1.0).abs() < 0.001);
-        assert!(cosine_similarity(&[1.0, 0.0, 0.0], &[0.0, 1.0, 0.0]).abs() < 0.001);
+        assert!((cosine_similarity(&[1.0, 0.0, 0.0], &[0.0, 1.0, 0.0]) - 0.5).abs() < 0.001);
         // Sparse keyword similarity
         let q = SparseVector::new(vec![10, 20, 30], vec![1.0, 0.5, 0.3]).unwrap();
         let d = SparseVector::new(vec![10, 20, 30], vec![1.0, 0.5, 0.3]).unwrap();

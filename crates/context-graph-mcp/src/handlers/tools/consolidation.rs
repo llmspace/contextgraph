@@ -155,7 +155,11 @@ pub struct TriggerConsolidationParams {
     #[serde(default = "default_consolidation_strategy")]
     pub strategy: String,
 
-    /// Minimum similarity for consolidation (default: 0.85)
+    /// Minimum similarity for consolidation (default: 0.925).
+    ///
+    /// Uses SRC-3 normalized cosine [0,1] scale where 0.925 = raw cosine 0.85.
+    /// This preserves the original strictness after cosine_similarity() was
+    /// normalized from [-1,1] to [0,1] via (raw+1)/2.
     #[serde(default = "default_consolidation_similarity")]
     pub min_similarity: f32,
 }
@@ -169,7 +173,9 @@ fn default_consolidation_strategy() -> String {
 }
 
 fn default_consolidation_similarity() -> f32 {
-    0.85
+    // SRC-3: cosine_similarity returns [0,1] via (raw+1)/2.
+    // 0.925 on [0,1] scale = raw cosine 0.85, preserving original strictness.
+    0.925
 }
 
 impl Handlers {
@@ -181,7 +187,7 @@ impl Handlers {
     /// Arguments:
     /// - max_memories (optional): Maximum to process (default: 100)
     /// - strategy (optional): "similarity", "temporal", "semantic" (default: "similarity")
-    /// - min_similarity (optional): Minimum similarity for merge (default: 0.85)
+    /// - min_similarity (optional): Minimum similarity for merge (default: 0.925)
     ///
     /// Returns:
     /// - consolidation_result: Pairs merged and outcome

@@ -68,7 +68,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "description": "Minimum semantic similarity threshold before temporal boost"
                     }
                 },
-                "required": ["query"]
+                "required": ["query"],
+                "additionalProperties": false
             }),
         ),
         // search_periodic - temporal search with E3 periodic pattern boost
@@ -130,7 +131,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "description": "Minimum semantic similarity threshold before periodic boost"
                     }
                 },
-                "required": ["query"]
+                "required": ["query"],
+                "additionalProperties": false
             }),
         ),
     ]

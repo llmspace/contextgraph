@@ -28,7 +28,7 @@
 use crate::tools::types::ToolDefinition;
 use serde_json::json;
 
-/// Returns embedder-first search tool definitions (5 tools).
+/// Returns embedder-first search tool definitions (7 tools).
 pub fn definitions() -> Vec<ToolDefinition> {
     vec![
         // search_by_embedder - Generic search using any embedder as primary

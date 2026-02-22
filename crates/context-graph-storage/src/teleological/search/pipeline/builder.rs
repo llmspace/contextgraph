@@ -73,7 +73,10 @@ impl PipelineBuilder {
     /// Execute the pipeline.
     pub fn execute(self, pipeline: &RetrievalPipeline) -> Result<PipelineResult, PipelineError> {
         let query_splade = self.query_splade.unwrap_or_default();
-        let query_matryoshka = self.query_matryoshka.unwrap_or_else(|| vec![0.0; 128]);
+        // When no matryoshka query is provided, skip MatryoshkaAnn stage instead of
+        // defaulting to zero vector (which would pollute ANN results with nonsense scores).
+        let has_matryoshka = self.query_matryoshka.is_some();
+        let query_matryoshka = self.query_matryoshka.unwrap_or_default();
         let query_semantic = self.query_semantic.ok_or_else(|| {
             error!("Pipeline build failed: query_semantic (E1) is required but not set");
             PipelineError::MissingQuery {
@@ -82,7 +85,10 @@ impl PipelineBuilder {
         })?;
         let query_tokens = self.query_tokens.unwrap_or_default();
 
-        let stages = self.stages.unwrap_or_else(|| PipelineStage::all().to_vec());
+        let mut stages = self.stages.unwrap_or_else(|| PipelineStage::all().to_vec());
+        if !has_matryoshka {
+            stages.retain(|s| *s != PipelineStage::MatryoshkaAnn);
+        }
 
         // Create modified config with k
         let mut config = pipeline.config.clone();

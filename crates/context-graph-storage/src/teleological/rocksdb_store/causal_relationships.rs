@@ -861,7 +861,7 @@ impl RocksDbTeleologicalStore {
                 (e8_results, config.e8_weight, "e8"),
                 (e11_results, config.e11_weight, "e11"),
             ],
-            RRF_K as i32,
+            RRF_K,
         );
 
         // Stage 6: Build results with consensus scoring

@@ -31,7 +31,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "default": "standard",
                         "description": "Output format: brief (names only), standard (with spaces), verbose (full profiles)"
                     }
-                }
+                },
+                "additionalProperties": false
             }),
         ),
         // get_topic_stability
@@ -48,7 +49,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "default": 6,
                         "description": "Lookback period in hours for computing averages"
                     }
-                }
+                },
+                "additionalProperties": false
             }),
         ),
         // detect_topics
@@ -72,7 +74,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "default": 10000,
                         "description": "Maximum fingerprints to load for clustering (default: 10000, max: 50000)"
                     }
-                }
+                },
+                "additionalProperties": false
             }),
         ),
         // get_divergence_alerts
@@ -91,7 +94,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "default": 2,
                         "description": "Hours to look back for recent activity comparison"
                     }
-                }
+                },
+                "additionalProperties": false
             }),
         ),
     ]

@@ -36,7 +36,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "default": true,
                         "description": "Use soft delete with 30-day recovery (default true per BR-MCP-001)"
                     }
-                }
+                },
+                "additionalProperties": false
             }),
         ),
         // boost_importance
@@ -59,7 +60,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "maximum": 1.0,
                         "description": "Importance change value (-1.0 to 1.0)"
                     }
-                }
+                },
+                "additionalProperties": false
             }),
         ),
     ]

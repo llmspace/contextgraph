@@ -46,7 +46,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "description": "Operator/user ID for audit provenance tracking"
                     }
                 },
-                "required": ["content"]
+                "required": ["content"],
+                "additionalProperties": false
             }),
         ),
         // get_memetic_status - get system state and metrics
@@ -57,7 +58,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
             json!({
                 "type": "object",
                 "properties": {},
-                "required": []
+                "required": [],
+                "additionalProperties": false
             }),
         ),
         // search_graph - semantic search with E5 causal and E10 paraphrase asymmetric similarity (ARCH-15, AP-77)
@@ -208,12 +210,14 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "description": "Half-life in seconds for exponential temporal decay (default: 86400 = 1 day). Only used with decayFunction='exponential'."
                     },
                     "lastHours": {
-                        "type": "number",
-                        "description": "Filter results to the last N hours. Shortcut for temporal window filtering."
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Filter results to the last N hours (integer). Shortcut for temporal window filtering."
                     },
                     "lastDays": {
-                        "type": "number",
-                        "description": "Filter results to the last N days. Shortcut for temporal window filtering."
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Filter results to the last N days (integer). Shortcut for temporal window filtering."
                     },
                     "sessionId": {
                         "type": "string",
@@ -265,7 +269,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "description": "Temporal scale for decay: micro, meso, macro, long, archival"
                     }
                 },
-                "required": ["query"]
+                "required": ["query"],
+                "additionalProperties": false
             }),
         ),
         // trigger_consolidation - trigger memory consolidation (PRD Section 10.1)
@@ -287,8 +292,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "type": "number",
                         "minimum": 0,
                         "maximum": 1,
-                        "default": 0.85,
-                        "description": "Minimum similarity threshold for consolidation candidates"
+                        "default": 0.925,
+                        "description": "Minimum similarity threshold for consolidation candidates (SRC-3 normalized [0,1] scale)"
                     },
                     "max_memories": {
                         "type": "integer",
@@ -298,7 +303,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "description": "Maximum memories to process in one batch"
                     }
                 },
-                "required": []
+                "required": [],
+                "additionalProperties": false
             }),
         ),
     ]

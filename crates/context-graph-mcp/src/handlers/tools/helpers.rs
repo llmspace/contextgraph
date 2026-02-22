@@ -210,15 +210,13 @@ impl Handlers {
 /// LOW-15: Consolidated from 4 identical private implementations in
 /// robustness_tools.rs, keyword_tools.rs, code_tools.rs, consolidation.rs.
 ///
-/// Returns the raw cosine similarity clamped to [-1.0, 1.0].
-/// Returns 0.0 if either vector is empty, lengths differ, or either has zero norm.
-///
-/// Note: This returns raw cosine [-1, 1], NOT the [0, 1] normalized version from
-/// `context_graph_core::retrieval::distance::cosine_similarity` which applies
-/// `(raw + 1) / 2`. MCP tool handlers use raw cosine for scoring.
+/// Returns cosine similarity normalized to [0.0, 1.0] per SRC-3 convention.
+/// Uses `(raw + 1) / 2` to map [-1, 1] → [0, 1], matching core retrieval pipeline.
+/// Returns 0.5 if either vector is empty, lengths differ, or either has zero norm
+/// (0.5 = orthogonal in normalized space).
 pub(crate) fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     if a.is_empty() || b.is_empty() || a.len() != b.len() {
-        return 0.0;
+        return 0.5;
     }
 
     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
@@ -226,8 +224,10 @@ pub(crate) fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
 
     if norm_a < f32::EPSILON || norm_b < f32::EPSILON {
-        return 0.0;
+        return 0.5;
     }
 
-    (dot / (norm_a * norm_b)).clamp(-1.0, 1.0)
+    let raw = (dot / (norm_a * norm_b)).clamp(-1.0, 1.0);
+    // SRC-3: Normalize [-1,1] → [0,1]
+    (raw + 1.0) / 2.0
 }

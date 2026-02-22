@@ -647,7 +647,7 @@ impl Handlers {
             json!({
                 "results": results,
                 "query": query,
-                "searchMode": search_mode,
+                "direction": direction,
                 "topK": top_k
             }),
         )

@@ -34,7 +34,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "description": "Optional glob pattern to filter paths (e.g., '**/docs/*.md')"
                     }
                 },
-                "required": []
+                "required": [],
+                "additionalProperties": false
             }),
         ),
         // get_file_watcher_stats
@@ -45,7 +46,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
             json!({
                 "type": "object",
                 "properties": {},
-                "required": []
+                "required": [],
+                "additionalProperties": false
             }),
         ),
         // delete_file_content
@@ -66,7 +68,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "description": "Use soft delete with 30-day recovery (default true per SEC-06)"
                     }
                 },
-                "required": ["file_path"]
+                "required": ["file_path"],
+                "additionalProperties": false
             }),
         ),
         // reconcile_files
@@ -87,7 +90,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "description": "Optional base path to limit reconciliation scope"
                     }
                 },
-                "required": []
+                "required": [],
+                "additionalProperties": false
             }),
         ),
     ]

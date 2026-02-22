@@ -430,13 +430,18 @@ impl SemanticFingerprint {
 
     /// Get the active E10 multimodal vector for standard operations.
     ///
-    /// Returns the `e10_multimodal_paraphrase` vector.
+    /// Returns `e10_multimodal_paraphrase` if populated, otherwise falls back to
+    /// the `e10_multimodal_as_context` field for backward compatibility.
     ///
     /// This is the default E10 vector used for symmetric similarity comparisons
     /// (when paraphrase/context direction is unknown or not relevant).
     #[inline]
     pub fn e10_active_vector(&self) -> &[f32] {
-        &self.e10_multimodal_paraphrase
+        if !self.e10_multimodal_paraphrase.is_empty() {
+            &self.e10_multimodal_paraphrase
+        } else {
+            &self.e10_multimodal_as_context
+        }
     }
 
     /// Get E10 multimodal embedding (paraphrase side).

@@ -63,7 +63,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "description": "Minimum similarity threshold when query is provided"
                     }
                 },
-                "required": []
+                "required": [],
+                "additionalProperties": false
             }),
         ),
         // get_session_timeline - ordered timeline view
@@ -106,7 +107,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "description": "Include full content text in results"
                     }
                 },
-                "required": []
+                "required": [],
+                "additionalProperties": false
             }),
         ),
         // traverse_memory_chain - multi-hop navigation
@@ -153,7 +155,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "description": "Include full content text in results"
                     }
                 },
-                "required": ["anchorId"]
+                "required": ["anchorId"],
+                "additionalProperties": false
             }),
         ),
         // compare_session_states - before/after analysis
@@ -182,7 +185,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "description": "Session ID to compare within (default: current session)"
                     }
                 },
-                "required": ["beforeSequence", "afterSequence"]
+                "required": ["beforeSequence", "afterSequence"],
+                "additionalProperties": false
             }),
         ),
     ]

@@ -53,7 +53,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     "default": false,
                     "description": "Force merge even if priors conflict (use with caution)"
                 }
-            }
+            },
+            "additionalProperties": false
         }),
     )]
 }

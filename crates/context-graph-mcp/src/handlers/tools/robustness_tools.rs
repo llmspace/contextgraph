@@ -458,11 +458,12 @@ mod tests {
 
     #[test]
     fn test_cosine_similarity() {
+        // SRC-3: normalized to [0,1] via (raw+1)/2
         assert!((cosine_similarity(&[1.0, 0.0, 0.0], &[1.0, 0.0, 0.0]) - 1.0).abs() < 0.001);
-        assert!(cosine_similarity(&[1.0, 0.0, 0.0], &[0.0, 1.0, 0.0]).abs() < 0.001);
-        assert!((cosine_similarity(&[1.0, 0.0, 0.0], &[-1.0, 0.0, 0.0]) - (-1.0)).abs() < 0.001);
-        assert_eq!(cosine_similarity(&[], &[1.0, 0.0]), 0.0);
-        assert_eq!(cosine_similarity(&[1.0, 0.0], &[1.0, 0.0, 0.0]), 0.0);
+        assert!((cosine_similarity(&[1.0, 0.0, 0.0], &[0.0, 1.0, 0.0]) - 0.5).abs() < 0.001);
+        assert!((cosine_similarity(&[1.0, 0.0, 0.0], &[-1.0, 0.0, 0.0])).abs() < 0.001);
+        assert_eq!(cosine_similarity(&[], &[1.0, 0.0]), 0.5);
+        assert_eq!(cosine_similarity(&[1.0, 0.0], &[1.0, 0.0, 0.0]), 0.5);
     }
 
     #[test]

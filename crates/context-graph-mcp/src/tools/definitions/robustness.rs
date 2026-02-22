@@ -98,7 +98,8 @@ fn search_robust_definition() -> ToolDefinition {
                     "description": "Search strategy: 'e1_only' (E1 only), 'multi_space' (default, multi-embedder fusion), 'pipeline' (E13 recall -> E1 -> E12 rerank)."
                 }
             },
-            "required": ["query"]
+            "required": ["query"],
+            "additionalProperties": false
         }),
     )
 }
