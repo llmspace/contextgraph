@@ -28,7 +28,7 @@ use crate::protocol::{JsonRpcId, JsonRpcResponse};
 
 /// Request handlers for MCP protocol.
 ///
-/// Supports 55 MCP tools with LLM feature (51 without) across 18 tool categories:
+/// Supports 56 MCP tools with LLM feature (52 without) across 18 tool categories:
 /// core, merge, curation, topic, file_watcher, sequence, causal, causal_discovery,
 /// keyword, code, graph, robustness, entity, embedder, temporal, graph_link,
 /// maintenance, provenance.

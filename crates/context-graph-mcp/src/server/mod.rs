@@ -7,7 +7,7 @@
 //!
 //! ## Module Structure (M4 Split)
 //! - `mod.rs` — McpServer struct, constructor, stdio transport, handle_request, path resolution
-//! - `transport.rs` — TCP transport (run_tcp, handle_tcp_client), SSE transport (run_sse), read_line_bounded
+//! - `transport.rs` — TCP transport (run_tcp, handle_tcp_client), read_line_bounded
 //! - `watchers.rs` — File watcher, code watcher, graph builder background tasks
 //!
 //! NO BACKWARDS COMPATIBILITY with stubs. FAIL FAST with clear errors.
@@ -33,7 +33,6 @@ use tracing::{debug, error, info, warn};
 /// Transport mode for the MCP server.
 ///
 /// TASK-INTEG-018: Enum for selecting between stdio and TCP transports.
-/// TASK-42: Added Sse variant for HTTP-based real-time streaming.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TransportMode {
     /// Standard input/output transport (default).
@@ -44,12 +43,6 @@ pub enum TransportMode {
     /// TCP socket transport.
     /// Used for network-based MCP clients and remote deployments.
     Tcp,
-
-    /// Server-Sent Events transport.
-    /// Used for HTTP-based real-time streaming to web clients.
-    /// Events are broadcast to all connected clients.
-    /// TASK-42: Added for web client support.
-    Sse,
 }
 
 use context_graph_core::config::Config;
@@ -126,8 +119,11 @@ pub struct McpServer {
     /// M1 FIX: HNSW persistence background task handle.
     /// Uses tokio::sync::Mutex so shutdown(&self) can take ownership of the handle.
     hnsw_persist_task: tokio::sync::Mutex<Option<JoinHandle<()>>>,
-    /// M1 FIX: Shutdown flag for background tasks.
+    /// M1 FIX: Shutdown flag for background tasks (legacy, kept for compatibility).
     background_shutdown: Arc<AtomicBool>,
+    /// SRV-M1 FIX: Watch channel sender for immediate background task cancellation.
+    /// Sending `true` wakes all background tasks from their sleep immediately.
+    shutdown_tx: tokio::sync::watch::Sender<bool>,
 }
 
 impl McpServer {
@@ -189,21 +185,33 @@ impl McpServer {
         let gc_store = Arc::clone(&rocksdb_store_arc);
         let persist_store = Arc::clone(&rocksdb_store_arc);
 
-        // M1 FIX: Shared shutdown flag for background tasks (constitution: JoinHandle must be awaited)
+        // SRV-M1 FIX: Use tokio::sync::watch for shutdown signaling.
+        // Unlike AtomicBool which requires the sleep to complete before checking,
+        // watch::changed() can be used in tokio::select! to wake immediately.
+        let (shutdown_tx, mut gc_shutdown_rx) = tokio::sync::watch::channel(false);
+        let mut persist_shutdown_rx = gc_shutdown_rx.clone();
         let background_shutdown = Arc::new(AtomicBool::new(false));
-        let gc_shutdown = Arc::clone(&background_shutdown);
-        let persist_shutdown = Arc::clone(&background_shutdown);
 
         // Spawn soft-delete GC background task (runs every 5 minutes)
         // M1 FIX: Store JoinHandle — panics in this task are now observable
+        // SRV-M1 FIX: Uses tokio::select! so shutdown wakes immediately (not after 5min sleep)
         let gc_task = tokio::spawn(async move {
             let gc_interval = std::time::Duration::from_secs(5 * 60);
             let gc_retention = 7 * 24 * 3600u64; // 7 days
             info!("Soft-delete GC background task started (interval=5min, retention=7d)");
             loop {
-                tokio::time::sleep(gc_interval).await;
-                if gc_shutdown.load(Ordering::SeqCst) {
-                    info!("GC background task received shutdown signal");
+                // SRV-M1: select! between sleep and shutdown signal.
+                // Whichever fires first wins — no more 5-minute zombie waits.
+                tokio::select! {
+                    _ = tokio::time::sleep(gc_interval) => {}
+                    _ = gc_shutdown_rx.changed() => {
+                        info!("GC background task received shutdown signal");
+                        break;
+                    }
+                }
+                // Double-check after wakeup (changed() could spuriously wake)
+                if *gc_shutdown_rx.borrow() {
+                    info!("GC background task shutting down");
                     break;
                 }
                 match gc_store.gc_soft_deleted(gc_retention).await {
@@ -223,6 +231,7 @@ impl McpServer {
         // M1 FIX: Store JoinHandle — panics in this task are now observable
         // H1/M9 FIX: Also checks for HNSW compaction (orphaned vector cleanup)
         // CORRUPTION-RESILIENCE: Also creates periodic checkpoints (every 6 hours)
+        // SRV-M1 FIX: Uses tokio::select! so shutdown wakes immediately (not after 10min sleep)
         let hnsw_persist_task = tokio::spawn(async move {
             let persist_interval = std::time::Duration::from_secs(10 * 60);
             let checkpoint_interval = std::time::Duration::from_secs(6 * 3600); // 6 hours
@@ -232,9 +241,16 @@ impl McpServer {
                  (persist=10min, checkpoint=6h)"
             );
             loop {
-                tokio::time::sleep(persist_interval).await;
-                if persist_shutdown.load(Ordering::SeqCst) {
-                    info!("HNSW persistence background task received shutdown signal");
+                // SRV-M1: select! between sleep and shutdown signal.
+                tokio::select! {
+                    _ = tokio::time::sleep(persist_interval) => {}
+                    _ = persist_shutdown_rx.changed() => {
+                        info!("HNSW persistence background task received shutdown signal");
+                        break;
+                    }
+                }
+                if *persist_shutdown_rx.borrow() {
+                    info!("HNSW persistence background task shutting down");
                     break;
                 }
                 // H1/M9 FIX: Check for compaction before persistence
@@ -702,6 +718,8 @@ impl McpServer {
             gc_task: tokio::sync::Mutex::new(Some(gc_task)),
             hnsw_persist_task: tokio::sync::Mutex::new(Some(hnsw_persist_task)),
             background_shutdown,
+            // SRV-M1 FIX: Watch channel sender for immediate cancellation
+            shutdown_tx,
         })
     }
 
@@ -891,9 +909,12 @@ impl McpServer {
     pub async fn shutdown(&self) {
         info!("Initiating graceful shutdown...");
 
-        // 1. Signal all background tasks to stop
+        // 1. Signal all background tasks to stop immediately via watch channel.
+        // SRV-M1 FIX: This wakes tasks from tokio::select! instantly,
+        // instead of waiting up to 5-10 minutes for the sleep to complete.
         self.background_shutdown.store(true, Ordering::SeqCst);
-        info!("Background shutdown flag set — GC and HNSW persist tasks will stop");
+        let _ = self.shutdown_tx.send(true);
+        info!("Background shutdown signal sent — GC and HNSW persist tasks will stop immediately");
 
         // 2. Await GC task with 5s timeout
         {
@@ -988,7 +1009,9 @@ impl McpServer {
     /// unpredictable directories (e.g., `/` or their own installation path).
     ///
     /// Creates the directory if it doesn't exist.
-    pub(in crate::server) fn resolve_storage_path(config: &Config) -> PathBuf {
+    /// SRV-M3 FIX: Made `pub` so main.rs can use the same path resolution
+    /// for PID file guard, ensuring PID file and RocksDB always use the same path.
+    pub fn resolve_storage_path(config: &Config) -> PathBuf {
         // Check environment variable first
         if let Ok(env_path) = std::env::var("CONTEXT_GRAPH_STORAGE_PATH") {
             let path = PathBuf::from(env_path);
@@ -1226,7 +1249,6 @@ mod tests {
         let result = match mode {
             TransportMode::Stdio => "stdio",
             TransportMode::Tcp => "tcp",
-            TransportMode::Sse => "sse",
         };
 
         assert_eq!(result, "tcp");

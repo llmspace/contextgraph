@@ -60,8 +60,9 @@ impl CausalPromptBuilder {
     /// Uses Hermes 2 Pro ChatML format with structured output instructions.
     /// The model will generate valid JSON constrained by GBNF grammar.
     pub fn build_analysis_prompt(&self, memory_a: &str, memory_b: &str) -> String {
-        let truncated_a = self.truncate_content(memory_a);
-        let truncated_b = self.truncate_content(memory_b);
+        // CAUSAL-M1 FIX: Sanitize user content to prevent prompt injection
+        let truncated_a = Self::sanitize_content(&self.truncate_content(memory_a));
+        let truncated_b = Self::sanitize_content(&self.truncate_content(memory_b));
 
         format!(
             r#"<|im_start|>system
@@ -86,8 +87,9 @@ Determine if there is a causal relationship and respond with JSON.
     pub fn build_batch_prompt(&self, pairs: &[(String, String)]) -> String {
         let mut pairs_text = String::new();
         for (i, (a, b)) in pairs.iter().enumerate() {
-            let truncated_a = self.truncate_content(a);
-            let truncated_b = self.truncate_content(b);
+            // CAUSAL-M1 FIX: Sanitize user content to prevent prompt injection
+            let truncated_a = Self::sanitize_content(&self.truncate_content(a));
+            let truncated_b = Self::sanitize_content(&self.truncate_content(b));
             pairs_text.push_str(&format!(
                 "Pair {}:\n  A: \"{}\"\n  B: \"{}\"\n\n",
                 i + 1,
@@ -111,6 +113,19 @@ For each pair, determine if there's a causal relationship.
 "#,
             self.system_prompt, pairs_text
         )
+    }
+
+    /// Sanitize user content for safe embedding in ChatML prompts.
+    ///
+    /// CAUSAL-M1 FIX: Prevents prompt injection by escaping:
+    /// 1. Double quotes → escaped (prevents breaking JSON string boundaries)
+    /// 2. ChatML markers `<|im_start|>` and `<|im_end|>` → neutralized
+    ///    (prevents premature section termination and role injection)
+    fn sanitize_content(content: &str) -> String {
+        content
+            .replace('"', "\\\"")
+            .replace("<|im_start|>", "<|im_start_|>")
+            .replace("<|im_end|>", "<|im_end_|>")
     }
 
     /// Truncate content to maximum length (UTF-8 safe).
@@ -381,7 +396,8 @@ Output:
     /// # Returns
     /// A ChatML-formatted prompt for single-text causal analysis.
     pub fn build_single_text_prompt(&self, content: &str) -> String {
-        let truncated = self.truncate_content(content);
+        // CAUSAL-M1 FIX: Sanitize user content to prevent prompt injection
+        let truncated = Self::sanitize_content(&self.truncate_content(content));
         format!(
             r#"<|im_start|>system
 {}
@@ -407,7 +423,8 @@ Text: "{}"
     /// # Returns
     /// A ChatML-formatted prompt for multi-relationship extraction.
     pub fn build_multi_relationship_prompt(&self, content: &str) -> String {
-        let truncated = self.truncate_content(content);
+        // CAUSAL-M1 FIX: Use shared sanitize_content for consistent escaping
+        let truncated = Self::sanitize_content(&self.truncate_content(content));
         format!(
             r#"<|im_start|>system
 {}
@@ -419,8 +436,7 @@ Analyze for causal relationships:
 <|im_end|>
 <|im_start|>assistant
 "#,
-            self.multi_relationship_system_prompt,
-            truncated.replace('"', "\\\"")
+            self.multi_relationship_system_prompt, truncated
         )
     }
 }
@@ -428,8 +444,9 @@ Analyze for causal relationships:
 impl CausalPromptBuilder {
     /// Build analysis prompt with few-shot examples for better accuracy.
     pub fn build_analysis_prompt_with_examples(&self, memory_a: &str, memory_b: &str) -> String {
-        let truncated_a = self.truncate_content(memory_a);
-        let truncated_b = self.truncate_content(memory_b);
+        // CAUSAL-M1 FIX: Sanitize user content to prevent prompt injection
+        let truncated_a = Self::sanitize_content(&self.truncate_content(memory_a));
+        let truncated_b = Self::sanitize_content(&self.truncate_content(memory_b));
 
         format!(
             r#"<|im_start|>system

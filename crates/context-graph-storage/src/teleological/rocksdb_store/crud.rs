@@ -416,9 +416,11 @@ impl RocksDbTeleologicalStore {
             let sd_key = soft_delete_key(&id);
             batch.delete_cf(cf_system, sd_key.as_bytes());
 
-            // STG-04: Release inverted-index lock before write.
-            drop(_index_guard);
-
+            // STOR-M2 FIX: Commit RocksDB batch BEFORE releasing the inverted-index lock.
+            // Previously, drop(_index_guard) happened before db.write(batch), creating a
+            // race window where a concurrent store could un-delete from the posting list
+            // between lock release and batch commit.
+            //
             // FIX-M5: Commit RocksDB FIRST, then remove from HNSW indexes.
             // If RocksDB fails, nothing is lost (HNSW still has the entry = safe).
             // If HNSW fails after RocksDB commit, entry is orphaned in HNSW
@@ -426,6 +428,9 @@ impl RocksDbTeleologicalStore {
             self.db.write(batch).map_err(|e| {
                 TeleologicalStoreError::rocksdb_op("delete_batch", CF_FINGERPRINTS, Some(id), e)
             })?;
+
+            // Release inverted-index lock AFTER batch commit is durable.
+            drop(_index_guard);
 
             // Best-effort HNSW cleanup — log but don't fail if indexes can't be updated
             if let Err(e) = self.remove_from_indexes(id) {

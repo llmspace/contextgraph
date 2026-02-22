@@ -416,7 +416,7 @@ fn compute_embedder_scores_sync(
         None => compute_cosine_similarity(&query.e7_code, &stored.e7_code),
     };
 
-    // AP-77: E5 returns 0.0 for Unknown direction (causal is inherently directional)
+    // AP-77: E5 returns -1.0 sentinel for Unknown direction (causal is inherently directional)
     let e5_score = compute_similarity_for_space_with_direction(
         Embedder::Causal,
         query,
@@ -441,11 +441,13 @@ fn compute_embedder_scores_sync(
         // SEARCH-1 FIX: Normalize sparse cosine [-1,1] to [0,1]
         (query.e6_sparse.cosine_similarity(&stored.e6_sparse) + 1.0) / 2.0,
         e7_score,
-        // E8: asymmetric source/target vectors
-        compute_cosine_similarity(query.get_e8_as_source(), stored.get_e8_as_target()),
+        // STOR-H1 FIX: E8 asymmetric — max of both directions, matching compute_similarity_for_space
+        compute_cosine_similarity(query.get_e8_as_source(), stored.get_e8_as_target())
+            .max(compute_cosine_similarity(query.get_e8_as_target(), stored.get_e8_as_source())),
         compute_cosine_similarity(&query.e9_hdc, &stored.e9_hdc),
-        // E10: asymmetric paraphrase/context vectors
-        compute_cosine_similarity(query.get_e10_as_paraphrase(), stored.get_e10_as_context()),
+        // STOR-H1 FIX: E10 asymmetric — max of both directions, matching compute_similarity_for_space
+        compute_cosine_similarity(query.get_e10_as_paraphrase(), stored.get_e10_as_context())
+            .max(compute_cosine_similarity(query.get_e10_as_context(), stored.get_e10_as_paraphrase())),
         compute_cosine_similarity(&query.e11_entity, &stored.e11_entity),
         e12_score,
         (query.e13_splade.cosine_similarity(&stored.e13_splade) + 1.0) / 2.0,
@@ -1355,26 +1357,30 @@ fn suppress_degenerate_weights(
             continue;
         }
 
-        // F-8 fix: detect all-zero scores BEFORE filtering.
-        // If every candidate scored 0.0 for this embedder, the embedder produced
-        // no signal — suppress its weight to prevent denominator inflation in fusion.
-        let all_zero = all_scores.iter().all(|s| s[idx] == 0.0);
-        if all_zero {
+        // F-8 fix: detect no-signal scores BEFORE filtering.
+        // CORE-H1 FIX: "no signal" is now -1.0 sentinel (not 0.0).
+        // 0.0 = anti-correlated after normalization, which IS valid signal.
+        // Suppress if every candidate has no signal (sentinel) for this embedder.
+        let all_no_signal = all_scores.iter().all(|s| s[idx] < 0.0);
+        if all_no_signal {
             tracing::debug!(
                 embedder_idx = idx,
                 original_weight = weights[idx],
-                "Suppressing all-zero embedder weight (no signal produced)"
+                "Suppressing embedder weight (all candidates have no-signal sentinel)"
             );
             adjusted[idx] = 0.0;
             continue;
         }
 
         // P2: Welford's online algorithm — single-pass mean & variance.
-        // Eliminates the second pass over all candidates for each embedder.
+        // CORE-H1 FIX: Skip sentinel values (-1.0) in variance computation.
         let mut count = 0u32;
         let mut mean = 0.0f32;
         let mut m2 = 0.0f32;
         for s in all_scores.iter().map(|s| s[idx]) {
+            if s < 0.0 {
+                continue; // Skip "no signal" sentinels
+            }
             count += 1;
             let delta = s - mean;
             mean += delta / count as f32;
@@ -1408,15 +1414,11 @@ fn compute_semantic_fusion(scores: &[f32; 13], weights: &[f32; 13]) -> f32 {
 
     for (&score, &weight) in scores.iter().zip(weights.iter()) {
         if weight > 0.0 {
-            // MED-11 FIX: If score is exactly 0.0, the embedder produced no signal for
-            // this result. Adding its weight to the denominator would dilute scores from
-            // embedders that DID produce signal. This is distinct from a LOW score (e.g. 0.01)
-            // which IS valid signal. The suppress_degenerate_weights function handles the
-            // cross-candidate case (all candidates score 0.0 for an embedder), but for
-            // individual results with <3 candidates, we must also skip per-result zero scores.
-            // Example: E5=0.0 for non-causal queries adds 0.15 to denominator but 0.0 to
-            // numerator, deflating the fusion score by ~15%.
-            if score > 0.0 {
+            // CORE-H1 FIX: Use score >= 0.0 (not > 0.0) to include anti-correlated
+            // results. After [-1,1]->[0,1] normalization, 0.0 = maximally anti-correlated,
+            // which IS valid signal. "No signal" is now represented by -1.0 sentinel
+            // (e.g., E5 with Unknown direction returns -1.0).
+            if score >= 0.0 {
                 weighted_sum += score * weight;
                 weight_total += weight;
             }
@@ -1426,8 +1428,8 @@ fn compute_semantic_fusion(scores: &[f32; 13], weights: &[f32; 13]) -> f32 {
     if weight_total > 0.0 {
         weighted_sum / weight_total
     } else {
-        // Fallback to E1 if all weights are zero or all scores are zero
-        scores[0]
+        // Fallback to E1 if all weights are zero or all scores are sentinel
+        scores[0].max(0.0)
     }
 }
 

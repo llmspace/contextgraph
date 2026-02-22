@@ -307,6 +307,7 @@ impl UnifiedRealdataBenchmarkRunner {
     }
 
     /// Evaluate all configured embedders.
+    #[allow(dead_code)] // Called from run() which is used by bin targets
     fn evaluate_all_embedders(&self) -> Result<HashMap<EmbedderName, EmbedderResults>, RunnerError> {
         let ground_truth = self.ground_truth.as_ref()
             .ok_or(RunnerError::NoGroundTruth)?;
@@ -334,6 +335,7 @@ impl UnifiedRealdataBenchmarkRunner {
     }
 
     /// Evaluate a single embedder.
+    #[allow(dead_code)] // Called from evaluate_all_embedders
     fn evaluate_embedder(
         &self,
         embedder: EmbedderName,
@@ -438,6 +440,7 @@ impl UnifiedRealdataBenchmarkRunner {
     }
 
     /// Compute asymmetric ratio for E5, E8, E10.
+    #[allow(dead_code)] // Called from evaluate_embedder
     fn compute_asymmetric_ratio(&self, embedder: EmbedderName) -> Result<f64, RunnerError> {
         // Sample pairs and compute forward/reverse similarity ratio
         let ids: Vec<_> = self.fingerprints.keys().copied().collect();
@@ -470,6 +473,7 @@ impl UnifiedRealdataBenchmarkRunner {
     }
 
     /// Compare fusion strategies.
+    #[allow(dead_code)] // Called from run() which is used by bin targets
     fn compare_fusion_strategies(
         &self,
         per_embedder: &HashMap<EmbedderName, EmbedderResults>,
@@ -561,6 +565,7 @@ impl UnifiedRealdataBenchmarkRunner {
     }
 
     /// Estimate fusion MRR using weighted RRF approximation.
+    #[allow(dead_code)] // Called from compare_fusion_strategies
     fn estimate_fusion_mrr(
         &self,
         embedders: &[EmbedderName],
@@ -586,6 +591,7 @@ impl UnifiedRealdataBenchmarkRunner {
     }
 
     /// Analyze cross-embedder correlations.
+    #[allow(dead_code)] // Called from run() which is used by bin targets
     fn analyze_cross_embedder(
         &self,
         per_embedder: &HashMap<EmbedderName, EmbedderResults>,
@@ -650,6 +656,7 @@ impl UnifiedRealdataBenchmarkRunner {
     }
 
     /// Run ablation study.
+    #[allow(dead_code)] // Called from run() which is used by bin targets
     fn run_ablation_study(
         &self,
         per_embedder: &HashMap<EmbedderName, EmbedderResults>,
@@ -873,6 +880,7 @@ impl UnifiedRealdataBenchmarkRunner {
 }
 
 /// Compute similarity between two fingerprints for a specific embedder.
+#[allow(dead_code)] // Called from evaluate_embedder and compute_asymmetric_ratio
 fn compute_similarity(a: &SemanticFingerprint, b: &SemanticFingerprint, embedder_idx: usize) -> f64 {
     use context_graph_core::types::fingerprint::EmbeddingSlice;
 
@@ -897,6 +905,7 @@ fn compute_similarity(a: &SemanticFingerprint, b: &SemanticFingerprint, embedder
 }
 
 /// Compute dot product between sparse vectors.
+#[allow(dead_code)] // Called from compute_similarity
 fn sparse_dot_product(a: &context_graph_core::types::fingerprint::SparseVector, b: &context_graph_core::types::fingerprint::SparseVector) -> f64 {
     // Use the dot method if available, otherwise compute manually
     // Simple approach: iterate through indices using two-pointer merge
@@ -919,6 +928,7 @@ fn sparse_dot_product(a: &context_graph_core::types::fingerprint::SparseVector, 
 }
 
 /// Compute max similarity between token-level embeddings.
+#[allow(dead_code)] // Called from compute_similarity
 fn max_token_similarity(a: &[Vec<f32>], b: &[Vec<f32>]) -> f64 {
     if a.is_empty() || b.is_empty() {
         return 0.0;
@@ -937,6 +947,7 @@ fn max_token_similarity(a: &[Vec<f32>], b: &[Vec<f32>]) -> f64 {
 }
 
 /// Compute cosine similarity between two vectors.
+#[allow(dead_code)] // Called from compute_similarity and max_token_similarity
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
     if a.len() != b.len() || a.is_empty() {
         return 0.0;

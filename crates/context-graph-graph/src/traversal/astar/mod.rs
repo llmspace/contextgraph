@@ -33,7 +33,7 @@
 
 mod algorithm;
 mod bidirectional;
-mod helpers;
+pub(crate) mod helpers;
 mod node;
 mod types;
 

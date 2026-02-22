@@ -199,9 +199,10 @@ pub fn compute_similarity_for_space(
     // to produce a more informative similarity score.
     match embedder {
         Embedder::Causal => {
-            // EMB-7 FIX: E5 without direction returns 0.0.
+            // EMB-7 FIX: E5 without direction returns -1.0 (sentinel = "no signal").
             // Use compute_similarity_for_space_with_direction() for directional E5 similarity.
-            0.0
+            // CORE-H1 FIX: -1.0 sentinel distinguishes "no signal" from 0.0 (anti-correlated).
+            -1.0
         }
         Embedder::Graph => {
             // E8: Compare source-vs-target cross pairs and take max
@@ -291,8 +292,9 @@ pub fn compute_similarity_for_space_with_direction(
     if matches!(embedder, Embedder::Causal) {
         if causal_direction == CausalDirection::Unknown {
             // No direction known → E5 cannot provide meaningful signal.
-            // Return 0.0 so E5 is effectively excluded from fusion.
-            return 0.0;
+            // CORE-H1 FIX: Return -1.0 sentinel (not 0.0) so fusion correctly
+            // distinguishes "no signal" from 0.0 (anti-correlated after normalization).
+            return -1.0;
         }
 
         let query_is_cause = matches!(causal_direction, CausalDirection::Cause);
@@ -356,7 +358,8 @@ pub fn compute_all_similarities(
 /// * `causal_direction` - Detected causal direction of the query
 ///
 /// # Returns
-/// Array of 13 similarity scores in [0.0, 1.0]
+/// Array of 13 similarity scores. Valid scores are in [0.0, 1.0].
+/// E5 returns -1.0 sentinel when `causal_direction` is `Unknown` (CORE-H1: no signal).
 pub fn compute_all_similarities_with_direction(
     query: &SemanticFingerprint,
     memory: &SemanticFingerprint,
@@ -479,8 +482,13 @@ mod tests {
         let scores = compute_all_similarities(&query, &memory);
         assert_eq!(scores.len(), 13);
         for (i, score) in scores.iter().enumerate() {
-            assert!(*score >= 0.0 && *score <= 1.0, "Embedder {} score {} out of range", i, score);
             assert!(!score.is_nan());
+            if i == 4 {
+                // CORE-H1: E5 returns -1.0 sentinel without direction
+                assert_eq!(*score, -1.0, "E5 should return -1.0 sentinel");
+            } else {
+                assert!(*score >= 0.0 && *score <= 1.0, "E{} score {} out of range", i + 1, score);
+            }
         }
     }
 
@@ -501,9 +509,16 @@ mod tests {
         assert!(sim.abs() < 1e-5 && sim >= 0.0);
 
         // All 13 spaces with zeroed fingerprints
+        // CORE-H1: E5 returns -1.0 sentinel (no signal) when no direction is provided.
         let zeroed = SemanticFingerprint::zeroed();
-        for score in compute_all_similarities(&zeroed, &zeroed) {
-            assert!(!score.is_nan() && !score.is_infinite() && (0.0..=1.0).contains(&score));
+        for (idx, score) in compute_all_similarities(&zeroed, &zeroed).iter().enumerate() {
+            if idx == 4 {
+                // E5 (Causal) returns -1.0 sentinel without direction
+                assert_eq!(*score, -1.0, "E5 should return -1.0 sentinel without direction");
+            } else {
+                assert!(!score.is_nan() && !score.is_infinite() && (0.0..=1.0).contains(score),
+                    "E{} score {} out of range", idx + 1, score);
+            }
         }
     }
 
@@ -519,10 +534,10 @@ mod tests {
         memory.e5_causal_as_cause = vec![1.0; 768];
         memory.e5_causal_as_effect = vec![0.5; 768];
 
-        // Unknown direction: E5 returns 0.0 per AP-77
+        // Unknown direction: E5 returns -1.0 sentinel per AP-77 + CORE-H1 fix
         assert_eq!(
             compute_similarity_for_space_with_direction(Embedder::Causal, &query, &memory, CausalDirection::Unknown),
-            0.0,
+            -1.0,
         );
 
         // Known direction: non-zero
@@ -562,8 +577,14 @@ mod tests {
         for dir in [CausalDirection::Unknown, CausalDirection::Cause, CausalDirection::Effect] {
             let scores = compute_all_similarities_with_direction(&query, &memory, dir);
             assert_eq!(scores.len(), 13);
-            for score in &scores {
-                assert!(*score >= 0.0 && *score <= 1.0 && !score.is_nan());
+            for (idx, score) in scores.iter().enumerate() {
+                if idx == 4 && dir == CausalDirection::Unknown {
+                    // E5 returns -1.0 sentinel for Unknown direction (no causal signal)
+                    assert!((*score - (-1.0)).abs() < 1e-6, "E5 with Unknown should be -1.0 sentinel, got {score}");
+                } else {
+                    assert!(*score >= 0.0 && *score <= 1.0 && !score.is_nan(),
+                        "score[{idx}] with dir {dir:?} out of range: {score}");
+                }
             }
         }
     }

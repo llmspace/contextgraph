@@ -645,7 +645,7 @@ async fn phase1_gpu_embeddings(
 
         // Generate embeddings for batch
         let outputs = provider
-            .embed_batch_all(&contents)
+            .embed_batch_all(&contents, &[])
             .await
             .context("Failed to generate batch embeddings")?;
 

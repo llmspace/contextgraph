@@ -4,8 +4,6 @@
 
 use std::collections::HashMap;
 
-use uuid::Uuid;
-
 use crate::storage::GraphEdge;
 
 // Re-export edge types for convenience
@@ -165,15 +163,5 @@ impl BfsResult {
 
 }
 
-/// Convert UUID to i64 for storage key operations.
-///
-/// This reverses `Uuid::from_u64_pair(id as u64, 0)` used in storage.
-/// from_u64_pair stores values in big-endian order in the UUID bytes.
-#[inline]
-pub(crate) fn uuid_to_i64(uuid: &Uuid) -> i64 {
-    let bytes = uuid.as_bytes();
-    // from_u64_pair uses big-endian byte order
-    i64::from_be_bytes([
-        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-    ])
-}
+/// Re-export uuid_to_i64 from the canonical location in astar::helpers.
+pub(crate) use crate::traversal::astar::helpers::uuid_to_i64;

@@ -188,6 +188,16 @@ async fn handle_portfolio(args: PortfolioArgs) -> i32 {
 
 /// Handle topic stability command.
 async fn handle_stability(args: StabilityArgs) -> i32 {
+    // CLI-M1 FIX: Validate hours range (1-168) before any server interaction.
+    // Documented range is 1-168 (weekly). Reject 0 and values > 168.
+    if args.hours == 0 || args.hours > 168 {
+        eprintln!(
+            "Error: --hours must be between 1 and 168, got {}",
+            args.hours
+        );
+        return 1;
+    }
+
     let client = McpClient::new();
 
     // Check if server is running

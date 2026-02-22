@@ -63,7 +63,7 @@ impl Handlers {
     /// # Parameters
     ///
     /// - `mode`: Analysis mode ("pairs" for pair analysis, "extract" for multi-relationship extraction, default: "extract")
-    /// - `maxMemories`: Maximum memories to analyze (1-200, default: 50)
+    /// - `maxPairs`: Maximum candidate pairs to analyze (1-200, default: 50)
     /// - `minConfidence`: Minimum LLM confidence to accept (0.5-1.0, default: 0.7)
     /// - `sessionScope`: Scope of indexed files ("current" = last 10, "recent" = last 50, "all" = all, default: "all")
     ///   MCP-5: This is file-count based, not session-scoped. Contrast with search_graph's sessionScope which filters by session_id.
@@ -92,8 +92,9 @@ impl Handlers {
         }
 
         // Parse parameters with defaults per schema
+        // CD-H1 FIX: Read "maxPairs" to match schema (was "maxMemories")
         let max_memories = args
-            .get("maxMemories")
+            .get("maxPairs")
             .and_then(|v| v.as_u64())
             .unwrap_or(50) as usize;
         let min_confidence = args
@@ -111,7 +112,7 @@ impl Handlers {
 
         // Validate parameters
         if !(1..=200).contains(&max_memories) {
-            return self.tool_error(id, "maxMemories must be between 1 and 200");
+            return self.tool_error(id, "maxPairs must be between 1 and 200");
         }
         if !(0.5..=1.0).contains(&min_confidence) {
             return self.tool_error(id, "minConfidence must be between 0.5 and 1.0");

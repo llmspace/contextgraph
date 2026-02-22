@@ -1298,9 +1298,15 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
     ///
     /// Uses concurrent tokio tasks to maximize GPU utilization. Each task
     /// runs embed_all() which itself runs all 13 embedders in parallel.
+    /// EMB-H1 FIX: Accept metadata parameter to propagate E4 sequence instruction
+    /// and E5 causal hint through the batch path. Previously, embed_batch_all used
+    /// e4.embed(&c) instead of e4.embed_with_instruction(&c, Some(&inst)) and
+    /// e5.embed_dual(&c) instead of e5.embed_dual_with_hint(&c, hint.as_ref()),
+    /// losing E4/E5 metadata that embed_all_with_metadata correctly propagates.
     async fn embed_batch_all(
         &self,
         contents: &[String],
+        metadata: &[EmbeddingMetadata],
     ) -> CoreResult<Vec<MultiArrayEmbeddingOutput>> {
         use futures::future::join_all;
 
@@ -1323,8 +1329,11 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
         // Spawn concurrent tasks for each content
         let tasks: Vec<_> = contents
             .iter()
-            .map(|content| {
+            .enumerate()
+            .map(|(idx, content)| {
                 let content = content.clone();
+                // EMB-H1: Get corresponding metadata or default for this content item
+                let item_metadata = metadata.get(idx).cloned().unwrap_or_default();
                 let e1 = Arc::clone(&e1);
                 let e2 = Arc::clone(&e2);
                 let e3 = Arc::clone(&e3);
@@ -1342,6 +1351,11 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
 
                 tokio::spawn(async move {
                     let start = Instant::now();
+
+                    // EMB-H1 FIX: Generate E4 instruction from metadata (same as embed_all_with_metadata)
+                    let e4_instruction = item_metadata.e4_instruction();
+                    // EMB-H1 FIX: Clone causal hint for E5 embedding (same as embed_all_with_metadata)
+                    let causal_hint = item_metadata.causal_hint.clone();
 
                     // Run all 13 embedders in parallel for this content
                     let (
@@ -1371,13 +1385,17 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
                             let c = content.clone();
                             async move { e3.embed(&c).await }
                         }),
+                        // EMB-H1 FIX: Use embed_with_instruction for E4 (was embed)
                         Self::timed_embed("E4_TemporalPositional", {
                             let c = content.clone();
-                            async move { e4.embed(&c).await }
+                            let inst = e4_instruction.clone();
+                            async move { e4.embed_with_instruction(&c, Some(&inst)).await }
                         }),
+                        // EMB-H1 FIX: Use embed_dual_with_hint for E5 (was embed_dual)
                         Self::timed_embed("E5_Causal_Dual", {
                             let c = content.clone();
-                            async move { e5.embed_dual(&c).await }
+                            let hint = causal_hint.clone();
+                            async move { e5.embed_dual_with_hint(&c, hint.as_ref()).await }
                         }),
                         Self::timed_embed("E6_Sparse", {
                             let c = content.clone();

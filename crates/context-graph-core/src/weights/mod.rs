@@ -229,13 +229,15 @@ pub const WEIGHT_PROFILES: &[(&str, [f32; NUM_EMBEDDERS])] = &[
     // =========================================================================
 
     // Temporal Navigation: EXPLICIT time-based queries only
+    // CORE-L3 FIX: E12/E13 set to 0.0 per ARCH-13 (pipeline-stage only, not for scoring)
+    // Redistributed 0.04 to E2/E3/E4 (primary temporal embedders: +0.01 each, +0.01 to E1)
     (
         "temporal_navigation",
         [
-            0.12, // E1_Semantic
-            0.22, // E2_Temporal_Recent (primary)
-            0.22, // E3_Temporal_Periodic (primary)
-            0.22, // E4_Temporal_Positional (primary)
+            0.13, // E1_Semantic
+            0.23, // E2_Temporal_Recent (primary)
+            0.23, // E3_Temporal_Periodic (primary)
+            0.23, // E4_Temporal_Positional (primary)
             0.03, // E5_Causal
             0.02, // E6_Sparse
             0.03, // E7_Code
@@ -243,8 +245,8 @@ pub const WEIGHT_PROFILES: &[(&str, [f32; NUM_EMBEDDERS])] = &[
             0.03, // E9_HDC
             0.03, // E10_Multimodal
             0.02, // E11_Entity
-            0.02, // E12_Late_Interaction
-            0.02, // E13_SPLADE
+            0.0,  // E12_Late_Interaction (Stage 3 rerank only per ARCH-13)
+            0.0,  // E13_SPLADE (Stage 1 recall only per ARCH-13)
         ],
     ),
 
@@ -319,6 +321,8 @@ pub const WEIGHT_PROFILES: &[(&str, [f32; NUM_EMBEDDERS])] = &[
     // =========================================================================
 
     // Typo Tolerant: For queries with potential spelling errors
+    // CORE-L3 FIX: E12/E13 set to 0.0 per ARCH-13 (pipeline-stage only, not for scoring)
+    // Redistributed 0.05 to E9 (+0.03, primary for typo tolerance) and E6 (+0.02, keyword backup)
     (
         "typo_tolerant",
         [
@@ -327,14 +331,14 @@ pub const WEIGHT_PROFILES: &[(&str, [f32; NUM_EMBEDDERS])] = &[
             0.0,  // E3_Temporal_Periodic - NOT for semantic search
             0.0,  // E4_Temporal_Positional - NOT for semantic search
             0.10, // E5_Causal
-            0.05, // E6_Sparse (keyword backup for exact matches)
+            0.07, // E6_Sparse (keyword backup for exact matches)
             0.15, // E7_Code (reduced to make room for E9)
             0.03, // E8_Graph (relational)
-            0.15, // E9_HDC (PRIMARY for typo tolerance)
+            0.18, // E9_HDC (PRIMARY for typo tolerance)
             0.12, // E10_Multimodal
             0.05, // E11_Entity (relational)
-            0.03, // E12_Late_Interaction (can help with phrase matching)
-            0.02, // E13_SPLADE (term expansion helps with variations)
+            0.0,  // E12_Late_Interaction (Stage 3 rerank only per ARCH-13)
+            0.0,  // E13_SPLADE (Stage 1 recall only per ARCH-13)
         ],
     ),
 

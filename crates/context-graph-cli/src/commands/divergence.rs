@@ -73,6 +73,16 @@ pub async fn handle_divergence_command(cmd: DivergenceCommands) -> i32 {
 
 /// Handle divergence check command.
 async fn handle_check(args: CheckArgs) -> i32 {
+    // CLI-M1 FIX: Validate hours range (1-48) before any server interaction.
+    // Documented range is 1-48 (daily). Reject 0 and values > 48.
+    if args.hours == 0 || args.hours > 48 {
+        eprintln!(
+            "Error: --hours must be between 1 and 48, got {}",
+            args.hours
+        );
+        return 1;
+    }
+
     let client = McpClient::new();
 
     // Check if server is running

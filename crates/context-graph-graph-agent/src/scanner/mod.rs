@@ -336,6 +336,20 @@ impl MemoryScanner {
     }
 
     /// Cosine similarity between two embeddings.
+    ///
+    /// # Return Range
+    ///
+    /// **Raw cosine similarity in \[-1.0, 1.0\].**
+    ///
+    /// This intentionally returns raw cosine (not \[0,1\] normalized) because
+    /// the graph agent uses it for clustering and pair scoring where the full
+    /// range is meaningful:
+    /// - Negative values indicate anti-correlated embeddings (should NOT cluster)
+    /// - Values near 0.0 indicate no relationship
+    /// - Positive values indicate similarity (candidates for clustering/edges)
+    ///
+    /// The `similarity_threshold` and `max_similarity` config fields are
+    /// calibrated for this \[-1,1\] range.
     fn cosine_similarity(&self, a: &[f32], b: &[f32]) -> f32 {
         if a.len() != b.len() || a.is_empty() {
             return 0.0;

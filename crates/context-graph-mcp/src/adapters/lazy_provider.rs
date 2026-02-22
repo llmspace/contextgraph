@@ -137,6 +137,7 @@ impl MultiArrayEmbeddingProvider for LazyMultiArrayProvider {
     async fn embed_batch_all(
         &self,
         contents: &[String],
+        metadata: &[EmbeddingMetadata],
     ) -> CoreResult<Vec<MultiArrayEmbeddingOutput>> {
         // Check if still loading
         if self.loading.load(Ordering::SeqCst) {
@@ -156,7 +157,7 @@ impl MultiArrayEmbeddingProvider for LazyMultiArrayProvider {
         // Get the provider
         let guard = self.inner.read().await;
         match guard.as_ref() {
-            Some(provider) => provider.embed_batch_all(contents).await,
+            Some(provider) => provider.embed_batch_all(contents, metadata).await,
             None => Err(CoreError::Internal(
                 "Embedding provider not available. This is a bug.".to_string(),
             )),

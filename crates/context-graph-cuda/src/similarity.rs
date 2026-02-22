@@ -187,6 +187,17 @@ impl BatchedQueryContext {
 /// Uses SIMD-friendly memory access patterns for ~10x speedup over scalar.
 /// Returns similarity scores for 10 dense embedders per candidate.
 ///
+/// # Return Range
+///
+/// **Raw cosine similarity in \[-1.0, 1.0\].**
+/// - `1.0` = identical direction
+/// - `0.0` = orthogonal (no correlation)
+/// - `-1.0` = opposite direction
+///
+/// **Important:** This returns raw cosine, NOT normalized \[0,1\].
+/// Callers that feed into the fusion pipeline MUST apply `(raw + 1.0) / 2.0`
+/// before mixing with other embedder scores (SRC-3 normalization).
+///
 /// # Arguments
 ///
 /// * `query_ctx` - Pre-normalized query context
@@ -194,8 +205,8 @@ impl BatchedQueryContext {
 ///
 /// # Returns
 ///
-/// Vec of [f32; 10] arrays, one per candidate. Order matches:
-/// [E1, E2, E3, E4, E5, E7, E8, E9, E10, E11]
+/// Vec of [f32; 10] arrays, one per candidate. Each score is in \[-1.0, 1.0\].
+/// Order matches: [E1, E2, E3, E4, E5, E7, E8, E9, E10, E11]
 ///
 /// # Performance
 ///
@@ -273,6 +284,11 @@ pub fn compute_batch_cosine_similarity(
 ///
 /// For large candidate sets, processes in batches to maintain cache locality.
 ///
+/// # Return Range
+///
+/// **Raw cosine similarity in \[-1.0, 1.0\]** per score (same as
+/// [`compute_batch_cosine_similarity`]). NOT normalized to \[0,1\].
+///
 /// # Arguments
 ///
 /// * `query_ctx` - Pre-normalized query context
@@ -280,7 +296,7 @@ pub fn compute_batch_cosine_similarity(
 ///
 /// # Returns
 ///
-/// Combined results from all batches
+/// Combined results from all batches, each score in \[-1.0, 1.0\]
 pub fn compute_batch_cosine_similarity_chunked(
     query_ctx: &BatchedQueryContext,
     candidate_vectors: &[[&[f32]; 10]],

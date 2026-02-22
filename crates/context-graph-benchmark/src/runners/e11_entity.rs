@@ -258,6 +258,7 @@ pub struct GraphBenchmarkResults {
 
 /// E11 Entity Benchmark Runner.
 pub struct E11EntityBenchmarkRunner {
+    #[allow(dead_code)] // Used by bin targets, not lib tests
     config: E11EntityBenchmarkConfig,
     #[cfg(feature = "real-embeddings")]
     provider: Option<Arc<dyn MultiArrayEmbeddingProvider>>,
@@ -396,6 +397,7 @@ impl E11EntityBenchmarkRunner {
     }
 
     /// Load dataset from real data.
+    #[allow(dead_code)] // Called from run() which is used by bin targets
     fn load_dataset(&self, data_dir: &str) -> Result<E11EntityBenchmarkDataset, String> {
         let loader = DatasetLoader::new().with_max_chunks(self.config.max_chunks);
 
@@ -506,6 +508,7 @@ impl E11EntityBenchmarkRunner {
     // Benchmark A: Entity Extraction
     // ========================================================================
 
+    #[allow(dead_code)] // Called from run() which is used by bin targets
     fn run_extraction_benchmark(
         &self,
         dataset: &E11EntityBenchmarkDataset,
@@ -1076,6 +1079,7 @@ fn find_optimal_threshold(valid_scores: &[f32], invalid_scores: &[f32]) -> (f32,
 }
 
 /// Determine relationship strength label based on co-occurrence count.
+#[allow(dead_code)] // Called from benchmark infrastructure used by bin targets
 fn cooccurrence_relation(count: usize) -> &'static str {
     if count >= 5 {
         "strongly_related_to"

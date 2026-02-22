@@ -157,12 +157,22 @@ pub fn bfs_traverse(
 /// # Returns
 /// * `Ok(Some(path))` - Path from start to target (inclusive)
 /// * `Ok(None)` - No path found within max_depth
+///
+/// # Safeguards
+///
+/// GRAPH-L1 FIX: Enforces a hard limit of 10,000 visited nodes to prevent
+/// unbounded memory growth on large or pathological graphs. If the limit
+/// is reached, returns `None` (no path found) and logs a warning.
 pub fn bfs_shortest_path(
     storage: &GraphStorage,
     start: NodeId,
     target: NodeId,
     max_depth: usize,
 ) -> GraphResult<Option<Vec<NodeId>>> {
+    /// GRAPH-L1: Maximum nodes to visit before aborting.
+    /// Prevents OOM on large graphs (10K nodes * ~32 bytes = ~320KB).
+    const MAX_VISITED_NODES: usize = 10_000;
+
     if start == target {
         return Ok(Some(vec![start]));
     }
@@ -175,6 +185,17 @@ pub fn bfs_shortest_path(
     visited.insert(start);
 
     while let Some((current_node, depth)) = frontier.pop_front() {
+        // GRAPH-L1 FIX: Abort if we've visited too many nodes
+        if visited.len() >= MAX_VISITED_NODES {
+            log::warn!(
+                "bfs_shortest_path: visited {} nodes without finding target — aborting \
+                 (max_visited_nodes={})",
+                visited.len(),
+                MAX_VISITED_NODES
+            );
+            return Ok(None);
+        }
+
         if depth >= max_depth {
             continue;
         }

@@ -203,7 +203,22 @@ async fn test_get_topic_stability_custom_hours() {
     let is_error = result.get("isError").unwrap().as_bool().unwrap();
     assert!(!is_error, "isError must be false");
 
-    println!("[PASS] get_topic_stability accepts custom hours");
+    // TST-L3 FIX: Verify response body contains expected fields (not just isError)
+    let data = extract_mcp_tool_data(&result);
+    assert!(
+        data.get("churn_rate").is_some(),
+        "Custom hours response must contain churn_rate"
+    );
+    assert!(
+        data.get("phases").is_some(),
+        "Custom hours response must contain phases"
+    );
+    assert!(
+        data.get("average_churn").is_some(),
+        "Custom hours response must contain average_churn"
+    );
+
+    println!("[PASS] get_topic_stability accepts custom hours with valid body");
 }
 
 #[tokio::test]
@@ -398,7 +413,24 @@ async fn test_get_divergence_alerts_custom_lookback() {
     let is_error = result.get("isError").unwrap().as_bool().unwrap();
     assert!(!is_error, "isError must be false");
 
-    println!("[PASS] get_divergence_alerts accepts custom lookback_hours");
+    // TST-L4 FIX: Verify response body contains expected fields (not just isError)
+    let data = extract_mcp_tool_data(&result);
+    assert!(
+        data.get("alerts").is_some(),
+        "Custom lookback response must contain alerts field"
+    );
+    assert!(
+        data.get("severity").is_some(),
+        "Custom lookback response must contain severity field"
+    );
+    // With no stored memories, custom lookback should also return empty alerts
+    let alerts = data.get("alerts").unwrap().as_array().unwrap();
+    assert!(
+        alerts.is_empty(),
+        "Custom lookback with empty store should have no alerts"
+    );
+
+    println!("[PASS] get_divergence_alerts accepts custom lookback_hours with valid body");
 }
 
 #[tokio::test]

@@ -1,4 +1,5 @@
-#![allow(dead_code, unused_variables, unreachable_code, unused_assignments)]
+// BENCH-H1 FIX: Removed global warning suppression that hid dead code and unused variables.
+// Individual items that are genuinely needed but unused should use targeted #[allow] on that item.
 //! # Context Graph Benchmark Suite
 //!
 //! Comprehensive benchmarking system comparing the 13-embedder multi-space fingerprinting

@@ -49,7 +49,7 @@ const MAX_SUMMARY_WORDS: usize = 50;
 fn embedder_to_dto_space(embedder: Embedder) -> &'static str {
     match embedder {
         Embedder::Semantic => "E1_Semantic",
-        Embedder::Causal => "E5_Causal",
+        Embedder::Causal => "E5_Causal", // NOTE: E5 excluded from DIVERGENCE_SPACES per AP-77
         Embedder::Sparse => "E6_Sparse",
         Embedder::Code => "E7_Code",
         Embedder::Contextual => "E10_Multimodal",
@@ -832,8 +832,9 @@ mod tests {
         assert_eq!(MIN_MEMORIES_FOR_DIVERGENCE, 2);
         assert_eq!(MAX_SUMMARY_WORDS, 50);
         assert_eq!(error_codes::INSUFFICIENT_MEMORIES, -32021);
-        // AP-62: SEMANTIC embedders for divergence
-        assert_eq!(DivergenceAlert::VALID_SEMANTIC_SPACES.len(), 7);
+        // AP-62/AP-77: SEMANTIC embedders for divergence (E5 excluded per AP-77)
+        // Audit-12 TST-H1 FIX: 6 spaces (E5 Causal excluded), must match DIVERGENCE_SPACES
+        assert_eq!(DivergenceAlert::VALID_SEMANTIC_SPACES.len(), 6);
         assert!(!DivergenceAlert::is_valid_semantic_space("E2_TemporalRecent"));
         // Embedder mapping
         assert_eq!(embedder_to_dto_space(Embedder::Semantic), "E1_Semantic");

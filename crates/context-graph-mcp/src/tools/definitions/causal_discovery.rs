@@ -39,6 +39,12 @@ pub fn definitions() -> Vec<ToolDefinition> {
             json!({
                 "type": "object",
                 "properties": {
+                    "mode": {
+                        "type": "string",
+                        "enum": ["extract", "pairs"],
+                        "description": "Discovery mode: 'extract' (find ALL cause-effect in each memory, default) or 'pairs' (find relationships BETWEEN memories via GraphDiscoveryService).",
+                        "default": "extract"
+                    },
                     "maxPairs": {
                         "type": "integer",
                         "description": "Maximum candidate pairs to analyze per run (1-200, default: 50). More pairs = longer runtime.",
@@ -58,18 +64,6 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "enum": ["current", "all", "recent"],
                         "description": "Scope of indexed files to analyze: 'current' (last 10 indexed files), 'recent' (last 50 indexed files), 'all' (all indexed files). MCP-5 FIX: Causal discovery is file-based, not session-scoped. Default: 'all'.",
                         "default": "all"
-                    },
-                    "similarityThreshold": {
-                        "type": "number",
-                        "description": "Minimum E1 similarity for candidate pairs (0.3-0.9, default: 0.5). Pairs below this are skipped.",
-                        "default": 0.5,
-                        "minimum": 0.3,
-                        "maximum": 0.9
-                    },
-                    "skipAnalyzed": {
-                        "type": "boolean",
-                        "description": "Skip pairs already analyzed in previous runs (default: true).",
-                        "default": true
                     },
                     "dryRun": {
                         "type": "boolean",
@@ -128,6 +122,14 @@ mod tests {
         let props = trigger.input_schema["properties"].as_object().unwrap();
         assert_eq!(props["maxPairs"]["default"], 50);
         assert_eq!(props["sessionScope"]["default"], "all");
+        // CD-H2 FIX: mode parameter now declared in schema
+        assert_eq!(props["mode"]["default"], "extract");
+        let mode_enum = props["mode"]["enum"].as_array().unwrap();
+        assert!(mode_enum.contains(&json!("extract")));
+        assert!(mode_enum.contains(&json!("pairs")));
+        // CD-H3 FIX: similarityThreshold and skipAnalyzed removed (were never read by handler)
+        assert!(!props.contains_key("similarityThreshold"), "similarityThreshold should be removed");
+        assert!(!props.contains_key("skipAnalyzed"), "skipAnalyzed should be removed");
         let scope_enum = props["sessionScope"]["enum"].as_array().unwrap();
         assert!(scope_enum.contains(&json!("current")));
         assert!(scope_enum.contains(&json!("all")));

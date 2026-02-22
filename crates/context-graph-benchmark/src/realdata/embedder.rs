@@ -123,6 +123,7 @@ impl EmbeddingCheckpoint {
 
 /// Embedder for real data using the 13-embedder system.
 pub struct RealDataEmbedder {
+    #[allow(dead_code)] // Used by bin targets, not lib tests
     config: EmbedderConfig,
 }
 

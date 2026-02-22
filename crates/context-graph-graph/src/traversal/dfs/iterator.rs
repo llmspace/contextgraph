@@ -5,25 +5,11 @@
 
 use std::collections::HashSet;
 
-use uuid::Uuid;
-
 use crate::error::GraphResult;
 use crate::storage::GraphStorage;
+use crate::traversal::astar::helpers::uuid_to_i64;
 
 use super::types::{DfsParams, NodeId};
-
-/// Convert UUID to i64 for storage key operations.
-///
-/// This reverses `Uuid::from_u64_pair(id as u64, 0)` used in storage.
-/// from_u64_pair stores values in big-endian order in the UUID bytes.
-#[inline]
-pub(super) fn uuid_to_i64(uuid: &Uuid) -> i64 {
-    let bytes = uuid.as_bytes();
-    // from_u64_pair uses big-endian byte order
-    i64::from_be_bytes([
-        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-    ])
-}
 
 /// DFS Iterator for lazy traversal.
 ///

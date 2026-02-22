@@ -172,13 +172,6 @@ pub struct SearchCodeRequest {
     /// Whether to include full content text in results (default: false).
     #[serde(rename = "includeContent", default)]
     pub include_content: bool,
-
-    /// Whether to include AST context (scope chain, entity type) if available.
-    /// Only affects chunks created by AST chunker.
-    /// NOTE: Accepted from JSON schema but not yet wired into handler (needs AST chunker integration).
-    #[serde(rename = "includeAstContext", default)]
-    #[allow(dead_code)]
-    pub include_ast_context: bool,
 }
 
 fn default_top_k() -> usize {
@@ -203,7 +196,6 @@ impl Default for SearchCodeRequest {
             search_mode: CodeSearchMode::Hybrid,
             language_hint: None,
             include_content: false,
-            include_ast_context: false,
         }
     }
 }

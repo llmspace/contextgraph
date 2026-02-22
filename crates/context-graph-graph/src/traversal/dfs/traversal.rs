@@ -18,7 +18,7 @@ use std::collections::HashSet;
 use crate::error::GraphResult;
 use crate::storage::GraphStorage;
 
-use super::iterator::uuid_to_i64;
+use crate::traversal::astar::helpers::uuid_to_i64;
 use super::result::DfsResult;
 use super::types::{DfsParams, Domain, NodeId};
 

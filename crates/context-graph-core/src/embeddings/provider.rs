@@ -18,8 +18,8 @@ use std::time::{Duration, Instant};
 
 use crate::error::{CoreError, CoreResult};
 use crate::traits::{
-    MultiArrayEmbeddingOutput, MultiArrayEmbeddingProvider, SingleEmbedder, SparseEmbedder,
-    TokenEmbedder,
+    EmbeddingMetadata, MultiArrayEmbeddingOutput, MultiArrayEmbeddingProvider, SingleEmbedder,
+    SparseEmbedder, TokenEmbedder,
 };
 use crate::types::fingerprint::{SemanticFingerprint, NUM_EMBEDDERS};
 
@@ -371,6 +371,7 @@ impl MultiArrayEmbeddingProvider for StubMultiArrayProvider {
     async fn embed_batch_all(
         &self,
         contents: &[String],
+        _metadata: &[EmbeddingMetadata],
     ) -> CoreResult<Vec<MultiArrayEmbeddingOutput>> {
         // Validate input
         if contents.is_empty() {
@@ -590,7 +591,7 @@ mod tests {
     #[tokio::test]
     async fn test_embed_batch_empty() {
         let provider = StubMultiArrayProvider::new();
-        let result = provider.embed_batch_all(&[]).await;
+        let result = provider.embed_batch_all(&[], &[]).await;
 
         assert!(result.is_ok());
         assert!(result.expect("success").is_empty());
@@ -604,7 +605,7 @@ mod tests {
             "second content".to_string(),
             "third content".to_string(),
         ];
-        let result = provider.embed_batch_all(&contents).await;
+        let result = provider.embed_batch_all(&contents, &[]).await;
 
         assert!(result.is_ok());
         let outputs = result.expect("success");
@@ -621,8 +622,8 @@ mod tests {
         let provider = StubMultiArrayProvider::new();
         let contents = vec!["a".to_string(), "b".to_string()];
 
-        let batch1 = provider.embed_batch_all(&contents).await.expect("first");
-        let batch2 = provider.embed_batch_all(&contents).await.expect("second");
+        let batch1 = provider.embed_batch_all(&contents, &[]).await.expect("first");
+        let batch2 = provider.embed_batch_all(&contents, &[]).await.expect("second");
 
         assert_eq!(batch1.len(), batch2.len());
         for (o1, o2) in batch1.iter().zip(batch2.iter()) {
@@ -847,7 +848,7 @@ mod tests {
             "".to_string(), // Empty - should fail the whole batch
             "third".to_string(),
         ];
-        let result = provider.embed_batch_all(&contents).await;
+        let result = provider.embed_batch_all(&contents, &[]).await;
 
         // Batch should fail because one content is empty
         assert!(result.is_err(), "Batch with empty string should fail");

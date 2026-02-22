@@ -370,11 +370,19 @@ fn default_samples_per_cluster() -> usize {
 impl GetEmbedderClustersRequest {
     /// Validate the request.
     pub fn validate(&self) -> Result<(), String> {
-        if EmbedderId::from_str(&self.embedder).is_none() {
-            return Err(format!(
-                "Invalid embedder '{}'. Must be E1-E13.",
-                self.embedder
-            ));
+        match EmbedderId::from_str(&self.embedder) {
+            None => {
+                return Err(format!(
+                    "Invalid embedder '{}'. Must be E1-E13.",
+                    self.embedder
+                ));
+            }
+            Some(eid) => {
+                // CD-M3 FIX: Reject non-HNSW embedders (E6/E12/E13 cannot be clustered)
+                if !eid.uses_hnsw() {
+                    return Err(EmbedderId::hnsw_unsupported_error(&self.embedder));
+                }
+            }
         }
         if self.min_cluster_size < 2 || self.min_cluster_size > 50 {
             return Err("minClusterSize must be between 2 and 50".to_string());

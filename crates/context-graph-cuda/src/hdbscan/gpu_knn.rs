@@ -211,5 +211,6 @@ impl GpuKnnIndex {
     }
 }
 
-// SAFETY: GpuKnnIndex owns its data exclusively
-unsafe impl Send for GpuKnnIndex {}
+// CUDA-M1 FIX: Removed `unsafe impl Send for GpuKnnIndex`.
+// All fields (Vec<f32>, usize, usize) are Send, so the compiler
+// auto-derives Send. The explicit unsafe impl was unnecessary.

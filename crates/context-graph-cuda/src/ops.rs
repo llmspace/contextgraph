@@ -10,6 +10,15 @@ use crate::error::CudaResult;
 #[async_trait]
 pub trait VectorOps: Send + Sync {
     /// Compute cosine similarity between two vectors.
+    ///
+    /// # Return Range
+    ///
+    /// **Raw cosine similarity in \[-1.0, 1.0\].**
+    /// - `1.0` = identical direction
+    /// - `0.0` = orthogonal
+    /// - `-1.0` = opposite direction
+    ///
+    /// Callers needing \[0,1\] range must apply `(raw + 1.0) / 2.0` (SRC-3).
     async fn cosine_similarity(&self, a: &[f32], b: &[f32]) -> CudaResult<f32>;
 
     /// Compute dot product of two vectors.
@@ -19,6 +28,11 @@ pub trait VectorOps: Send + Sync {
     async fn normalize(&self, v: &[f32]) -> CudaResult<Vec<f32>>;
 
     /// Batch cosine similarity: compare query against multiple vectors.
+    ///
+    /// # Return Range
+    ///
+    /// **Raw cosine similarity in \[-1.0, 1.0\]** per element.
+    /// NOT normalized to \[0,1\]. Apply `(raw + 1.0) / 2.0` if needed (SRC-3).
     async fn batch_cosine_similarity(
         &self,
         query: &[f32],

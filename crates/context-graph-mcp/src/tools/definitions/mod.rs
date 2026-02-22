@@ -3,10 +3,10 @@
 //! Includes 17 original tools (inject_context merged into store_memory)
 //! plus 4 sequence tools for E4 integration
 //! plus 4 causal tools for E5 Priority 1 enhancement
-//! plus 2 causal discovery tools for E5 LLM-based relationship discovery
+//! plus 2 causal discovery tools for E5 LLM-based relationship discovery (LLM only)
 //! plus 1 keyword tool for E6 keyword search enhancement
 //! plus 1 code tool for E7 code search enhancement
-//! plus 2 graph tools for E8 upgrade (Phase 4)
+//! plus 2 graph tools (+2 with LLM) for E8 upgrade (Phase 4)
 //! plus 1 robustness tool for E9 typo-tolerant search
 //! plus 6 entity tools for E11 integration (extract, search, infer, find, validate, graph)
 //! plus 4 embedder-first search tools for Constitution v6.3
@@ -70,7 +70,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
     // Code tools (1) - E7 code search enhancement
     tools.extend(code::definitions());
 
-    // Graph tools (2) - E8 upgrade (Phase 4)
+    // Graph tools (2 base, +2 LLM) - E8 upgrade (Phase 4)
     tools.extend(graph::definitions());
 
     // Robustness tools (1) - E9 typo-tolerant search
@@ -143,5 +143,16 @@ mod tests {
         assert_eq!(maintenance::definitions().len(), 1);
         assert_eq!(provenance::definitions().len(), 3);
         assert_eq!(daemon::definitions().len(), 1);
+        // Audit-12 TST-H2 FIX: graph and causal_discovery are LLM-gated, must be tested
+        #[cfg(feature = "llm")]
+        {
+            assert_eq!(graph::definitions().len(), 4); // 2 base + 2 LLM
+            assert_eq!(causal_discovery::definitions().len(), 2);
+        }
+        #[cfg(not(feature = "llm"))]
+        {
+            assert_eq!(graph::definitions().len(), 2);
+            assert_eq!(causal_discovery::definitions().len(), 0);
+        }
     }
 }

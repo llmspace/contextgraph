@@ -180,6 +180,31 @@ impl GraphStorage {
         Ok(result)
     }
 
+    /// Get all incoming edges to a target node.
+    ///
+    /// This method iterates CF_EDGES to find edges where `edge.target`
+    /// matches the given target node ID (converted from i64 to UUID).
+    /// Required for correct bidirectional A* backward search.
+    ///
+    /// # Arguments
+    /// * `target_node` - Target node ID (i64 storage format)
+    ///
+    /// # Returns
+    /// Vector of full GraphEdges pointing to the target node.
+    pub fn get_incoming_edges(&self, target_node: i64) -> GraphResult<Vec<GraphEdge>> {
+        let target_uuid = self.i64_to_uuid(target_node);
+        let mut result = Vec::new();
+
+        for edge_result in self.iter_edges()? {
+            let edge = edge_result?;
+            if edge.target == target_uuid {
+                result.push(edge);
+            }
+        }
+
+        Ok(result)
+    }
+
     // ========== UUID Conversion Helpers ==========
 
     /// Convert i64 node ID to UUID for comparison with GraphEdge.source/target.

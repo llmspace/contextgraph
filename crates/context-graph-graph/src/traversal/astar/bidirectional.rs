@@ -1,11 +1,13 @@
 //! Bidirectional A* search algorithm.
 //!
 //! Searches from both start and goal simultaneously for improved performance.
+//! Forward search follows outgoing edges; backward search follows incoming edges.
 
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use crate::config::HyperbolicConfig;
 use crate::error::{GraphError, GraphResult};
+use crate::hyperbolic::poincare::PoincarePoint;
 use crate::hyperbolic::PoincareBall;
 use crate::storage::GraphStorage;
 
@@ -13,10 +15,99 @@ use super::helpers::{edge_cost, to_hyperbolic_point, uuid_to_i64};
 use super::node::AstarNode;
 use super::types::{AstarParams, AstarResult, NodeId};
 
+/// Expand one direction of the bidirectional search.
+///
+/// For forward search: follows outgoing edges, neighbor = edge.target
+/// For backward search: follows incoming edges, neighbor = edge.source
+#[allow(clippy::too_many_arguments)]
+fn expand_direction(
+    storage: &GraphStorage,
+    ball: &PoincareBall,
+    params: &AstarParams,
+    current_id: NodeId,
+    current_g: f32,
+    is_forward: bool,
+    g_scores: &mut HashMap<NodeId, f32>,
+    parent_map: &mut HashMap<NodeId, NodeId>,
+    closed_set: &HashSet<NodeId>,
+    open_set: &mut BinaryHeap<AstarNode>,
+    other_g: &HashMap<NodeId, f32>,
+    target_point: &PoincarePoint,
+    best_path_cost: &mut f32,
+    meeting_node: &mut Option<NodeId>,
+) -> GraphResult<()> {
+    // GRAPH-H1 FIX: Forward follows outgoing edges, backward follows incoming edges
+    let edges = if is_forward {
+        storage.get_outgoing_edges(current_id)?
+    } else {
+        storage.get_incoming_edges(current_id)?
+    };
+
+    for edge in edges {
+        // Filter by edge type
+        if let Some(ref allowed_types) = params.edge_types {
+            if !allowed_types.contains(&edge.edge_type) {
+                continue;
+            }
+        }
+
+        // Get modulated weight
+        let effective_weight = edge.get_modulated_weight(params.domain);
+
+        // Filter by minimum weight
+        if effective_weight < params.min_weight {
+            continue;
+        }
+
+        // GRAPH-H1 FIX: Forward neighbor = target, backward neighbor = source
+        let neighbor_id = if is_forward {
+            uuid_to_i64(&edge.target)
+        } else {
+            uuid_to_i64(&edge.source)
+        };
+
+        if closed_set.contains(&neighbor_id) {
+            continue;
+        }
+
+        let tentative_g = current_g + edge_cost(effective_weight);
+        let neighbor_g = *g_scores.get(&neighbor_id).unwrap_or(&f32::INFINITY);
+
+        if tentative_g >= neighbor_g {
+            continue;
+        }
+
+        parent_map.insert(neighbor_id, current_id);
+        g_scores.insert(neighbor_id, tentative_g);
+
+        // Get heuristic
+        let neighbor_point = to_hyperbolic_point(
+            storage
+                .get_hyperbolic(neighbor_id)?
+                .ok_or(GraphError::MissingHyperbolicData(neighbor_id))?,
+        );
+
+        let h = params.heuristic_scale * ball.distance(&neighbor_point, target_point);
+        open_set.push(AstarNode::new(neighbor_id, tentative_g, h));
+
+        // Check if meets other search
+        if let Some(&other_cost) = other_g.get(&neighbor_id) {
+            let path_cost = tentative_g + other_cost;
+            if path_cost < *best_path_cost {
+                *best_path_cost = path_cost;
+                *meeting_node = Some(neighbor_id);
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// A* with bidirectional search optimization.
 ///
 /// Searches from both start and goal simultaneously, meeting in the middle.
-/// Can be ~2x faster than unidirectional A* for long paths.
+/// Forward search follows outgoing edges (source→target).
+/// Backward search follows incoming edges (target→source).
 ///
 /// # Arguments
 /// * `storage` - Graph storage backend
@@ -53,7 +144,7 @@ pub fn astar_bidirectional(
             .ok_or(GraphError::MissingHyperbolicData(goal))?,
     );
 
-    // Forward search state - pre-allocate for expected exploration (half of max_nodes)
+    // Forward search state
     let estimated_nodes = params.max_nodes / 2;
     let mut forward_open: BinaryHeap<AstarNode> = BinaryHeap::new();
     let mut forward_g: HashMap<NodeId, f32> = HashMap::with_capacity(estimated_nodes);
@@ -64,7 +155,7 @@ pub fn astar_bidirectional(
     forward_open.push(AstarNode::new(start, 0.0, h_start));
     forward_g.insert(start, 0.0);
 
-    // Backward search state - pre-allocate for expected exploration (half of max_nodes)
+    // Backward search state
     let mut backward_open: BinaryHeap<AstarNode> = BinaryHeap::new();
     let mut backward_g: HashMap<NodeId, f32> = HashMap::with_capacity(estimated_nodes);
     let mut backward_parent: HashMap<NodeId, NodeId> = HashMap::with_capacity(estimated_nodes);
@@ -82,7 +173,6 @@ pub fn astar_bidirectional(
     let mut forward_turn = true;
 
     loop {
-        // Check termination
         if forward_open.is_empty() && backward_open.is_empty() {
             break;
         }
@@ -92,29 +182,22 @@ pub fn astar_bidirectional(
             break;
         }
 
-        // Choose direction
+        // Determine which direction to expand
+        let is_forward = if forward_turn && !forward_open.is_empty() {
+            true
+        } else if !backward_open.is_empty() {
+            false
+        } else if !forward_open.is_empty() {
+            true
+        } else {
+            break;
+        };
+
+        forward_turn = !forward_turn;
+
+        // Select the correct state for this direction
         let (open_set, g_scores, parent_map, closed_set, other_closed, other_g, target_point) =
-            if forward_turn && !forward_open.is_empty() {
-                (
-                    &mut forward_open,
-                    &mut forward_g,
-                    &mut forward_parent,
-                    &mut forward_closed,
-                    &backward_closed,
-                    &backward_g,
-                    &goal_point,
-                )
-            } else if !backward_open.is_empty() {
-                (
-                    &mut backward_open,
-                    &mut backward_g,
-                    &mut backward_parent,
-                    &mut backward_closed,
-                    &forward_closed,
-                    &forward_g,
-                    &start_point,
-                )
-            } else if !forward_open.is_empty() {
+            if is_forward {
                 (
                     &mut forward_open,
                     &mut forward_g,
@@ -125,10 +208,16 @@ pub fn astar_bidirectional(
                     &goal_point,
                 )
             } else {
-                break;
+                (
+                    &mut backward_open,
+                    &mut backward_g,
+                    &mut backward_parent,
+                    &mut backward_closed,
+                    &forward_closed,
+                    &forward_g,
+                    &start_point,
+                )
             };
-
-        forward_turn = !forward_turn;
 
         // Pop from open set
         let Some(current) = open_set.pop() else {
@@ -162,63 +251,25 @@ pub fn astar_bidirectional(
             break;
         }
 
-        // Get current g-score
         let current_g = *g_scores.get(&current_id).unwrap_or(&f32::INFINITY);
 
-        // Expand neighbors
-        let edges = storage.get_outgoing_edges(current_id)?;
-
-        for edge in edges {
-            // Filter by edge type
-            if let Some(ref allowed_types) = params.edge_types {
-                if !allowed_types.contains(&edge.edge_type) {
-                    continue;
-                }
-            }
-
-            // Get modulated weight
-            let effective_weight = edge.get_modulated_weight(params.domain);
-
-            // Filter by minimum weight
-            if effective_weight < params.min_weight {
-                continue;
-            }
-
-            let neighbor_id = uuid_to_i64(&edge.target);
-
-            if closed_set.contains(&neighbor_id) {
-                continue;
-            }
-
-            let tentative_g = current_g + edge_cost(effective_weight);
-            let neighbor_g = *g_scores.get(&neighbor_id).unwrap_or(&f32::INFINITY);
-
-            if tentative_g >= neighbor_g {
-                continue;
-            }
-
-            parent_map.insert(neighbor_id, current_id);
-            g_scores.insert(neighbor_id, tentative_g);
-
-            // Get heuristic
-            let neighbor_point = to_hyperbolic_point(
-                storage
-                    .get_hyperbolic(neighbor_id)?
-                    .ok_or(GraphError::MissingHyperbolicData(neighbor_id))?,
-            );
-
-            let h = params.heuristic_scale * ball.distance(&neighbor_point, target_point);
-            open_set.push(AstarNode::new(neighbor_id, tentative_g, h));
-
-            // Check if meets other search
-            if let Some(&other_cost) = other_g.get(&neighbor_id) {
-                let path_cost = tentative_g + other_cost;
-                if path_cost < best_path_cost {
-                    best_path_cost = path_cost;
-                    meeting_node = Some(neighbor_id);
-                }
-            }
-        }
+        // GRAPH-H1 FIX: Expand using direction-appropriate edge traversal
+        expand_direction(
+            storage,
+            &ball,
+            &params,
+            current_id,
+            current_g,
+            is_forward,
+            g_scores,
+            parent_map,
+            closed_set,
+            open_set,
+            other_g,
+            target_point,
+            &mut best_path_cost,
+            &mut meeting_node,
+        )?;
     }
 
     // Reconstruct path if found

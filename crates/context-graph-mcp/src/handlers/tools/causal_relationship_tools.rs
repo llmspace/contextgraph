@@ -196,11 +196,17 @@ impl Handlers {
             .unwrap_or(DEFAULT_E11_WEIGHT);
 
         // Parse minimum consensus threshold for multi-embedder search
+        // CD-M2 FIX: Reject out-of-range instead of silent clamping (Audit-11 SB-8 pattern)
         let min_consensus = args
             .get("minConsensus")
             .and_then(|v| v.as_f64())
-            .map(|v| (v as f32).clamp(0.0, 1.0))
-            .unwrap_or(0.0);
+            .unwrap_or(0.0) as f32;
+        if !(0.0..=1.0).contains(&min_consensus) {
+            return self.tool_error(
+                id,
+                &format!("minConsensus must be between 0.0 and 1.0, got {}", min_consensus),
+            );
+        }
 
         info!(
             query_len = query.len(),

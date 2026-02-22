@@ -45,10 +45,11 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "properties": {
                     "embedder": {
                         "type": "string",
-                        "description": "Which embedder to use as primary (E1-E13). E1=semantic, E2=recency, \
-                                        E3=periodic, E4=sequence, E5=causal, E6=keyword, E7=code, E8=graph, \
-                                        E9=robustness, E10=paraphrase, E11=entity, E12=precision, E13=expansion.",
-                        "enum": ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13"]
+                        "description": "Which embedder to use as primary. E1=semantic, E2=recency, \
+                                        E3=periodic, E4=sequence, E5=causal, E7=code, E8=graph, \
+                                        E9=robustness, E10=paraphrase, E11=entity. \
+                                        E6/E12/E13 use non-HNSW indexes and are not supported for direct search.",
+                        "enum": ["E1", "E2", "E3", "E4", "E5", "E7", "E8", "E9", "E10", "E11"]
                     },
                     "query": {
                         "type": "string",
@@ -96,8 +97,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "properties": {
                     "embedder": {
                         "type": "string",
-                        "description": "Which embedder's clusters to explore (E1-E13).",
-                        "enum": ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13"]
+                        "description": "Which embedder's clusters to explore. E6/E12/E13 use non-HNSW indexes and are not supported for clustering.",
+                        "enum": ["E1", "E2", "E3", "E4", "E5", "E7", "E8", "E9", "E10", "E11"]
                     },
                     "minClusterSize": {
                         "type": "integer",
@@ -146,10 +147,10 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     },
                     "embedders": {
                         "type": "array",
-                        "description": "Which embedders to compare (2-5 embedders).",
+                        "description": "Which embedders to compare (2-5 embedders). E6/E12/E13 use non-HNSW indexes and are not supported.",
                         "items": {
                             "type": "string",
-                            "enum": ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13"]
+                            "enum": ["E1", "E2", "E3", "E4", "E5", "E7", "E8", "E9", "E10", "E11"]
                         },
                         "minItems": 2,
                         "maxItems": 5
@@ -350,7 +351,8 @@ mod tests {
         assert!(required.contains(&json!("query")));
         let props = search.input_schema.get("properties").unwrap().as_object().unwrap();
         let embedder_enum = props["embedder"]["enum"].as_array().unwrap();
-        assert_eq!(embedder_enum.len(), 13);
+        // CD-M1 FIX: E6/E12/E13 removed from search_by_embedder (non-HNSW)
+        assert_eq!(embedder_enum.len(), 10);
     }
 
     #[test]

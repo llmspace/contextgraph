@@ -24,7 +24,7 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
-use tracing::{debug, info, instrument};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 use super::error::{GpuHdbscanError, GpuHdbscanResult};
@@ -249,8 +249,8 @@ impl GpuHdbscanClusterer {
         let cluster_elapsed = cluster_start.elapsed();
         debug!(cluster_elapsed_us = cluster_elapsed.as_micros(), "Cluster extraction complete");
 
-        // === STEP 5: Identify core points ===
-        let core_points = self.identify_core_points(&labels);
+        // === STEP 5: Identify core points (CUDA-H1 FIX: use GPU k-NN core distances) ===
+        let core_points = self.identify_core_points(&labels, &core_distances);
 
         // Build result
         let memberships: Vec<ClusterMembership> = memory_ids
@@ -479,23 +479,59 @@ impl GpuHdbscanClusterer {
         semantic_threshold
     }
 
-    /// Identify core points based on cluster labels.
-    fn identify_core_points(&self, labels: &[i32]) -> Vec<bool> {
+    /// Identify core points using GPU k-NN core distances.
+    ///
+    /// CUDA-H1 FIX: Uses actual spatial core distances from GPU k-NN instead of
+    /// global label counting. A point is core if:
+    /// 1. It is not noise (label != -1)
+    /// 2. Its core distance (distance to min_samples-th nearest neighbor) is at or
+    ///    below the median core distance for its cluster.
+    ///
+    /// Points with above-median core distances within their cluster are border points —
+    /// they were density-reachable but sit at the cluster periphery.
+    fn identify_core_points(&self, labels: &[i32], core_distances: &[f32]) -> Vec<bool> {
         let n = labels.len();
         let mut is_core = vec![false; n];
+
+        if core_distances.len() != n {
+            error!(
+                "CUDA-H1: core_distances length {} != labels length {}. Cannot identify core points.",
+                core_distances.len(),
+                n
+            );
+            return is_core;
+        }
+
+        // Compute median core distance per cluster
+        let mut cluster_core_dists: HashMap<i32, Vec<f32>> = HashMap::new();
+        for i in 0..n {
+            if labels[i] != -1 && core_distances[i].is_finite() {
+                cluster_core_dists
+                    .entry(labels[i])
+                    .or_default()
+                    .push(core_distances[i]);
+            }
+        }
+
+        let mut cluster_medians: HashMap<i32, f32> = HashMap::new();
+        for (label, mut dists) in cluster_core_dists {
+            dists.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let median = if dists.len() % 2 == 0 && dists.len() >= 2 {
+                (dists[dists.len() / 2 - 1] + dists[dists.len() / 2]) / 2.0
+            } else {
+                dists[dists.len() / 2]
+            };
+            cluster_medians.insert(label, median);
+        }
 
         for i in 0..n {
             if labels[i] == -1 {
                 continue;
             }
-
-            let neighbor_count = labels
-                .iter()
-                .enumerate()
-                .filter(|&(j, &label)| j != i && label == labels[i])
-                .count();
-
-            is_core[i] = neighbor_count >= self.params.min_samples;
+            // Core point: core distance at or below cluster median
+            if let Some(&median) = cluster_medians.get(&labels[i]) {
+                is_core[i] = core_distances[i] <= median;
+            }
         }
 
         is_core

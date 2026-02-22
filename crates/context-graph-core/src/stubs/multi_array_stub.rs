@@ -27,7 +27,7 @@ use std::sync::RwLock;
 use std::time::Duration;
 
 use crate::error::CoreResult;
-use crate::traits::{MultiArrayEmbeddingOutput, MultiArrayEmbeddingProvider};
+use crate::traits::{EmbeddingMetadata, MultiArrayEmbeddingOutput, MultiArrayEmbeddingProvider};
 use crate::types::fingerprint::{SemanticFingerprint, SparseVector, NUM_EMBEDDERS};
 
 /// Stub implementation of MultiArrayEmbeddingProvider for testing.
@@ -335,6 +335,7 @@ impl MultiArrayEmbeddingProvider for StubMultiArrayProvider {
     async fn embed_batch_all(
         &self,
         contents: &[String],
+        _metadata: &[EmbeddingMetadata],
     ) -> CoreResult<Vec<MultiArrayEmbeddingOutput>> {
         // Check readiness before processing
         if !self.is_ready() {
@@ -613,7 +614,7 @@ mod tests {
             "third content".to_string(),
         ];
 
-        let outputs = provider.embed_batch_all(&contents).await.unwrap();
+        let outputs = provider.embed_batch_all(&contents, &[]).await.unwrap();
         assert_eq!(outputs.len(), 3);
 
         // Each output should have valid fingerprint
@@ -691,7 +692,7 @@ mod tests {
         }
 
         let contents = vec!["test".to_string()];
-        let result = provider.embed_batch_all(&contents).await;
+        let result = provider.embed_batch_all(&contents, &[]).await;
         assert!(result.is_err());
     }
 
@@ -708,7 +709,7 @@ mod tests {
         assert_eq!(provider.fingerprint_count(), 2);
 
         let contents = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        provider.embed_batch_all(&contents).await.unwrap();
+        provider.embed_batch_all(&contents, &[]).await.unwrap();
         assert_eq!(provider.fingerprint_count(), 5);
     }
 

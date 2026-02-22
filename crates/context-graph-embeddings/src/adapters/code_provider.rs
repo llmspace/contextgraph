@@ -179,7 +179,7 @@ impl CodeEmbeddingProvider for E7CodeEmbeddingProvider {
         // Generate all 13 embeddings for each input
         let outputs = self
             .provider
-            .embed_batch_all(&contents)
+            .embed_batch_all(&contents, &[])
             .await
             .map_err(Self::convert_error)?;
 

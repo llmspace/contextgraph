@@ -47,7 +47,6 @@ mod monitoring;
 mod protocol;
 mod server;
 mod tools;
-mod transport;
 mod weights;
 
 use std::env;
@@ -69,7 +68,6 @@ use server::TransportMode;
 /// Parsed CLI arguments for the MCP server.
 ///
 /// TASK-INTEG-019: Simple argument parsing without external dependencies.
-/// TASK-42: Added sse_port for SSE transport.
 /// TASK-EMB-WARMUP: Added warm_first flag for blocking model warmup at startup.
 /// TASK-DAEMON: Added daemon mode for shared MCP server across multiple terminals.
 struct CliArgs {
@@ -81,7 +79,7 @@ struct CliArgs {
     port: Option<u16>,
     /// SSE port override (--sse-port, TASK-42)
     sse_port: Option<u16>,
-    /// TCP/SSE bind address override (--bind)
+    /// TCP bind address override (--bind)
     bind_address: Option<String>,
     /// Show help
     help: bool,
@@ -232,10 +230,8 @@ OPTIONS:
     --daemon-port <PORT> Daemon TCP port (default: 3100)
     --help, -h           Show this help message
 
-    # Note: SSE transport was removed (use TCP instead)
-
 ENVIRONMENT VARIABLES:
-    CONTEXT_GRAPH_TRANSPORT     Transport mode (stdio|tcp)
+    CONTEXT_GRAPH_TRANSPORT     Transport mode (stdio|tcp). SSE is not supported.
     CONTEXT_GRAPH_TCP_PORT      TCP port number
     CONTEXT_GRAPH_BIND_ADDRESS  TCP bind address
     CONTEXT_GRAPH_WARM_FIRST    Set to "0" to disable blocking warmup (default: "1")
@@ -297,7 +293,6 @@ EXAMPLES:
 /// Priority: CLI > ENV > Config > Default (Stdio)
 ///
 /// TASK-INTEG-019: FAIL FAST if invalid transport is specified.
-/// TASK-42: Added SSE transport support.
 fn determine_transport_mode(cli: &CliArgs, config: &Config) -> Result<TransportMode> {
     // CLI takes highest priority
     if let Some(ref transport) = cli.transport {
@@ -305,14 +300,21 @@ fn determine_transport_mode(cli: &CliArgs, config: &Config) -> Result<TransportM
         return match transport_lower.as_str() {
             "stdio" => Ok(TransportMode::Stdio),
             "tcp" => Ok(TransportMode::Tcp),
-            "sse" => Ok(TransportMode::Sse),
+            "sse" => {
+                error!(
+                    "FATAL: SSE transport is not supported. Use 'stdio' or 'tcp'."
+                );
+                Err(anyhow::anyhow!(
+                    "SSE transport is not supported. Use 'stdio' or 'tcp'."
+                ))
+            }
             _ => {
                 error!(
-                    "FATAL: Invalid transport '{}' from CLI. Must be 'stdio', 'tcp', or 'sse'.",
+                    "FATAL: Invalid transport '{}' from CLI. Must be 'stdio' or 'tcp'.",
                     transport
                 );
                 Err(anyhow::anyhow!(
-                    "Invalid transport '{}'. Must be 'stdio', 'tcp', or 'sse'.",
+                    "Invalid transport '{}'. Must be 'stdio' or 'tcp'.",
                     transport
                 ))
             }
@@ -325,14 +327,21 @@ fn determine_transport_mode(cli: &CliArgs, config: &Config) -> Result<TransportM
         return match transport_lower.as_str() {
             "stdio" => Ok(TransportMode::Stdio),
             "tcp" => Ok(TransportMode::Tcp),
-            "sse" => Ok(TransportMode::Sse),
+            "sse" => {
+                error!(
+                    "FATAL: SSE transport is not supported. Use 'stdio' or 'tcp'."
+                );
+                Err(anyhow::anyhow!(
+                    "SSE transport is not supported. Use 'stdio' or 'tcp'."
+                ))
+            }
             _ => {
                 error!(
-                    "FATAL: Invalid CONTEXT_GRAPH_TRANSPORT='{}'. Must be 'stdio', 'tcp', or 'sse'.",
+                    "FATAL: Invalid CONTEXT_GRAPH_TRANSPORT='{}'. Must be 'stdio' or 'tcp'.",
                     transport
                 );
                 Err(anyhow::anyhow!(
-                    "Invalid CONTEXT_GRAPH_TRANSPORT='{}'. Must be 'stdio', 'tcp', or 'sse'.",
+                    "Invalid CONTEXT_GRAPH_TRANSPORT='{}'. Must be 'stdio' or 'tcp'.",
                     transport
                 ))
             }
@@ -344,15 +353,22 @@ fn determine_transport_mode(cli: &CliArgs, config: &Config) -> Result<TransportM
     match transport_lower.as_str() {
         "stdio" => Ok(TransportMode::Stdio),
         "tcp" => Ok(TransportMode::Tcp),
-        "sse" => Ok(TransportMode::Sse),
+        "sse" => {
+            error!(
+                "FATAL: SSE transport is not supported. Use 'stdio' or 'tcp'."
+            );
+            Err(anyhow::anyhow!(
+                "SSE transport is not supported. Use 'stdio' or 'tcp'."
+            ))
+        }
         _ => {
             // This should not happen if Config::validate() passed, but FAIL FAST anyway
             error!(
-                "FATAL: Invalid transport '{}' in config. Must be 'stdio', 'tcp', or 'sse'.",
+                "FATAL: Invalid transport '{}' in config. Must be 'stdio' or 'tcp'.",
                 config.mcp.transport
             );
             Err(anyhow::anyhow!(
-                "Invalid transport '{}' in config. Must be 'stdio', 'tcp', or 'sse'.",
+                "Invalid transport '{}' in config. Must be 'stdio' or 'tcp'.",
                 config.mcp.transport
             ))
         }
@@ -362,7 +378,6 @@ fn determine_transport_mode(cli: &CliArgs, config: &Config) -> Result<TransportM
 /// Apply CLI/env overrides to config.
 ///
 /// TASK-INTEG-019: Modifies config in-place with CLI and env overrides.
-/// TASK-42: Added sse_port override.
 /// Called AFTER config is loaded but BEFORE validation.
 fn apply_overrides(config: &mut Config, cli: &CliArgs) {
     // Override TCP port from CLI
@@ -1659,10 +1674,12 @@ async fn main() -> Result<()> {
     let daemon_mode = determine_daemon_mode(&cli);
     let daemon_port = determine_daemon_port(&cli);
 
-    // Resolve database path for PID file guard.
+    // SRV-M3 FIX: Resolve database path using the SAME function as McpServer::new().
+    // Previously used `PathBuf::from(&config.storage.path)` which diverges from the
+    // server's resolve_storage_path() when config path is empty or env var is set.
     // The guard prevents multiple processes from opening the same RocksDB,
     // which causes corruption if one is killed mid-compaction.
-    let db_path = PathBuf::from(&config.storage.path);
+    let db_path = server::McpServer::resolve_storage_path(&config);
     let uses_rocksdb = config.storage.backend == "rocksdb";
 
     // ==================================================================
@@ -2049,17 +2066,6 @@ async fn main() -> Result<()> {
                     result = server.run_tcp() => {
                         if let Err(e) = result {
                             error!("Server run_tcp() returned error: {}", e);
-                        }
-                    }
-                    _ = shutdown_signal => {}
-                }
-            }
-            TransportMode::Sse => {
-                info!("MCP Server initialized, starting SSE transport");
-                tokio::select! {
-                    result = server.run_sse() => {
-                        if let Err(e) = result {
-                            error!("Server run_sse() returned error: {}", e);
                         }
                     }
                     _ = shutdown_signal => {}

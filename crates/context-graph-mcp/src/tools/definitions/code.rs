@@ -66,11 +66,6 @@ fn search_code_definition() -> ToolDefinition {
                 "languageHint": {
                     "type": "string",
                     "description": "Optional programming language hint to boost language-specific results. Supports: rust, python, javascript, typescript, go, java, cpp, sql."
-                },
-                "includeAstContext": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Include AST context (scope chain, entity type) in results if available (default: false). Only affects chunks created by AST chunker."
                 }
             },
             "required": ["query"],

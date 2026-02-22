@@ -560,10 +560,13 @@ pub struct DivergenceAlert {
 
 impl DivergenceAlert {
     /// Valid semantic spaces that can trigger divergence alerts per AP-62.
+    ///
+    /// NOTE: E5 (Causal) is EXCLUDED per AP-77 -- it requires CausalDirection for
+    /// meaningful scores. Without direction, E5 returns 0.0, causing false-positive alerts.
+    /// Must match DIVERGENCE_SPACES in context-graph-core/src/retrieval/divergence.rs.
     #[allow(dead_code)] // Constitution compliance: AP-62 semantic space validation
-    pub const VALID_SEMANTIC_SPACES: [&'static str; 7] = [
+    pub const VALID_SEMANTIC_SPACES: [&'static str; 6] = [
         "E1_Semantic",
-        "E5_Causal",
         "E6_Sparse",
         "E7_Code",
         "E10_Multimodal",
@@ -816,10 +819,17 @@ mod tests {
 
     #[test]
     fn test_divergence_alert_valid_semantic_spaces() {
-        // Valid semantic spaces per AP-62
+        // Valid semantic spaces per AP-62 (must match DIVERGENCE_SPACES in core)
         assert!(DivergenceAlert::is_valid_semantic_space("E1_Semantic"));
-        assert!(DivergenceAlert::is_valid_semantic_space("E5_Causal"));
         assert!(DivergenceAlert::is_valid_semantic_space("E7_Code"));
+        assert!(DivergenceAlert::is_valid_semantic_space("E6_Sparse"));
+        assert!(DivergenceAlert::is_valid_semantic_space("E10_Multimodal"));
+        assert!(DivergenceAlert::is_valid_semantic_space("E12_LateInteraction"));
+        assert!(DivergenceAlert::is_valid_semantic_space("E13_SPLADE"));
+
+        // Audit-12 TST-H1 FIX: E5 Causal EXCLUDED per AP-77 (requires CausalDirection;
+        // without it, E5 returns 0.0 causing false-positive divergence alerts)
+        assert!(!DivergenceAlert::is_valid_semantic_space("E5_Causal"));
 
         // Invalid - temporal spaces per AP-63
         assert!(!DivergenceAlert::is_valid_semantic_space(
@@ -835,7 +845,7 @@ mod tests {
         // Invalid - relational/structural (not for divergence)
         assert!(!DivergenceAlert::is_valid_semantic_space("E8_Graph"));
         assert!(!DivergenceAlert::is_valid_semantic_space("E11_Entity"));
-        println!("[PASS] DivergenceAlert semantic space validation per AP-62/AP-63");
+        println!("[PASS] DivergenceAlert semantic space validation per AP-62/AP-63/AP-77");
     }
 
     #[test]

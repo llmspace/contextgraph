@@ -46,9 +46,8 @@ pub struct WarmupArgs {
 /// # Returns
 ///
 /// Exit code:
-/// - 0: Success (models are warm)
+/// - 0: Success (models are warm, including "already warm")
 /// - 1: Failed to initialize models
-/// - 2: Models already warm (when skip_if_warm is true)
 pub async fn handle_warmup(args: WarmupArgs) -> i32 {
     info!("Context Graph Warmup - Loading embedding models into VRAM...");
 
@@ -59,11 +58,8 @@ pub async fn handle_warmup(args: WarmupArgs) -> i32 {
         // Verify we can actually get the provider
         match get_warm_provider() {
             Ok(_provider) => {
-                info!("SUCCESS: All 13 embedding models are warm and ready");
-                if args.skip_if_warm {
-                    return 0; // Success - already warm
-                }
-                return 2; // Special code indicating "already warm"
+                info!("Already warm, skipping. All 13 embedding models are warm and ready");
+                return 0; // Success - already warm is still success
             }
             Err(e) => {
                 error!(

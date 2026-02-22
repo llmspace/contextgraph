@@ -834,6 +834,10 @@ pub trait MultiArrayEmbeddingProvider: Send + Sync {
     /// # Arguments
     ///
     /// * `contents` - Slice of text content to embed
+    /// * `metadata` - Slice of metadata for each content item. If shorter than
+    ///   `contents`, remaining items use `EmbeddingMetadata::default()`. This
+    ///   ensures E4 receives sequence instructions and E5 receives causal hints
+    ///   through the batch path (EMB-H1 fix).
     ///
     /// # Returns
     ///
@@ -845,6 +849,7 @@ pub trait MultiArrayEmbeddingProvider: Send + Sync {
     async fn embed_batch_all(
         &self,
         contents: &[String],
+        metadata: &[EmbeddingMetadata],
     ) -> CoreResult<Vec<MultiArrayEmbeddingOutput>>;
 
     /// Embed content using only E1 (semantic) embedder.
@@ -1267,6 +1272,7 @@ mod tests {
             async fn embed_batch_all(
                 &self,
                 _: &[String],
+                _: &[EmbeddingMetadata],
             ) -> CoreResult<Vec<MultiArrayEmbeddingOutput>> {
                 Err(CoreError::Internal(
                     "MockProvider.embed_batch_all() is not implemented - this is a test mock"

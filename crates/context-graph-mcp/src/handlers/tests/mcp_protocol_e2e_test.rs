@@ -168,10 +168,11 @@ async fn test_e2e_tools_list_all_tools() {
         );
     }
 
-    // Audit-11 TST-H3: Assert actual tool count (56 with LLM feature)
-    assert!(
-        tools.len() >= 52,
-        "Expected at least 52 tools (56 with LLM), found {}",
+    // Audit-12 TST-H3 FIX: Exact assertion (this test is #[cfg(feature = "llm")])
+    assert_eq!(
+        tools.len(),
+        56,
+        "Expected exactly 56 tools with LLM feature, found {}",
         tools.len()
     );
 
@@ -862,6 +863,18 @@ async fn test_e2e_all_11_tools_callable() {
         successful_tools.insert("get_divergence_alerts");
     }
 
+    // Store a 4th memory for forget_concept (separate from merge sources)
+    let params4 = json!({
+        "name": "store_memory",
+        "arguments": {
+            "content": "Fourth test memory for forget_concept",
+            "importance": 0.4
+        }
+    });
+    let request4 = make_request("tools/call", Some(JsonRpcId::Number(97)), Some(params4));
+    let response4 = handlers.dispatch(request4).await;
+    let fingerprint_id_for_forget = extract_fingerprint_id(&response4);
+
     // Curation tools (3)
     println!("\n--- Curation Tools ---");
     if call_tool(
@@ -876,32 +889,33 @@ async fn test_e2e_all_11_tools_callable() {
     {
         successful_tools.insert("boost_importance");
     }
+    // merge_concepts: use fingerprint_id + fingerprint_id_for_merge as sources
+    if call_tool(
+        &handlers,
+        "merge_concepts",
+        json!({
+            "source_ids": [&fingerprint_id, &fingerprint_id_for_merge],
+            "target_name": "Merged Concept",
+            "rationale": "Consolidating similar memories",
+            "merge_strategy": "union"
+        }),
+    )
+    .await
+    {
+        successful_tools.insert("merge_concepts");
+    }
+    // forget_concept: use dedicated memory not consumed by merge
     if call_tool(
         &handlers,
         "forget_concept",
         json!({
-            "node_id": &fingerprint_id,
+            "node_id": &fingerprint_id_for_forget,
             "soft_delete": true
         }),
     )
     .await
     {
         successful_tools.insert("forget_concept");
-    }
-    // TST-03 FIX: merge_concepts requires 2+ valid UUIDs with DIFFERENT source and target.
-    // fingerprint_id_for_merge (third memory) is the source, fingerprint_id (second memory) is the target.
-    if call_tool(
-        &handlers,
-        "merge_concepts",
-        json!({
-            "source_ids": [&fingerprint_id_for_merge],
-            "target_id": &fingerprint_id,
-            "strategy": "absorb"
-        }),
-    )
-    .await
-    {
-        successful_tools.insert("merge_concepts");
     }
 
     // Summary
@@ -911,14 +925,21 @@ async fn test_e2e_all_11_tools_callable() {
         println!("  ✓ {}", tool);
     }
 
-    // All 11 tools should succeed with proper inputs
+    // TST-M1 FIX: Exact assertion instead of >= to catch regressions.
+    // If a tool silently breaks, >= would hide it. == ensures all 11 succeed.
     let expected = 11;
     let actual = successful_tools.len();
-    assert!(
-        actual >= expected,
-        "Expected at least {} tools to succeed, got {}",
-        expected,
-        actual
+    let all_expected: HashSet<&str> = [
+        "store_memory", "get_memetic_status", "search_graph",
+        "trigger_consolidation", "get_topic_portfolio", "get_topic_stability",
+        "detect_topics", "get_divergence_alerts", "boost_importance",
+        "merge_concepts", "forget_concept",
+    ].into_iter().collect();
+    let missing: Vec<&&str> = all_expected.difference(&successful_tools).collect();
+    assert_eq!(
+        actual, expected,
+        "Expected exactly {} tools to succeed, got {}. Missing: {:?}",
+        expected, actual, missing
     );
 
     println!("\n=== ALL 11 TOOLS CALLABLE ===\n");

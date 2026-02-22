@@ -1,8 +1,7 @@
 //! Transport implementations for the MCP server.
 //!
-//! Contains TCP and SSE transport code extracted from the main server module.
+//! Contains TCP transport code extracted from the main server module.
 //! TASK-INTEG-018: TCP transport with concurrent client handling.
-//! TASK-42: SSE transport for web client support.
 
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -392,35 +391,4 @@ impl McpServer {
         Ok(())
     }
 
-    /// Run the MCP server with SSE transport.
-    ///
-    /// TASK-42: Starts an HTTP server with SSE endpoint for real-time streaming.
-    /// Uses axum web framework with the SSE transport module.
-    ///
-    /// # Endpoint
-    ///
-    /// - `GET /events` - SSE endpoint for receiving MCP events
-    ///
-    /// # Configuration
-    ///
-    /// - `config.mcp.bind_address` - HTTP server bind address
-    /// - `config.mcp.sse_port` - HTTP server port (default: 3101)
-    /// - `config.mcp.max_connections` - Maximum concurrent SSE connections
-    ///
-    /// # Errors
-    ///
-    /// Returns error if:
-    /// - HTTP server fails to bind (address in use, permissions)
-    /// - Server encounters fatal error during operation
-    pub async fn run_sse(&self) -> Result<()> {
-        // CLI-M3 FIX: SSE transport is broadcast-only — it cannot process MCP tool calls.
-        // All 56 tools would be unreachable. Fail fast instead of silently starting
-        // a server that appears to work but can't handle any requests.
-        // Dead SSE implementation code removed — was 70+ lines behind #[allow(unreachable_code)].
-        Err(anyhow::anyhow!(
-            "SSE transport is not supported for MCP tool calls. \
-             SSE is a one-directional broadcast protocol — it cannot receive or process \
-             JSON-RPC requests. Use --transport stdio (default) or --transport tcp instead."
-        ))
-    }
 }

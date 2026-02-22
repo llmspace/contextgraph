@@ -130,8 +130,10 @@ impl E7Params {
 #[derive(Debug, Clone)]
 struct TuningQueryResult {
     /// Query ID.
+    #[allow(dead_code)] // Stored for debug/reporting in bin targets
     query_id: String,
     /// Query type.
+    #[allow(dead_code)] // Stored for debug/reporting in bin targets
     query_type: E7QueryType,
     /// Relevant document paths (ground truth).
     relevant_docs: Vec<String>,
