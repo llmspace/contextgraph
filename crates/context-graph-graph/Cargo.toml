@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
 description = "Knowledge graph with FAISS GPU vector search and hyperbolic geometry"
-license = "MIT"
+license = "PolyForm-Noncommercial-1.0.0"
 repository = "https://github.com/contextgraph/contextgraph"
 keywords = ["knowledge-graph", "faiss", "hyperbolic", "vector-search", "gpu"]
 

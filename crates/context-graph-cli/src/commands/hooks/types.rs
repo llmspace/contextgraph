@@ -69,44 +69,7 @@ pub enum HookEventType {
 }
 
 impl HookEventType {
-    /// Get timeout in milliseconds for this hook type
-    ///
-    /// # Returns
-    /// Timeout value in milliseconds as enforced by Claude Code
-    ///
-    /// # Performance Note
-    /// PreToolUse has the strictest timeout (500ms) and MUST use
-    /// cached state only - NO database access allowed.
-    #[inline]
-    pub const fn timeout_ms(&self) -> u64 {
-        match self {
-            Self::PreToolUse => 500,        // Fast path - NO DB access
-            Self::UserPromptSubmit => 2000, // Context injection
-            Self::PostToolUse => 3000,      // Stability update + trajectory
-            Self::SessionStart => 5000,     // Load/create snapshot
-            Self::SessionEnd => 30000,      // Final persist + consolidation
-        }
-    }
-
-    /// Check if this hook type is time-critical (fast path)
-    ///
-    /// # Returns
-    /// `true` if timeout is under 500ms (only PreToolUse)
-    ///
-    /// # Performance Implications
-    /// Fast path hooks MUST NOT:
-    /// - Access disk/database
-    /// - Perform network calls
-    /// - Block on locks for more than microseconds
-    #[inline]
-    pub const fn is_fast_path(&self) -> bool {
-        self.timeout_ms() <= 500
-    }
-
     /// Get human-readable description of this hook type
-    ///
-    /// # Returns
-    /// Static string describing the hook's purpose
     pub const fn description(&self) -> &'static str {
         match self {
             Self::SessionStart => "Session initialization and state restoration",
@@ -116,11 +79,27 @@ impl HookEventType {
             Self::SessionEnd => "Session persistence and consolidation",
         }
     }
+}
 
-    /// Get the corresponding CLI command for this hook type
-    ///
-    /// # Returns
-    /// CLI command string that implements this hook
+#[cfg(test)]
+impl HookEventType {
+    /// Get timeout in milliseconds for this hook type (test helper)
+    pub const fn timeout_ms(&self) -> u64 {
+        match self {
+            Self::PreToolUse => 500,
+            Self::UserPromptSubmit => 2000,
+            Self::PostToolUse => 3000,
+            Self::SessionStart => 5000,
+            Self::SessionEnd => 30000,
+        }
+    }
+
+    /// Check if this hook type is time-critical (test helper)
+    pub const fn is_fast_path(&self) -> bool {
+        self.timeout_ms() <= 500
+    }
+
+    /// Get the corresponding CLI command for this hook type (test helper)
     pub const fn cli_command(&self) -> &'static str {
         match self {
             Self::SessionStart => "hooks session-start",
@@ -131,10 +110,7 @@ impl HookEventType {
         }
     }
 
-    /// Get all hook event types as an array
-    ///
-    /// # Returns
-    /// Array of all 5 hook event types in execution order
+    /// Get all hook event types (test helper)
     pub const fn all() -> [Self; 5] {
         [
             Self::SessionStart,
@@ -533,16 +509,16 @@ impl StabilityLevel {
         }
     }
 
-    /// Check if this level indicates a crisis state
-    /// Crisis = Critical (stability < 0.5)
-    #[inline]
+}
+
+#[cfg(test)]
+impl StabilityLevel {
+    /// Check if this level indicates a crisis state (test helper)
     pub const fn is_crisis(&self) -> bool {
         matches!(self, Self::Critical)
     }
 
-    /// Check if this level requires attention
-    /// Attention needed = Warning OR Critical
-    #[inline]
+    /// Check if this level requires attention (test helper)
     pub const fn needs_attention(&self) -> bool {
         matches!(self, Self::Warning | Self::Critical)
     }

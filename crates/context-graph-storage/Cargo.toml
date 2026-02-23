@@ -3,7 +3,7 @@ name = "context-graph-storage"
 version = "0.1.0"
 edition = "2021"
 description = "Storage layer for Context Graph with RocksDB backend"
-license = "MIT"
+license = "PolyForm-Noncommercial-1.0.0"
 
 [dependencies]
 context-graph-core = { path = "../context-graph-core" }

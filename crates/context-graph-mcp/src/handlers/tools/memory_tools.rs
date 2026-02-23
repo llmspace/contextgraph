@@ -720,11 +720,20 @@ impl Handlers {
         // =========================================================================
 
         // Parse temporalWeight (master weight for all temporal boosts)
-        let temporal_weight = args
-            .get("temporalWeight")
-            .and_then(|v| v.as_f64())
-            .map(|v| (v as f32).clamp(0.0, 1.0))
-            .unwrap_or(0.0);
+        let temporal_weight = match args.get("temporalWeight").and_then(|v| v.as_f64()) {
+            Some(v) => {
+                let w = v as f32;
+                if !(0.0..=1.0).contains(&w) {
+                    return self.tool_error_typed(
+                        id,
+                        ToolErrorKind::Validation,
+                        &format!("temporalWeight must be between 0.0 and 1.0, got {}", v),
+                    );
+                }
+                w
+            }
+            None => 0.0,
+        };
 
         // Parse decayFunction (linear, exponential, step, none)
         // Default is exponential to match the schema definition in core.rs
@@ -779,10 +788,19 @@ impl Handlers {
             .map(|v| (v as u8).min(6));
 
         // Parse sequenceAnchor (UUID) for E4 sequence-based retrieval
-        let sequence_anchor = args
-            .get("sequenceAnchor")
-            .and_then(|v| v.as_str())
-            .and_then(|s| uuid::Uuid::parse_str(s).ok());
+        let sequence_anchor = match args.get("sequenceAnchor").and_then(|v| v.as_str()) {
+            Some(s) => match uuid::Uuid::parse_str(s) {
+                Ok(uuid) => Some(uuid),
+                Err(_) => {
+                    return self.tool_error_typed(
+                        id,
+                        ToolErrorKind::Validation,
+                        &format!("Invalid sequenceAnchor UUID format: '{}'", s),
+                    );
+                }
+            },
+            None => None,
+        };
 
         // Parse sequenceDirection (before, after, around/both)
         let sequence_direction = match args.get("sequenceDirection").and_then(|v| v.as_str()) {

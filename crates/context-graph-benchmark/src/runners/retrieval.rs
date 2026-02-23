@@ -87,7 +87,7 @@ impl RetrievalRunner {
 
     /// Run retrieval benchmark on multi-space system.
     ///
-    /// Uses all 13 embedding spaces for search.
+    /// Uses 4 embedding spaces (E1, E5, E7, E10) for simplified multi-space search.
     pub fn run_multi_space(
         &self,
         dataset: &BenchmarkDataset,
@@ -256,8 +256,8 @@ mod tests {
         let runner = RetrievalRunner::new();
         let results = runner.run_single_embedder(&baseline, &dataset);
 
-        // Should have computed metrics
-        assert!(results.metrics.mrr >= 0.0);
+        // Should have computed meaningful metrics (exact match retrieval should achieve MRR > 0.1)
+        assert!(results.metrics.mrr >= 0.1, "MRR too low: {} — expected at least 0.1 for exact-match queries", results.metrics.mrr);
         assert!(results.performance.operation_count > 0);
     }
 }

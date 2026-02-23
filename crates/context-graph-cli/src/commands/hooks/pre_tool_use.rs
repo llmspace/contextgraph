@@ -23,8 +23,6 @@ use tracing::debug;
 // Constants
 // ============================================================================
 
-/// Fast path timeout in milliseconds (from constitution.yaml line 677)
-pub const PRE_TOOL_USE_TIMEOUT_MS: u64 = 500;
 
 // ============================================================================
 // Handler
@@ -232,10 +230,8 @@ fn get_tool_guidance(tool_name: &str) -> Option<String> {
     }
 }
 
-/// Check if a tool is considered high-impact for coherence tracking
-///
-/// High-impact tools significantly affect the agent's understanding or project state.
-#[inline]
+#[cfg(test)]
+/// Check if a tool is considered high-impact for coherence tracking (test helper).
 pub fn is_high_impact_tool(tool_name: &str) -> bool {
     matches!(
         tool_name,
@@ -243,10 +239,8 @@ pub fn is_high_impact_tool(tool_name: &str) -> bool {
     )
 }
 
-/// Check if a tool is read-only
-///
-/// Read-only tools don't modify state but may expand awareness.
-#[inline]
+#[cfg(test)]
+/// Check if a tool is read-only (test helper).
 pub fn is_read_only_tool(tool_name: &str) -> bool {
     matches!(
         tool_name,
@@ -262,7 +256,6 @@ pub fn is_read_only_tool(tool_name: &str) -> bool {
 mod tests {
     use super::*;
     use crate::commands::hooks::args::OutputFormat;
-    use crate::commands::hooks::types::HookEventType;
 
     // =========================================================================
     // Test Helpers
@@ -275,20 +268,6 @@ mod tests {
             stdin: false,
             fast_path: true,
             format: OutputFormat::Json,
-        }
-    }
-
-    #[allow(dead_code)]
-    fn create_pre_tool_input(tool_name: &str) -> HookInput {
-        HookInput {
-            hook_type: HookEventType::PreToolUse,
-            session_id: "test-session-12345".to_string(),
-            timestamp_ms: 1736956800000, // Fixed timestamp for reproducibility
-            payload: HookPayload::PreToolUse {
-                tool_name: tool_name.to_string(),
-                tool_input: serde_json::json!({"file_path": "/test/file.rs"}),
-                tool_use_id: "toolu_01TEST123".to_string(),
-            },
         }
     }
 

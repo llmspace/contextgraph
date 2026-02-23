@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Context Graph Team"]
 description = "Embedding pipeline for Context Graph with local model support"
-license = "MIT"
+license = "PolyForm-Noncommercial-1.0.0"
 repository = "https://github.com/contextgraph/contextgraph"
 keywords = ["embeddings", "ml", "nlp", "context-graph"]
 

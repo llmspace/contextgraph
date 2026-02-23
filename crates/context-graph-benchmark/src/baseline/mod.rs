@@ -7,4 +7,4 @@ pub mod single_embedder;
 pub mod single_hnsw;
 
 pub use single_embedder::SingleEmbedderBaseline;
-pub use single_hnsw::SingleHnswIndex;
+pub use single_hnsw::SingleBruteForceIndex;

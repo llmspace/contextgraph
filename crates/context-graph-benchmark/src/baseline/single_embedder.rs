@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use context_graph_core::types::fingerprint::SemanticFingerprint;
 
-use super::single_hnsw::SingleHnswIndex;
+use super::single_hnsw::SingleBruteForceIndex;
 use crate::util::cosine_similarity as compute_cosine_similarity;
 
 /// Configuration for single-embedder baseline.
@@ -43,7 +43,7 @@ impl Default for SingleEmbedderConfig {
 /// signals from additional embedding spaces.
 pub struct SingleEmbedderBaseline {
     /// HNSW index for the single embedding space.
-    index: SingleHnswIndex,
+    index: SingleBruteForceIndex,
     /// Stored embeddings for reference.
     embeddings: HashMap<Uuid, Vec<f32>>,
     /// Configuration.
@@ -60,7 +60,7 @@ impl SingleEmbedderBaseline {
 
     /// Create a new baseline with specific config.
     pub fn with_config(config: SingleEmbedderConfig) -> Self {
-        let index = SingleHnswIndex::new(
+        let index = SingleBruteForceIndex::new(
             config.dimension,
             config.hnsw_m,
             config.hnsw_ef_construction,

@@ -2,7 +2,7 @@
 
 **Persistent, multi-dimensional semantic memory for AI assistants.**
 
-[![License: MIT/Apache-2.0](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](#license)
+[![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20Noncommercial-blue.svg)](#license)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05-green.svg)](https://modelcontextprotocol.io/)
 
@@ -540,9 +540,10 @@ contextgraph/
 
 ## License
 
-Licensed under either of:
+This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE).
 
-- [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
-- [MIT License](http://opensource.org/licenses/MIT)
+**Free for noncommercial use.** You may use, modify, and distribute Context Graph for personal projects, research, education, hobby use, and within nonprofit or government organizations — at no cost.
 
-at your option.
+**Commercial use requires a license.** If you use Context Graph to generate revenue — including incorporating it into a commercial product, offering it as a paid service, or using it internally at a for-profit company — you must obtain a commercial license from the project owner.
+
+For commercial licensing inquiries, contact: **chrisroyseai@gmail.com**

@@ -10,15 +10,15 @@ use uuid::Uuid;
 
 use crate::util::{cosine_similarity, similarity_sort_desc};
 
-/// Single HNSW index using in-memory brute force for simplicity.
+/// Single brute-force index for benchmarking baseline.
 ///
-/// In production, this would use usearch like the main system, but for
-/// benchmarking purposes we use a simple brute force implementation to
-/// avoid external dependencies in the benchmark crate.
+/// Uses O(n) linear scan cosine similarity. This is NOT HNSW — it uses
+/// brute force for simplicity (avoids usearch dependency in benchmarks).
 ///
-/// The performance characteristics should still be representative since
-/// we measure both systems the same way.
-pub struct SingleHnswIndex {
+/// NOTE: Latency comparisons against this baseline reflect brute-force
+/// characteristics, not HNSW graph traversal. Retrieval quality comparisons
+/// are valid (brute force is exact nearest neighbor).
+pub struct SingleBruteForceIndex {
     /// Dimension of vectors.
     dimension: usize,
     /// HNSW M parameter (stored for API compatibility).
@@ -34,7 +34,7 @@ pub struct SingleHnswIndex {
     vectors: RwLock<HashMap<Uuid, Vec<f32>>>,
 }
 
-impl SingleHnswIndex {
+impl SingleBruteForceIndex {
     /// Create a new index.
     pub fn new(dimension: usize, m: usize, ef_construction: usize, ef_search: usize) -> Self {
         Self {
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn test_insert_and_search() {
-        let index = SingleHnswIndex::new(3, 16, 200, 100);
+        let index = SingleBruteForceIndex::new(3, 16, 200, 100);
 
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn test_min_similarity_threshold() {
-        let index = SingleHnswIndex::new(3, 16, 200, 100);
+        let index = SingleBruteForceIndex::new(3, 16, 200, 100);
 
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();

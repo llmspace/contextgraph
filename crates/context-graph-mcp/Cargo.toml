@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Context Graph Team"]
 description = "MCP JSON-RPC server for Context Graph"
-license = "MIT"
+license = "PolyForm-Noncommercial-1.0.0"
 repository = "https://github.com/contextgraph/contextgraph"
 keywords = ["mcp", "jsonrpc", "server", "context-graph"]
 

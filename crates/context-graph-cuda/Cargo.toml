@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Context Graph Team"]
 description = "CUDA acceleration for Context Graph (RTX 5090 / Blackwell optimized)"
-license = "MIT"
+license = "PolyForm-Noncommercial-1.0.0"
 repository = "https://github.com/contextgraph/contextgraph"
 keywords = ["cuda", "gpu", "neural", "context-graph"]
 

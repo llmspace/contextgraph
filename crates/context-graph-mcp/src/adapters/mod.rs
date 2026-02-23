@@ -6,14 +6,12 @@
 //! # Available Adapters
 //!
 //! - [`LazyMultiArrayProvider`]: Wraps provider for lazy loading on MCP startup
-//! - [`CodeStoreAdapter`]: Bridges `CodeStore` to `CodeStorage` trait for code capture
 //! - [`LlmCausalHintProvider`]: LLM-based causal hint provider for E5 enhancement
 
 /// LLM-based causal hint provider (requires `llm` feature).
 /// Wraps CausalDiscoveryLLM for causal hint generation during store_memory.
 #[cfg(feature = "llm")]
 pub mod causal_hint;
-pub mod code_store_adapter;
 pub mod lazy_provider;
 
 // LazyMultiArrayProvider allows immediate MCP startup while models load in background

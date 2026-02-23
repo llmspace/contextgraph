@@ -58,8 +58,9 @@ pub enum HookType {
     SessionEnd,
 }
 
+#[cfg(test)]
 impl HookType {
-    /// Get all hook types
+    /// Get all hook types (test helper)
     pub const fn all() -> [Self; 5] {
         [
             Self::SessionStart,

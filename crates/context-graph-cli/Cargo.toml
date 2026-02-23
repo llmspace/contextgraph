@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Context Graph Team"]
 description = "CLI tools for Context Graph session and topic coherence management"
-license = "MIT"
+license = "PolyForm-Noncommercial-1.0.0"
 repository = "https://github.com/contextgraph/contextgraph"
 keywords = ["cli", "coherence", "topic", "context-graph"]
 

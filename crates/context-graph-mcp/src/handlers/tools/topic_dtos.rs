@@ -16,7 +16,9 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-pub use context_graph_core::clustering::{MAX_WEIGHTED_AGREEMENT, TOPIC_THRESHOLD};
+pub use context_graph_core::clustering::MAX_WEIGHTED_AGREEMENT;
+#[cfg(test)]
+pub use context_graph_core::clustering::TOPIC_THRESHOLD;
 
 // ============================================================================
 // CONSTANTS
@@ -340,20 +342,20 @@ pub struct TopicSummary {
 }
 
 impl TopicSummary {
-    /// Check if this topic meets the validity threshold.
-    ///
-    /// Per ARCH-09: weighted_agreement >= 2.5
-    #[inline]
-    pub fn is_valid_topic(&self) -> bool {
-        self.weighted_agreement >= TOPIC_THRESHOLD
-    }
-
     /// Compute confidence from weighted agreement.
     ///
     /// confidence = weighted_agreement / 8.5
     #[inline]
     pub fn compute_confidence(weighted_agreement: f32) -> f32 {
         (weighted_agreement / MAX_WEIGHTED_AGREEMENT).clamp(0.0, 1.0)
+    }
+}
+
+#[cfg(test)]
+impl TopicSummary {
+    /// Check if this topic meets the validity threshold (test helper).
+    pub fn is_valid_topic(&self) -> bool {
+        self.weighted_agreement >= TOPIC_THRESHOLD
     }
 }
 
@@ -446,8 +448,9 @@ pub struct DetectTopicsResponse {
     pub message: Option<String>,
 }
 
+#[cfg(test)]
 impl DetectTopicsResponse {
-    /// Create a response when insufficient memories exist.
+    /// Create a response when insufficient memories exist (test helper).
     pub fn insufficient_memories(current_count: usize) -> Self {
         Self {
             new_topics: Vec::new(),
@@ -549,12 +552,9 @@ pub struct DivergenceAlert {
     pub threshold: f32,
 }
 
+#[cfg(test)]
 impl DivergenceAlert {
-    /// Valid semantic spaces that can trigger divergence alerts per AP-62.
-    ///
-    /// NOTE: E5 (Causal) is EXCLUDED per AP-77 -- it requires CausalDirection for
-    /// meaningful scores. Without direction, E5 returns 0.0, causing false-positive alerts.
-    /// Must match DIVERGENCE_SPACES in context-graph-core/src/retrieval/divergence.rs.
+    /// Valid semantic spaces that can trigger divergence alerts per AP-62 (test helper).
     pub const VALID_SEMANTIC_SPACES: [&'static str; 6] = [
         "E1_Semantic",
         "E6_Sparse",

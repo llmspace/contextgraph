@@ -644,6 +644,7 @@ impl McpServer {
                          52 other tools still operational. Error: {}",
                         e
                     );
+                    warn!("NoOpCausalHintProvider active — E5 causal embeddings use marker-only detection (reduced quality).");
                     Handlers::without_llm(
                         Arc::clone(&teleological_store),
                         lazy_provider,
@@ -658,7 +659,8 @@ impl McpServer {
 
         #[cfg(not(feature = "llm"))]
         let handlers = {
-            info!("LLM feature disabled - creating Handlers without LLM (graph/causal discovery tools unavailable)");
+            warn!("LLM feature disabled - E5 causal embeddings use marker-only detection (reduced quality). \
+                   Graph/causal discovery tools unavailable.");
             Handlers::without_llm(
                 Arc::clone(&teleological_store),
                 lazy_provider,

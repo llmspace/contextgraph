@@ -65,12 +65,13 @@ fn search_robust_definition() -> ToolDefinition {
                 },
                 "e9DiscoveryThreshold": {
                     "type": "number",
-                    "default": 0.15,
+                    "default": 0.08,
                     "minimum": 0,
                     "maximum": 1,
                     "description": "Minimum E9 score for a result to be marked as 'E9 discovery' \
-                                    (0-1, default: 0.15). Results with E9 score >= this AND \
-                                    E1 score < e1WeaknessThreshold are blind spots E9 found."
+                                    (0-1, default: 0.08). Calibrated for projected E9 vectors \
+                                    (1024D cosine, not native Hamming). Results with E9 score >= \
+                                    this AND E1 score < e1WeaknessThreshold are blind spots E9 found."
                 },
                 "e1WeaknessThreshold": {
                     "type": "number",
@@ -129,7 +130,7 @@ mod tests {
         let def = search_robust_definition();
         let props = def.input_schema.get("properties").unwrap().as_object().unwrap();
         assert_eq!(props["query"]["minLength"], 3);
-        assert_eq!(props["e9DiscoveryThreshold"]["default"], 0.15);
+        assert_eq!(props["e9DiscoveryThreshold"]["default"], 0.08);
         assert_eq!(props["e1WeaknessThreshold"]["default"], 0.5);
         assert_eq!(props["topK"]["default"], 10);
     }

@@ -97,7 +97,7 @@ pub struct SearchRobustRequest {
     #[serde(rename = "includeE9Score", default = "default_include_e9_score")]
     pub include_e9_score: bool,
 
-    /// E9 discovery threshold override (default: 0.15).
+    /// E9 discovery threshold override (default: 0.08).
     /// Minimum E9 score for a result to be marked as "E9 discovery".
     /// Note: Projected E9 vectors have lower cosine similarity than native Hamming.
     #[serde(rename = "e9DiscoveryThreshold", default = "default_e9_threshold")]

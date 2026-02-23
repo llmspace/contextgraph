@@ -2,10 +2,14 @@
 //!
 //! This module contains cosine similarity and semantic score computation functions
 //! used by the search operations.
+//!
+//! IMPORTANT: These functions MUST match the production scoring in
+//! context-graph-storage/src/teleological/rocksdb_store/search.rs lines 446-466.
 
 use crate::types::fingerprint::{SemanticFingerprint, NUM_EMBEDDERS};
 
 /// Compute cosine similarity between two dense vectors.
+/// Returns [0,1] via SRC-3 normalization: (raw+1)/2.
 pub(crate) fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     if a.len() != b.len() || a.is_empty() {
         return 0.0;
@@ -31,6 +35,13 @@ pub(crate) fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 }
 
 /// Compute semantic similarity across all embedders.
+///
+/// MATCHES production scoring at search.rs:446-466:
+/// - E2: hardcoded 0.5 (E2 cosine broken; production uses timestamp decay)
+/// - E5: returns -1.0 sentinel (AP-77: causal requires direction; stub has no direction context)
+/// - E6/E13: sparse cosine normalized to [0,1] via (raw+1)/2
+/// - E8: asymmetric cross-pair max: max(source→target, target→source)
+/// - E10: asymmetric cross-pair max: max(paraphrase→context, context→paraphrase)
 pub(crate) fn compute_semantic_scores(
     query: &SemanticFingerprint,
     target: &SemanticFingerprint,
@@ -41,6 +52,7 @@ pub(crate) fn compute_semantic_scores(
     scores[0] = cosine_similarity(&query.e1_semantic, &target.e1_semantic);
 
     // E2: Temporal Recent — neutral score (E2 cosine is broken: all vectors identical → 1.0)
+    // Production uses compute_e2_recency_decay(stored_created_at) but we lack timestamps here.
     scores[1] = 0.5;
 
     // E3: Temporal Periodic
@@ -52,23 +64,28 @@ pub(crate) fn compute_semantic_scores(
         &target.e4_temporal_positional,
     );
 
-    // E5: Causal - use active vector (supports both legacy and dual format)
-    scores[4] = cosine_similarity(query.e5_active_vector(), target.e5_active_vector());
+    // E5: AP-77 FIX: Return -1.0 sentinel (causal requires direction context which
+    // the in-memory stub does not have). Production returns -1.0 via
+    // compute_similarity_for_space_with_direction when direction is Unknown.
+    // The -1.0 sentinel causes fusion to skip E5 via suppress_degenerate_weights.
+    scores[4] = -1.0;
 
-    // E6: Sparse (use sparse dot product normalized)
-    scores[5] = query.e6_sparse.cosine_similarity(&target.e6_sparse);
+    // E6: SEARCH-1 FIX: Normalize sparse cosine [-1,1] to [0,1]
+    scores[5] = (query.e6_sparse.cosine_similarity(&target.e6_sparse) + 1.0) / 2.0;
 
     // E7: Code
     scores[6] = cosine_similarity(&query.e7_code, &target.e7_code);
 
-    // E8: Graph - use active vector (supports both legacy and dual format)
-    scores[7] = cosine_similarity(query.e8_active_vector(), target.e8_active_vector());
+    // E8: STOR-H1 FIX: Asymmetric — max of both cross-directions
+    scores[7] = cosine_similarity(query.get_e8_as_source(), target.get_e8_as_target())
+        .max(cosine_similarity(query.get_e8_as_target(), target.get_e8_as_source()));
 
     // E9: HDC
     scores[8] = cosine_similarity(&query.e9_hdc, &target.e9_hdc);
 
-    // E10: Multimodal - use active vector (supports both legacy and dual format)
-    scores[9] = cosine_similarity(query.e10_active_vector(), target.e10_active_vector());
+    // E10: STOR-H1 FIX: Asymmetric — max of both cross-directions
+    scores[9] = cosine_similarity(query.get_e10_as_paraphrase(), target.get_e10_as_context())
+        .max(cosine_similarity(query.get_e10_as_context(), target.get_e10_as_paraphrase()));
 
     // E11: Entity
     scores[10] = cosine_similarity(&query.e11_entity, &target.e11_entity);
@@ -77,8 +94,8 @@ pub(crate) fn compute_semantic_scores(
     scores[11] =
         compute_late_interaction_score(&query.e12_late_interaction, &target.e12_late_interaction);
 
-    // E13: SPLADE
-    scores[12] = query.e13_splade.cosine_similarity(&target.e13_splade);
+    // E13: SEARCH-1 FIX: Normalize sparse cosine [-1,1] to [0,1]
+    scores[12] = (query.e13_splade.cosine_similarity(&target.e13_splade) + 1.0) / 2.0;
 
     scores
 }

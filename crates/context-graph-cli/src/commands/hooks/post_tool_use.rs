@@ -28,7 +28,8 @@ use super::types::{
 // Constants (from constitution.yaml)
 // ============================================================================
 
-/// PostToolUse timeout in milliseconds
+/// PostToolUse timeout in milliseconds (test-only constant)
+#[cfg(test)]
 pub const POST_TOOL_USE_TIMEOUT_MS: u64 = 3000;
 
 /// Minimum response length to capture as memory (avoid noise from empty/trivial responses)

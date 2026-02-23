@@ -19,18 +19,13 @@ use super::validate::{Validate, ValidateInto};
 /// in the content (per MCP spec). Protocol errors (method_not_found, invalid_request)
 /// use `JsonRpcResponse::error()` — do NOT use ToolErrorKind for those.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 pub(crate) enum ToolErrorKind {
     /// Invalid request parameters (bad format, out of range, missing required fields)
     Validation,
     /// Storage layer failure (RocksDB read/write, serialization)
     Storage,
-    /// Embedding operation failed (model not ready, OOM, dimension mismatch)
-    Embedding,
     /// Requested resource not found (memory, fingerprint, session)
     NotFound,
-    /// Feature or subsystem not available (disabled, not initialized)
-    Unavailable,
     /// General execution failure (internal error, unexpected state)
     Execution,
 }
@@ -41,9 +36,7 @@ impl ToolErrorKind {
         match self {
             Self::Validation => (error_codes::INVALID_PARAMS, "VALIDATION_ERROR"),
             Self::Storage => (error_codes::STORAGE_ERROR, "STORAGE_ERROR"),
-            Self::Embedding => (error_codes::EMBEDDING_ERROR, "EMBEDDING_ERROR"),
             Self::NotFound => (error_codes::NODE_NOT_FOUND, "NOT_FOUND"),
-            Self::Unavailable => (error_codes::FEATURE_DISABLED, "UNAVAILABLE"),
             Self::Execution => (error_codes::INTERNAL_ERROR, "EXECUTION_ERROR"),
         }
     }

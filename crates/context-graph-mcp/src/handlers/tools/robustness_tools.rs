@@ -68,7 +68,7 @@ impl Handlers {
     /// - `minScore`: Minimum score threshold (0-1, default: 0.1)
     /// - `includeContent`: Include full content text (default: false)
     /// - `includeE9Score`: Include E9 and E1 scores separately (default: true)
-    /// - `e9DiscoveryThreshold`: Min E9 score for discovery (default: 0.7)
+    /// - `e9DiscoveryThreshold`: Min E9 score for discovery (default: 0.08)
     /// - `e1WeaknessThreshold`: Max E1 score to be "missed" (default: 0.5)
     pub(crate) async fn call_search_robust(
         &self,

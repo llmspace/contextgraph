@@ -385,10 +385,18 @@ impl Handlers {
                 return self.tool_error(id, &msg);
             }
         };
+        const MAX_OFFSET: u64 = 10_000;
         let offset = args
             .get("offset")
             .and_then(|v| v.as_u64())
-            .unwrap_or(0) as usize;
+            .unwrap_or(0);
+        if offset > MAX_OFFSET {
+            return self.tool_error(
+                id,
+                &format!("offset must be at most {} to prevent excessive memory usage", MAX_OFFSET),
+            );
+        }
+        let offset = offset as usize;
 
         // Parse include content
         let include_content = args
@@ -397,9 +405,18 @@ impl Handlers {
             .unwrap_or(false);
 
         // MCP-7 FIX: Parse sourceTypes filter parameter
-        let source_types: Option<Vec<String>> = args
-            .get("sourceTypes")
-            .and_then(|v| serde_json::from_value(v.clone()).ok());
+        let source_types: Option<Vec<String>> = match args.get("sourceTypes") {
+            Some(v) => match serde_json::from_value::<Vec<String>>(v.clone()) {
+                Ok(types) => Some(types),
+                Err(_) => {
+                    return self.tool_error(
+                        id,
+                        "Invalid sourceTypes: expected array of strings (e.g., [\"Manual\", \"AI\"])",
+                    );
+                }
+            },
+            None => None,
+        };
 
         debug!(
             session_id = %session_id,
