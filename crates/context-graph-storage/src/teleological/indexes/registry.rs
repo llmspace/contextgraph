@@ -179,7 +179,7 @@ impl EmbedderIndexRegistry {
             .map(|arc| Arc::clone(arc) as Arc<dyn EmbedderIndexOps>)
     }
 
-    /// Number of indexes in the registry (always 11).
+    /// Number of indexes in the registry (always 15: 11 base + 2 E5 + 2 E10 asymmetric).
     pub fn len(&self) -> usize {
         self.indexes.len()
     }

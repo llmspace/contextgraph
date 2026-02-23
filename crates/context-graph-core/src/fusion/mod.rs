@@ -33,6 +33,9 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+// CORE-M5: Use canonical RRF formula from retrieval::aggregation
+use crate::retrieval::AggregationStrategy;
+
 /// RRF constant (standard value from research)
 /// k=60 provides good balance between top-heavy ranking and uniform distribution
 pub const RRF_K: f32 = 60.0;
@@ -170,12 +173,14 @@ pub fn score_weighted_rrf(
         let use_score_weighting = score_weighted_embedders.contains(&ranking.embedder_name.as_str());
 
         for (rank, (doc_id, similarity)) in ranking.ranked_docs.iter().enumerate() {
+            // CORE-M5: Use canonical rrf_contribution formula from aggregation
+            let base_rrf = AggregationStrategy::rrf_contribution(rank, RRF_K);
             let rrf_contribution = if use_score_weighting {
                 // Score-weighted: magnitude of similarity modulates contribution
-                ranking.weight * similarity / (rank as f32 + 1.0 + RRF_K)
+                ranking.weight * similarity * base_rrf
             } else {
                 // Standard RRF: rank-only
-                ranking.weight / (rank as f32 + 1.0 + RRF_K)
+                ranking.weight * base_rrf
             };
 
             let entry = doc_scores.entry(*doc_id).or_insert((0.0, Vec::new()));

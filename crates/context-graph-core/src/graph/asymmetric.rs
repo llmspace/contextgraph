@@ -660,32 +660,9 @@ pub fn rank_by_connectivity(
     scored
 }
 
-/// Helper: compute cosine similarity between two f32 slices.
-///
-/// Returns a value in [-1, 1]. For empty or zero-norm vectors, returns 0.0.
-fn cosine_similarity_f32(a: &[f32], b: &[f32]) -> f32 {
-    if a.is_empty() || b.is_empty() || a.len() != b.len() {
-        return 0.0;
-    }
-
-    let mut dot = 0.0f32;
-    let mut norm_a = 0.0f32;
-    let mut norm_b = 0.0f32;
-
-    for (x, y) in a.iter().zip(b.iter()) {
-        dot += x * y;
-        norm_a += x * x;
-        norm_b += y * y;
-    }
-
-    let norm_product = (norm_a * norm_b).sqrt();
-
-    if norm_product < f32::EPSILON {
-        0.0
-    } else {
-        dot / norm_product
-    }
-}
+// CORE-M3: Use canonical raw cosine implementation from retrieval::distance.
+// Previous local version lacked .clamp(-1,1) — floating point could exceed range.
+use crate::retrieval::distance::cosine_similarity_raw as cosine_similarity_f32;
 
 #[cfg(test)]
 mod tests {

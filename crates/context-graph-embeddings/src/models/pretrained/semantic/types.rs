@@ -46,11 +46,10 @@ pub struct SemanticModel {
     pub(crate) memory_size: usize,
 }
 
-// Implement Send and Sync manually since RwLock is involved.
-// TODO(EMB-L2): Audit all 15+ `unsafe impl Send/Sync` across the embeddings crate.
-// Most model types (SemanticModel, CausalModel, etc.) contain only std::sync
-// primitives (RwLock, AtomicBool) which are auto-Send/Sync. These manual impls
-// may be unnecessary and could be removed after verifying no field type blocks
-// auto-derivation (e.g., raw pointers from candle tensors behind feature flags).
+// SAFETY: SemanticModel wraps candle Tensors (via BertWeights in ModelState) behind a
+// std::sync::RwLock. Candle Tensors contain raw GPU pointers that are !Send/!Sync,
+// but all access is synchronized through the RwLock. The 3 temporal custom models
+// (TemporalRecentModel, TemporalPeriodicModel, TemporalPositionalModel) are auto-Send+Sync
+// and no longer need unsafe impls. Pretrained models with GPU weights still require them.
 unsafe impl Send for SemanticModel {}
 unsafe impl Sync for SemanticModel {}

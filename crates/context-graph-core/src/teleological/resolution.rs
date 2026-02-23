@@ -361,7 +361,9 @@ impl ResolutionView {
     }
 }
 
-/// Compute cosine similarity between two slices.
+/// CORE-M3: Const-generic variant for compile-time-sized arrays.
+/// Returns raw [-1,1]. See `crate::retrieval::distance::cosine_similarity_raw`
+/// for the canonical slice-based version.
 fn cosine_similarity<const N: usize>(a: &[f32; N], b: &[f32; N]) -> f32 {
     let mut dot = 0.0f32;
     let mut norm_a = 0.0f32;

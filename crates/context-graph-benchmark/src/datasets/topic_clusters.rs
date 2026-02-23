@@ -378,17 +378,23 @@ mod tests {
 
         let mut rng = ChaCha8Rng::seed_from_u64(123);
 
-        // Sample from topic 0
+        // Sample from each topic
         let sample0 = topics[0].sample_e1(&mut rng, 0.1);
-        let _sample1 = topics[1].sample_e1(&mut rng, 0.1);
+        let sample1 = topics[1].sample_e1(&mut rng, 0.1);
 
         // Samples should be more similar to their own centroid
         let sim00 = cosine_similarity(&sample0, &topics[0].e1_centroid);
         let sim01 = cosine_similarity(&sample0, &topics[1].e1_centroid);
+        let sim11 = cosine_similarity(&sample1, &topics[1].e1_centroid);
+        let sim10 = cosine_similarity(&sample1, &topics[0].e1_centroid);
 
         assert!(
             sim00 > sim01,
-            "Sample should be more similar to own centroid"
+            "Sample0 should be more similar to own centroid (sim00={}, sim01={})", sim00, sim01,
+        );
+        assert!(
+            sim11 > sim10,
+            "Sample1 should be more similar to own centroid (sim11={}, sim10={})", sim11, sim10,
         );
     }
 }

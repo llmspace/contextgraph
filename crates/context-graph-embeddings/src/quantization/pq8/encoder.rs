@@ -306,9 +306,15 @@ impl PQ8Encoder {
     }
 
     /// Get the expected compression ratio.
+    ///
+    /// PQ-8 stores 8 centroid indices (1 byte each = 8 bytes total).
+    /// For a D-dimensional f32 vector (D * 4 bytes), the actual ratio is D*4/8 = D/2.
+    /// This constant returns 32.0 as a reference ratio assuming D=64 subvector elements,
+    /// matching the QuantizationMethod::PQ8 constant used in the router.
+    /// The true ratio is dimension-dependent: D=1024 -> 512x, D=768 -> 384x.
     #[must_use]
     pub const fn compression_ratio() -> f32 {
-        32.0 // D * 4 bytes / 8 bytes = D/2, for D=1024: 128x, but we store 8 indices
+        32.0
     }
 }
 

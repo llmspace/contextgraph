@@ -31,6 +31,8 @@ pub struct UnifiedBenchmarkResults {
     pub recommendations: Vec<String>,
     /// Constitutional compliance checks.
     pub constitutional_compliance: ConstitutionalCompliance,
+    /// Per-phase timing breakdown.
+    pub timings: BenchmarkTimings,
 }
 
 /// Metadata about the benchmark run.
@@ -208,27 +210,35 @@ pub struct FusionStrategyResults {
     pub quality_latency_ratio: f64,
 }
 
-/// Cross-embedder correlation analysis.
+/// Cross-embedder analysis based on MRR proximity.
+///
+/// NOTE: The `mrr_proximity_matrix` is computed as `1.0 - |mrr_i - mrr_j| / max(mrr_i, mrr_j)`,
+/// which measures how close two embedders' MRR scores are. This is NOT a statistical correlation
+/// (Pearson/Spearman) -- it is a rank agreement / proximity metric.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrossEmbedderAnalysis {
-    /// Correlation matrix (embedder x embedder).
-    pub correlation_matrix: Vec<Vec<f64>>,
+    /// MRR proximity matrix (embedder x embedder).
+    /// Values near 1.0 mean similar MRR performance; near 0.0 means divergent.
+    pub mrr_proximity_matrix: Vec<Vec<f64>>,
     /// Embedder names for matrix rows/columns.
     pub embedder_order: Vec<EmbedderName>,
     /// Complementarity scores (how much each pair adds to each other).
     pub complementarity_scores: HashMap<String, f64>,
-    /// Redundancy pairs (high correlation, limited complementarity).
+    /// Redundancy pairs (high MRR proximity, limited complementarity).
     pub redundancy_pairs: Vec<(EmbedderName, EmbedderName, f64)>,
     /// Best complementary pairs.
     pub best_complementary_pairs: Vec<(EmbedderName, EmbedderName, f64)>,
 }
 
 impl CrossEmbedderAnalysis {
-    /// Get correlation between two embedders.
-    pub fn get_correlation(&self, a: EmbedderName, b: EmbedderName) -> Option<f64> {
+    /// Get MRR proximity between two embedders.
+    ///
+    /// Returns a value in [0, 1] where 1.0 means identical MRR scores.
+    /// This is NOT a statistical correlation -- it measures MRR score proximity.
+    pub fn get_mrr_proximity(&self, a: EmbedderName, b: EmbedderName) -> Option<f64> {
         let idx_a = self.embedder_order.iter().position(|&e| e == a)?;
         let idx_b = self.embedder_order.iter().position(|&e| e == b)?;
-        Some(self.correlation_matrix[idx_a][idx_b])
+        Some(self.mrr_proximity_matrix[idx_a][idx_b])
     }
 }
 

@@ -278,11 +278,11 @@ impl ReportGenerator {
         if !analysis.redundancy_pairs.is_empty() {
             writeln!(out, "### Redundancy Warnings").unwrap();
             writeln!(out).unwrap();
-            writeln!(out, "These pairs have high correlation but limited complementarity:").unwrap();
+            writeln!(out, "These pairs have high MRR proximity but limited complementarity:").unwrap();
             writeln!(out).unwrap();
 
-            for (a, b, corr) in &analysis.redundancy_pairs {
-                writeln!(out, "- {} and {} (correlation: {:.3})", a, b, corr).unwrap();
+            for (a, b, proximity) in &analysis.redundancy_pairs {
+                writeln!(out, "- {} and {} (MRR proximity: {:.3})", a, b, proximity).unwrap();
             }
             writeln!(out).unwrap();
         }
@@ -497,6 +497,7 @@ mod tests {
             ablation_results: None,
             recommendations: vec!["Use E1+E5+E7 for best results".to_string()],
             constitutional_compliance: ConstitutionalCompliance::new(),
+            timings: BenchmarkTimings::default(),
         }
     }
 

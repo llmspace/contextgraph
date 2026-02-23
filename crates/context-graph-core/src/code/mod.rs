@@ -612,36 +612,8 @@ pub fn compute_e7_similarity_with_query_type(
     }
 }
 
-/// Compute cosine similarity between two dense vectors.
-///
-/// # Returns
-///
-/// Similarity score in range [-1.0, 1.0], clamped for numerical stability.
-/// Returns 0.0 for empty or mismatched vectors.
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-    if a.len() != b.len() || a.is_empty() {
-        return 0.0;
-    }
-
-    let mut dot = 0.0f32;
-    let mut norm_a = 0.0f32;
-    let mut norm_b = 0.0f32;
-
-    for i in 0..a.len() {
-        dot += a[i] * b[i];
-        norm_a += a[i] * a[i];
-        norm_b += b[i] * b[i];
-    }
-
-    let norm_a = norm_a.sqrt();
-    let norm_b = norm_b.sqrt();
-
-    if norm_a < f32::EPSILON || norm_b < f32::EPSILON {
-        return 0.0;
-    }
-
-    (dot / (norm_a * norm_b)).clamp(-1.0, 1.0)
-}
+// CORE-M3: Use canonical raw cosine implementation from retrieval::distance.
+use crate::retrieval::distance::cosine_similarity_raw as cosine_similarity;
 
 #[cfg(test)]
 mod tests {

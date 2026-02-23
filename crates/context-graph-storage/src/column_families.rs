@@ -28,7 +28,9 @@ use rocksdb::{BlockBasedOptions, Cache, ColumnFamilyDescriptor, Options, SliceTr
 ///
 /// RocksDB defaults to 64MB write buffer x 2 per CF, which for 51 CFs would
 /// consume ~6.4GB just for write buffers. This function applies sensible limits.
-fn apply_write_buffer_limits(opts: &mut Options, write_buffer_mb: usize) {
+// Audit-14 STOR-L2 FIX: pub(crate) so teleological/column_families.rs can reuse it
+// instead of duplicating the function.
+pub(crate) fn apply_write_buffer_limits(opts: &mut Options, write_buffer_mb: usize) {
     opts.set_write_buffer_size(write_buffer_mb * 1024 * 1024);
     opts.set_max_write_buffer_number(2);
 }

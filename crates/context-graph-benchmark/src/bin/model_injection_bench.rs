@@ -176,7 +176,7 @@ async fn main() -> Result<()> {
 
     println!("  Creating GraphDiscoveryService::with_models()...");
     let service_start = Instant::now();
-    let _service = GraphDiscoveryService::with_models(
+    let _ = GraphDiscoveryService::with_models(
         Arc::new(llm),
         graph_model_for_service,
         graph_config,

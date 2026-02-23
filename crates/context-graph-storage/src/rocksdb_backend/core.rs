@@ -38,7 +38,7 @@
 use rocksdb::{Cache, ColumnFamily, Options, DB};
 use std::path::Path;
 
-use crate::column_families::{cf_names, get_all_column_family_descriptors};
+use crate::column_families::get_all_column_family_descriptors;
 
 use super::config::RocksDbConfig;
 use super::error::StorageError;
@@ -338,7 +338,13 @@ impl RocksDbMemex {
     ///
     /// `Constraint: latency < 1ms`
     pub fn health_check(&self) -> Result<(), StorageError> {
-        for cf_name in cf_names::ALL {
+        // Audit-14 STOR-M1 FIX: Iterate ALL column families dynamically via
+        // DB::list_cf(), not just the base 11 from cf_names::ALL.
+        // This covers all 51 CFs including teleological, quantized, code, and causal.
+        let all_cf_names = DB::list_cf(&Options::default(), &self.path).map_err(|e| {
+            StorageError::Internal(format!("Failed to list column families: {}", e))
+        })?;
+        for cf_name in &all_cf_names {
             self.get_cf(cf_name)?;
         }
         Ok(())
@@ -381,7 +387,13 @@ impl RocksDbMemex {
     ///
     /// `Constraint: latency < 500ms for typical workload`
     pub fn flush_all(&self) -> Result<(), StorageError> {
-        for cf_name in cf_names::ALL {
+        // Audit-14 STOR-M1 FIX: Iterate ALL column families dynamically via
+        // DB::list_cf(), not just the base 11 from cf_names::ALL.
+        // This covers all 51 CFs including teleological, quantized, code, and causal.
+        let all_cf_names = DB::list_cf(&Options::default(), &self.path).map_err(|e| {
+            StorageError::Internal(format!("Failed to list column families: {}", e))
+        })?;
+        for cf_name in &all_cf_names {
             let cf = self.get_cf(cf_name)?;
             self.db
                 .flush_cf(cf)

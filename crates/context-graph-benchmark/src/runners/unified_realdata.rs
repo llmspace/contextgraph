@@ -220,6 +220,7 @@ impl UnifiedRealdataBenchmarkRunner {
             ablation_results,
             recommendations,
             constitutional_compliance: compliance,
+            timings,
         })
     }
 
@@ -227,28 +228,28 @@ impl UnifiedRealdataBenchmarkRunner {
     pub fn run_without_embedding(&mut self) -> Result<UnifiedBenchmarkResults, RunnerError> {
         let start_time = Utc::now();
         let benchmark_start = Instant::now();
-        let mut _timings = BenchmarkTimings::default();
+        let mut timings = BenchmarkTimings::default();
 
         // Load dataset
         let load_start = Instant::now();
         if self.dataset.is_none() {
             self.load_dataset()?;
         }
-        _timings.load_dataset_ms = load_start.elapsed().as_millis() as u64;
+        timings.load_dataset_ms = load_start.elapsed().as_millis() as u64;
 
         // Inject temporal metadata
         let temporal_start = Instant::now();
         if self.temporal_metadata.is_none() {
             self.inject_temporal_metadata()?;
         }
-        _timings.temporal_injection_ms = temporal_start.elapsed().as_millis() as u64;
+        timings.temporal_injection_ms = temporal_start.elapsed().as_millis() as u64;
 
         // Generate ground truth
         let gt_start = Instant::now();
         if self.ground_truth.is_none() {
             self.generate_ground_truth()?;
         }
-        _timings.ground_truth_ms = gt_start.elapsed().as_millis() as u64;
+        timings.ground_truth_ms = gt_start.elapsed().as_millis() as u64;
 
         // Generate synthetic results (for testing)
         let per_embedder_results = self.generate_synthetic_results();
@@ -257,7 +258,7 @@ impl UnifiedRealdataBenchmarkRunner {
         let recommendations = self.generate_recommendations(&per_embedder_results, &None);
 
         let end_time = Utc::now();
-        _timings.total_ms = benchmark_start.elapsed().as_millis() as u64;
+        timings.total_ms = benchmark_start.elapsed().as_millis() as u64;
 
         let dataset = self.dataset.as_ref().unwrap();
         let ground_truth = self.ground_truth.as_ref().unwrap();
@@ -279,6 +280,7 @@ impl UnifiedRealdataBenchmarkRunner {
             ablation_results: None,
             recommendations,
             constitutional_compliance: compliance,
+            timings,
         })
     }
 
@@ -307,7 +309,7 @@ impl UnifiedRealdataBenchmarkRunner {
     }
 
     /// Evaluate all configured embedders.
-    #[allow(dead_code)] // Called from run() which is used by bin targets
+    #[cfg_attr(not(feature = "real-embeddings"), allow(dead_code))]
     fn evaluate_all_embedders(&self) -> Result<HashMap<EmbedderName, EmbedderResults>, RunnerError> {
         let ground_truth = self.ground_truth.as_ref()
             .ok_or(RunnerError::NoGroundTruth)?;
@@ -335,7 +337,7 @@ impl UnifiedRealdataBenchmarkRunner {
     }
 
     /// Evaluate a single embedder.
-    #[allow(dead_code)] // Called from evaluate_all_embedders
+    #[cfg_attr(not(feature = "real-embeddings"), allow(dead_code))]
     fn evaluate_embedder(
         &self,
         embedder: EmbedderName,
@@ -344,7 +346,11 @@ impl UnifiedRealdataBenchmarkRunner {
         let mut result = EmbedderResults::new(embedder);
 
         if self.fingerprints.is_empty() {
-            // Synthetic mode - generate plausible results
+            // WARNING: Synthetic mode -- all metrics below are randomly generated
+            // placeholder values (rng.gen_range), NOT real measurements. These exist
+            // only to exercise the reporting pipeline when no embeddings are available.
+            eprintln!("WARNING: evaluate_embedder running in synthetic mode for {} -- \
+                       metrics are randomly generated, not real measurements", embedder);
             let mut local_rng = self.rng.clone();
             result.mrr_at_10 = 0.5 + local_rng.gen_range(0.0..0.3);
             for &k in &self.config.k_values {
@@ -440,7 +446,7 @@ impl UnifiedRealdataBenchmarkRunner {
     }
 
     /// Compute asymmetric ratio for E5, E8, E10.
-    #[allow(dead_code)] // Called from evaluate_embedder
+    #[cfg_attr(not(feature = "real-embeddings"), allow(dead_code))]
     fn compute_asymmetric_ratio(&self, embedder: EmbedderName) -> Result<f64, RunnerError> {
         // Sample pairs and compute forward/reverse similarity ratio
         let ids: Vec<_> = self.fingerprints.keys().copied().collect();
@@ -473,7 +479,7 @@ impl UnifiedRealdataBenchmarkRunner {
     }
 
     /// Compare fusion strategies.
-    #[allow(dead_code)] // Called from run() which is used by bin targets
+    #[cfg_attr(not(feature = "real-embeddings"), allow(dead_code))]
     fn compare_fusion_strategies(
         &self,
         per_embedder: &HashMap<EmbedderName, EmbedderResults>,
@@ -565,7 +571,7 @@ impl UnifiedRealdataBenchmarkRunner {
     }
 
     /// Estimate fusion MRR using weighted RRF approximation.
-    #[allow(dead_code)] // Called from compare_fusion_strategies
+    #[cfg_attr(not(feature = "real-embeddings"), allow(dead_code))]
     fn estimate_fusion_mrr(
         &self,
         embedders: &[EmbedderName],
@@ -591,7 +597,7 @@ impl UnifiedRealdataBenchmarkRunner {
     }
 
     /// Analyze cross-embedder correlations.
-    #[allow(dead_code)] // Called from run() which is used by bin targets
+    #[cfg_attr(not(feature = "real-embeddings"), allow(dead_code))]
     fn analyze_cross_embedder(
         &self,
         per_embedder: &HashMap<EmbedderName, EmbedderResults>,
@@ -599,30 +605,31 @@ impl UnifiedRealdataBenchmarkRunner {
         let embedder_order: Vec<_> = self.config.embedders.clone();
         let n = embedder_order.len();
 
-        // Build correlation matrix (placeholder - real implementation needs query-level data)
-        let mut correlation_matrix = vec![vec![0.0; n]; n];
+        // Build MRR proximity matrix: 1.0 - |mrr_i - mrr_j| / max(mrr_i, mrr_j).
+        // This is NOT a statistical correlation -- it measures how close two embedders'
+        // MRR scores are. Values near 1.0 mean similar performance.
+        let mut mrr_proximity_matrix = vec![vec![0.0; n]; n];
         for i in 0..n {
             for j in 0..n {
                 if i == j {
-                    correlation_matrix[i][j] = 1.0;
+                    mrr_proximity_matrix[i][j] = 1.0;
                 } else {
-                    // Estimate correlation from MRR similarity
                     let mrr_i = per_embedder.get(&embedder_order[i]).map(|r| r.mrr_at_10).unwrap_or(0.0);
                     let mrr_j = per_embedder.get(&embedder_order[j]).map(|r| r.mrr_at_10).unwrap_or(0.0);
-                    let corr = 1.0 - (mrr_i - mrr_j).abs() / (mrr_i.max(mrr_j) + 0.01);
-                    correlation_matrix[i][j] = corr.clamp(0.0, 1.0);
+                    let proximity = 1.0 - (mrr_i - mrr_j).abs() / (mrr_i.max(mrr_j) + 0.01);
+                    mrr_proximity_matrix[i][j] = proximity.clamp(0.0, 1.0);
                 }
             }
         }
 
-        // Find best complementary pairs (low correlation, high individual MRR)
+        // Find best complementary pairs (low proximity = diverse MRR, high individual MRR)
         let mut pairs: Vec<_> = Vec::new();
         for i in 0..n {
             for j in (i + 1)..n {
                 let e_i = embedder_order[i];
                 let e_j = embedder_order[j];
-                let corr = correlation_matrix[i][j];
-                let complementarity = (1.0 - corr) *
+                let proximity = mrr_proximity_matrix[i][j];
+                let complementarity = (1.0 - proximity) *
                     (per_embedder.get(&e_i).map(|r| r.mrr_at_10).unwrap_or(0.0) +
                      per_embedder.get(&e_j).map(|r| r.mrr_at_10).unwrap_or(0.0));
                 pairs.push((e_i, e_j, complementarity));
@@ -632,22 +639,22 @@ impl UnifiedRealdataBenchmarkRunner {
 
         let best_complementary_pairs: Vec<_> = pairs.iter().take(10).cloned().collect();
 
-        // Redundancy pairs (high correlation)
+        // Redundancy pairs (high MRR proximity)
         let redundancy_pairs: Vec<_> = pairs.iter()
             .filter(|(a, b, _)| {
                 let idx_a = embedder_order.iter().position(|e| *e == *a).unwrap();
                 let idx_b = embedder_order.iter().position(|e| *e == *b).unwrap();
-                correlation_matrix[idx_a][idx_b] > 0.9
+                mrr_proximity_matrix[idx_a][idx_b] > 0.9
             })
             .map(|(a, b, _)| {
                 let idx_a = embedder_order.iter().position(|e| *e == *a).unwrap();
                 let idx_b = embedder_order.iter().position(|e| *e == *b).unwrap();
-                (*a, *b, correlation_matrix[idx_a][idx_b])
+                (*a, *b, mrr_proximity_matrix[idx_a][idx_b])
             })
             .collect();
 
         Ok(CrossEmbedderAnalysis {
-            correlation_matrix,
+            mrr_proximity_matrix,
             embedder_order,
             complementarity_scores: HashMap::new(),
             redundancy_pairs,
@@ -656,7 +663,7 @@ impl UnifiedRealdataBenchmarkRunner {
     }
 
     /// Run ablation study.
-    #[allow(dead_code)] // Called from run() which is used by bin targets
+    #[cfg_attr(not(feature = "real-embeddings"), allow(dead_code))]
     fn run_ablation_study(
         &self,
         per_embedder: &HashMap<EmbedderName, EmbedderResults>,
@@ -743,9 +750,6 @@ impl UnifiedRealdataBenchmarkRunner {
 
         // AP-73: Temporal embedders not in similarity fusion
         // This is enforced by our fusion strategy not including E2-E4
-        let _temporal_in_config: Vec<_> = self.config.embedders.iter()
-            .filter(|e| EmbedderName::temporal().contains(e))
-            .collect();
         compliance.check_ap_73(&self.config.embedders);
 
         // Check asymmetric ratios for E5, E8, E10
@@ -801,7 +805,6 @@ impl UnifiedRealdataBenchmarkRunner {
         }
 
         // Enhancement recommendations
-        let _e1_mrr = per_embedder.get(&EmbedderName::E1Semantic).map(|r| r.mrr_at_10).unwrap_or(0.0);
         for embedder in [EmbedderName::E5Causal, EmbedderName::E7Code, EmbedderName::E10Multimodal] {
             if let Some(result) = per_embedder.get(&embedder) {
                 if result.contribution_vs_e1 > 0.05 {
@@ -880,7 +883,7 @@ impl UnifiedRealdataBenchmarkRunner {
 }
 
 /// Compute similarity between two fingerprints for a specific embedder.
-#[allow(dead_code)] // Called from evaluate_embedder and compute_asymmetric_ratio
+#[cfg_attr(not(feature = "real-embeddings"), allow(dead_code))]
 fn compute_similarity(a: &SemanticFingerprint, b: &SemanticFingerprint, embedder_idx: usize) -> f64 {
     use context_graph_core::types::fingerprint::EmbeddingSlice;
 
@@ -905,7 +908,7 @@ fn compute_similarity(a: &SemanticFingerprint, b: &SemanticFingerprint, embedder
 }
 
 /// Compute dot product between sparse vectors.
-#[allow(dead_code)] // Called from compute_similarity
+#[cfg_attr(not(feature = "real-embeddings"), allow(dead_code))]
 fn sparse_dot_product(a: &context_graph_core::types::fingerprint::SparseVector, b: &context_graph_core::types::fingerprint::SparseVector) -> f64 {
     // Use the dot method if available, otherwise compute manually
     // Simple approach: iterate through indices using two-pointer merge
@@ -928,7 +931,7 @@ fn sparse_dot_product(a: &context_graph_core::types::fingerprint::SparseVector, 
 }
 
 /// Compute max similarity between token-level embeddings.
-#[allow(dead_code)] // Called from compute_similarity
+#[cfg_attr(not(feature = "real-embeddings"), allow(dead_code))]
 fn max_token_similarity(a: &[Vec<f32>], b: &[Vec<f32>]) -> f64 {
     if a.is_empty() || b.is_empty() {
         return 0.0;
@@ -949,7 +952,7 @@ fn max_token_similarity(a: &[Vec<f32>], b: &[Vec<f32>]) -> f64 {
 /// Compute cosine similarity between two vectors with f64 precision (raw [-1, 1] range).
 ///
 /// Delegates to the canonical implementation in `crate::util`.
-#[allow(dead_code)] // Called from compute_similarity and max_token_similarity
+#[cfg_attr(not(feature = "real-embeddings"), allow(dead_code))]
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
     crate::util::cosine_similarity_raw_f64(a, b)
 }

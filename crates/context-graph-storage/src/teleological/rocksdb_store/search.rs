@@ -629,6 +629,11 @@ fn search_multi_space_sync(
     // returns the "paraphrase" vector for queries, matching against stored "doc" vectors.
     // This is correct per ARCH-28: queries are paraphrased versions of stored documents,
     // so query=paraphrase and stored=doc aligns with the intended retrieval direction.
+    //
+    // TODO(Audit-14 STOR-L6): E10 uses the legacy E10Multimodal index. The asymmetric
+    // E10MultimodalParaphrase and E10MultimodalContext indexes exist in the registry but
+    // are not yet wired into the search path. Once directional index population is
+    // confirmed, switch to E10MultimodalParaphrase for query-side search.
     if let Some(e10_index) = index_registry.get(EmbedderIndex::E10Multimodal) {
         match e10_index.search(query.e10_active_vector(), k, None) {
             Ok(e10_candidates) => {

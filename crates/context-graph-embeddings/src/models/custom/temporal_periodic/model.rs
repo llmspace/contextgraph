@@ -173,6 +173,5 @@ impl Default for TemporalPeriodicModel {
     }
 }
 
-// Implement Send and Sync explicitly (safe due to AtomicBool usage)
-unsafe impl Send for TemporalPeriodicModel {}
-unsafe impl Sync for TemporalPeriodicModel {}
+// TemporalPeriodicModel is auto-Send+Sync: all fields (Vec<u64>, usize, AtomicBool)
+// are Send+Sync. No unsafe impl needed.

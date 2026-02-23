@@ -143,7 +143,7 @@ pub use config::{
 // Distance and similarity computation functions
 pub use distance::{
     compute_all_similarities, compute_similarity_for_space, cosine_similarity,
-    hamming_similarity, jaccard_similarity, max_sim, transe_similarity,
+    cosine_similarity_raw, hamming_similarity, jaccard_similarity, max_sim, transe_similarity,
 };
 
 // Multi-space similarity service

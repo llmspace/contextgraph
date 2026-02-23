@@ -21,7 +21,6 @@ mod entity;
 mod graph;
 pub mod kepler;
 mod late_interaction;
-mod multimodal;
 pub mod rgcn;
 mod semantic;
 mod sparse;
@@ -34,8 +33,7 @@ pub use causal::{
 pub use causal::loader::load_nomic_weights;
 pub use causal::weights::NomicWeights;
 pub use contextual::{
-    context_pooling_weights, detect_context_markers, intent_pooling_weights,
-    ContextMarkerResult, ContextType, ContextualModel,
+    ContextualModel,
     CONTEXTUAL_DIMENSION, CONTEXTUAL_HIDDEN_SIZE, CONTEXTUAL_INTERMEDIATE_SIZE,
     CONTEXTUAL_LATENCY_BUDGET_MS, CONTEXTUAL_LAYER_NORM_EPS, CONTEXTUAL_MAX_TOKENS,
     CONTEXTUAL_MODEL_NAME, CONTEXTUAL_NUM_HEADS, CONTEXTUAL_NUM_LAYERS, CONTEXTUAL_VOCAB_SIZE,
@@ -59,14 +57,6 @@ pub use graph::{
 pub use late_interaction::{
     LateInteractionModel, TokenEmbeddings, LATE_INTERACTION_DIMENSION,
     LATE_INTERACTION_LATENCY_BUDGET_MS, LATE_INTERACTION_MAX_TOKENS, LATE_INTERACTION_MODEL_NAME,
-};
-pub use multimodal::{
-    ClipTextAttentionWeights, ClipTextConfig, ClipTextLayerWeights, ClipTextMlpWeights,
-    ClipTextWeights, ClipVisionAttentionWeights, ClipVisionConfig, ClipVisionLayerWeights,
-    ClipVisionMlpWeights, ClipVisionWeights, ClipWeights, ImageProcessor, MultimodalModel,
-    CLIP_IMAGE_SIZE, CLIP_MEAN, CLIP_NUM_PATCHES, CLIP_NUM_PATCHES_PER_DIM, CLIP_PATCH_SIZE,
-    CLIP_STD, MULTIMODAL_DIMENSION, MULTIMODAL_LATENCY_BUDGET_MS, MULTIMODAL_MAX_TOKENS,
-    MULTIMODAL_MODEL_NAME,
 };
 pub use semantic::{
     SemanticModel, PASSAGE_PREFIX, QUERY_PREFIX, SEMANTIC_DIMENSION, SEMANTIC_LATENCY_BUDGET_MS,

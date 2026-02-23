@@ -384,8 +384,11 @@ impl GreenContexts {
 
     /// Estimate SM count based on GPU compute capability.
     ///
-    /// This is a fallback - ideally we'd query the actual SM count via CUDA
-    /// using CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT.
+    /// CUDA-L1: Uses a hardcoded lookup table mapping (major, minor) to SM counts.
+    /// This is a known limitation — only covers flagship SKUs. Non-flagship GPUs
+    /// (RTX 4070, 3060, etc.) fall through to the default of 0 SMs, which disables
+    /// Green Contexts. The proper fix is `cuDeviceGetAttribute(MULTIPROCESSOR_COUNT)`
+    /// but that requires a live CUDA context at initialization time.
     fn estimate_sm_count(device: &GpuDevice) -> u32 {
         let (major, minor) = device.compute_capability();
         match (major, minor) {

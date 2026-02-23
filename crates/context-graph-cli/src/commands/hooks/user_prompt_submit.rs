@@ -205,9 +205,6 @@ pub async fn execute(args: PromptSubmitArgs) -> HookResult<HookOutput> {
         "PROMPT_SUBMIT: identity marker detected"
     );
 
-    // 4. Evaluate conversation context (used for logging, not injected per R3)
-    let _context_summary = evaluate_context(&context);
-
     // 5. Create MCP client once for all operations
     let client = McpClient::new();
 
@@ -596,46 +593,6 @@ pub fn detect_identity_marker(prompt: &str) -> IdentityMarkerType {
     IdentityMarkerType::None
 }
 
-// ============================================================================
-// Context Evaluation
-// ============================================================================
-
-/// Summary of conversation context evaluation
-#[derive(Debug, Clone)]
-#[allow(dead_code)] // R3: Fields no longer injected but struct used in evaluate_context + tests
-pub struct ContextSummary {
-    /// Number of messages in context
-    pub message_count: usize,
-    /// Number of user messages
-    pub user_message_count: usize,
-    /// Number of assistant messages
-    pub assistant_message_count: usize,
-    /// Total character count
-    pub total_chars: usize,
-}
-
-/// Evaluate conversation context for patterns.
-fn evaluate_context(context: &[ConversationMessage]) -> ContextSummary {
-    let mut user_count = 0;
-    let mut assistant_count = 0;
-    let mut total_chars = 0;
-
-    for msg in context {
-        total_chars += msg.content.len();
-        match msg.role.as_str() {
-            "user" => user_count += 1,
-            "assistant" => assistant_count += 1,
-            _ => {}
-        }
-    }
-
-    ContextSummary {
-        message_count: context.len(),
-        user_message_count: user_count,
-        assistant_message_count: assistant_count,
-        total_chars,
-    }
-}
 
 // ============================================================================
 // Memory Retrieval via MCP
@@ -650,9 +607,6 @@ pub struct RetrievedMemory {
     pub content: Option<String>,
     /// Similarity score to the query [0.0, 1.0]
     pub similarity: f32,
-    /// Dominant embedder that matched (e.g., "E1_Semantic")
-    #[allow(dead_code)] // R3: No longer in slim injection but part of parsed data
-    pub dominant_embedder: String,
     /// Source metadata - where this memory originated
     pub source: Option<SourceInfo>,
 }
@@ -712,9 +666,6 @@ pub struct ExtractedEntity {
     pub surface_form: String,
     /// Canonical ID (normalized form)
     pub canonical_id: String,
-    /// Entity type (ProgrammingLanguage, Framework, Database, etc.)
-    #[allow(dead_code)] // R3: Not in slim injection but part of parsed data
-    pub entity_type: String,
 }
 
 /// A memory discovered by E11 (KEPLER) entity search.
@@ -727,9 +678,6 @@ pub struct E11DiscoveredMemory {
     pub content: Option<String>,
     /// Combined score (E1 + E11 + entity Jaccard)
     pub score: f32,
-    /// E11 entity similarity component
-    #[allow(dead_code)] // R3: Not in slim injection but part of parsed data
-    pub e11_similarity: f32,
     /// Entities that matched
     pub matched_entities: Vec<String>,
 }
@@ -746,21 +694,6 @@ pub struct DivergenceAlert {
     pub description: String,
 }
 
-/// A recent conversation turn from the session timeline.
-/// Includes position label for user clarity (e.g., "2 turns ago").
-#[derive(Debug, Clone)]
-#[allow(dead_code)] // R3: Recent turns no longer injected but struct kept for future use
-pub struct RecentConversationTurn {
-    /// Memory ID
-    #[allow(dead_code)] // Part of Clone+Debug DTO
-    pub id: String,
-    /// Content text (summary or full)
-    pub content: Option<String>,
-    /// Source type (HookDescription, ClaudeResponse, etc.)
-    pub source_type: String,
-    /// Position label (e.g., "previous turn", "2 turns ago")
-    pub position_label: String,
-}
 
 /// Search the knowledge graph for memories relevant to the user's prompt.
 ///
@@ -883,11 +816,6 @@ fn parse_search_results(result: &serde_json::Value) -> Vec<RetrievedMemory> {
                 .get("similarity")
                 .and_then(|v| v.as_f64())
                 .unwrap_or(0.0) as f32,
-            dominant_embedder: item
-                .get("dominantEmbedder")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown")
-                .to_string(),
             source,
         });
     }
@@ -980,18 +908,9 @@ fn parse_extracted_entities(result: &serde_json::Value) -> Vec<ExtractedEntity> 
             .unwrap_or(&surface_form)
             .to_string();
 
-        let entity_type = item
-            .get("entity_type")
-            .or_else(|| item.get("entityType"))
-            .or_else(|| item.get("type"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("Unknown")
-            .to_string();
-
         extracted.push(ExtractedEntity {
             surface_form,
             canonical_id,
-            entity_type,
         });
     }
 
@@ -1083,12 +1002,6 @@ fn parse_e11_search_results(result: &serde_json::Value) -> Vec<E11DiscoveredMemo
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0) as f32;
 
-        let e11_similarity = item
-            .get("e11Similarity")
-            .or_else(|| item.get("entitySimilarity"))
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0) as f32;
-
         let matched_entities = item
             .get("matchedEntities")
             .and_then(|v| v.as_array())
@@ -1103,7 +1016,6 @@ fn parse_e11_search_results(result: &serde_json::Value) -> Vec<E11DiscoveredMemo
             id,
             content,
             score,
-            e11_similarity,
             matched_entities,
         });
     }
@@ -1155,99 +1067,6 @@ async fn fetch_divergence_alerts_with_client(client: &McpClient) -> Vec<Divergen
     }
 }
 
-// ============================================================================
-// Recent Conversation Context via MCP
-// ============================================================================
-
-/// Number of recent conversation turns to auto-inject for context.
-/// R3: Recent turns removed from injection but kept for potential future use.
-#[allow(dead_code)]
-const RECENT_TURNS_TO_INJECT: u32 = 5;
-
-/// Fetch recent conversation context using the get_conversation_context MCP tool.
-///
-/// Returns the last N conversation turns with position labels (e.g., "2 turns ago").
-/// This provides sequential context from the current session.
-///
-/// # Arguments
-/// * `client` - MCP client to use for the request
-///
-/// # Returns
-/// Vector of recent conversation turns, empty if fetch fails or no turns found.
-#[allow(dead_code)] // R3: Recent turns removed from injection
-async fn fetch_recent_conversation_context_with_client(
-    client: &McpClient,
-) -> Vec<RecentConversationTurn> {
-    debug!("PROMPT_SUBMIT: Fetching recent conversation context via MCP (fast path)");
-
-    match client
-        .get_conversation_context_fast(Some("before"), Some(RECENT_TURNS_TO_INJECT), true)
-        .await
-    {
-        Ok(result) => parse_conversation_context(&result),
-        Err(e) => {
-            warn!(error = %e, "PROMPT_SUBMIT: Conversation context fetch failed, continuing without recent turns");
-            Vec::new()
-        }
-    }
-}
-
-/// Parse MCP get_conversation_context results into RecentConversationTurn structs.
-#[allow(dead_code)] // R3: Recent turns removed from injection
-fn parse_conversation_context(result: &serde_json::Value) -> Vec<RecentConversationTurn> {
-    let Some(memories) = result.get("memories").and_then(|v| v.as_array()) else {
-        debug!("PROMPT_SUBMIT: No memories array in conversation context response");
-        return Vec::new();
-    };
-
-    let mut turns = Vec::new();
-
-    for item in memories {
-        let id = item
-            .get("id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown")
-            .to_string();
-
-        let content = item
-            .get("content")
-            .and_then(|v| v.as_str())
-            .map(String::from);
-
-        // Extract source type from source object
-        let source_type = item
-            .get("source")
-            .and_then(|s| s.get("type"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("Unknown")
-            .to_string();
-
-        // Extract position label from sequence info
-        let position_label = item
-            .get("sequenceInfo")
-            .and_then(|s| s.get("positionLabel"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown position")
-            .to_string();
-
-        turns.push(RecentConversationTurn {
-            id,
-            content,
-            source_type,
-            position_label,
-        });
-    }
-
-    if !turns.is_empty() {
-        info!(
-            turn_count = turns.len(),
-            "PROMPT_SUBMIT: Parsed {} recent conversation turns",
-            turns.len()
-        );
-    }
-
-    turns
-}
 
 /// Parse MCP get_divergence_alerts results into DivergenceAlert structs.
 fn parse_divergence_alerts(result: &serde_json::Value) -> Vec<DivergenceAlert> {
@@ -1503,55 +1322,6 @@ fn get_coherence_state_name(coherence: f32) -> &'static str {
     }
 }
 
-/// Get integration description from value.
-/// R3: No longer injected.
-#[allow(dead_code)]
-fn get_integration_description(integration: f32) -> &'static str {
-    match integration {
-        r if r >= 0.8 => "Excellent synchronization",
-        r if r >= 0.6 => "Good coherence",
-        r if r >= 0.4 => "Moderate integration",
-        _ => "Low integration - attention needed",
-    }
-}
-
-/// Get stability status from coherence value.
-/// R3: No longer injected.
-#[allow(dead_code)]
-fn get_stability_status(coherence: f32) -> &'static str {
-    match coherence {
-        c if c >= 0.9 => "Healthy",
-        c if c >= 0.7 => "Normal",
-        c if c >= 0.5 => "Warning",
-        _ => "Critical",
-    }
-}
-
-/// Get guidance for identity marker type.
-/// R3: No longer injected.
-#[allow(dead_code)]
-fn get_marker_guidance(marker: IdentityMarkerType) -> &'static str {
-    match marker {
-        IdentityMarkerType::SelfReference => {
-            "User is inquiring about identity. Respond with authentic self-description."
-        }
-        IdentityMarkerType::Goal => "User has a clear objective. Focus on helpful assistance.",
-        IdentityMarkerType::Value => {
-            "User is expressing values. Acknowledge and align where appropriate."
-        }
-        IdentityMarkerType::Capability => {
-            "User is testing capabilities. Be honest about abilities and limitations."
-        }
-        IdentityMarkerType::Challenge => {
-            "User is challenging. Respond thoughtfully without defensiveness."
-        }
-        IdentityMarkerType::Confirmation => {
-            "User is confirming understanding. Acknowledge and continue coherently."
-        }
-        IdentityMarkerType::None => "No specific identity marker. Proceed normally.",
-    }
-}
-
 /// Build CoherenceState from snapshot.
 /// Note: Uses coherence computed from integration/reflection/differentiation per PRD v6.
 fn build_coherence_state(snapshot: &SessionSnapshot) -> CoherenceState {
@@ -1574,6 +1344,38 @@ mod tests {
     use super::*;
     use crate::commands::hooks::args::OutputFormat;
     use crate::commands::test_utils::GLOBAL_IDENTITY_LOCK;
+
+    /// Summary of conversation context evaluation (test-only)
+    #[derive(Debug, Clone)]
+    struct ContextSummary {
+        message_count: usize,
+        user_message_count: usize,
+        assistant_message_count: usize,
+        total_chars: usize,
+    }
+
+    /// Evaluate conversation context for patterns (test-only).
+    fn evaluate_context(context: &[ConversationMessage]) -> ContextSummary {
+        let mut user_count = 0;
+        let mut assistant_count = 0;
+        let mut total_chars = 0;
+
+        for msg in context {
+            total_chars += msg.content.len();
+            match msg.role.as_str() {
+                "user" => user_count += 1,
+                "assistant" => assistant_count += 1,
+                _ => {}
+            }
+        }
+
+        ContextSummary {
+            message_count: context.len(),
+            user_message_count: user_count,
+            assistant_message_count: assistant_count,
+            total_chars,
+        }
+    }
 
     /// Create a test session in the SessionCache.
     /// Uses integration/reflection/differentiation to achieve target coherence.

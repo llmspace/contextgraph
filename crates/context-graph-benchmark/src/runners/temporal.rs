@@ -407,13 +407,6 @@ impl TemporalBenchmarkRunner {
         let mut before_after_results = Vec::new();
         let mut boundary_results = Vec::new();
 
-        // Build timestamp index (for potential future use)
-        let _ts_index: HashMap<Uuid, i64> = dataset
-            .memories
-            .iter()
-            .map(|m| (m.id, m.timestamp.timestamp_millis()))
-            .collect();
-
         for query in &dataset.sequence_queries {
             let anchor_ts = query.anchor_timestamp.timestamp_millis();
 
@@ -965,11 +958,13 @@ fn run_adaptive_half_life_test(
 
 fn run_time_window_tests(
     dataset: &TemporalBenchmarkDataset,
-    _settings: &RecencyBenchmarkSettings,
+    settings: &RecencyBenchmarkSettings,
 ) -> TimeWindowResults {
     let now = chrono::Utc::now();
-    let threshold_24h = now - chrono::Duration::hours(24);
-    let threshold_7d = now - chrono::Duration::days(7);
+    // Use fresh_threshold_ms from settings for the short window (default: 24h)
+    let threshold_24h = now - chrono::Duration::milliseconds(settings.fresh_threshold_ms);
+    // Long window is 7x the short window (e.g., 24h -> 7d)
+    let threshold_7d = now - chrono::Duration::milliseconds(settings.fresh_threshold_ms * 7);
 
     // Count memories in each window
     let in_24h: HashSet<_> = dataset
@@ -986,18 +981,18 @@ fn run_time_window_tests(
         .map(|m| m.id)
         .collect();
 
-    // Simulate retrieval with time filter
+    // Retrieve memories that actually fall within each time window
     let retrieved_24h: HashSet<_> = dataset
         .memories
         .iter()
-        .take(in_24h.len().max(10))
+        .filter(|m| m.timestamp >= threshold_24h)
         .map(|m| m.id)
         .collect();
 
     let retrieved_7d: HashSet<_> = dataset
         .memories
         .iter()
-        .take(in_7d.len().max(10))
+        .filter(|m| m.timestamp >= threshold_7d)
         .map(|m| m.id)
         .collect();
 

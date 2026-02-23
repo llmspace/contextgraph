@@ -36,7 +36,6 @@
 //! - With FP16 quantization: ~220MB
 
 mod constants;
-mod marker_detection;
 mod model;
 mod state;
 
@@ -47,12 +46,6 @@ pub use constants::{
     CONTEXTUAL_MODEL_NAME, CONTEXTUAL_NUM_HEADS, CONTEXTUAL_NUM_LAYERS, CONTEXTUAL_VOCAB_SIZE,
     // E5-base-v2 prefix constants for asymmetric encoding
     INTENT_PREFIX, CONTEXT_PREFIX,
-};
-
-// Marker detection is still useful for context analysis
-pub use marker_detection::{
-    context_pooling_weights, detect_context_markers, intent_pooling_weights, ContextMarkerResult,
-    ContextType,
 };
 
 pub use model::ContextualModel;

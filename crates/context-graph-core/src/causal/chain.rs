@@ -552,30 +552,8 @@ pub fn build_causal_chain(
 // Helper Functions
 // =============================================================================
 
-/// Compute cosine similarity between two f32 slices.
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-    if a.is_empty() || b.is_empty() || a.len() != b.len() {
-        return 0.0;
-    }
-
-    let mut dot = 0.0f32;
-    let mut norm_a = 0.0f32;
-    let mut norm_b = 0.0f32;
-
-    for (x, y) in a.iter().zip(b.iter()) {
-        dot += x * y;
-        norm_a += x * x;
-        norm_b += y * y;
-    }
-
-    let norm_product = (norm_a * norm_b).sqrt();
-
-    if norm_product < f32::EPSILON {
-        0.0
-    } else {
-        (dot / norm_product).clamp(-1.0, 1.0)
-    }
-}
+// CORE-M3: Use canonical raw cosine implementation from retrieval::distance.
+use crate::retrieval::distance::cosine_similarity_raw as cosine_similarity;
 
 #[cfg(test)]
 mod tests {

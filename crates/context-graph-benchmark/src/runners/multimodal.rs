@@ -306,7 +306,7 @@ impl E10MultimodalBenchmarkRunner {
                 .documents
                 .iter()
                 .map(|doc| {
-                    let score = self.compute_simulated_score(query, doc, &expected_docs);
+                    let score = self.compute_simulated_score(query, doc);
                     (doc.id.to_string(), score)
                 })
                 .collect();
@@ -349,7 +349,7 @@ impl E10MultimodalBenchmarkRunner {
                 .documents
                 .iter()
                 .map(|doc| {
-                    let score = self.compute_simulated_score(query, doc, &expected_docs);
+                    let score = self.compute_simulated_score(query, doc);
                     (doc.id.to_string(), score)
                 })
                 .collect();
@@ -395,7 +395,6 @@ impl E10MultimodalBenchmarkRunner {
         &self,
         query: &crate::datasets::multimodal::ParaphraseQuery,
         doc: &crate::datasets::multimodal::ParaphraseDocument,
-        _expected_docs: &[String], // Kept for signature compatibility but UNUSED
     ) -> f64 {
         // Base semantic similarity from keyword overlap
         let keyword_overlap = Self::compute_keyword_overlap(&query.query, &doc.content);

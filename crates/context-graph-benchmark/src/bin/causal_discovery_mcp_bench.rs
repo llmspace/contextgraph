@@ -522,7 +522,8 @@ async fn run_benchmark(args: &Args) -> Result<CausalDiscoveryBenchResults, Box<d
         };
 
         let start = Instant::now();
-        let _response = handlers.dispatch(request).await;
+        // Response intentionally consumed for latency measurement only
+        let _ = handlers.dispatch(request).await;
         let elapsed = start.elapsed().as_secs_f64() * 1000.0;
         dry_run_latencies.push(elapsed);
     }

@@ -83,6 +83,9 @@ pub const RRF_K: i32 = 60;
 /// );
 /// // id2 appears high in both lists, likely scores higher than id1
 /// ```
+// Audit-14 STOR-L1 FIX: Only used by tests in this module. The production code uses
+// weighted_rrf_fusion_with_scores (which tracks per-embedder contributions).
+#[cfg(test)]
 pub fn weighted_rrf_fusion(
     result_sets: Vec<(Vec<(Uuid, f32)>, f32)>,
     k: i32,
@@ -161,6 +164,9 @@ pub fn weighted_rrf_fusion_with_scores(
 /// # Returns
 ///
 /// Fraction of embedders that have this result in their top-K [0.0, 1.0]
+// Audit-14 STOR-L1 FIX: Only used by tests in this module. Production consensus
+// scoring is done inline in CausalSearchResult::compute_consensus().
+#[cfg(test)]
 pub fn compute_consensus(id: Uuid, result_sets: &[(Vec<(Uuid, f32)>, f32)], top_k: usize) -> f32 {
     let total_embedders = result_sets.len();
     if total_embedders == 0 {

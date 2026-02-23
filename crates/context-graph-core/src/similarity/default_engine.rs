@@ -469,8 +469,11 @@ impl CrossSpaceSimilarityEngine for DefaultCrossSpaceEngine {
             WeightingStrategy::Uniform => WeightingStrategy::uniform_weights(),
             WeightingStrategy::Static(weights) => *weights,
             WeightingStrategy::TopicAligned => {
-                // TopicAligned is not yet implemented — returns uniform weights.
-                // TODO: Implement topic-profile-based weight modulation.
+                // CORE-L7: TopicAligned is not yet implemented — returns uniform weights.
+                tracing::warn!(
+                    "WeightingStrategy::TopicAligned is not implemented — \
+                     falling back to uniform weights"
+                );
                 WeightingStrategy::uniform_weights()
             }
             WeightingStrategy::RRF { .. } => {

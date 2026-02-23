@@ -9,10 +9,6 @@ pub enum TokenizerFamily {
     BertWordpiece,
     /// RoBERTa BPE tokenization (KEPLER)
     RobertaBpe,
-    /// SentencePiece BPE tokenization (legacy, unused)
-    SentencePieceBpe,
-    /// CLIP-specific BPE tokenization
-    ClipBpe,
     /// Custom models with no tokenization
     None,
 }

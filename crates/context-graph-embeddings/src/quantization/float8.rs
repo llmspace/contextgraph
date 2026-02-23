@@ -287,12 +287,15 @@ impl Float8E4M3Encoder {
     }
 
     /// Convert E4M3 byte to f32 (in [0, 1] range).
+    ///
+    /// Sign bit is never set by f32_to_e4m3 (values <= 0.0 return early as 0x00).
+    /// We assert this invariant in debug builds; in release, the sign bit is
+    /// simply masked out since negative values are impossible in valid data.
     #[inline]
     fn e4m3_to_f32(&self, byte: u8) -> f32 {
-        // L2 FIX: f32_to_e4m3 never sets the sign bit (values <= 0.0 return early).
-        // Catch data corruption if sign bit is somehow set.
         debug_assert!(byte & 0x80 == 0, "unexpected sign bit in E4M3 byte: {:#04x}", byte);
-        let sign = (byte >> 7) & 1;
+        // Mask to 7 bits — sign bit is always 0 for valid data (f32_to_e4m3 never sets it).
+        let byte = byte & 0x7F;
         let exp = (byte >> 3) & 0x0F;
         let mantissa = byte & 0x07;
 
@@ -301,15 +304,13 @@ impl Float8E4M3Encoder {
             return 0.0;
         }
 
-        // Reconstruct value
-        // E4M3: value = (-1)^sign * 2^(exp-7) * (1 + mantissa/8)
+        // Reconstruct value: 2^(exp-7) * (1 + mantissa/8)
         let exp_value = 2.0f32.powi(exp as i32 - 7);
         let mant_value = 1.0 + (mantissa as f32) / 8.0;
         let value = exp_value * mant_value;
 
-        // Apply sign and scale back to [0, 1]
-        let signed_value = if sign == 1 { -value } else { value };
-        (signed_value / 240.0).clamp(0.0, 1.0)
+        // Scale back to [0, 1]
+        (value / 240.0).clamp(0.0, 1.0)
     }
 
     /// Compute theoretical compression ratio.

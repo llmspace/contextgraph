@@ -85,7 +85,7 @@ impl ModelFactory for DefaultModelFactory {
     /// Returns all 12 supported model IDs.
     ///
     /// The factory supports all models defined in the constitution:
-    /// - E1-E12 covering semantic, temporal, code, graph, and multimodal embeddings.
+    /// - E1-E12 covering semantic, temporal, code, graph, and contextual embeddings.
     fn supported_models(&self) -> &[ModelId] {
         ModelId::all()
     }

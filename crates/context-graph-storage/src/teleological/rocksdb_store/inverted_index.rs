@@ -31,106 +31,112 @@ fn deserialize_sorted_posting_list(data: &[u8]) -> Result<(Vec<Uuid>, bool), con
     Ok((ids, was_unsorted))
 }
 
+// =============================================================================
+// Generic inverted index helpers (Audit-14 STOR-M2 FIX)
+//
+// E6 and E13 inverted index update/remove were ~90 lines of copy-paste each.
+// Extracted into two generic helpers parameterized by CF name and key function.
+// =============================================================================
+
+/// Generic helper: update an inverted index for a fingerprint.
+fn update_inverted_index(
+    db: &rocksdb::DB,
+    cf: &rocksdb::ColumnFamily,
+    batch: &mut WriteBatch,
+    id: &Uuid,
+    term_keys: &[[u8; 2]],
+    cf_name: &'static str,
+) -> TeleologicalStoreResult<()> {
+    let results = db.multi_get_cf(
+        term_keys.iter().map(|k| (cf, k.as_slice()))
+    );
+    for (i, result) in results.into_iter().enumerate() {
+        let term_key = &term_keys[i];
+        let existing = result.map_err(|e| {
+            TeleologicalStoreError::rocksdb_op("multi_get", cf_name, None, e)
+        })?;
+        let (mut ids, was_unsorted) = match existing {
+            Some(data) => deserialize_sorted_posting_list(&data)?,
+            None => (Vec::new(), false),
+        };
+        match ids.binary_search(id) {
+            Ok(_) => {
+                if was_unsorted {
+                    let serialized = serialize_memory_id_list(&ids);
+                    batch.put_cf(cf, term_key.as_slice(), &serialized);
+                }
+            }
+            Err(pos) => {
+                ids.insert(pos, *id);
+                let serialized = serialize_memory_id_list(&ids);
+                batch.put_cf(cf, term_key.as_slice(), &serialized);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Generic helper: remove a fingerprint from an inverted index.
+fn remove_from_inverted_index(
+    db: &rocksdb::DB,
+    cf: &rocksdb::ColumnFamily,
+    batch: &mut WriteBatch,
+    id: &Uuid,
+    term_keys: &[[u8; 2]],
+    cf_name: &'static str,
+) -> TeleologicalStoreResult<()> {
+    let results = db.multi_get_cf(
+        term_keys.iter().map(|k| (cf, k.as_slice()))
+    );
+    for (i, result) in results.into_iter().enumerate() {
+        let term_key = &term_keys[i];
+        if let Some(data) = result.map_err(|e| {
+            TeleologicalStoreError::rocksdb_op("multi_get", cf_name, None, e)
+        })? {
+            let (mut ids, _was_unsorted) = deserialize_sorted_posting_list(&data)?;
+            if let Ok(pos) = ids.binary_search(id) {
+                ids.remove(pos);
+            } else {
+                ids.retain(|&entry_id| entry_id != *id);
+            }
+            if ids.is_empty() {
+                batch.delete_cf(cf, term_key.as_slice());
+            } else {
+                let serialized = serialize_memory_id_list(&ids);
+                batch.put_cf(cf, term_key.as_slice(), &serialized);
+            }
+        }
+    }
+    Ok(())
+}
+
 impl RocksDbTeleologicalStore {
     /// Update the E13 SPLADE inverted index for a fingerprint.
-    ///
-    /// P4: Batch-reads all posting lists via multi_get_cf (was: per-term sequential read).
-    /// This reduces lock hold time from O(terms x posting_list_size) to O(1 batch).
     pub(crate) fn update_splade_inverted_index(
         &self,
         batch: &mut WriteBatch,
         id: &Uuid,
         sparse: &SparseVector,
     ) -> TeleologicalStoreResult<()> {
-        let cf_inverted = self.get_cf(CF_E13_SPLADE_INVERTED)?;
-
-        // P4: Collect all term keys first
+        let cf = self.get_cf(CF_E13_SPLADE_INVERTED)?;
         let term_keys: Vec<[u8; 2]> = sparse.indices.iter()
             .map(|&term_id| e13_splade_inverted_key(term_id))
             .collect();
-
-        // P4: Batch-read all posting lists in one RocksDB call
-        let results = self.db.multi_get_cf(
-            term_keys.iter().map(|k| (cf_inverted, k.as_slice()))
-        );
-
-        // Apply all mutations
-        for (i, result) in results.into_iter().enumerate() {
-            let term_key = &term_keys[i];
-            let existing = result.map_err(|e| {
-                TeleologicalStoreError::rocksdb_op("multi_get", CF_E13_SPLADE_INVERTED, None, e)
-            })?;
-
-            let (mut ids, was_unsorted) = match existing {
-                Some(data) => deserialize_sorted_posting_list(&data)?,
-                None => (Vec::new(), false),
-            };
-
-            match ids.binary_search(id) {
-                Ok(_) => {
-                    if was_unsorted {
-                        let serialized = serialize_memory_id_list(&ids);
-                        batch.put_cf(cf_inverted, term_key.as_slice(), &serialized);
-                    }
-                }
-                Err(pos) => {
-                    ids.insert(pos, *id);
-                    let serialized = serialize_memory_id_list(&ids);
-                    batch.put_cf(cf_inverted, term_key.as_slice(), &serialized);
-                }
-            }
-        }
-
-        Ok(())
+        update_inverted_index(&self.db, cf, batch, id, &term_keys, CF_E13_SPLADE_INVERTED)
     }
 
     /// Remove a fingerprint's terms from the E13 SPLADE inverted index.
-    ///
-    /// P4: Batch-reads all posting lists via multi_get_cf.
     pub(crate) fn remove_from_splade_inverted_index(
         &self,
         batch: &mut WriteBatch,
         id: &Uuid,
         sparse: &SparseVector,
     ) -> TeleologicalStoreResult<()> {
-        let cf_inverted = self.get_cf(CF_E13_SPLADE_INVERTED)?;
-
+        let cf = self.get_cf(CF_E13_SPLADE_INVERTED)?;
         let term_keys: Vec<[u8; 2]> = sparse.indices.iter()
             .map(|&term_id| e13_splade_inverted_key(term_id))
             .collect();
-
-        let results = self.db.multi_get_cf(
-            term_keys.iter().map(|k| (cf_inverted, k.as_slice()))
-        );
-
-        for (i, result) in results.into_iter().enumerate() {
-            let term_key = &term_keys[i];
-            if let Some(data) = result.map_err(|e| {
-                TeleologicalStoreError::rocksdb_op("multi_get", CF_E13_SPLADE_INVERTED, None, e)
-            })? {
-                // M4 FIX (Audit #10): Use deserialize_sorted_posting_list to handle
-                // legacy unsorted lists. Previously used raw deserialize_memory_id_list
-                // which wrote back unsorted data, breaking binary_search in concurrent
-                // update_splade_inverted_index calls.
-                let (mut ids, _was_unsorted) = deserialize_sorted_posting_list(&data)?;
-                if let Ok(pos) = ids.binary_search(id) {
-                    ids.remove(pos);
-                } else {
-                    // ID not found via binary search -- fall back to linear retain
-                    // for safety (legacy data or concurrent modification edge case)
-                    ids.retain(|&entry_id| entry_id != *id);
-                }
-
-                if ids.is_empty() {
-                    batch.delete_cf(cf_inverted, term_key.as_slice());
-                } else {
-                    let serialized = serialize_memory_id_list(&ids);
-                    batch.put_cf(cf_inverted, term_key.as_slice(), &serialized);
-                }
-            }
-        }
-
-        Ok(())
+        remove_from_inverted_index(&self.db, cf, batch, id, &term_keys, CF_E13_SPLADE_INVERTED)
     }
 
     // =========================================================================
@@ -138,96 +144,31 @@ impl RocksDbTeleologicalStore {
     // =========================================================================
 
     /// Update the E6 Sparse inverted index for a fingerprint.
-    ///
-    /// P4: Batch-reads all posting lists via multi_get_cf.
     pub(crate) fn update_e6_sparse_inverted_index(
         &self,
         batch: &mut WriteBatch,
         id: &Uuid,
         sparse: &SparseVector,
     ) -> TeleologicalStoreResult<()> {
-        let cf_inverted = self.get_cf(CF_E6_SPARSE_INVERTED)?;
-
+        let cf = self.get_cf(CF_E6_SPARSE_INVERTED)?;
         let term_keys: Vec<[u8; 2]> = sparse.indices.iter()
             .map(|&term_id| e6_sparse_inverted_key(term_id))
             .collect();
-
-        let results = self.db.multi_get_cf(
-            term_keys.iter().map(|k| (cf_inverted, k.as_slice()))
-        );
-
-        for (i, result) in results.into_iter().enumerate() {
-            let term_key = &term_keys[i];
-            let existing = result.map_err(|e| {
-                TeleologicalStoreError::rocksdb_op("multi_get", CF_E6_SPARSE_INVERTED, None, e)
-            })?;
-
-            let (mut ids, was_unsorted) = match existing {
-                Some(data) => deserialize_sorted_posting_list(&data)?,
-                None => (Vec::new(), false),
-            };
-
-            match ids.binary_search(id) {
-                Ok(_) => {
-                    if was_unsorted {
-                        let serialized = serialize_memory_id_list(&ids);
-                        batch.put_cf(cf_inverted, term_key.as_slice(), &serialized);
-                    }
-                }
-                Err(pos) => {
-                    ids.insert(pos, *id);
-                    let serialized = serialize_memory_id_list(&ids);
-                    batch.put_cf(cf_inverted, term_key.as_slice(), &serialized);
-                }
-            }
-        }
-
-        Ok(())
+        update_inverted_index(&self.db, cf, batch, id, &term_keys, CF_E6_SPARSE_INVERTED)
     }
 
     /// Remove a fingerprint's terms from the E6 sparse inverted index.
-    ///
-    /// P4: Batch-reads all posting lists via multi_get_cf.
     pub(crate) fn remove_from_e6_sparse_inverted_index(
         &self,
         batch: &mut WriteBatch,
         id: &Uuid,
         sparse: &SparseVector,
     ) -> TeleologicalStoreResult<()> {
-        let cf_inverted = self.get_cf(CF_E6_SPARSE_INVERTED)?;
-
+        let cf = self.get_cf(CF_E6_SPARSE_INVERTED)?;
         let term_keys: Vec<[u8; 2]> = sparse.indices.iter()
             .map(|&term_id| e6_sparse_inverted_key(term_id))
             .collect();
-
-        let results = self.db.multi_get_cf(
-            term_keys.iter().map(|k| (cf_inverted, k.as_slice()))
-        );
-
-        for (i, result) in results.into_iter().enumerate() {
-            let term_key = &term_keys[i];
-            if let Some(data) = result.map_err(|e| {
-                TeleologicalStoreError::rocksdb_op("multi_get", CF_E6_SPARSE_INVERTED, None, e)
-            })? {
-                // M4 FIX (Audit #10): Use deserialize_sorted_posting_list to handle
-                // legacy unsorted lists (same fix as E13 SPLADE remove path above).
-                let (mut ids, _was_unsorted) = deserialize_sorted_posting_list(&data)?;
-                if let Ok(pos) = ids.binary_search(id) {
-                    ids.remove(pos);
-                } else {
-                    ids.retain(|&entry_id| entry_id != *id);
-                }
-
-                if ids.is_empty() {
-                    batch.delete_cf(cf_inverted, term_key.as_slice());
-                } else {
-                    let serialized = serialize_memory_id_list(&ids);
-                    batch.put_cf(cf_inverted, term_key.as_slice(), &serialized);
-                }
-            }
-        }
-
-        Ok(())
+        remove_from_inverted_index(&self.db, cf, batch, id, &term_keys, CF_E6_SPARSE_INVERTED)
     }
 
     /// Recall candidates from E6 sparse inverted index.

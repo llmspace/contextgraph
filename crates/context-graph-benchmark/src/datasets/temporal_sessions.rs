@@ -640,7 +640,7 @@ impl SessionGenerator {
             chunks_with_emb.iter().map(|(idx, emb)| (*idx, emb)).collect();
 
         // Verify seed has embedding (required for coherent session)
-        let _seed_emb = idx_to_emb.get(&seed_idx)?;
+        idx_to_emb.get(&seed_idx)?;
 
         // Greedily add nearest neighbors
         while session_indices.len() < target_length {

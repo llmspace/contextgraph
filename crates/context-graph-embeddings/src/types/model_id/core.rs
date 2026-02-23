@@ -165,7 +165,7 @@ impl ModelId {
             Self::Semantic => TokenizerFamily::BertWordpiece, // e5 uses BERT tokenizer
             Self::Causal => TokenizerFamily::BertWordpiece,    // nomic-embed uses BERT tokenizer
             Self::Sparse => TokenizerFamily::BertWordpiece,   // SPLADE uses BERT
-            Self::Code => TokenizerFamily::BertWordpiece,     // Qodo-Embed-1-1.5B uses Qwen2 (BPE) but shares BERT family for caching
+            Self::Code => TokenizerFamily::BertWordpiece,     // Qodo-Embed-1-1.5B uses Qwen2 BPE — mapped to BertWordpiece for enum simplicity (loads its own tokenizer)
             Self::Graph => TokenizerFamily::BertWordpiece,    // MiniLM uses BERT
             Self::Contextual => TokenizerFamily::BertWordpiece, // EMB-1 FIX: e5-base-v2 uses BERT, not CLIP
             Self::Entity => TokenizerFamily::BertWordpiece,   // all-MiniLM uses BERT

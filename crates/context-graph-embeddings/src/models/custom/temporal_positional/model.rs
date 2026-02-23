@@ -352,6 +352,5 @@ impl EmbeddingModel for TemporalPositionalModel {
     }
 }
 
-// Implement Send and Sync explicitly (safe due to AtomicBool usage)
-unsafe impl Send for TemporalPositionalModel {}
-unsafe impl Sync for TemporalPositionalModel {}
+// TemporalPositionalModel is auto-Send+Sync: all fields (f32, usize, AtomicBool, bool)
+// are Send+Sync. No unsafe impl needed.

@@ -1,27 +1,28 @@
 //! Extended column families for teleological fingerprint storage.
 //!
-//! These CFs extend the base 8 CFs defined in ../column_families.rs.
+//! These CFs extend the base 11 CFs defined in ../column_families.rs.
 //!
 //! # FAIL FAST Policy
 //!
 //! All option builders are infallible at construction time. Errors only
 //! occur at DB open time, and those are surfaced by RocksDB itself.
+//!
+//! # Audit-14 STOR-L5 Note on Repetitive CF Option Builders
+//!
+//! This file contains ~25 CF option builder functions that follow similar patterns
+//! (create BlockBasedOptions, set cache/bloom/compression, create Options, apply
+//! write buffer limits). This repetition is **intentional** — each CF has unique
+//! settings (block size, prefix extractor, compression type, point lookup hints)
+//! that must be independently tunable. Extracting a generic builder would either
+//! (a) require a config struct with as many fields as the current code has lines,
+//! or (b) obscure the per-CF tuning behind indirection. The current approach
+//! trades DRY for clarity and independent tunability.
 
 use rocksdb::{BlockBasedOptions, Cache, ColumnFamilyDescriptor, Options, SliceTransform};
 
-/// Apply memory-optimized write buffer settings to CF options.
-///
-/// RocksDB defaults to 64MB write buffer x 2 per CF, which for 51 CFs would
-/// consume ~6.4GB just for write buffers. This function applies sensible limits
-/// based on the expected write volume for each CF.
-///
-/// # Arguments
-/// * `opts` - Mutable reference to CF options to configure
-/// * `write_buffer_mb` - Write buffer size in MB (typically 2-8)
-fn apply_write_buffer_limits(opts: &mut Options, write_buffer_mb: usize) {
-    opts.set_write_buffer_size(write_buffer_mb * 1024 * 1024);
-    opts.set_max_write_buffer_number(2);
-}
+// Audit-14 STOR-L2 FIX: Reuse the canonical apply_write_buffer_limits from the base
+// column_families module instead of duplicating it here.
+use crate::column_families::apply_write_buffer_limits;
 
 /// Column family for ~63KB TeleologicalFingerprints.
 ///

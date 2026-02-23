@@ -9,7 +9,7 @@ use tokenizers::Tokenizer;
 /// Internal state for pretrained model weight management.
 ///
 /// Generic over the weight type `W` so different architectures
-/// (BertWeights, QwenWeights, ClipWeights) can share the same enum.
+/// (BertWeights, QwenWeights, etc.) can share the same enum.
 ///
 /// Models with extra state in their Loaded variant (graph projections,
 /// LoRA trained state, MLM heads) should define their own enum.

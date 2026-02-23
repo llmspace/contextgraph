@@ -64,17 +64,16 @@ pub use pretrained::{
     CausalModel,
     // CodeModel (E7) - Qodo-Embed-1-1.5B (Qwen2-based)
     CodeModel,
+    // ContextualModel (E10) - intfloat/e5-base-v2
+    ContextualModel,
     // EntityModel (E11 legacy) - MiniLM entity (deprecated, use KeplerModel)
     EntityModel,
     // GraphModel (E8) - sentence-transformers/all-MiniLM-L6-v2
     GraphModel,
-    ImageProcessor,
     // KeplerModel (E11) - RoBERTa-base + TransE on Wikidata5M (768D)
     KeplerModel,
     // LateInteractionModel (E12) - ColBERT
     LateInteractionModel,
-    // MultimodalModel (E10) - CLIP
-    MultimodalModel,
     // SemanticModel (E1) - intfloat/e5-large-v2
     SemanticModel,
     // SparseModel (E6) - SPLADE
@@ -84,9 +83,6 @@ pub use pretrained::{
     CAUSAL_DIMENSION,
     CAUSAL_LATENCY_BUDGET_MS,
     CAUSAL_MAX_TOKENS,
-    CLIP_IMAGE_SIZE,
-    CLIP_MEAN,
-    CLIP_STD,
     CODE_LATENCY_BUDGET_MS,
     CODE_MAX_TOKENS,
     CODE_MODEL_NAME,
@@ -110,10 +106,6 @@ pub use pretrained::{
     LATE_INTERACTION_MAX_TOKENS,
     LATE_INTERACTION_MODEL_NAME,
     MAX_CONTEXT_NEIGHBORS,
-    MULTIMODAL_DIMENSION,
-    MULTIMODAL_LATENCY_BUDGET_MS,
-    MULTIMODAL_MAX_TOKENS,
-    MULTIMODAL_MODEL_NAME,
     PASSAGE_PREFIX,
     QUERY_PREFIX,
     SEMANTIC_DIMENSION,

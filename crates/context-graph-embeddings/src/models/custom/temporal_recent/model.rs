@@ -140,9 +140,8 @@ impl Default for TemporalRecentModel {
     }
 }
 
-// Implement Send and Sync explicitly (safe due to AtomicBool usage)
-unsafe impl Send for TemporalRecentModel {}
-unsafe impl Sync for TemporalRecentModel {}
+// TemporalRecentModel is auto-Send+Sync: all fields (Vec<f32>, Option<DateTime<Utc>>,
+// AtomicBool) are Send+Sync. No unsafe impl needed.
 
 #[cfg(test)]
 mod tests {

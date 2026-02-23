@@ -20,7 +20,7 @@
 //! - E6: SparseModel (SPLADE)
 //! - E7: CodeModel (CodeBERT)
 //! - E8: GraphModel (sentence-transformers)
-//! - E10: MultimodalModel (CLIP)
+//! - E10: ContextualModel (intfloat/e5-base-v2)
 //! - E11: EntityModel (MiniLM entity)
 //! - E12: LateInteractionModel (ColBERT)
 //!

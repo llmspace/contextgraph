@@ -324,13 +324,6 @@ impl ArchComplianceValidator {
             "Search strategies: E1Only, MultiSpace, Pipeline",
         ).with_priority(CheckPriority::High);
 
-        // Verify fusion strategies exist
-        let _strategies = [
-            FusionStrategy::E1Only,
-            FusionStrategy::MultiSpace,
-            FusionStrategy::Pipeline,
-        ];
-
         // Default should be E1Only
         let default = FusionStrategy::default();
         if default == FusionStrategy::E1Only {

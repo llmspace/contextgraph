@@ -59,6 +59,35 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     (raw_sim + 1.0) / 2.0
 }
 
+/// Compute raw cosine similarity between two dense vectors.
+///
+/// CORE-M3: Canonical raw cosine implementation returning [-1.0, 1.0].
+/// Use this when raw cosine is needed (e.g., code search, causal chain scoring)
+/// without the SRC-3 normalization to [0, 1] that `cosine_similarity()` applies.
+///
+/// Zero-allocation, NaN-safe, clamped to [-1.0, 1.0].
+pub fn cosine_similarity_raw(a: &[f32], b: &[f32]) -> f32 {
+    if a.is_empty() || b.is_empty() || a.len() != b.len() {
+        return 0.0;
+    }
+
+    let mut dot = 0.0_f32;
+    let mut mag_a_sq = 0.0_f32;
+    let mut mag_b_sq = 0.0_f32;
+
+    for (ai, bi) in a.iter().zip(b.iter()) {
+        dot += ai * bi;
+        mag_a_sq += ai * ai;
+        mag_b_sq += bi * bi;
+    }
+
+    if mag_a_sq == 0.0 || mag_b_sq == 0.0 {
+        return 0.0;
+    }
+
+    (dot / (mag_a_sq.sqrt() * mag_b_sq.sqrt())).clamp(-1.0, 1.0)
+}
+
 /// Compute Jaccard similarity between two sparse vectors.
 ///
 /// Thin wrapper that delegates to SparseVector::jaccard_similarity().
@@ -135,9 +164,9 @@ pub fn max_sim(query_tokens: &[Vec<f32>], memory_tokens: &[Vec<f32>]) -> f32 {
 /// NOT for general entity-entity similarity. For general E11 similarity,
 /// use `cosine_similarity()` instead.
 ///
-/// This function is used by:
-/// - `infer_relationship` MCP tool (computing predicted relation vectors)
-/// - `validate_knowledge` MCP tool (scoring (subject, predicate, object) triples)
+/// CORE-L3: This function is currently only used by unit tests in this module.
+/// It is re-exported as public API for potential use by TransE-based entity
+/// relationship scoring (e.g., `infer_relationship`, `validate_knowledge`).
 ///
 /// # Returns
 /// Similarity in (0.0, 1.0] where 1.0 = identical vectors (distance = 0)
