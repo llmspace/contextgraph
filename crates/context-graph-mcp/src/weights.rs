@@ -9,19 +9,30 @@ use context_graph_core::types::fingerprint::NUM_EMBEDDERS;
 #[cfg(test)]
 pub use context_graph_core::weights::space_name;
 
-/// Get weight profile by name.
+// Re-export E11 toggle and disable helper so MCP handlers can gate transparency display
+// and apply E11 disable to custom weights / custom profiles.
+pub use context_graph_core::weights::{E11_ENTITY_ENABLED, apply_e11_disable};
+
+/// Get raw weight profile by name (without E11 disable applied).
 ///
-/// # Arguments
-/// * `name` - Profile name (e.g., "semantic_search", "code_search")
-///
-/// # Returns
-/// The 13-element weight array if found.
-///
-/// # Errors
-/// Returns error string if profile name is not found — FAIL FAST, no silent fallback.
-/// Audit-11 MCP-H3 FIX: Returns Result instead of Option to propagate error details.
+/// Used only in tests. Production code should use `get_effective_weight_profile`
+/// which applies E11 disable when `E11_ENTITY_ENABLED=false`.
+#[cfg(test)]
 pub fn get_weight_profile(name: &str) -> Result<[f32; NUM_EMBEDDERS], String> {
     context_graph_core::weights::get_weight_profile(name).map_err(|e| {
+        let msg = format!("Weight profile '{}' lookup failed: {}", name, e);
+        tracing::error!(profile = %name, error = %e, "Weight profile lookup failed — FAIL FAST");
+        msg
+    })
+}
+
+/// Get weight profile with E11 disable applied (if E11_ENTITY_ENABLED=false).
+///
+/// Mirrors `get_effective_weight_profile` in the core crate. Use this for any
+/// user-facing weight display (searchTransparency) so the shown weights match
+/// what the storage layer actually uses in fusion.
+pub fn get_effective_weight_profile(name: &str) -> Result<[f32; NUM_EMBEDDERS], String> {
+    context_graph_core::weights::get_effective_weight_profile(name).map_err(|e| {
         let msg = format!("Weight profile '{}' lookup failed: {}", name, e);
         tracing::error!(profile = %name, error = %e, "Weight profile lookup failed — FAIL FAST");
         msg

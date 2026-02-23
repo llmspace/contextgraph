@@ -76,7 +76,10 @@ use super::types::TeleologicalStoreError;
 
 use context_graph_core::code::CodeQueryType;
 use context_graph_core::types::fingerprint::TeleologicalFingerprint;
-use context_graph_core::weights::{get_weight_profile, validate_weights};
+use context_graph_core::weights::{
+    get_effective_weight_profile, apply_e11_disable,
+    validate_weights, E11_ENTITY_ENABLED,
+};
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -684,25 +687,28 @@ fn search_multi_space_sync(
     }
 
     // E11 Entity (KEPLER entity embeddings, 768D HNSW)
-    if let Some(e11_index) = index_registry.get(EmbedderIndex::E11Entity) {
-        match e11_index.search(&query.e11_entity, k, None) {
-            Ok(e11_candidates) => {
-                let e11_ranked: Vec<(Uuid, f32)> = e11_candidates
-                    .into_iter()
-                    .filter(|(id, _)| options.include_deleted || !is_soft_deleted_sync(soft_deleted, id))
-                    .map(|(id, dist)| (id, hnsw_distance_to_similarity(dist)))
-                    .collect();
+    // Guarded by E11_ENTITY_ENABLED: KEPLER produces non-discriminating vectors (0.96-0.98 cosine)
+    if E11_ENTITY_ENABLED {
+        if let Some(e11_index) = index_registry.get(EmbedderIndex::E11Entity) {
+            match e11_index.search(&query.e11_entity, k, None) {
+                Ok(e11_candidates) => {
+                    let e11_ranked: Vec<(Uuid, f32)> = e11_candidates
+                        .into_iter()
+                        .filter(|(id, _)| options.include_deleted || !is_soft_deleted_sync(soft_deleted, id))
+                        .map(|(id, dist)| (id, hnsw_distance_to_similarity(dist)))
+                        .collect();
 
-                if !e11_ranked.is_empty() && weights[10] > 0.0 {
-                    embedder_rankings.push(EmbedderRanking::new("E11", weights[10], e11_ranked));
+                    if !e11_ranked.is_empty() && weights[10] > 0.0 {
+                        embedder_rankings.push(EmbedderRanking::new("E11", weights[10], e11_ranked));
+                    }
                 }
-            }
-            Err(e) => {
-                degraded_embedders.push("E11");
-                error!(
-                    error = %e,
-                    "E11 HNSW search failed in multi-space — degraded results"
-                );
+                Err(e) => {
+                    degraded_embedders.push("E11");
+                    error!(
+                        error = %e,
+                        "E11 HNSW search failed in multi-space — degraded results"
+                    );
+                }
             }
         }
     }
@@ -912,15 +918,18 @@ fn search_pipeline_sync(
     }
 
     // E11 Entity (KEPLER entity embeddings)
-    if let Some(e11_index) = index_registry.get(EmbedderIndex::E11Entity) {
-        match e11_index.search(&query.e11_entity, recall_k / 2, None) {
-            Ok(e11_candidates) => {
-                let e11_count = e11_candidates.len();
-                candidate_ids.extend(e11_candidates.into_iter().map(|(id, _)| id));
-                debug!("Stage 1: E11 Entity returned {} additional candidates", e11_count);
-            }
-            Err(e) => {
-                warn!("Stage 1: E11 Entity search failed: {}, continuing without E11 candidates", e);
+    // Guarded by E11_ENTITY_ENABLED: KEPLER produces non-discriminating vectors (0.96-0.98 cosine)
+    if E11_ENTITY_ENABLED {
+        if let Some(e11_index) = index_registry.get(EmbedderIndex::E11Entity) {
+            match e11_index.search(&query.e11_entity, recall_k / 2, None) {
+                Ok(e11_candidates) => {
+                    let e11_count = e11_candidates.len();
+                    candidate_ids.extend(e11_candidates.into_iter().map(|(id, _)| id));
+                    debug!("Stage 1: E11 Entity returned {} additional candidates", e11_count);
+                }
+                Err(e) => {
+                    warn!("Stage 1: E11 Entity search failed: {}, continuing without E11 candidates", e);
+                }
             }
         }
     }
@@ -1152,7 +1161,7 @@ fn resolve_weights_sync(options: &TeleologicalSearchOptions) -> CoreResult<[f32;
     } else {
         match &options.weight_profile {
             Some(profile_name) => {
-                let weights = get_weight_profile(profile_name).map_err(|e| {
+                let weights = get_effective_weight_profile(profile_name).map_err(|e| {
                     error!(
                         profile = %profile_name,
                         error = %e,
@@ -1172,6 +1181,11 @@ fn resolve_weights_sync(options: &TeleologicalSearchOptions) -> CoreResult<[f32;
             }
         }
     };
+
+    // Apply E11 disable to ALL weight sources (custom, named, default)
+    if !E11_ENTITY_ENABLED {
+        apply_e11_disable(&mut weights);
+    }
 
     // Step 2: Apply embedder exclusions (zero out + renormalize)
     if !options.exclude_embedders.is_empty() {
@@ -1293,25 +1307,31 @@ fn search_sparse_sync(
 /// SEARCH-3: Kept in sync with the "semantic_search" named profile in
 /// `context_graph_core::weights::WEIGHT_PROFILES`. Any changes there must
 /// be mirrored here to avoid silent weight divergence.
+///
+/// NOTE: E11 weight is manually redistributed here for E11_ENTITY_ENABLED=false.
+/// When re-enabling E11 (setting E11_ENTITY_ENABLED=true), restore E11=0.05 and
+/// revert the [+0.0X from E11] adjustments on E1/E5/E7/E10 to match the
+/// "semantic_search" named profile.
+///
 /// Sum of non-zero weights = 1.0
 /// E2-E4 (temporal) = 0.0 per research
 const DEFAULT_SEMANTIC_WEIGHTS: [f32; 13] = [
-    0.33, // E1 - Semantic (primary)
+    0.35, // E1 - Semantic (primary) [+0.02 from E11]
     0.0,  // E2 - Temporal Recent (metadata only)
     0.0,  // E3 - Temporal Periodic (metadata only)
     0.0,  // E4 - Temporal Positional (metadata only)
-    0.15, // E5 - Causal
+    0.16, // E5 - Causal [+0.01 from E11]
     // MED-16: E6 (keyword/sparse) only participates in fusion SCORING, not candidate
     // retrieval. E6 is not HNSW-indexed (see get_query_vector_for_embedder returning None
     // for idx=5). In MultiSpace, E6 scores are computed post-retrieval via cosine similarity
     // of stored sparse vectors. For sparse CANDIDATE RECALL, use Pipeline strategy which
     // uses E13 SPLADE for sparse-aware first-stage retrieval.
     0.05, // E6 - Sparse (keyword scoring only, not candidate retrieval)
-    0.20, // E7 - Code
+    0.21, // E7 - Code [+0.01 from E11]
     0.05, // E8 - Graph (relational)
     0.02, // E9 - HDC (noise-robust backup for typo tolerance)
-    0.15, // E10 - Multimodal
-    0.05, // E11 - Entity (relational)
+    0.16, // E10 - Multimodal [+0.01 from E11]
+    0.0,  // E11 - Entity (KEPLER disabled: non-discriminating 0.96-0.98 cosine)
     0.0,  // E12 - Late Interaction (used in Stage 3 rerank only)
     0.0,  // E13 - SPLADE (used in Stage 1 recall only)
 ];

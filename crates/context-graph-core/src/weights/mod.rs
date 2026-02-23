@@ -27,6 +27,11 @@
 
 use crate::types::fingerprint::NUM_EMBEDDERS;
 
+/// Whether E11 Entity (KEPLER) participates in search/fusion.
+/// KEPLER produces near-identical vectors for all inputs (0.96-0.98 cosine).
+/// Set to `true` and rebuild to re-enable when loading custom entity embeddings.
+pub const E11_ENTITY_ENABLED: bool = false;
+
 /// Weight profile error types.
 ///
 /// Provides detailed context for FAIL FAST error handling.
@@ -443,6 +448,40 @@ pub fn get_profile_names() -> Vec<&'static str> {
     WEIGHT_PROFILES.iter().map(|(n, _)| *n).collect()
 }
 
+/// Get weight profile with E11 disable applied when `E11_ENTITY_ENABLED` is false.
+///
+/// This is the preferred entry point for production search code. It returns the
+/// same weights as `get_weight_profile` but with E11's weight redistributed to
+/// remaining active embedders when E11 is disabled.
+pub fn get_effective_weight_profile(name: &str) -> Result<[f32; NUM_EMBEDDERS], WeightProfileError> {
+    let mut weights = get_weight_profile(name)?;
+    if !E11_ENTITY_ENABLED {
+        apply_e11_disable(&mut weights);
+    }
+    Ok(weights)
+}
+
+/// Zero out E11 weight and redistribute proportionally to remaining active embedders.
+///
+/// After redistribution, the weights still sum to ~1.0.
+pub fn apply_e11_disable(weights: &mut [f32; NUM_EMBEDDERS]) {
+    const E11_IDX: usize = 10;
+    let e11_weight = weights[E11_IDX];
+    if e11_weight <= 0.0 {
+        return;
+    }
+    weights[E11_IDX] = 0.0;
+    let remaining_sum: f32 = weights.iter().sum();
+    if remaining_sum > 0.0 {
+        let scale = (remaining_sum + e11_weight) / remaining_sum;
+        for w in weights.iter_mut() {
+            if *w > 0.0 {
+                *w *= scale;
+            }
+        }
+    }
+}
+
 /// Validate that weights sum to ~1.0 and all are in [0.0, 1.0].
 ///
 /// # FAIL FAST
@@ -646,5 +685,62 @@ mod tests {
         assert!(names.contains(&"causal_reasoning"));
         assert!(names.contains(&"graph_reasoning"));
         println!("[VERIFIED] get_profile_names returns {} profiles", names.len());
+    }
+
+    #[test]
+    fn test_e11_disabled_profiles_sum_to_one() {
+        for (name, _) in WEIGHT_PROFILES {
+            let weights = get_effective_weight_profile(name).unwrap();
+            let sum: f32 = weights.iter().sum();
+            assert!(
+                (sum - 1.0).abs() < 0.02,
+                "Effective profile '{}' sums to {} (expected ~1.0)",
+                name,
+                sum
+            );
+            if !E11_ENTITY_ENABLED {
+                assert!(
+                    weights[10] == 0.0,
+                    "E11 weight should be 0.0 when disabled, got {} for '{}'",
+                    weights[10],
+                    name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_apply_e11_disable_redistributes() {
+        let mut weights = [0.0f32; NUM_EMBEDDERS];
+        weights[0] = 0.5;  // E1
+        weights[6] = 0.3;  // E7
+        weights[10] = 0.2; // E11
+        let original_sum: f32 = weights.iter().sum();
+
+        apply_e11_disable(&mut weights);
+
+        assert_eq!(weights[10], 0.0, "E11 should be zeroed");
+        let new_sum: f32 = weights.iter().sum();
+        assert!(
+            (new_sum - original_sum).abs() < 0.01,
+            "Sum should be preserved: was {}, now {}",
+            original_sum,
+            new_sum
+        );
+        assert!(weights[0] > 0.5, "E1 should receive redistributed weight");
+        assert!(weights[6] > 0.3, "E7 should receive redistributed weight");
+    }
+
+    #[test]
+    fn test_apply_e11_disable_noop_when_zero() {
+        let mut weights = [0.0f32; NUM_EMBEDDERS];
+        weights[0] = 0.6;
+        weights[6] = 0.4;
+        // E11 is already 0.0
+        let original = weights;
+
+        apply_e11_disable(&mut weights);
+
+        assert_eq!(weights, original, "Should be no-op when E11 is already 0.0");
     }
 }

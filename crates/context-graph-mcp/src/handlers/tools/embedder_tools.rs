@@ -191,7 +191,8 @@ impl Handlers {
                         e2: s[1],
                         e3: s[2],
                         e4: s[3],
-                        e5: s[4],
+                        // E5 sentinel (-1.0) = no causal direction detected
+                        e5: if s[4] < 0.0 { None } else { Some(s[4]) },
                         e6: s[5],
                         e7: s[6],
                         e8: s[7],

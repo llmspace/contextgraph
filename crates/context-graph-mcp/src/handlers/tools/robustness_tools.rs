@@ -251,7 +251,11 @@ impl Handlers {
             discoveries_count
         );
 
-        // Step 5: Combine E1 results + E9 discoveries
+        // Step 5: Combine E1 results + E9 discoveries with reserved slots
+        // Reserve slots for E9 discoveries so E1 doesn't fill all topK slots
+        let reserved_e9_slots = std::cmp::min(2, top_k / 3).max(1);
+        let e1_max_slots = top_k.saturating_sub(reserved_e9_slots);
+
         // Start with E1's top results (sorted by E1 score)
         let mut e1_results_sorted: Vec<(Uuid, f32)> = e1_candidates
             .iter()
@@ -262,30 +266,44 @@ impl Handlers {
             .collect();
         e1_results_sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        // Take top E1 results that aren't blind spots
+        // Take top E1 results (capped at e1_max_slots), excluding blind spots
         let e1_result_ids: Vec<Uuid> = e1_results_sorted
             .iter()
             .filter(|(id, score)| !blind_spot_ids.contains(id) && *score >= min_score)
-            .take(top_k)
+            .take(e1_max_slots)
             .map(|(id, _)| *id)
             .collect();
 
-        // Calculate how many slots remain for E9 discoveries
-        let e1_count = e1_result_ids.len();
-        let e9_slots = top_k.saturating_sub(e1_count);
-
-        // Take top E9 discoveries
+        // Take top E9 discoveries into their reserved slots
         let e9_discovery_ids: Vec<Uuid> = blind_spot_candidates
             .iter()
             .filter(|c| c.e9_score >= min_score)
-            .take(e9_slots)
+            .take(reserved_e9_slots)
             .map(|c| c.memory_id)
             .collect();
 
-        // Combine for content retrieval
+        // If E9 has fewer discoveries than reserved, let E1 backfill remaining slots
+        let e1_backfill_count = reserved_e9_slots.saturating_sub(e9_discovery_ids.len());
+        let e1_backfill_ids: Vec<Uuid> = if e1_backfill_count > 0 {
+            e1_results_sorted
+                .iter()
+                .filter(|(id, score)| {
+                    !blind_spot_ids.contains(id)
+                        && *score >= min_score
+                        && !e1_result_ids.contains(id)
+                })
+                .take(e1_backfill_count)
+                .map(|(id, _)| *id)
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        // Combine: E1 primary + E9 discoveries + E1 backfill
         let all_result_ids: Vec<Uuid> = e1_result_ids
             .iter()
             .chain(e9_discovery_ids.iter())
+            .chain(e1_backfill_ids.iter())
             .copied()
             .collect();
 
@@ -417,12 +435,49 @@ impl Handlers {
             });
         }
 
+        // Build E1 backfill results (when E9 had fewer discoveries than reserved slots)
+        let backfill_offset = e1_result_ids.len() + e9_discovery_ids.len();
+        for (j, &mem_id) in e1_backfill_ids.iter().enumerate() {
+            let i = backfill_offset + j;
+            let e1_score = *e1_scores.get(&mem_id).unwrap_or(&0.0);
+            let e9_score = *e9_scores.get(&mem_id).unwrap_or(&0.0);
+
+            let provenance = source_metadata.get(i).and_then(|m| {
+                m.as_ref().map(|meta| RobustSourceInfo {
+                    source_type: format!("{}", meta.source_type),
+                    file_path: meta.file_path.clone(),
+                    hook_type: meta.hook_type.clone(),
+                    tool_name: meta.tool_name.clone(),
+                })
+            });
+
+            results.push(RobustSearchResult {
+                memory_id: mem_id,
+                score: e1_score,
+                source: ResultSource::E1,
+                e9_score: if request.include_e9_score {
+                    Some(e9_score)
+                } else {
+                    None
+                },
+                e1_score: if request.include_e9_score {
+                    Some(e1_score)
+                } else {
+                    None
+                },
+                divergence: None,
+                discovery_reason: None,
+                content: contents.get(i).and_then(|c| c.clone()),
+                provenance,
+            });
+        }
+
         let response = SearchRobustResponse {
             query: query.clone(),
             count: results.len(),
             results,
             metadata: RobustSearchMetadata {
-                e1_results_count: e1_result_ids.len(),
+                e1_results_count: e1_result_ids.len() + e1_backfill_ids.len(),
                 e9_discoveries_count: e9_discovery_ids.len(),
                 blind_spots_found: e9_discovery_ids.clone(),
                 e1_candidates_evaluated: e1_candidates_count,
@@ -470,7 +525,7 @@ mod tests {
     #[allow(clippy::assertions_on_constants)]
     fn test_threshold_constants() {
         assert!(E9_DISCOVERY_THRESHOLD < E1_WEAKNESS_THRESHOLD);
-        assert!(E9_DISCOVERY_THRESHOLD >= 0.1);
+        assert!(E9_DISCOVERY_THRESHOLD >= 0.05, "E9 threshold should be at least 0.05 to filter noise");
         assert!(E1_WEAKNESS_THRESHOLD <= 0.6);
     }
 }

@@ -38,7 +38,7 @@ use context_graph_core::traits::{EmbeddingMetadata, SearchStrategy, Teleological
 use context_graph_core::types::fingerprint::{SemanticFingerprint, TeleologicalFingerprint, NUM_EMBEDDERS};
 use context_graph_core::types::{SourceMetadata, SourceType};
 
-use crate::weights::get_weight_profile;
+use crate::weights::{get_effective_weight_profile, apply_e11_disable, E11_ENTITY_ENABLED};
 
 use crate::protocol::JsonRpcId;
 use crate::protocol::JsonRpcResponse;
@@ -1251,7 +1251,7 @@ impl Handlers {
                     // Audit-11 MCP-H3: get_weight_profile now returns Result, propagate errors.
                     match self.custom_profiles.read().get(profile_name).copied() {
                         Some(weights) => weights,
-                        None => match get_weight_profile(profile_name) {
+                        None => match get_effective_weight_profile(profile_name) {
                             Ok(weights) => weights,
                             Err(e) => {
                                 return self.tool_error_typed(
@@ -1268,9 +1268,17 @@ impl Handlers {
                 } else {
                     // WEIGHT-1 FIX: Use semantic_search profile (matches DEFAULT_SEMANTIC_WEIGHTS
                     // used in actual search). Was [1/13; 13] which showed misleading 46% utilization.
-                    get_weight_profile("semantic_search")
+                    get_effective_weight_profile("semantic_search")
                         .expect("semantic_search profile must exist")
                 };
+
+                // Apply E11 disable to resolved weights for display consistency.
+                // get_effective_weight_profile already handles this, but custom weights
+                // and custom profiles bypass it, so apply unconditionally.
+                let mut resolved_weights = resolved_weights;
+                if !E11_ENTITY_ENABLED {
+                    apply_e11_disable(&mut resolved_weights);
+                }
 
                 // LOW-16: Removed dead `query_analysis: Option<QueryClassification> = None`.
                 // The field was always None and the schema advertised a perpetually null
@@ -1543,11 +1551,30 @@ impl Handlers {
                     // resolved_weights already has exclusions applied by resolve_weights_sync(),
                     // so no need to re-apply exclude_embedders here.
 
-                    // Active embedders depend on search strategy, filtered by exclusions
+                    // Active embedders depend on search strategy, filtered by exclusions.
+                    // E11 is conditionally included based on E11_ENTITY_ENABLED toggle.
                     let (strategy_indices, strategy_label) = match strategy {
                         SearchStrategy::E1Only => (vec![0usize], "E1 HNSW only"),
-                        SearchStrategy::MultiSpace => (vec![0, 4, 6, 7, 9, 10], "E1+E5+E7+E8+E10+E11 RRF fusion"),
-                        SearchStrategy::Pipeline => (vec![0, 4, 6, 7, 9, 10], "E13+E1+E5+E7+E8+E11 recall → 6-embedder RRF scoring"),
+                        SearchStrategy::MultiSpace => {
+                            let mut indices = vec![0, 4, 6, 7, 9];
+                            let label = if E11_ENTITY_ENABLED {
+                                indices.push(10);
+                                "E1+E5+E7+E8+E10+E11 RRF fusion"
+                            } else {
+                                "E1+E5+E7+E8+E10 RRF fusion (E11 disabled)"
+                            };
+                            (indices, label)
+                        }
+                        SearchStrategy::Pipeline => {
+                            let mut indices = vec![0, 4, 6, 7, 9];
+                            let label = if E11_ENTITY_ENABLED {
+                                indices.push(10);
+                                "E13+E1+E5+E7+E8+E11 recall → 6-embedder RRF scoring"
+                            } else {
+                                "E13+E1+E5+E7+E8 recall → 5-embedder RRF scoring (E11 disabled)"
+                            };
+                            (indices, label)
+                        }
                     };
                     let active_indices: Vec<usize> = strategy_indices.into_iter()
                         .filter(|idx| resolved_weights[*idx] > 0.0)
@@ -1625,9 +1652,10 @@ use context_graph_core::traits::TeleologicalSearchResult;
 ///
 /// # Returns
 /// E5 weight (index 4) from the profile, or 0.10 if profile not found.
-/// Audit-11 MCP-H3: Now uses Result-based get_weight_profile.
+/// Audit-11 MCP-H3: Now uses Result-based get_effective_weight_profile.
+/// Uses effective profile so E5 weight reflects E11 redistribution.
 fn get_e5_causal_weight(profile_name: &str) -> f32 {
-    get_weight_profile(profile_name)
+    get_effective_weight_profile(profile_name)
         .map(|weights| weights[4]) // E5 is at index 4
         .unwrap_or_else(|e| {
             tracing::warn!(profile = %profile_name, error = %e, "Weight profile not found, using default E5 weight 0.10");
@@ -2114,21 +2142,27 @@ fn build_embedder_scores_json(embedder_scores: &[f32; 13]) -> serde_json::Value 
 
     for &(idx, name, category, _) in &EMBEDDER_INFO {
         let score = embedder_scores[idx];
-        let entry = serde_json::Number::from_f64(score as f64)
-            .unwrap_or_else(|| serde_json::Number::from(0));
+        // E5 sentinel (-1.0) means no causal direction detected — show as null
+        let entry = if score < 0.0 {
+            serde_json::Value::Null
+        } else {
+            serde_json::Number::from_f64(score as f64)
+                .map(serde_json::Value::Number)
+                .unwrap_or(serde_json::Value::from(0))
+        };
 
         match category {
             "FOUNDATION" | "SEMANTIC" => {
-                semantic.insert(name.to_string(), serde_json::Value::Number(entry));
+                semantic.insert(name.to_string(), entry);
             }
             "RELATIONAL" => {
-                relational.insert(name.to_string(), serde_json::Value::Number(entry));
+                relational.insert(name.to_string(), entry);
             }
             "STRUCTURAL" => {
-                structural.insert(name.to_string(), serde_json::Value::Number(entry));
+                structural.insert(name.to_string(), entry);
             }
             "TEMPORAL" => {
-                temporal.insert(name.to_string(), serde_json::Value::Number(entry));
+                temporal.insert(name.to_string(), entry);
             }
             unknown => {
                 warn!(category = %unknown, "Unknown weight category '{}' — not included in breakdown", unknown);
@@ -2164,6 +2198,11 @@ fn compute_navigation_hints(embedder_scores: &[f32; 13]) -> Vec<String> {
     let e8 = embedder_scores[7];
     let e10 = embedder_scores[9];
     let e11 = embedder_scores[10];
+
+    // E5 sentinel: no causal direction detected
+    if e5 < 0.0 {
+        hints.push("E5 (causal): no signal — use causalDirection param for causal queries".to_string());
+    }
 
     // Suggest based on what's strong vs weak
     if e7 > e1 + 0.2 {
@@ -2215,9 +2254,11 @@ mod tests {
         assert!((demoted - 0.80 * causal_gate::NON_CAUSAL_DEMOTION).abs() < 1e-6);
         assert!((apply_causal_gate(0.80, 0.99, false) - 0.80).abs() < 1e-6);
         assert!((apply_causal_gate(0.80, 0.02, true) - 0.80).abs() < 1e-6);
-        // E5 weight profiles
-        assert!((get_e5_causal_weight("causal_reasoning") - 0.10).abs() < 0.01);
-        assert!((get_e5_causal_weight("semantic_search") - 0.15).abs() < 0.01);
+        // E5 weight profiles (effective weights: E11 redistribution bumps E5 slightly)
+        // causal_reasoning: raw E5=0.10, E11=0.10 → effective E5 ≈ 0.111
+        // semantic_search:  raw E5=0.15, E11=0.05 → effective E5 ≈ 0.158
+        assert!((get_e5_causal_weight("causal_reasoning") - 0.111).abs() < 0.02);
+        assert!((get_e5_causal_weight("semantic_search") - 0.158).abs() < 0.02);
         // Direction modifiers
         assert_eq!(direction_mod::CAUSE_TO_EFFECT, 1.2);
         assert_eq!(direction_mod::EFFECT_TO_CAUSE, 0.8);

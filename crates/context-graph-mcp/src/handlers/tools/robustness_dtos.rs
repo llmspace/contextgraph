@@ -47,8 +47,9 @@ pub const DEFAULT_MIN_ROBUST_SCORE: f32 = 0.1;
 ///
 /// NOTE: The projected E9 vectors (1024D) have lower cosine similarity than
 /// native Hamming similarity (10K bits). A native similarity of 0.58 maps to
-/// projected cosine of ~0.16. This threshold is calibrated for projected vectors.
-pub const E9_DISCOVERY_THRESHOLD: f32 = 0.15;
+/// projected cosine of ~0.12-0.14. This threshold is calibrated for projected
+/// vectors — 0.08 captures genuine E9 discoveries while filtering noise.
+pub const E9_DISCOVERY_THRESHOLD: f32 = 0.08;
 
 /// Maximum E1 score for a result to be considered "missed" by E1.
 /// If E1 would have found it (score >= this), it's not a blind spot.

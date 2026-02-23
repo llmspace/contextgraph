@@ -28,7 +28,7 @@ use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use context_graph_core::graph_linking::GraphLinkEdgeType;
-use context_graph_core::weights::get_weight_profile;
+use context_graph_core::weights::get_effective_weight_profile;
 
 use crate::protocol::JsonRpcId;
 use crate::protocol::JsonRpcResponse;
@@ -933,7 +933,7 @@ impl Handlers {
             }
             w
         } else {
-            match get_weight_profile(weight_profile) {
+            match get_effective_weight_profile(weight_profile) {
                 Ok(w) => w,
                 Err(e) => {
                     error!(error = %e, "get_unified_neighbors: Invalid weight profile");

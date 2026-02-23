@@ -300,7 +300,9 @@ pub struct AllEmbedderScores {
     pub e2: f32,
     pub e3: f32,
     pub e4: f32,
-    pub e5: f32,
+    /// E5 causal score. None when no causal direction detected (sentinel -1.0).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub e5: Option<f32>,
     pub e6: f32,
     pub e7: f32,
     pub e8: f32,
