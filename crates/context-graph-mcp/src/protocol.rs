@@ -74,7 +74,6 @@ impl JsonRpcResponse {
 /// JSON-RPC error codes.
 ///
 /// Standard JSON-RPC 2.0 codes plus Context Graph specific codes.
-#[allow(dead_code)]
 pub mod error_codes {
     // Standard JSON-RPC 2.0 error codes
     pub const PARSE_ERROR: i32 = -32700;
@@ -84,24 +83,31 @@ pub mod error_codes {
     pub const INTERNAL_ERROR: i32 = -32603;
 
     // Context Graph specific error codes (-32001 to -32099)
+    #[allow(dead_code)] // Protocol-defined; used in tests, reserved for future handlers
     pub const FEATURE_DISABLED: i32 = -32001;
     pub const NODE_NOT_FOUND: i32 = -32002;
     pub const STORAGE_ERROR: i32 = -32004;
+    #[allow(dead_code)] // Protocol-defined; used in tests, reserved for future handlers
     pub const EMBEDDING_ERROR: i32 = -32005;
     pub const TOOL_NOT_FOUND: i32 = -32006;
     pub const LAYER_TIMEOUT: i32 = -32007;
 
     /// Insufficient memories for topic detection (< min_cluster_size)
+    #[allow(dead_code)] // D-L14: used in tests only
     pub const INSUFFICIENT_MEMORIES: i32 = -32021;
 
     // TCP Transport error codes (-32110 to -32119) - TASK-INTEG-018
     /// TCP bind failed - address/port unavailable or permission denied
+    #[allow(dead_code)] // D-L15: protocol-defined, used in tests, pending full TCP transport
     pub const TCP_BIND_FAILED: i32 = -32110;
     /// TCP connection error - stream read/write failed, client disconnected
+    #[allow(dead_code)] // D-L15: protocol-defined, used in tests, pending full TCP transport
     pub const TCP_CONNECTION_ERROR: i32 = -32111;
     /// Maximum concurrent TCP connections reached
+    #[allow(dead_code)] // D-L15: protocol-defined, used in tests, pending full TCP transport
     pub const TCP_MAX_CONNECTIONS_REACHED: i32 = -32112;
     /// TCP frame error - invalid NDJSON framing, message too large
+    #[allow(dead_code)] // D-L15: protocol-defined, used in tests, pending full TCP transport
     pub const TCP_FRAME_ERROR: i32 = -32113;
     /// TCP client timeout - request processing exceeded request_timeout
     pub const TCP_CLIENT_TIMEOUT: i32 = -32114;
