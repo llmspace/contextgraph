@@ -260,17 +260,24 @@ impl MemoryStore {
         // Update session index (read-modify-write under lock)
         let session_key = memory.session_id.as_bytes();
         let mut session_ids: Vec<Uuid> = match self.db.get_cf(cf_session_index, session_key) {
-            Ok(Some(bytes)) => bincode::deserialize(&bytes).map_err(|e| {
-                error!(
-                    session_id = %memory.session_id,
-                    error = %e,
-                    "Failed to deserialize session index"
-                );
-                StorageError::SerializationFailed(format!(
-                    "session_index for '{}': {}",
-                    memory.session_id, e
-                ))
-            })?,
+            Ok(Some(bytes)) => {
+                let mut ids: Vec<Uuid> = bincode::deserialize(&bytes).map_err(|e| {
+                    error!(
+                        session_id = %memory.session_id,
+                        error = %e,
+                        "Failed to deserialize session index"
+                    );
+                    StorageError::SerializationFailed(format!(
+                        "session_index for '{}': {}",
+                        memory.session_id, e
+                    ))
+                })?;
+                // Legacy data may be unsorted (built with push()). Sort + dedup
+                // once on read so binary_search works correctly.
+                ids.sort_unstable();
+                ids.dedup();
+                ids
+            }
             Ok(None) => Vec::new(),
             Err(e) => {
                 error!(
@@ -285,15 +292,22 @@ impl MemoryStore {
             }
         };
 
-        if !session_ids.contains(&memory.id) {
-            session_ids.push(memory.id);
-            let index_bytes = bincode::serialize(&session_ids).map_err(|e| {
-                StorageError::SerializationFailed(format!(
-                    "session_index for '{}': {}",
-                    memory.session_id, e
-                ))
-            })?;
-            batch.put_cf(cf_session_index, session_key, &index_bytes);
+        match session_ids.binary_search(&memory.id) {
+            Ok(_) => {} // already present
+            Err(pos) => {
+                session_ids.insert(pos, memory.id);
+                // Evict lowest-sorted entries when cap exceeded (bounds memory)
+                if session_ids.len() > 100_000 {
+                    session_ids.drain(..session_ids.len() - 100_000);
+                }
+                let index_bytes = bincode::serialize(&session_ids).map_err(|e| {
+                    StorageError::SerializationFailed(format!(
+                        "session_index for '{}': {}",
+                        memory.session_id, e
+                    ))
+                })?;
+                batch.put_cf(cf_session_index, session_key, &index_bytes);
+            }
         }
 
         // Update file index for MDFileChunk sources (also in same batch + lock)

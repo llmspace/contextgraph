@@ -9,6 +9,20 @@
 
 use rocksdb::{BlockBasedOptions, Cache, ColumnFamilyDescriptor, Options, SliceTransform};
 
+/// Apply memory-optimized write buffer settings to CF options.
+///
+/// RocksDB defaults to 64MB write buffer x 2 per CF, which for 51 CFs would
+/// consume ~6.4GB just for write buffers. This function applies sensible limits
+/// based on the expected write volume for each CF.
+///
+/// # Arguments
+/// * `opts` - Mutable reference to CF options to configure
+/// * `write_buffer_mb` - Write buffer size in MB (typically 2-8)
+fn apply_write_buffer_limits(opts: &mut Options, write_buffer_mb: usize) {
+    opts.set_write_buffer_size(write_buffer_mb * 1024 * 1024);
+    opts.set_max_write_buffer_number(2);
+}
+
 /// Column family for ~63KB TeleologicalFingerprints.
 ///
 /// Each fingerprint contains:
@@ -452,6 +466,7 @@ pub fn fingerprint_cf_options(cache: &Cache) -> Options {
     let mut opts = Options::default();
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    apply_write_buffer_limits(&mut opts, 8); // 63KB values — needs larger buffer
     opts.create_if_missing(true);
     // FAIL FAST: No fallback options - let RocksDB error on open if misconfigured
     opts
@@ -474,6 +489,7 @@ pub fn topic_profile_cf_options(cache: &Cache) -> Options {
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::None); // 52 bytes, compression overhead not worth it
     opts.optimize_for_point_lookup(64); // 64MB hint
+    apply_write_buffer_limits(&mut opts, 2); // 52-byte values
     opts.create_if_missing(true);
     opts
 }
@@ -493,6 +509,7 @@ pub fn e13_splade_inverted_cf_options(cache: &Cache) -> Options {
     let mut opts = Options::default();
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    apply_write_buffer_limits(&mut opts, 4); // posting lists grow with corpus
     opts.create_if_missing(true);
     opts
 }
@@ -519,6 +536,7 @@ pub fn e6_sparse_inverted_cf_options(cache: &Cache) -> Options {
     let mut opts = Options::default();
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    apply_write_buffer_limits(&mut opts, 4); // posting lists grow with corpus
     opts.create_if_missing(true);
     opts
 }
@@ -539,6 +557,7 @@ pub fn e1_matryoshka_128_cf_options(cache: &Cache) -> Options {
     let mut opts = Options::default();
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    apply_write_buffer_limits(&mut opts, 2); // 512-byte values
     opts.create_if_missing(true);
     opts
 }
@@ -561,6 +580,7 @@ pub fn custom_weight_profiles_cf_options(cache: &Cache) -> Options {
     let mut opts = Options::default();
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    apply_write_buffer_limits(&mut opts, 2); // small JSON
     opts.create_if_missing(true);
     opts
 }
@@ -587,6 +607,7 @@ pub fn hnsw_graphs_cf_options(cache: &Cache) -> Options {
     let mut opts = Options::default();
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    apply_write_buffer_limits(&mut opts, 8); // MB-sized values
     opts.create_if_missing(true);
     opts
 }
@@ -618,6 +639,7 @@ pub fn content_cf_options(cache: &Cache) -> Options {
     // LZ4 compression for ~50% text reduction
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_compaction_style(rocksdb::DBCompactionStyle::Level);
+    apply_write_buffer_limits(&mut opts, 8); // up to 1MB values
     opts.create_if_missing(true);
     // FAIL FAST: No fallback options - let RocksDB error on open if misconfigured
     opts
@@ -648,6 +670,7 @@ pub fn source_metadata_cf_options(cache: &Cache) -> Options {
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.optimize_for_point_lookup(32); // 32MB hint for point lookups
+    apply_write_buffer_limits(&mut opts, 2); // 100-500 byte values
     opts.create_if_missing(true);
     // FAIL FAST: No fallback options - let RocksDB error on open if misconfigured
     opts
@@ -677,6 +700,7 @@ pub fn file_index_cf_options(cache: &Cache) -> Options {
     let mut opts = Options::default();
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    apply_write_buffer_limits(&mut opts, 2); // small index entries
     opts.create_if_missing(true);
     // FAIL FAST: No fallback options - let RocksDB error on open if misconfigured
     opts
@@ -708,6 +732,7 @@ pub fn topic_portfolio_cf_options(cache: &Cache) -> Options {
     // LZ4 compression - JSON compresses well
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.optimize_for_point_lookup(32); // 32MB hint for point lookups
+    apply_write_buffer_limits(&mut opts, 2); // session data
     opts.create_if_missing(true);
     // FAIL FAST: No fallback options - let RocksDB error on open if misconfigured
     opts
@@ -747,6 +772,7 @@ pub fn e12_late_interaction_cf_options(cache: &Cache) -> Options {
     // UUID prefix extractor for efficient key lookup
     opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(16));
     opts.optimize_for_point_lookup(64); // 64MB hint for point lookups
+    apply_write_buffer_limits(&mut opts, 4); // 10-25KB values
     opts.create_if_missing(true);
     // FAIL FAST: No fallback options - let RocksDB error on open if misconfigured
     opts
@@ -778,6 +804,7 @@ pub fn entity_provenance_cf_options(cache: &Cache) -> Options {
     let mut opts = Options::default();
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    apply_write_buffer_limits(&mut opts, 2); // 200-2000 byte values
     opts.create_if_missing(true);
     opts
 }
@@ -810,6 +837,7 @@ pub fn audit_log_cf_options(cache: &Cache) -> Options {
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_compaction_style(rocksdb::DBCompactionStyle::Level);
+    apply_write_buffer_limits(&mut opts, 4); // append-heavy
     opts.create_if_missing(true);
     // FAIL FAST: No fallback options - let RocksDB error on open if misconfigured
     opts
@@ -838,6 +866,7 @@ pub fn audit_by_target_cf_options(cache: &Cache) -> Options {
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(16)); // UUID prefix
+    apply_write_buffer_limits(&mut opts, 2); // secondary index
     opts.create_if_missing(true);
     // FAIL FAST: No fallback options - let RocksDB error on open if misconfigured
     opts
@@ -869,6 +898,7 @@ pub fn merge_history_cf_options(cache: &Cache) -> Options {
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_compaction_style(rocksdb::DBCompactionStyle::Level);
+    apply_write_buffer_limits(&mut opts, 2); // append, moderate volume
     opts.create_if_missing(true);
     // FAIL FAST: No fallback options - let RocksDB error on open if misconfigured
     opts
@@ -896,6 +926,7 @@ pub fn importance_history_cf_options(cache: &Cache) -> Options {
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_compaction_style(rocksdb::DBCompactionStyle::Level);
+    apply_write_buffer_limits(&mut opts, 2); // append, moderate volume
     opts.create_if_missing(true);
     // FAIL FAST: No fallback options - let RocksDB error on open if misconfigured
     opts
@@ -930,6 +961,7 @@ pub fn tool_call_index_cf_options(cache: &Cache) -> Options {
     let mut opts = Options::default();
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    apply_write_buffer_limits(&mut opts, 2); // small values
     opts.create_if_missing(true);
     opts
 }
@@ -961,6 +993,7 @@ pub fn consolidation_recommendations_cf_options(cache: &Cache) -> Options {
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(16)); // UUID prefix
     opts.optimize_for_point_lookup(32); // 32MB hint for point lookups
+    apply_write_buffer_limits(&mut opts, 2); // small values
     opts.create_if_missing(true);
     opts
 }
@@ -986,6 +1019,7 @@ pub fn embedding_registry_cf_options(cache: &Cache) -> Options {
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(16)); // UUID prefix
     opts.optimize_for_point_lookup(32); // 32MB hint
+    apply_write_buffer_limits(&mut opts, 2); // 200-500 byte values
     opts.create_if_missing(true);
     opts
 }
@@ -1011,6 +1045,7 @@ pub fn quantized_embedder_cf_options(cache: &Cache) -> Options {
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.optimize_for_point_lookup(64); // 64MB hint for point lookups
+    apply_write_buffer_limits(&mut opts, 2); // 1-2KB values
     opts.create_if_missing(true);
     // FAIL FAST: No fallback options - let RocksDB error on open if misconfigured
     opts
@@ -1227,6 +1262,7 @@ pub fn code_entities_cf_options(cache: &Cache) -> Options {
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(16)); // UUID prefix
     opts.optimize_for_point_lookup(64); // 64MB hint
+    apply_write_buffer_limits(&mut opts, 4); // 500-5000 byte values
     opts.create_if_missing(true);
     opts
 }
@@ -1250,6 +1286,7 @@ pub fn code_e7_embeddings_cf_options(cache: &Cache) -> Options {
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(16)); // UUID prefix
     opts.optimize_for_point_lookup(128); // 128MB hint for embeddings
+    apply_write_buffer_limits(&mut opts, 4); // 6144-byte values
     opts.create_if_missing(true);
     opts
 }
@@ -1268,6 +1305,7 @@ pub fn code_file_index_cf_options(cache: &Cache) -> Options {
     let mut opts = Options::default();
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    apply_write_buffer_limits(&mut opts, 2); // small index
     opts.create_if_missing(true);
     opts
 }
@@ -1285,6 +1323,7 @@ pub fn code_name_index_cf_options(cache: &Cache) -> Options {
     let mut opts = Options::default();
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    apply_write_buffer_limits(&mut opts, 2); // small index
     opts.create_if_missing(true);
     opts
 }
@@ -1304,6 +1343,7 @@ pub fn code_signature_index_cf_options(cache: &Cache) -> Options {
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::None);
     opts.optimize_for_point_lookup(32); // 32MB hint
+    apply_write_buffer_limits(&mut opts, 2); // small index
     opts.create_if_missing(true);
     opts
 }
@@ -1392,6 +1432,7 @@ pub fn causal_relationships_cf_options(cache: &Cache) -> Options {
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(16)); // UUID prefix
     opts.optimize_for_point_lookup(64); // 64MB hint
+    apply_write_buffer_limits(&mut opts, 4); // 5-15KB values
     opts.create_if_missing(true);
     opts
 }
@@ -1416,6 +1457,7 @@ pub fn causal_by_source_cf_options(cache: &Cache) -> Options {
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(16)); // UUID prefix
     opts.optimize_for_point_lookup(32); // 32MB hint
+    apply_write_buffer_limits(&mut opts, 2); // small index
     opts.create_if_missing(true);
     opts
 }

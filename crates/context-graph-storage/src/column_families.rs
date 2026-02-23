@@ -24,6 +24,15 @@
 
 use rocksdb::{BlockBasedOptions, Cache, ColumnFamilyDescriptor, Options, SliceTransform};
 
+/// Apply memory-optimized write buffer settings to CF options.
+///
+/// RocksDB defaults to 64MB write buffer x 2 per CF, which for 51 CFs would
+/// consume ~6.4GB just for write buffers. This function applies sensible limits.
+fn apply_write_buffer_limits(opts: &mut Options, write_buffer_mb: usize) {
+    opts.set_write_buffer_size(write_buffer_mb * 1024 * 1024);
+    opts.set_max_write_buffer_number(2);
+}
+
 /// Column family name constants.
 pub mod cf_names {
     /// Primary node storage column family.
@@ -109,6 +118,7 @@ pub fn nodes_options(cache: &Cache) -> Options {
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.optimize_for_point_lookup(256); // 256MB hint for point lookups
+    apply_write_buffer_limits(&mut opts, 4);
     opts.create_if_missing(true);
 
     opts
@@ -136,6 +146,7 @@ pub fn edges_options(cache: &Cache) -> Options {
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(16)); // UUID is 16 bytes
+    apply_write_buffer_limits(&mut opts, 4);
     opts.create_if_missing(true);
 
     opts
@@ -162,6 +173,7 @@ pub fn embeddings_options(cache: &Cache) -> Options {
     let mut opts = Options::default();
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+    apply_write_buffer_limits(&mut opts, 8); // 6KB values, sequential reads
     opts.create_if_missing(true);
 
     opts
@@ -189,6 +201,7 @@ pub fn index_options(cache: &Cache) -> Options {
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(16)); // UUID prefix
+    apply_write_buffer_limits(&mut opts, 2); // small index entries
     opts.create_if_missing(true);
 
     opts
@@ -206,6 +219,8 @@ pub fn index_options(cache: &Cache) -> Options {
 pub fn system_options() -> Options {
     let mut opts = Options::default();
     opts.set_compression_type(rocksdb::DBCompressionType::None);
+    opts.set_write_buffer_size(2 * 1024 * 1024);
+    opts.set_max_write_buffer_number(2);
     opts.create_if_missing(true);
 
     opts
@@ -233,6 +248,7 @@ pub fn embedder_edges_options(cache: &Cache) -> Options {
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(1)); // embedder_id prefix
+    apply_write_buffer_limits(&mut opts, 4);
     opts.create_if_missing(true);
 
     opts
@@ -260,6 +276,7 @@ pub fn typed_edges_options(cache: &Cache) -> Options {
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(16)); // source UUID prefix
+    apply_write_buffer_limits(&mut opts, 4);
     opts.create_if_missing(true);
 
     opts
@@ -287,6 +304,7 @@ pub fn typed_edges_by_type_options(cache: &Cache) -> Options {
     opts.set_block_based_table_factory(&block_opts);
     opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
     opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(1)); // edge_type prefix
+    apply_write_buffer_limits(&mut opts, 2);
     opts.create_if_missing(true);
 
     opts

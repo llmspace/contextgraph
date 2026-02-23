@@ -6,7 +6,7 @@
 //! # Design Philosophy
 //!
 //! Most similarity functions delegate to existing vector type methods:
-//! - DenseVector::cosine_similarity()
+//! - cosine_similarity() (zero-allocation, direct slice computation)
 //! - SparseVector::jaccard_similarity()
 //! - BinaryVector::hamming_distance()
 //!
@@ -17,13 +17,13 @@
 //!
 //! # All outputs are normalized to [0.0, 1.0]
 
-use crate::embeddings::{BinaryVector, DenseVector};
+use crate::embeddings::BinaryVector;
 use crate::teleological::Embedder;
 use crate::types::fingerprint::{EmbeddingRef, SemanticFingerprint, SparseVector};
 
 /// Compute cosine similarity between two dense vectors.
 ///
-/// Thin wrapper that creates DenseVectors and delegates to existing method.
+/// Zero-allocation implementation using direct slice computation.
 /// Returns 0.0 for zero-magnitude vectors (AP-10: no NaN).
 ///
 /// # Arguments
@@ -37,20 +37,25 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
         return 0.0;
     }
 
-    // Check for zero vectors before computation (AP-10 compliance)
-    let mag_a_sq: f32 = a.iter().map(|x| x * x).sum();
-    let mag_b_sq: f32 = b.iter().map(|x| x * x).sum();
+    // Compute dot product and magnitudes in a single pass (zero-allocation)
+    let mut dot = 0.0_f32;
+    let mut mag_a_sq = 0.0_f32;
+    let mut mag_b_sq = 0.0_f32;
+
+    for (ai, bi) in a.iter().zip(b.iter()) {
+        dot += ai * bi;
+        mag_a_sq += ai * ai;
+        mag_b_sq += bi * bi;
+    }
+
+    // AP-10: zero-magnitude vectors return 0.0 (no NaN)
     if mag_a_sq == 0.0 || mag_b_sq == 0.0 {
         return 0.0;
     }
 
-    let vec_a = DenseVector::new(a.to_vec());
-    let vec_b = DenseVector::new(b.to_vec());
+    let raw_sim = (dot / (mag_a_sq.sqrt() * mag_b_sq.sqrt())).clamp(-1.0, 1.0);
 
-    let raw_sim = vec_a.cosine_similarity(&vec_b);
-
-    // Normalize from [-1, 1] to [0, 1]
-    // DenseVector.cosine_similarity already clamps to [-1, 1]
+    // Normalize from [-1, 1] to [0, 1] (SRC-3)
     (raw_sim + 1.0) / 2.0
 }
 
@@ -141,10 +146,9 @@ pub fn transe_similarity(a: &[f32], b: &[f32]) -> f32 {
         return 0.0;
     }
 
-    let vec_a = DenseVector::new(a.to_vec());
-    let vec_b = DenseVector::new(b.to_vec());
-
-    let distance = vec_a.euclidean_distance(&vec_b);
+    // Compute Euclidean distance directly on slices (zero-allocation)
+    let sum_sq: f32 = a.iter().zip(b.iter()).map(|(ai, bi)| (ai - bi) * (ai - bi)).sum();
+    let distance = sum_sq.sqrt();
     1.0 / (1.0 + distance)
 }
 

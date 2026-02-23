@@ -292,8 +292,11 @@ impl EmbeddingCache {
         }
 
         // Build moka cache with configuration
+        // M10 FIX: In moka 0.12, when a weigher is set, max_capacity acts as the
+        // max total weight (not entry count). Use config.max_bytes as the weight
+        // budget so the weigher actually controls eviction based on memory usage.
         let mut builder = Cache::builder()
-            .max_capacity(config.max_entries as u64)
+            .max_capacity(config.max_bytes as u64)
             .weigher(|_key: &CacheKey, value: &Arc<MultiArrayEmbedding>| {
                 estimate_embedding_memory(value)
             });

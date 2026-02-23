@@ -538,6 +538,12 @@ impl RocksDbTeleologicalStore {
             }
         }
 
+        // M9 FIX: After GC removes entries, shrink the DashMap to release memory.
+        // Without this, DashMap retains allocated capacity from peak usage indefinitely.
+        if deleted > 0 {
+            self.soft_deleted.shrink_to_fit();
+        }
+
         info!("GC: completed, {deleted}/{} entries hard-deleted", expired_ids.len());
         Ok(deleted)
     }

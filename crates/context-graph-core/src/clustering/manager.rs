@@ -74,6 +74,13 @@ pub const MAX_WEIGHTED_AGREEMENT: f32 = 8.5;
 /// Topic detection threshold per ARCH-09.
 pub const TOPIC_THRESHOLD: f32 = 2.5;
 
+/// Maximum embeddings accumulated per space before oldest are evicted.
+///
+/// At 50,000 embeddings per space with 13 spaces (average ~4KB per vector):
+/// worst-case ~2.6GB. This prevents unbounded growth while retaining enough
+/// history for meaningful HDBSCAN clustering.
+const MAX_EMBEDDINGS_PER_SPACE: usize = 50_000;
+
 // =============================================================================
 // ManagerParams
 // =============================================================================
@@ -381,10 +388,17 @@ impl MultiSpaceClusterManager {
             let cluster_idx = state.tree.insert(embedding, memory_id)? as i32;
             cluster_indices[i] = cluster_idx;
 
-            // Accumulate for HDBSCAN
+            // Accumulate for HDBSCAN (with eviction to prevent unbounded growth)
             state.embeddings.push(embedding.clone());
             state.memory_ids.push(memory_id);
             state.updates_since_recluster += 1;
+
+            // Evict oldest half when cap exceeded to bound memory usage
+            if state.embeddings.len() > MAX_EMBEDDINGS_PER_SPACE {
+                let keep_from = state.embeddings.len() / 2;
+                state.embeddings.drain(..keep_from);
+                state.memory_ids.drain(..keep_from);
+            }
 
             // Check if we need to trigger HDBSCAN reclustering
             if state.updates_since_recluster >= self.params.recluster_threshold {
@@ -445,23 +459,25 @@ impl MultiSpaceClusterManager {
             state.memberships.clear();
             state.clusters.clear();
 
-            let mut cluster_embeddings: HashMap<i32, Vec<Vec<f32>>> = HashMap::new();
+            // Collect indices per cluster to avoid cloning embeddings
+            let mut cluster_indices: HashMap<i32, Vec<usize>> = HashMap::new();
 
             for (j, membership) in memberships.iter().enumerate() {
                 state.memberships.insert(membership.memory_id, membership.clone());
 
                 if membership.cluster_id >= 0 {
-                    cluster_embeddings
+                    cluster_indices
                         .entry(membership.cluster_id)
                         .or_default()
-                        .push(state.embeddings[j].clone());
+                        .push(j);
                 }
             }
 
-            // Build Cluster objects with centroids
-            for (cluster_id, embs) in cluster_embeddings {
-                let centroid = Self::compute_centroid(&embs);
-                let cluster = Cluster::new(cluster_id, embedder, centroid, embs.len() as u32);
+            // Build Cluster objects with centroids using index references (no clone)
+            for (cluster_id, indices) in cluster_indices {
+                let refs: Vec<&Vec<f32>> = indices.iter().map(|&j| &state.embeddings[j]).collect();
+                let centroid = Self::compute_centroid_refs(&refs);
+                let cluster = Cluster::new(cluster_id, embedder, centroid, refs.len() as u32);
                 state.clusters.insert(cluster_id, cluster);
             }
 
@@ -1149,8 +1165,8 @@ impl MultiSpaceClusterManager {
         TopicProfile::new(sum)
     }
 
-    /// Compute centroid from a set of embeddings.
-    fn compute_centroid(embeddings: &[Vec<f32>]) -> Vec<f32> {
+    /// Compute centroid from references to embeddings (zero-copy).
+    fn compute_centroid_refs(embeddings: &[&Vec<f32>]) -> Vec<f32> {
         if embeddings.is_empty() {
             return Vec::new();
         }

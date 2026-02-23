@@ -226,6 +226,22 @@ impl BackgroundGraphBuilder {
     /// Thread-safe and non-blocking.
     pub async fn enqueue(&self, fingerprint_id: Uuid) {
         let mut queue = self.pending_queue.lock().await;
+
+        // M8 FIX: Enforce max queue depth to prevent unbounded memory growth.
+        if queue.len() >= 100_000 {
+            warn!(
+                queue_len = queue.len(),
+                "Background graph builder queue overflow, dropping oldest entries"
+            );
+            let drain_count = queue.len() - 50_000;
+            queue.drain(..drain_count);
+        } else if queue.len() >= 50_000 {
+            warn!(
+                queue_len = queue.len(),
+                "Background graph builder queue approaching capacity limit (100,000)"
+            );
+        }
+
         queue.push_back(fingerprint_id);
 
         let queue_size = queue.len();

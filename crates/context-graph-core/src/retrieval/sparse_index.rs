@@ -505,8 +505,24 @@ impl SparseInvertedIndex {
         let mut mt = self.memory_terms.write();
         let mut dc = self.doc_count.write();
         pl.clear();
+        pl.shrink_to_fit(); // Release allocated HashMap capacity
         mt.clear();
+        mt.shrink_to_fit(); // Release allocated HashMap capacity
         *dc = 0;
+    }
+
+    /// Estimated memory usage in bytes for monitoring.
+    ///
+    /// Includes posting lists (20 bytes per posting) and reverse term index.
+    pub fn estimated_memory_bytes(&self) -> usize {
+        let pl = self.posting_lists.read();
+        let mt = self.memory_terms.read();
+
+        let posting_bytes: usize = pl.values().map(|p| p.len() * 20).sum();
+        let terms_bytes: usize = mt.values().map(|v| v.len() * 2 + 16).sum(); // 2 per u16 + 16 UUID
+        let overhead = pl.capacity() * 24 + mt.capacity() * 32; // HashMap overhead
+
+        posting_bytes + terms_bytes + overhead
     }
 }
 

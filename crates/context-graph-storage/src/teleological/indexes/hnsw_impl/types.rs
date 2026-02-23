@@ -250,8 +250,12 @@ impl HnswEmbedderIndex {
         });
 
         *self.index.write() = new_index;
-        self.id_to_key.write().clear();
-        self.key_to_id.write().clear();
+        let mut id_map = self.id_to_key.write();
+        id_map.clear();
+        id_map.shrink_to_fit(); // Release allocated capacity
+        let mut key_map = self.key_to_id.write();
+        key_map.clear();
+        key_map.shrink_to_fit(); // Release allocated capacity
         *self.next_key.write() = 0;
         self.removed_count
             .store(0, std::sync::atomic::Ordering::Relaxed);

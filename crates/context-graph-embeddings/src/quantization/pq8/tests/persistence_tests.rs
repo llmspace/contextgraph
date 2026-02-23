@@ -14,14 +14,13 @@ use std::sync::Arc;
 
 #[test]
 fn test_codebook_save_and_load() {
-    use std::env::temp_dir;
-
     // Train a codebook
     let samples = generate_realistic_embeddings(300, 256, 42);
     let original = PQ8Codebook::train(&samples, None).expect("training");
 
     // Save to temp file
-    let path = temp_dir().join("test_pq8_codebook.bin");
+    let temp_dir = tempfile::tempdir().expect("create temp dir");
+    let path = temp_dir.path().join("test_pq8_codebook.bin");
     original.save(&path).expect("save should succeed");
 
     // Verify file exists
@@ -59,15 +58,12 @@ fn test_codebook_save_and_load() {
         }
     }
 
-    // Cleanup
-    std::fs::remove_file(&path).ok();
 }
 
 #[test]
 fn test_codebook_load_invalid_magic() {
-    use std::env::temp_dir;
-
-    let path = temp_dir().join("test_invalid_magic.bin");
+    let temp_dir = tempfile::tempdir().expect("create temp dir");
+    let path = temp_dir.path().join("test_invalid_magic.bin");
     std::fs::write(&path, b"INVL12345678").expect("write");
 
     let result = PQ8Codebook::load(&path);
@@ -78,8 +74,6 @@ fn test_codebook_load_invalid_magic() {
         }
         e => panic!("Expected InvalidCodebookFormat, got {:?}", e),
     }
-
-    std::fs::remove_file(&path).ok();
 }
 
 #[test]
@@ -98,13 +92,12 @@ fn test_codebook_load_nonexistent_file() {
 
 #[test]
 fn test_loaded_codebook_produces_same_quantization() {
-    use std::env::temp_dir;
-
     // Train and save
     let samples = generate_realistic_embeddings(300, 256, 42);
     let original = PQ8Codebook::train(&samples, None).expect("training");
 
-    let path = temp_dir().join("test_quantization_match.bin");
+    let temp_dir = tempfile::tempdir().expect("create temp dir");
+    let path = temp_dir.path().join("test_quantization_match.bin");
     original.save(&path).expect("save");
 
     // Create encoders
@@ -134,6 +127,4 @@ fn test_loaded_codebook_produces_same_quantization() {
             v2
         );
     }
-
-    std::fs::remove_file(&path).ok();
 }

@@ -1133,6 +1133,23 @@ impl Handlers {
             return self.tool_error(id, &format!("Invalid weights: {}", e));
         }
 
+        // M7 FIX: Enforce maximum of 1000 custom weight profiles to prevent unbounded growth.
+        // Check count BEFORE persisting to avoid orphaned RocksDB entries on rejection.
+        {
+            let profiles = self.custom_profiles.read();
+            // Allow overwrite of existing profile (not counted as new)
+            if profiles.len() >= 1000 && !profiles.contains_key(&request.name) {
+                error!(
+                    current_count = profiles.len(),
+                    "create_weight_profile: Maximum profile count reached"
+                );
+                return self.tool_error(
+                    id,
+                    "Maximum of 1000 custom weight profiles reached. Delete unused profiles first.",
+                );
+            }
+        }
+
         // Persist to RocksDB (source of truth) AND update in-memory cache
         if let Err(e) = self.teleological_store.store_custom_weight_profile(&request.name, &weights).await {
             error!(error = %e, name = %request.name, "create_weight_profile: Failed to persist to RocksDB");
