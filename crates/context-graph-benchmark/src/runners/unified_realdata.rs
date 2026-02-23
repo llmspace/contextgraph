@@ -349,8 +349,11 @@ impl UnifiedRealdataBenchmarkRunner {
             // WARNING: Synthetic mode -- all metrics below are randomly generated
             // placeholder values (rng.gen_range), NOT real measurements. These exist
             // only to exercise the reporting pipeline when no embeddings are available.
-            eprintln!("WARNING: evaluate_embedder running in synthetic mode for {} -- \
-                       metrics are randomly generated, not real measurements", embedder);
+            tracing::warn!(
+                "SYNTHETIC MODE: Results for {} are randomly generated, NOT measured — \
+                 do not use for real evaluation",
+                embedder,
+            );
             let mut local_rng = self.rng.clone();
             result.mrr_at_10 = 0.5 + local_rng.gen_range(0.0..0.3);
             for &k in &self.config.k_values {

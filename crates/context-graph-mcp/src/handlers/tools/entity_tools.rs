@@ -1,5 +1,11 @@
 //! # E11 KEPLER Entity Tool Implementations
 //!
+//! TODO(MCP-L10): This file is ~1800 lines (3.6x over 500-line limit). Split into:
+//! - `entity_extraction.rs`: classify_entity, extract_entity_mentions, is_common_word
+//! - `entity_search.rs`: search_by_entities, combine_multi_embedder_scores
+//! - `entity_graph.rs`: get_entity_graph
+//! - `entity_transe.rs`: infer_relationship, find_related_entities, validate_knowledge
+//!
 //! Per E11 Design Document, these tools expose KEPLER's unique capabilities:
 //! - **extract_entities**: Extract and canonicalize entities from text
 //! - **search_by_entities**: Multi-embedder discovery (E1 + E11 union)
@@ -83,6 +89,9 @@ use super::super::Handlers;
 ///
 /// Returns `(EntityType, confidence)`. KB matches get confidence 1.0,
 /// unmatched entities remain Unknown with confidence 0.5.
+///
+/// TODO(MCP-L9): These 200+ hardcoded entries should be data-driven (loaded from
+/// a config file or database) to allow updates without recompilation.
 fn classify_entity(canonical: &str) -> (EntityType, f32) {
     // Static knowledge base mapping canonical IDs to entity types.
     // KEPLER handles deeper relationship discovery, but this provides
@@ -989,27 +998,13 @@ impl Handlers {
             .entities
             .first()
             .map(EntityLinkDto::from)
-            .unwrap_or_else(|| EntityLinkDto {
-                surface_form: head_entity.clone(),
-                canonical_id: head_entity.to_lowercase().replace(' ', "_"),
-                entity_type: "Unknown".to_string(),
-                confidence: Some(0.5),
-                extraction_method: Some("heuristic".to_string()),
-                confidence_explanation: Some("Fallback entity detection".to_string()),
-            });
+            .unwrap_or_else(|| EntityLinkDto::fallback(head_entity.clone()));
 
         let tail_dto = tail_entities
             .entities
             .first()
             .map(EntityLinkDto::from)
-            .unwrap_or_else(|| EntityLinkDto {
-                surface_form: tail_entity.clone(),
-                canonical_id: tail_entity.to_lowercase().replace(' ', "_"),
-                entity_type: "Unknown".to_string(),
-                confidence: Some(0.5),
-                extraction_method: Some("heuristic".to_string()),
-                confidence_explanation: Some("Fallback entity detection".to_string()),
-            });
+            .unwrap_or_else(|| EntityLinkDto::fallback(tail_entity.clone()));
 
         let elapsed_ms = start.elapsed().as_millis() as u64;
 
@@ -1224,14 +1219,7 @@ impl Handlers {
             .entities
             .first()
             .map(EntityLinkDto::from)
-            .unwrap_or_else(|| EntityLinkDto {
-                surface_form: entity.clone(),
-                canonical_id: entity.to_lowercase().replace(' ', "_"),
-                entity_type: "Unknown".to_string(),
-                confidence: Some(0.5),
-                extraction_method: Some("heuristic".to_string()),
-                confidence_explanation: Some("Fallback entity detection".to_string()),
-            });
+            .unwrap_or_else(|| EntityLinkDto::fallback(entity.clone()));
 
         let elapsed_ms = start.elapsed().as_millis() as u64;
 
@@ -1455,27 +1443,13 @@ impl Handlers {
             .entities
             .first()
             .map(EntityLinkDto::from)
-            .unwrap_or_else(|| EntityLinkDto {
-                surface_form: subject.clone(),
-                canonical_id: subject.to_lowercase().replace(' ', "_"),
-                entity_type: "Unknown".to_string(),
-                confidence: Some(0.5),
-                extraction_method: Some("heuristic".to_string()),
-                confidence_explanation: Some("Fallback entity detection".to_string()),
-            });
+            .unwrap_or_else(|| EntityLinkDto::fallback(subject.clone()));
 
         let object_dto = object_entities
             .entities
             .first()
             .map(EntityLinkDto::from)
-            .unwrap_or_else(|| EntityLinkDto {
-                surface_form: object.clone(),
-                canonical_id: object.to_lowercase().replace(' ', "_"),
-                entity_type: "Unknown".to_string(),
-                confidence: Some(0.5),
-                extraction_method: Some("heuristic".to_string()),
-                confidence_explanation: Some("Fallback entity detection".to_string()),
-            });
+            .unwrap_or_else(|| EntityLinkDto::fallback(object.clone()));
 
         let elapsed_ms = start.elapsed().as_millis() as u64;
 
@@ -1566,11 +1540,15 @@ impl Handlers {
         );
 
         // Step 1: Search for memories to scan
-        let search_query = if let Some(ref center) = request.center_entity {
-            center.clone()
-        } else {
-            // Domain-neutral fallback for broad entity discovery
-            "entity relationship knowledge".to_string()
+        let search_query = match request.center_entity {
+            Some(ref center) if !center.trim().is_empty() => center.clone(),
+            _ => {
+                error!("get_entity_graph: center_entity is required for entity graph discovery");
+                return self.tool_error(
+                    id,
+                    "Missing or empty 'centerEntity' parameter. Provide an entity name to center the graph on.",
+                );
+            }
         };
 
         let query_fingerprint = match self.embed_query(id.clone(), &search_query, "get_entity_graph").await {
@@ -1763,14 +1741,7 @@ impl Handlers {
                 .entities
                 .first()
                 .map(EntityLinkDto::from)
-                .unwrap_or_else(|| EntityLinkDto {
-                    surface_form: center.clone(),
-                    canonical_id: center.to_lowercase().replace(' ', "_"),
-                    entity_type: "Unknown".to_string(),
-                    confidence: Some(0.5),
-                    extraction_method: Some("heuristic".to_string()),
-                    confidence_explanation: Some("Fallback entity detection".to_string()),
-                })
+                .unwrap_or_else(|| EntityLinkDto::fallback(center.clone()))
         });
 
         let elapsed_ms = start.elapsed().as_millis() as u64;

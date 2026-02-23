@@ -178,7 +178,7 @@ fn test_allocate_all_13_embedders_within_budget() {
         (Embedder::Code, 300_000_000, "E7: 300MB (1536D Qodo)"),
         (Embedder::Graph, 150_000_000, "E8: 150MB (1024D e5-large-v2)"),
         (Embedder::Hdc, 50_000_000, "E9: 50MB (1024D projected)"),
-        (Embedder::Contextual, 150_000_000, "E10: 150MB (768D CLIP)"),
+        (Embedder::Contextual, 150_000_000, "E10: 150MB (768D e5-base-v2)"),
         (Embedder::Entity, 150_000_000, "E11: 150MB (768D KEPLER)"),
         (
             Embedder::LateInteraction,

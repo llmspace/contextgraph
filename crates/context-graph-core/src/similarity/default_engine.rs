@@ -318,18 +318,67 @@ impl CrossSpaceSimilarityEngine for DefaultCrossSpaceEngine {
         // Step 4: Get weights based on strategy
         let weights = self.get_weights(&config.weighting_strategy);
 
-        // Note: Topic weighting uses topic profile strengths from the fingerprint.
-        // Weights are applied as-is based on the weighting strategy.
+        // Step 5: Compute aggregated score using the selected strategy
+        let (score, raw_score, rrf_score) = match &config.weighting_strategy {
+            WeightingStrategy::RRF { k } | WeightingStrategy::TopicWeightedRRF { k, .. } => {
+                // RRF: Convert per-space scores to ranks, apply RRF formula.
+                // Collect (space_index, score) for active spaces, sort descending by score,
+                // assign ranks with tie-handling, then compute:
+                //   RRF = SUM weight_i / (k + rank_i + 1)
+                // Tied scores share the same rank (standard competition ranking).
+                let mut active: Vec<(usize, f32)> = space_scores
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, s)| s.map(|v| (i, v)))
+                    .collect();
+                active.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        // Step 5: Compute aggregated score
-        let (score, raw_score) = Self::weighted_average(&space_scores, &weights);
+                let mut rrf_total = 0.0f32;
+                let mut weight_sum = 0.0f32;
+                let mut current_rank = 0usize;
+                for (pos, &(space_idx, score_val)) in active.iter().enumerate() {
+                    // Assign rank: tied scores share the rank of the first occurrence
+                    if pos > 0 {
+                        let prev_score = active[pos - 1].1;
+                        if (score_val - prev_score).abs() > f32::EPSILON {
+                            current_rank = pos;
+                        }
+                        // else: same rank as previous (tie)
+                    }
+                    let w = weights[space_idx];
+                    rrf_total += w / (k + current_rank as f32 + 1.0);
+                    weight_sum += w;
+                }
+
+                // Normalize so max possible RRF = 1.0 (when all spaces at rank 0)
+                let max_rrf = if weight_sum > f32::EPSILON {
+                    weight_sum / (k + 1.0)
+                } else {
+                    1.0
+                };
+                let normalized_rrf = if max_rrf > f32::EPSILON {
+                    (rrf_total / max_rrf).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+
+                // Also compute weighted average as raw_score for diagnostics
+                let (wa_score, wa_raw) = Self::weighted_average(&space_scores, &weights);
+                (normalized_rrf, wa_raw, Some(wa_score))
+            }
+            _ => {
+                // Uniform / Static / TopicAligned / LateInteraction: weighted average
+                let (score, raw_score) = Self::weighted_average(&space_scores, &weights);
+                (score, raw_score, None)
+            }
+        };
 
         // Step 6: Compute confidence
         let variance = Self::compute_variance(&space_scores);
         let confidence = CrossSpaceSimilarity::compute_confidence(active_count as u32, variance);
 
         // Step 7: Build result
-        let mut result = CrossSpaceSimilarity {
+        let result = CrossSpaceSimilarity {
             score,
             raw_score,
             space_scores: if config.include_breakdown {
@@ -343,17 +392,10 @@ impl CrossSpaceSimilarityEngine for DefaultCrossSpaceEngine {
             } else {
                 None
             },
-            // Purpose contribution is always None now since purpose weighting was removed
             purpose_contribution: None,
             confidence,
-            rrf_score: None,
+            rrf_score,
         };
-
-        // Add breakdown if requested
-        if config.include_breakdown {
-            result.space_scores = Some(space_scores);
-            result.space_weights = Some(weights);
-        }
 
         Ok(result)
     }
@@ -477,11 +519,14 @@ impl CrossSpaceSimilarityEngine for DefaultCrossSpaceEngine {
                 WeightingStrategy::uniform_weights()
             }
             WeightingStrategy::RRF { .. } => {
-                // RRF fusion is applied in the search pipeline, not here.
-                // This engine uses uniform weights for RRF explanation purposes.
+                // RRF uses uniform weights — differentiation comes from rank-based scoring
                 WeightingStrategy::uniform_weights()
             }
-            WeightingStrategy::TopicWeightedRRF { .. } => WeightingStrategy::uniform_weights(),
+            WeightingStrategy::TopicWeightedRRF { .. } => {
+                // TopicWeightedRRF: topic weighting applied via the RRF rank computation,
+                // not via per-space weights. Returns uniform weights as base.
+                WeightingStrategy::uniform_weights()
+            }
             WeightingStrategy::LateInteraction => {
                 // Emphasize E12 for late interaction
                 // Base: 11 slots * (0.40/11) ≈ 0.0364 each, E1=0.20, E12=0.40 → sum=1.0

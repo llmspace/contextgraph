@@ -184,6 +184,23 @@ pub struct EntityLinkDto {
     pub confidence_explanation: Option<String>,
 }
 
+impl EntityLinkDto {
+    /// Create a fallback DTO when entity extraction yields no KB match.
+    ///
+    /// Used when the entity text doesn't match the knowledge base but we still
+    /// need a valid DTO for the API response.
+    pub fn fallback(surface_form: String) -> Self {
+        Self {
+            canonical_id: surface_form.to_lowercase().replace(' ', "_"),
+            surface_form,
+            entity_type: "Unknown".to_string(),
+            confidence: Some(0.5),
+            extraction_method: Some("heuristic".to_string()),
+            confidence_explanation: Some("Entity not found in knowledge base".to_string()),
+        }
+    }
+}
+
 impl From<EntityLink> for EntityLinkDto {
     fn from(link: EntityLink) -> Self {
         let (method, explanation) = if link.entity_type != EntityType::Unknown {

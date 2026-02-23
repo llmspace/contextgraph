@@ -85,7 +85,7 @@ pub struct PerSpaceThresholds {
     /// E7: Code embedding threshold
     pub code: f32,
     /// E8: Graph/connectivity embedding threshold
-    pub emotional: f32,
+    pub graph: f32,
     /// E9: HDC embedding threshold
     pub hdc: f32,
     /// E10: Multimodal embedding threshold
@@ -110,7 +110,7 @@ impl PerSpaceThresholds {
             Embedder::Causal => self.causal,
             Embedder::Sparse => self.sparse,
             Embedder::Code => self.code,
-            Embedder::Graph => self.emotional,
+            Embedder::Graph => self.graph,
             Embedder::Hdc => self.hdc,
             Embedder::Contextual => self.multimodal,
             Embedder::Entity => self.entity,
@@ -132,7 +132,7 @@ impl PerSpaceThresholds {
             Embedder::Causal => self.causal = threshold,
             Embedder::Sparse => self.sparse = threshold,
             Embedder::Code => self.code = threshold,
-            Embedder::Graph => self.emotional = threshold,
+            Embedder::Graph => self.graph = threshold,
             Embedder::Hdc => self.hdc = threshold,
             Embedder::Contextual => self.multimodal = threshold,
             Embedder::Entity => self.entity = threshold,
@@ -153,7 +153,7 @@ impl PerSpaceThresholds {
             self.causal,
             self.sparse,
             self.code,
-            self.emotional,
+            self.graph,
             self.hdc,
             self.multimodal,
             self.entity,
@@ -174,7 +174,7 @@ impl PerSpaceThresholds {
             causal: arr[4],
             sparse: arr[5],
             code: arr[6],
-            emotional: arr[7],
+            graph: arr[7],
             hdc: arr[8],
             multimodal: arr[9],
             entity: arr[10],
@@ -364,7 +364,7 @@ pub fn high_thresholds() -> PerSpaceThresholds {
         causal: 0.70,
         sparse: 0.60,
         code: 0.80,
-        emotional: 0.70,
+        graph: 0.70,
         hdc: 0.70,
         multimodal: 0.70,
         entity: 0.70,
@@ -386,7 +386,7 @@ pub fn low_thresholds() -> PerSpaceThresholds {
         causal: 0.25,
         sparse: 0.20,
         code: 0.35,
-        emotional: 0.30,
+        graph: 0.30,
         hdc: 0.30,
         multimodal: 0.30,
         entity: 0.30,
@@ -424,7 +424,7 @@ mod tests {
         assert_eq!(h.causal, 0.70);
         assert_eq!(h.sparse, 0.60);
         assert_eq!(h.code, 0.80);
-        assert_eq!(h.emotional, 0.70);
+        assert_eq!(h.graph, 0.70);
         assert_eq!(h.keyword_splade, 0.60);
     }
 

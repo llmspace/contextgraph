@@ -29,19 +29,16 @@ struct MemoryId(Uuid);
 struct MemoryContent {
     id: MemoryId,
     embedding: Vec<f32>,
-    #[allow(dead_code)] // Populated from storage; used by future text-based consolidation strategies
-    text: String,
     access_count: u32,
     /// Gap 5: E5 causal direction for this memory (Cause, Effect, or Unknown)
     causal_direction: CausalDirection,
 }
 
 impl MemoryContent {
-    fn new(id: MemoryId, embedding: Vec<f32>, text: String, causal_direction: CausalDirection) -> Self {
+    fn new(id: MemoryId, embedding: Vec<f32>, causal_direction: CausalDirection) -> Self {
         Self {
             id,
             embedding,
-            text,
             access_count: 0,
             causal_direction,
         }
@@ -322,7 +319,9 @@ impl Handlers {
             // Gap 5: Infer E5 causal direction for consolidation direction-check
             let direction = infer_direction_from_fingerprint(&fp.semantic);
 
-            let content = MemoryContent::new(MemoryId(fp.id), embedding, text, direction)
+            // MCP-L3: text validated for non-empty above but not stored — only embedding used for similarity
+            let _ = text;
+            let content = MemoryContent::new(MemoryId(fp.id), embedding, direction)
                 .with_access_count(fp.access_count as u32);
 
             memory_contents.push(content);

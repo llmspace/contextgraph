@@ -62,9 +62,6 @@ pub struct LlmConfig {
     /// Number of GPU layers to offload (0xFFFF_FFFF = all).
     pub n_gpu_layers: u32,
 
-    /// Seed for reproducibility (not used in current llama-cpp-2 version).
-    pub seed: u32,
-
     /// Path to GBNF grammar file for causal analysis.
     pub causal_grammar_path: PathBuf,
 
@@ -90,7 +87,6 @@ impl Default for LlmConfig {
             temperature: 0.0, // Deterministic for analysis
             max_tokens: 512, // Increased from 256 to support 1-3 paragraph descriptions
             n_gpu_layers: u32::MAX, // Full GPU offload
-            seed: 42,
             causal_grammar_path: PathBuf::from("models/hermes-2-pro/causal_analysis.gbnf"),
             graph_grammar_path: PathBuf::from("models/hermes-2-pro/graph_relationship.gbnf"),
             validation_grammar_path: PathBuf::from("models/hermes-2-pro/validation.gbnf"),
@@ -201,10 +197,10 @@ impl CausalDiscoveryLLM {
 
     /// Create with custom configuration.
     pub fn with_config(config: LlmConfig) -> CausalAgentResult<Self> {
-        // Load grammar files (they're small, load eagerly)
-        let causal_grammar = Self::load_grammar_file(&config.causal_grammar_path)?;
-        let graph_grammar = Self::load_grammar_file(&config.graph_grammar_path)?;
-        let validation_grammar = Self::load_grammar_file(&config.validation_grammar_path)?;
+        // Load grammar files with type-specific fallbacks (CA-H1 FIX)
+        let causal_grammar = Self::load_grammar_file(&config.causal_grammar_path, GrammarType::Causal)?;
+        let graph_grammar = Self::load_grammar_file(&config.graph_grammar_path, GrammarType::Graph)?;
+        let validation_grammar = Self::load_grammar_file(&config.validation_grammar_path, GrammarType::Validation)?;
         // Single-text and multi-relationship grammars use embedded defaults
         let single_text_grammar = Self::default_single_text_grammar().to_string();
         let multi_relationship_grammar = Self::default_multi_relationship_grammar().to_string();
@@ -222,18 +218,28 @@ impl CausalDiscoveryLLM {
         })
     }
 
-    /// Load grammar from file, falling back to embedded default if not found.
-    fn load_grammar_file(path: &PathBuf) -> CausalAgentResult<String> {
+    /// Load grammar from file, falling back to type-specific embedded default if not found.
+    ///
+    /// CA-H1 FIX: Previously all grammar types fell back to causal grammar, causing
+    /// graph and validation grammars to parse as causal JSON schema on file load failure.
+    fn load_grammar_file(path: &PathBuf, grammar_type: GrammarType) -> CausalAgentResult<String> {
         match std::fs::read_to_string(path) {
             Ok(content) => Ok(content),
             Err(e) => {
                 warn!(
                     path = %path.display(),
+                    grammar_type = ?grammar_type,
                     error = %e,
-                    "Grammar file not found, using embedded default"
+                    "Grammar file not found, using type-specific embedded default"
                 );
-                // Return embedded default grammar for causal analysis
-                Ok(Self::default_causal_grammar().to_string())
+                let default = match grammar_type {
+                    GrammarType::Causal => Self::default_causal_grammar(),
+                    GrammarType::Graph => Self::default_graph_grammar(),
+                    GrammarType::Validation => Self::default_validation_grammar(),
+                    GrammarType::SingleText => Self::default_single_text_grammar(),
+                    GrammarType::MultiRelationship => Self::default_multi_relationship_grammar(),
+                };
+                Ok(default.to_string())
             }
         }
     }
@@ -246,6 +252,44 @@ direction ::= "\"direction\"" ws ":" ws direction-value
 confidence ::= "\"confidence\"" ws ":" ws number
 mechanism ::= "\"mechanism\"" ws ":" ws string
 direction-value ::= "\"A_causes_B\"" | "\"B_causes_A\"" | "\"bidirectional\"" | "\"none\""
+boolean ::= "true" | "false"
+number ::= "0" ("." [0-9] [0-9]?)? | "1" ("." "0" "0"?)?
+string ::= "\"" ([^"\\] | "\\" .)* "\""
+ws ::= [ \t\n\r]*"#
+    }
+
+    /// Default embedded grammar for graph relationship analysis.
+    ///
+    /// CA-H1 FIX: Type-specific fallback for graph grammar files.
+    /// Schema: {has_connection, direction, relationship_type, category, domain, confidence, description}
+    const fn default_graph_grammar() -> &'static str {
+        r#"root ::= "{" ws has-conn "," ws direction "," ws rel-type "," ws category "," ws domain "," ws confidence "," ws description ws "}"
+has-conn ::= "\"has_connection\"" ws ":" ws boolean
+direction ::= "\"direction\"" ws ":" ws dir-value
+rel-type ::= "\"relationship_type\"" ws ":" ws type-value
+category ::= "\"category\"" ws ":" ws category-value
+domain ::= "\"domain\"" ws ":" ws domain-value
+confidence ::= "\"confidence\"" ws ":" ws number
+description ::= "\"description\"" ws ":" ws string
+dir-value ::= "\"a_to_b\"" | "\"b_to_a\"" | "\"bidirectional\"" | "\"none\""
+type-value ::= "\"contains\"" | "\"scoped_by\"" | "\"depends_on\"" | "\"imports\"" | "\"requires\"" | "\"references\"" | "\"cites\"" | "\"interprets\"" | "\"distinguishes\"" | "\"implements\"" | "\"complies_with\"" | "\"fulfills\"" | "\"extends\"" | "\"modifies\"" | "\"supersedes\"" | "\"overrules\"" | "\"calls\"" | "\"applies\"" | "\"used_by\"" | "\"none\""
+category-value ::= "\"containment\"" | "\"dependency\"" | "\"reference\"" | "\"implementation\"" | "\"extension\"" | "\"invocation\""
+domain-value ::= "\"code\"" | "\"legal\"" | "\"academic\"" | "\"general\""
+boolean ::= "true" | "false"
+number ::= "0" ("." [0-9] [0-9]?)? | "1" ("." "0" "0"?)?
+string ::= "\"" ([^"\\] | "\\" .)* "\""
+ws ::= [ \t\n\r]*"#
+    }
+
+    /// Default embedded grammar for validation analysis.
+    ///
+    /// CA-H1 FIX: Type-specific fallback for validation grammar files.
+    /// Schema: {valid, confidence, explanation}
+    const fn default_validation_grammar() -> &'static str {
+        r#"root ::= "{" ws valid "," ws confidence "," ws explanation ws "}"
+valid ::= "\"valid\"" ws ":" ws boolean
+confidence ::= "\"confidence\"" ws ":" ws number
+explanation ::= "\"explanation\"" ws ":" ws string
 boolean ::= "true" | "false"
 number ::= "0" ("." [0-9] [0-9]?)? | "1" ("." "0" "0"?)?
 string ::= "\"" ([^"\\] | "\\" .)* "\""
@@ -899,7 +943,7 @@ ws ::= [ \t\n\r]*"#
         })
     }
 
-    /// Generate text from a custom prompt.
+    /// Generate text from a custom prompt with a specific grammar type.
     ///
     /// This is a public wrapper for the internal `generate` method,
     /// allowing other crates (like graph-agent) to use the shared LLM
@@ -908,12 +952,20 @@ ws ::= [ \t\n\r]*"#
     /// # Arguments
     ///
     /// * `prompt` - The full prompt text (should include system/user/assistant tokens)
+    /// * `grammar_type` - The grammar constraint to apply (e.g., `GrammarType::Graph`
+    ///   for graph-agent, `GrammarType::Causal` for causal analysis). CA-M1 FIX:
+    ///   Previously hardcoded to `GrammarType::Causal`, preventing callers from
+    ///   requesting unconstrained or differently-constrained generation.
     ///
     /// # Returns
     ///
     /// Generated text response from the LLM.
-    pub async fn generate_text(&self, prompt: &str) -> CausalAgentResult<String> {
-        self.generate_with_grammar(prompt, GrammarType::Causal).await
+    pub async fn generate_text(
+        &self,
+        prompt: &str,
+        grammar_type: GrammarType,
+    ) -> CausalAgentResult<String> {
+        self.generate_with_grammar(prompt, grammar_type).await
     }
 
     /// Generate text with a specific grammar type and return metadata.

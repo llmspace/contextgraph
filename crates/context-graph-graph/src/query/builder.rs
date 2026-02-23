@@ -278,7 +278,9 @@ impl QueryBuilder {
         index: &FaissGpuIndex,
         storage: &GraphStorage,
     ) -> GraphResult<QueryResult> {
-        let embedding = self.embedding.as_ref().unwrap();
+        let embedding = self.embedding.as_ref().ok_or_else(|| {
+            GraphError::InvalidInput("Semantic query requires embedding (post-validate)".to_string())
+        })?;
 
         let mut options = SemanticSearchOptions::default()
             .with_top_k(self.top_k)
@@ -301,7 +303,9 @@ impl QueryBuilder {
 
     /// Execute entailment query.
     async fn execute_entailment(&self, storage: &GraphStorage) -> GraphResult<QueryResult> {
-        let node_id = self.node_id.unwrap();
+        let node_id = self.node_id.ok_or_else(|| {
+            GraphError::InvalidInput("Entailment query requires node_id (post-validate)".to_string())
+        })?;
 
         let params = EntailmentQueryParams::default()
             .with_max_results(self.top_k)
@@ -321,8 +325,12 @@ impl QueryBuilder {
         index: &FaissGpuIndex,
         storage: &GraphStorage,
     ) -> GraphResult<QueryResult> {
-        let embedding = self.embedding.as_ref().unwrap();
-        let node_uuid = self.node_uuid.unwrap();
+        let embedding = self.embedding.as_ref().ok_or_else(|| {
+            GraphError::InvalidInput("Contradiction query requires embedding (post-validate)".to_string())
+        })?;
+        let node_uuid = self.node_uuid.ok_or_else(|| {
+            GraphError::InvalidInput("Contradiction query requires node_uuid (post-validate)".to_string())
+        })?;
 
         let params = ContradictionParams::default()
             .threshold(self.contradiction_threshold)

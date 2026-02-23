@@ -71,10 +71,7 @@ pub use multi_utl::{sigmoid, MultiUtlParams};
 pub use result::CrossSpaceSimilarity;
 
 // Sparse similarity functions for E6/E13 (SPLADE) embeddings
-pub use sparse::{
-    bm25_score, jaccard_similarity, sparse_cosine_similarity, sparse_dot_product, sparse_l2_norm,
-    Bm25Config, SparseSimilarityError,
-};
+pub use sparse::{jaccard_similarity, SparseSimilarityError};
 
 // Token-level similarity functions for E12 (ColBERT MaxSim) embeddings
 pub use token_level::{

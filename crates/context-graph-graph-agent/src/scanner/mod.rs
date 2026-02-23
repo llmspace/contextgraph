@@ -21,7 +21,7 @@ use uuid::Uuid;
 
 use crate::error::GraphAgentResult;
 use crate::types::{
-    ContentDomain, DomainMarkers, GraphCandidate, GraphMarkers, MemoryForGraphAnalysis,
+    DomainMarkers, GraphCandidate, GraphMarkers, MemoryForGraphAnalysis,
     RelationshipType,
 };
 
@@ -297,18 +297,6 @@ impl MemoryScanner {
         DomainMarkers::looks_like_code(content)
     }
 
-    /// Detect content domain for a memory.
-    #[allow(dead_code)]
-    fn detect_domain(&self, content: &str) -> ContentDomain {
-        DomainMarkers::detect_domain(content)
-    }
-
-    /// Detect content domain for a pair of memories.
-    #[allow(dead_code)]
-    fn detect_domain_pair(&self, content_a: &str, content_b: &str) -> ContentDomain {
-        DomainMarkers::detect_domain_pair(content_a, content_b)
-    }
-
     /// Check if two file paths are related.
     fn paths_related(&self, path_a: &str, path_b: &str) -> bool {
         // Same directory
@@ -385,6 +373,7 @@ impl Default for MemoryScanner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::ContentDomain;
     use chrono::Utc;
 
     fn make_test_memory(id: Uuid, content: &str, embedding: Vec<f32>) -> MemoryForGraphAnalysis {
@@ -460,17 +449,15 @@ mod tests {
 
     #[test]
     fn test_domain_detection() {
-        let scanner = MemoryScanner::new();
-
         // Code domain
         assert_eq!(
-            scanner.detect_domain("fn main() { use crate::foo; }"),
+            DomainMarkers::detect_domain("fn main() { use crate::foo; }"),
             ContentDomain::Code
         );
 
         // Legal domain
         assert_eq!(
-            scanner.detect_domain(
+            DomainMarkers::detect_domain(
                 "The court held that pursuant to 42 U.S.C. § 1983, the plaintiff..."
             ),
             ContentDomain::Legal
@@ -478,7 +465,7 @@ mod tests {
 
         // Academic domain
         assert_eq!(
-            scanner.detect_domain(
+            DomainMarkers::detect_domain(
                 "Smith et al. (2023) found statistical significance (p < 0.05) with n = 150"
             ),
             ContentDomain::Academic
@@ -486,7 +473,7 @@ mod tests {
 
         // General content
         assert_eq!(
-            scanner.detect_domain("This is just some general text."),
+            DomainMarkers::detect_domain("This is just some general text."),
             ContentDomain::General
         );
     }

@@ -323,11 +323,14 @@ impl E8Activator {
         self.stats.write().edges_created += edges_added;
 
         // Phase 2: Generate embeddings (async, no locks held)
-        // Combine source and target content for embedding context
-        let combined_content = format!("{}\n\nRelated to:\n{}", source_content, target_content);
-
-        let (source_embedding, target_embedding) =
-            self.generate_e8_embeddings(&combined_content).await?;
+        // GA-H1 FIX: Embed source and target SEPARATELY for genuine asymmetric signal.
+        // Previously, both were concatenated into one string, destroying directional
+        // differentiation. Causal-agent correctly embeds cause/effect separately;
+        // graph-agent must do the same for E8 source/target.
+        let (source_embedding, _) =
+            self.generate_e8_embeddings(source_content).await?;
+        let (_, target_embedding) =
+            self.generate_e8_embeddings(target_content).await?;
 
         // Phase 3: Update final stats
         self.stats.write().embeddings_generated += 2;

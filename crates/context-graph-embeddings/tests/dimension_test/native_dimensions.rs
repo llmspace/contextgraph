@@ -128,7 +128,7 @@ fn test_e10_multimodal_native_dimension() {
     assert_eq!(
         ModelId::Contextual.dimension(),
         768,
-        "E10 Multimodal: expected native dimension 768 (CLIP)"
+        "E10 Contextual: expected native dimension 768 (e5-base-v2)"
     );
     assert_eq!(
         MULTIMODAL_NATIVE, 768,

@@ -46,7 +46,7 @@ pub struct PerSpaceScores {
     /// E7: Code embedding similarity
     pub code: f32,
     /// E8: Graph/connectivity embedding similarity
-    pub emotional: f32,
+    pub graph: f32,
     /// E9: HDC embedding similarity
     pub hdc: f32,
     /// E10: Multimodal embedding similarity
@@ -76,7 +76,7 @@ impl PerSpaceScores {
             Embedder::Causal => self.causal,
             Embedder::Sparse => self.sparse,
             Embedder::Code => self.code,
-            Embedder::Graph => self.emotional,
+            Embedder::Graph => self.graph,
             Embedder::Hdc => self.hdc,
             Embedder::Contextual => self.multimodal,
             Embedder::Entity => self.entity,
@@ -97,7 +97,7 @@ impl PerSpaceScores {
             Embedder::Causal => self.causal = score,
             Embedder::Sparse => self.sparse = score,
             Embedder::Code => self.code = score,
-            Embedder::Graph => self.emotional = score,
+            Embedder::Graph => self.graph = score,
             Embedder::Hdc => self.hdc = score,
             Embedder::Contextual => self.multimodal = score,
             Embedder::Entity => self.entity = score,
@@ -156,7 +156,7 @@ impl PerSpaceScores {
             self.causal,
             self.sparse,
             self.code,
-            self.emotional,
+            self.graph,
             self.hdc,
             self.multimodal,
             self.entity,
@@ -176,7 +176,7 @@ impl PerSpaceScores {
             causal: arr[4],
             sparse: arr[5],
             code: arr[6],
-            emotional: arr[7],
+            graph: arr[7],
             hdc: arr[8],
             multimodal: arr[9],
             entity: arr[10],
@@ -336,7 +336,7 @@ mod tests {
         scores.late_interaction = 1.0;
         scores.keyword_splade = 1.0;
         // Set relational to 1.0
-        scores.emotional = 1.0;
+        scores.graph = 1.0;
         scores.entity = 1.0;
         // Set structural to 1.0
         scores.hdc = 1.0;

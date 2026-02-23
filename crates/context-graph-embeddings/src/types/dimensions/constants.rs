@@ -35,7 +35,7 @@ pub const GRAPH_NATIVE: usize = 1024;
 /// E9: Hyperdimensional computing native dimension (10K-bit vector)
 pub const HDC_NATIVE: usize = 10000;
 
-/// E10: Multimodal embedding native dimension (CLIP)
+/// E10: Contextual paraphrase native dimension (intfloat/e5-base-v2)
 pub const MULTIMODAL_NATIVE: usize = 768;
 
 /// E11: Entity embedding native dimension (legacy MiniLM-L6-v2).

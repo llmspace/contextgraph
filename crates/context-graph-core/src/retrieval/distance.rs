@@ -8,16 +8,13 @@
 //! Most similarity functions delegate to existing vector type methods:
 //! - cosine_similarity() (zero-allocation, direct slice computation)
 //! - SparseVector::jaccard_similarity()
-//! - BinaryVector::hamming_distance()
 //!
 //! This module adds:
 //! - max_sim() for ColBERT late interaction (E12)
-//! - transe_similarity() for knowledge graph embeddings (E11)
 //! - compute_similarity_for_space() dispatcher
 //!
 //! # All outputs are normalized to [0.0, 1.0]
 
-use crate::embeddings::BinaryVector;
 use crate::teleological::Embedder;
 use crate::types::fingerprint::{EmbeddingRef, SemanticFingerprint, SparseVector};
 
@@ -99,23 +96,6 @@ pub fn jaccard_similarity(a: &SparseVector, b: &SparseVector) -> f32 {
     a.jaccard_similarity(b)
 }
 
-/// Compute Hamming similarity between two binary vectors.
-///
-/// Converts Hamming distance to similarity: 1.0 - (distance / max_bits).
-///
-/// # Returns
-/// Similarity in [0.0, 1.0] where 1.0 = identical bit patterns
-pub fn hamming_similarity(a: &BinaryVector, b: &BinaryVector) -> f32 {
-    let distance = a.hamming_distance(b);
-    let max_bits = a.bit_len().max(b.bit_len());
-
-    if max_bits == 0 {
-        return 1.0; // Empty vectors are identical
-    }
-
-    1.0 - (distance as f32 / max_bits as f32)
-}
-
 /// Compute MaxSim for late interaction (ColBERT-style).
 ///
 /// For each query token, find max cosine similarity to any memory token.
@@ -153,34 +133,6 @@ pub fn max_sim(query_tokens: &[Vec<f32>], memory_tokens: &[Vec<f32>]) -> f32 {
     total_max / query_tokens.len() as f32
 }
 
-/// Compute TransE-style similarity for knowledge graph triplet scoring.
-///
-/// Uses inverse of Euclidean distance: 1 / (1 + distance).
-/// This maps distance [0, ∞) to similarity (0, 1].
-///
-/// # Important
-///
-/// This function is designed for TransE triplet operations (h + r - t),
-/// NOT for general entity-entity similarity. For general E11 similarity,
-/// use `cosine_similarity()` instead.
-///
-/// CORE-L3: This function is currently only used by unit tests in this module.
-/// It is re-exported as public API for potential use by TransE-based entity
-/// relationship scoring (e.g., `infer_relationship`, `validate_knowledge`).
-///
-/// # Returns
-/// Similarity in (0.0, 1.0] where 1.0 = identical vectors (distance = 0)
-pub fn transe_similarity(a: &[f32], b: &[f32]) -> f32 {
-    if a.is_empty() || b.is_empty() || a.len() != b.len() {
-        return 0.0;
-    }
-
-    // Compute Euclidean distance directly on slices (zero-allocation)
-    let sum_sq: f32 = a.iter().zip(b.iter()).map(|(ai, bi)| (ai - bi) * (ai - bi)).sum();
-    let distance = sum_sq.sqrt();
-    1.0 / (1.0 + distance)
-}
-
 /// Compute similarity for a specific embedding space.
 ///
 /// This is the main dispatcher that routes to the appropriate similarity
@@ -203,16 +155,11 @@ pub fn transe_similarity(a: &[f32], b: &[f32]) -> f32 {
 ///
 /// E9 uses 10,000-bit native hypervectors internally but projects to 1024D dense
 /// for storage and indexing compatibility (see constants.rs). Cosine similarity
-/// on the projected representation is used. For true Hamming distance on binary
-/// HDC vectors, the `hamming_similarity()` function with `BinaryVector` can be
-/// used if native binary storage is implemented in the future.
+/// on the projected representation is used.
 ///
 /// # E11 Entity Note
 ///
-/// E11 uses cosine similarity for general entity-entity comparison. The TransE
-/// similarity function (transe_similarity) is reserved for specific knowledge
-/// graph operations in entity_tools (infer_relationship, validate_knowledge)
-/// where the triplet scoring formula ||h + r - t|| is semantically meaningful.
+/// E11 uses cosine similarity for general entity-entity comparison.
 ///
 /// # Arguments
 /// * `embedder` - Which embedding space to compare
@@ -361,53 +308,6 @@ fn infer_direction_from_fingerprint(
     crate::causal::asymmetric::infer_direction_from_fingerprint(fp)
 }
 
-/// Compute all 13 similarities between query and memory fingerprints.
-///
-/// Returns an array indexed by Embedder::index().
-///
-/// # Returns
-/// Array of 13 similarity scores in [0.0, 1.0]
-pub fn compute_all_similarities(
-    query: &SemanticFingerprint,
-    memory: &SemanticFingerprint,
-) -> [f32; 13] {
-    let mut scores = [0.0_f32; 13];
-
-    for embedder in Embedder::all() {
-        scores[embedder.index()] = compute_similarity_for_space(embedder, query, memory);
-    }
-
-    scores
-}
-
-/// Compute all 13 similarities with causal direction for E5.
-///
-/// Like `compute_all_similarities()` but uses asymmetric E5 similarity
-/// when a causal direction is provided.
-///
-/// # Arguments
-/// * `query` - Query fingerprint
-/// * `memory` - Memory fingerprint
-/// * `causal_direction` - Detected causal direction of the query
-///
-/// # Returns
-/// Array of 13 similarity scores. Valid scores are in [0.0, 1.0].
-/// E5 returns -1.0 sentinel when `causal_direction` is `Unknown` (CORE-H1: no signal).
-pub fn compute_all_similarities_with_direction(
-    query: &SemanticFingerprint,
-    memory: &SemanticFingerprint,
-    causal_direction: crate::causal::asymmetric::CausalDirection,
-) -> [f32; 13] {
-    let mut scores = [0.0_f32; 13];
-
-    for embedder in Embedder::all() {
-        scores[embedder.index()] =
-            compute_similarity_for_space_with_direction(embedder, query, memory, causal_direction);
-    }
-
-    scores
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -467,19 +367,6 @@ mod tests {
     }
 
     #[test]
-    fn test_transe_similarity_cases() {
-        // Identical: distance=0, sim=1.0
-        let v = vec![1.0, 2.0, 3.0];
-        assert!((transe_similarity(&v, &v) - 1.0).abs() < 1e-5);
-
-        // Unit distance: sim = 1/(1+1) = 0.5
-        assert!((transe_similarity(&[0.0, 0.0, 0.0], &[1.0, 0.0, 0.0]) - 0.5).abs() < 1e-5);
-
-        // Empty
-        assert_eq!(transe_similarity(&[], &v), 0.0);
-    }
-
-    #[test]
     fn test_compute_similarity_for_space_dispatch() {
         let mut query = SemanticFingerprint::zeroed();
         let mut memory = SemanticFingerprint::zeroed();
@@ -508,24 +395,6 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_all_similarities() {
-        let query = SemanticFingerprint::zeroed();
-        let memory = SemanticFingerprint::zeroed();
-
-        let scores = compute_all_similarities(&query, &memory);
-        assert_eq!(scores.len(), 13);
-        for (i, score) in scores.iter().enumerate() {
-            assert!(!score.is_nan());
-            if i == 4 {
-                // CORE-H1: E5 returns -1.0 sentinel without direction
-                assert_eq!(*score, -1.0, "E5 should return -1.0 sentinel");
-            } else {
-                assert!(*score >= 0.0 && *score <= 1.0, "E{} score {} out of range", i + 1, score);
-            }
-        }
-    }
-
-    #[test]
     fn test_edge_cases_no_nan_or_overflow() {
         // Very small values
         let small = vec![1e-20_f32; 3];
@@ -541,16 +410,16 @@ mod tests {
         let sim = max_sim(&[vec![1.0_f32]], &[vec![-1.0_f32]]);
         assert!(sim.abs() < 1e-5 && sim >= 0.0);
 
-        // All 13 spaces with zeroed fingerprints
-        // CORE-H1: E5 returns -1.0 sentinel (no signal) when no direction is provided.
+        // All 13 spaces with zeroed fingerprints: verify per-space dispatch
         let zeroed = SemanticFingerprint::zeroed();
-        for (idx, score) in compute_all_similarities(&zeroed, &zeroed).iter().enumerate() {
-            if idx == 4 {
-                // E5 (Causal) returns -1.0 sentinel without direction
-                assert_eq!(*score, -1.0, "E5 should return -1.0 sentinel without direction");
+        for embedder in Embedder::all() {
+            let score = compute_similarity_for_space(embedder, &zeroed, &zeroed);
+            if embedder == Embedder::Causal {
+                // CORE-H1: E5 returns -1.0 sentinel without direction
+                assert_eq!(score, -1.0, "E5 should return -1.0 sentinel without direction");
             } else {
-                assert!(!score.is_nan() && !score.is_infinite() && (0.0..=1.0).contains(score),
-                    "E{} score {} out of range", idx + 1, score);
+                assert!(!score.is_nan() && !score.is_infinite() && (0.0..=1.0).contains(&score),
+                    "{} score {} out of range", embedder.name(), score);
             }
         }
     }
@@ -600,25 +469,4 @@ mod tests {
         assert!((ratio - 1.5).abs() < 1e-5);
     }
 
-    #[test]
-    fn test_compute_all_similarities_with_direction() {
-        use crate::causal::asymmetric::CausalDirection;
-
-        let query = SemanticFingerprint::zeroed();
-        let memory = SemanticFingerprint::zeroed();
-
-        for dir in [CausalDirection::Unknown, CausalDirection::Cause, CausalDirection::Effect] {
-            let scores = compute_all_similarities_with_direction(&query, &memory, dir);
-            assert_eq!(scores.len(), 13);
-            for (idx, score) in scores.iter().enumerate() {
-                if idx == 4 && dir == CausalDirection::Unknown {
-                    // E5 returns -1.0 sentinel for Unknown direction (no causal signal)
-                    assert!((*score - (-1.0)).abs() < 1e-6, "E5 with Unknown should be -1.0 sentinel, got {score}");
-                } else {
-                    assert!(*score >= 0.0 && *score <= 1.0 && !score.is_nan(),
-                        "score[{idx}] with dir {dir:?} out of range: {score}");
-                }
-            }
-        }
-    }
 }

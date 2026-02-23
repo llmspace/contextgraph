@@ -1,7 +1,8 @@
 //! Provenance query tool handlers (Phase P3).
+//!
+//! MCP-L11: DTOs extracted to provenance_dtos.rs per *_dtos.rs convention.
 
 use chrono::DateTime;
-use serde::{Deserialize, Deserializer};
 use serde_json::json;
 use tracing::{debug, error};
 use uuid::Uuid;
@@ -10,6 +11,8 @@ use context_graph_core::types::audit::{AuditOperation, AuditRecord};
 
 use crate::handlers::Handlers;
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
+
+use super::provenance_dtos::{GetAuditTrailParams, GetMergeHistoryParams, GetProvenanceChainParams};
 
 /// Serialize an audit record to JSON for API responses.
 fn audit_record_to_json(r: &AuditRecord) -> serde_json::Value {
@@ -24,63 +27,6 @@ fn audit_record_to_json(r: &AuditRecord) -> serde_json::Value {
         "parameters": r.parameters.clone(),
         "result": serde_json::to_value(&r.result).unwrap_or_else(|_| json!(format!("{}", r.result))),
     })
-}
-
-// ========== get_audit_trail ==========
-
-#[derive(Debug, Deserialize)]
-struct GetAuditTrailParams {
-    target_id: Option<String>,
-    start_time: Option<String>,
-    end_time: Option<String>,
-    #[serde(default = "default_audit_limit", deserialize_with = "deserialize_usize_lenient")]
-    limit: usize,
-}
-
-fn default_audit_limit() -> usize {
-    50
-}
-
-/// MCP clients may send integers as JSON strings — accept both.
-fn deserialize_usize_lenient<'de, D: Deserializer<'de>>(d: D) -> Result<usize, D::Error> {
-    let v = serde_json::Value::deserialize(d)?;
-    match &v {
-        serde_json::Value::Number(n) => n
-            .as_u64()
-            .map(|n| n as usize)
-            .ok_or_else(|| serde::de::Error::custom("limit must be a non-negative integer")),
-        serde_json::Value::String(s) => s
-            .parse::<usize>()
-            .map_err(serde::de::Error::custom),
-        _ => Err(serde::de::Error::custom("limit must be an integer or string")),
-    }
-}
-
-// ========== get_merge_history ==========
-
-#[derive(Debug, Deserialize)]
-struct GetMergeHistoryParams {
-    memory_id: String,
-    #[serde(default)]
-    include_source_metadata: bool,
-}
-
-// ========== get_provenance_chain ==========
-
-#[derive(Debug, Deserialize)]
-struct GetProvenanceChainParams {
-    memory_id: String,
-    #[serde(default)]
-    include_audit: bool,
-    #[serde(default)]
-    include_embedding_version: bool,
-    #[serde(default)]
-    include_importance_history: bool,
-    #[serde(default)]
-    include_merge_history: bool,
-    /// When true, includes ALL provenance data (audit, embedding, importance, merge).
-    #[serde(default)]
-    depth_full: bool,
 }
 
 impl Handlers {

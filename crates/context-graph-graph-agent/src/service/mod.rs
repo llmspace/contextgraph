@@ -175,14 +175,23 @@ impl GraphDiscoveryService {
         }
     }
 
-    /// Check if the background loop has been started.
+    /// Check if the background discovery loop is actively discovering relationships.
     ///
-    /// LOW-4 Note: The background loop is a stub — it sleeps and logs
-    /// "NOT IMPLEMENTED." No discovery cycles actually execute. This method
-    /// returns `true` when the loop task has been spawned (for lifecycle
-    /// management by `start()`/`stop()`), NOT when real discovery is happening.
+    /// GA-M1 FIX: Returns `false` because the background loop is a no-op stub
+    /// that never executes real discovery cycles. Returning `true` previously
+    /// misled callers into thinking discovery was happening. The loop task may
+    /// be spawned (for lifecycle management), but no work occurs.
     /// Use `discover_graph_relationships` MCP tool for on-demand analysis.
     pub fn is_running(&self) -> bool {
+        false
+    }
+
+    /// Check if the background loop task has been spawned.
+    ///
+    /// This returns `true` when start() has been called and the loop task
+    /// is alive, even though no real discovery occurs (the loop is a stub).
+    /// Use this for lifecycle management (start/stop) only.
+    pub fn is_loop_spawned(&self) -> bool {
         self.running.load(Ordering::SeqCst)
     }
 
@@ -382,7 +391,7 @@ impl GraphDiscoveryService {
 
     /// Start the background discovery loop.
     pub async fn start(self: Arc<Self>) -> GraphAgentResult<()> {
-        if self.is_running() {
+        if self.is_loop_spawned() {
             return Err(GraphAgentError::ServiceAlreadyRunning);
         }
 
@@ -432,7 +441,7 @@ impl GraphDiscoveryService {
 
     /// Stop the background discovery loop.
     pub async fn stop(&self) -> GraphAgentResult<()> {
-        if !self.is_running() {
+        if !self.is_loop_spawned() {
             return Ok(());
         }
 

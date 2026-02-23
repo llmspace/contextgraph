@@ -24,7 +24,6 @@ use serde::{Deserialize, Serialize};
 /// // Custom configuration with topic weighting
 /// let custom = CrossSpaceConfig {
 ///     weighting_strategy: WeightingStrategy::TopicAligned,
-///     use_topic_weighting: true,
 ///     include_breakdown: true,
 ///     ..Default::default()
 /// };
@@ -39,11 +38,6 @@ pub struct CrossSpaceConfig {
     /// If fewer spaces are active, returns `SimilarityError::InsufficientSpaces`.
     /// Default: 1
     pub min_active_spaces: usize,
-
-    /// Whether to apply topic profile weighting on top of similarity.
-    /// When true, similarity scores are modulated by topic alignment.
-    /// Default: false
-    pub use_topic_weighting: bool,
 
     /// How to handle missing embeddings in a fingerprint.
     /// Default: Skip (reduce denominator)
@@ -60,7 +54,6 @@ impl Default for CrossSpaceConfig {
         Self {
             weighting_strategy: WeightingStrategy::RRF { k: 60.0 },
             min_active_spaces: 1,
-            use_topic_weighting: false,
             missing_space_handling: MissingSpaceHandling::Skip,
             include_breakdown: false,
         }
@@ -86,7 +79,6 @@ impl CrossSpaceConfig {
     pub fn topic_aligned() -> Self {
         Self {
             weighting_strategy: WeightingStrategy::TopicAligned,
-            use_topic_weighting: true,
             ..Default::default()
         }
     }

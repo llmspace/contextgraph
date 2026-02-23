@@ -315,7 +315,9 @@ impl GraphRelationshipLLM {
 mod tests {
     use super::*;
 
-    /// Helper to test JSON parsing without LLM
+    /// Helper to test JSON parsing without LLM.
+    // TODO: This duplicates extract_analysis_from_json() in production code (~74 lines).
+    // Consider refactoring to call the production parser directly via a test-accessible path.
     fn parse_json_response(response: &str) -> GraphAgentResult<GraphAnalysisResult> {
         let value: Value = serde_json::from_str(response.trim()).map_err(|e| {
             GraphAgentError::LlmResponseParseError {

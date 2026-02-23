@@ -14,6 +14,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
+use tracing::warn;
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -980,30 +981,31 @@ impl EmbedderImpactRunner {
     }
 
     /// Phase 7: Graph structure impact.
+    ///
+    /// BM-H6 FIX: Returns empty impact (no topics) when no graph building
+    /// infrastructure is available, instead of fabricating mock counts.
     fn phase_graph_impact(&mut self) -> GraphStructureImpact {
-        // Placeholder - would need actual graph building infrastructure
-        let mut impact = GraphStructureImpact::new();
-
-        // Topic formation impact with mock data
-        impact.topic_impact.set_full(20, 6.5);
-
-        // Temporal embedders should have 0 impact
-        impact.topic_impact.add_without(EmbedderIndex::E2TemporalRecent, 20, 6.5);
-        impact.topic_impact.add_without(EmbedderIndex::E3TemporalPeriodic, 20, 6.5);
-        impact.topic_impact.add_without(EmbedderIndex::E4TemporalPositional, 20, 6.5);
-
-        // E1 should have significant impact
-        impact.topic_impact.add_without(EmbedderIndex::E1Semantic, 12, 4.0);
-
-        impact
+        // Without actual graph building infrastructure, we cannot measure
+        // topic formation impact. Return empty impact with zero counts.
+        // Callers can check topic_impact.is_empty() to detect this.
+        warn!("Graph impact phase: no graph building infrastructure available — returning measured-zero impact");
+        GraphStructureImpact::new()
     }
 
     /// Phase 8: Resource usage.
+    ///
+    /// BM-H7 FIX: Computes actual memory footprint from dimension metadata
+    /// and dataset size, instead of hardcoding 1000 vectors for every embedder.
     fn phase_resource(&mut self) -> ResourceImpact {
         let mut resource = ResourceImpact::new();
 
-        // Add estimated index stats for each embedder
-        let embedder_dims = [
+        // Use the largest tier's corpus size as the vector count estimate
+        let actual_vector_count = self.config.tiers.last()
+            .map(|t| t.size())
+            .unwrap_or(0);
+
+        // Compute real memory estimates from dimension × vector count × sizeof(f32)
+        let embedder_dims: [(EmbedderIndex, usize); 13] = [
             (EmbedderIndex::E1Semantic, 1024),
             (EmbedderIndex::E2TemporalRecent, 512),
             (EmbedderIndex::E3TemporalPeriodic, 512),
@@ -1021,7 +1023,7 @@ impl EmbedderImpactRunner {
 
         for (embedder, dim) in embedder_dims {
             let mut stats = IndexStats::new(embedder);
-            stats.set_dimensions(dim, 1000); // 1K vectors
+            stats.set_dimensions(dim, actual_vector_count);
             resource.add_index_stats(stats);
         }
 

@@ -15,7 +15,7 @@
 //! |---------|--------|----------|
 //! | Text | E1, E5-E6, E8-E9, E11-E12 | Optional instruction prefix |
 //! | Code | E7 (CodeBERT) | Language identifier |
-//! | Image | E10 (CLIP) | Image format |
+//! | Image | E10 (e5-base-v2) | Image format |
 //! | Audio | Future | Sample rate, channels |
 
 mod accessors;

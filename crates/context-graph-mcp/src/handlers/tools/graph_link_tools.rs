@@ -34,7 +34,8 @@ use crate::protocol::JsonRpcId;
 use crate::protocol::JsonRpcResponse;
 
 use super::graph_link_dtos::{
-    embedder_name, uses_asymmetric_similarity, AgreementSummary, EmbedderContribution,
+    embedder_name, embedder_name_to_index, uses_asymmetric_similarity,
+    AgreementSummary, EmbedderContribution, EMBEDDER_NAMES,
     GetMemoryNeighborsRequest, GetMemoryNeighborsResponse, GetTypedEdgesRequest,
     GetTypedEdgesResponse, GetUnifiedNeighborsRequest, GetUnifiedNeighborsResponse, NeighborResult,
     NeighborSearchMetadata, NeighborSourceInfo, TraversalMetadata, TraversalNode, TraversalPath,
@@ -911,9 +912,8 @@ impl Handlers {
         // GAP-1: custom_weights overrides weight_profile
         // AP-NAV-01: FAIL FAST on invalid embedder names
         let mut weights = if let Some(ref custom) = request.custom_weights {
-            const VALID_NAMES: [&str; 13] = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13"];
             for key in custom.keys() {
-                if !VALID_NAMES.contains(&key.as_str()) {
+                if !EMBEDDER_NAMES.contains(&key.as_str()) {
                     error!(invalid_key = %key, "get_unified_neighbors: custom_weights contains invalid embedder name");
                     return self.tool_error(id, &format!(
                         "Invalid embedder name '{}' in custom_weights. Valid names: E1-E13.", key
@@ -921,7 +921,7 @@ impl Handlers {
                 }
             }
             let mut w = [0.0f32; 13];
-            for (i, name) in VALID_NAMES.iter().enumerate() {
+            for (i, name) in EMBEDDER_NAMES.iter().enumerate() {
                 if let Some(&val) = custom.get(*name) {
                     w[i] = val as f32;
                 }
@@ -945,18 +945,8 @@ impl Handlers {
         // GAP-8: Apply embedder exclusions
         // AP-NAV-01: FAIL FAST on invalid embedder names
         if !request.exclude_embedders.is_empty() {
-            let name_to_idx = |s: &str| -> Result<usize, String> {
-                match s {
-                    "E1" => Ok(0), "E2" => Ok(1), "E3" => Ok(2),
-                    "E4" => Ok(3), "E5" => Ok(4), "E6" => Ok(5),
-                    "E7" => Ok(6), "E8" => Ok(7), "E9" => Ok(8),
-                    "E10" => Ok(9), "E11" => Ok(10), "E12" => Ok(11),
-                    "E13" => Ok(12),
-                    _ => Err(format!("Invalid embedder '{}' in exclude_embedders. Valid names: E1-E13.", s)),
-                }
-            };
             for name in &request.exclude_embedders {
-                match name_to_idx(name) {
+                match embedder_name_to_index(name) {
                     Ok(idx) => { weights[idx] = 0.0; }
                     Err(msg) => {
                         error!(embedder = %name, "get_unified_neighbors: Invalid embedder in exclude_embedders");

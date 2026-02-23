@@ -708,9 +708,7 @@ impl Handlers {
 
         // Parse request (optional params)
         let request: ListEmbedderIndexesRequest =
-            serde_json::from_value(args).unwrap_or(ListEmbedderIndexesRequest {
-                include_details: true,
-            });
+            serde_json::from_value(args).unwrap_or(ListEmbedderIndexesRequest {});
 
         if let Err(e) = request.validate() {
             error!(error = %e, "list_embedder_indexes: Validation failed");

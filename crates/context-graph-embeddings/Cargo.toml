@@ -53,7 +53,7 @@ bytemuck = { version = "1.14", features = ["derive"] }
 # Efficient bit vector operations for HDC (Hyperdimensional Computing) model
 bitvec = "1.0"
 
-# Image processing for CLIP multimodal embeddings
+# Image processing for multimodal embeddings
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 # LRU cache with O(1) operations for CacheManager

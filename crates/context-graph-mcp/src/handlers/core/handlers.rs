@@ -146,7 +146,7 @@ impl Handlers {
     ///
     /// Returns `ClusterError` if default cluster manager initialization fails.
     #[cfg(feature = "llm")]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Used by tests and benchmarks, not binary main
     pub fn with_defaults(
         teleological_store: Arc<dyn TeleologicalMemoryStore>,
         multi_array_provider: Arc<dyn MultiArrayEmbeddingProvider>,
@@ -296,7 +296,6 @@ impl Handlers {
     // =========================================================================
 
     /// Get the edge repository if available.
-    #[allow(dead_code)]
     pub fn edge_repository(&self) -> Option<&EdgeRepository> {
         self.edge_repository.as_ref()
     }
@@ -336,14 +335,6 @@ impl Handlers {
         self.session_sequence_counter.fetch_add(1, Ordering::SeqCst)
     }
 
-    /// Reset the session sequence counter to 0.
-    ///
-    /// Should be called at the start of a new session.
-    #[allow(dead_code)]
-    pub fn reset_sequence(&self) {
-        self.session_sequence_counter.store(0, Ordering::SeqCst);
-    }
-
     /// Get the current session ID.
     ///
     /// Priority order:
@@ -354,15 +345,6 @@ impl Handlers {
         std::env::var("CLAUDE_SESSION_ID")
             .ok()
             .or_else(|| self.current_session_id.read().clone())
-    }
-
-    /// Set the current session ID.
-    ///
-    /// Also resets the sequence counter for the new session.
-    #[allow(dead_code)]
-    pub fn set_session_id(&self, session_id: Option<String>) {
-        *self.current_session_id.write() = session_id;
-        self.reset_sequence();
     }
 
     /// Atomically get or initialize the session ID.

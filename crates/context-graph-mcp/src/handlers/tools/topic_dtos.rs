@@ -344,7 +344,6 @@ impl TopicSummary {
     ///
     /// Per ARCH-09: weighted_agreement >= 2.5
     #[inline]
-    #[allow(dead_code)] // Constitution compliance: ARCH-09 threshold check
     pub fn is_valid_topic(&self) -> bool {
         self.weighted_agreement >= TOPIC_THRESHOLD
     }
@@ -449,7 +448,6 @@ pub struct DetectTopicsResponse {
 
 impl DetectTopicsResponse {
     /// Create a response when insufficient memories exist.
-    #[allow(dead_code)]
     pub fn insufficient_memories(current_count: usize) -> Self {
         Self {
             new_topics: Vec::new(),
@@ -557,7 +555,6 @@ impl DivergenceAlert {
     /// NOTE: E5 (Causal) is EXCLUDED per AP-77 -- it requires CausalDirection for
     /// meaningful scores. Without direction, E5 returns 0.0, causing false-positive alerts.
     /// Must match DIVERGENCE_SPACES in context-graph-core/src/retrieval/divergence.rs.
-    #[allow(dead_code)] // Constitution compliance: AP-62 semantic space validation
     pub const VALID_SEMANTIC_SPACES: [&'static str; 6] = [
         "E1_Semantic",
         "E6_Sparse",
@@ -568,7 +565,6 @@ impl DivergenceAlert {
     ];
 
     /// Check if the semantic space is valid for divergence alerts.
-    #[allow(dead_code)] // Constitution compliance: AP-62 semantic space validation
     pub fn is_valid_semantic_space(space: &str) -> bool {
         Self::VALID_SEMANTIC_SPACES.contains(&space)
     }

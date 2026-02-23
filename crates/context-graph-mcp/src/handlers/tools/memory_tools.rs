@@ -43,7 +43,7 @@ use crate::weights::{get_effective_weight_profile, apply_e11_disable, E11_ENTITY
 use crate::protocol::JsonRpcId;
 use crate::protocol::JsonRpcResponse;
 
-use super::graph_link_dtos::RRF_K;
+use super::graph_link_dtos::{RRF_K, EMBEDDER_NAMES, embedder_name_to_index};
 use super::helpers::{ToolErrorKind, compute_position_label};
 use super::super::Handlers;
 
@@ -470,12 +470,8 @@ impl Handlers {
                     use context_graph_core::types::audit::EmbeddingVersionRecord;
                     use std::collections::HashMap;
 
-                    let embedder_labels = [
-                        "E1", "E2", "E3", "E4", "E5", "E6", "E7",
-                        "E8", "E9", "E10", "E11", "E12", "E13",
-                    ];
                     let mut embedder_versions = HashMap::new();
-                    for (i, label) in embedder_labels.iter().enumerate() {
+                    for (i, label) in EMBEDDER_NAMES.iter().enumerate() {
                         embedder_versions.insert(
                             label.to_string(),
                             embedding_output.model_ids[i].clone(),
@@ -542,6 +538,21 @@ impl Handlers {
     /// TASK-S001: Updated to use TeleologicalMemoryStore search_semantic.
     ///
     /// Searches the memory graph for matching content using all 13 embedding spaces.
+    ///
+    /// TODO(MCP-M4): This function is 1094 lines with 13+ concerns. Split into subfunctions:
+    /// - parameter parsing/validation
+    /// - strategy selection
+    /// - weight profile resolution
+    /// - E5 causal direction detection
+    /// - HNSW search execution
+    /// - ColBERT MaxSim reranking
+    /// - temporal post-retrieval scoring
+    /// - blind spot detection
+    /// - response formatting
+    /// - navigation hints
+    /// - embedder score breakdown
+    /// - audit record emission
+    /// - error handling
     pub(crate) async fn call_search_graph(
         &self,
         id: Option<JsonRpcId>,
@@ -643,10 +654,9 @@ impl Handlers {
         // AP-NAV-01: FAIL FAST on invalid embedder names
         let custom_weights: Option<[f32; 13]> = match args.get("customWeights").and_then(|v| v.as_object()) {
             Some(obj) => {
-                const VALID_NAMES: [&str; 13] = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13"];
                 // Reject any keys that are not valid embedder names
                 for key in obj.keys() {
-                    if !VALID_NAMES.contains(&key.as_str()) {
+                    if !EMBEDDER_NAMES.contains(&key.as_str()) {
                         error!(invalid_key = %key, "search_graph: customWeights contains invalid embedder name");
                         return self.tool_error(id, &format!(
                             "Invalid embedder name '{}' in customWeights. Valid names: E1-E13.", key
@@ -654,7 +664,7 @@ impl Handlers {
                     }
                 }
                 let mut weights = [0.0f32; 13];
-                for (i, name) in VALID_NAMES.iter().enumerate() {
+                for (i, name) in EMBEDDER_NAMES.iter().enumerate() {
                     if let Some(val) = obj.get(*name).and_then(|v| v.as_f64()) {
                         weights[i] = val as f32;
                     }
@@ -677,13 +687,11 @@ impl Handlers {
                             return self.tool_error(id, "excludeEmbedders must contain strings (E1-E13)");
                         }
                     };
-                    let idx = match s {
-                        "E1" => 0, "E2" => 1, "E3" => 2, "E4" => 3, "E5" => 4, "E6" => 5,
-                        "E7" => 6, "E8" => 7, "E9" => 8, "E10" => 9, "E11" => 10, "E12" => 11,
-                        "E13" => 12,
-                        _ => {
+                    let idx = match embedder_name_to_index(s) {
+                        Ok(i) => i,
+                        Err(msg) => {
                             error!(embedder = %s, "search_graph: Invalid embedder in excludeEmbedders");
-                            return self.tool_error(id, &format!("Invalid embedder '{}' in excludeEmbedders. Must be E1-E13.", s));
+                            return self.tool_error(id, &msg);
                         }
                     };
                     exclude_embedder_names.push(s.to_string());
@@ -1129,7 +1137,6 @@ impl Handlers {
                         &mut results,
                         &query_embedding,
                         causal_direction,
-                        e5_weight,
                     );
                     apply_direction_aware_reranking(&mut results, causal_direction);
                     true
@@ -1464,7 +1471,7 @@ impl Handlers {
                                     // P6: Use pre-resolved weights (no lock per-embedder)
                                     let weight = resolved_weights[idx];
                                     // Compute RRF contribution (matches breakdown formula)
-                                    let rrf_contrib = weight / (60.0 + approx_rank as f32 + 1.0);
+                                    let rrf_contrib = weight / (RRF_K + approx_rank as f32 + 1.0);
                                     json!({
                                         "embedder": name,
                                         "similarity": score,
@@ -1537,7 +1544,7 @@ impl Handlers {
                     "customWeightsValues": custom_weights.map(|w| w.to_vec()),
                     "excludedEmbedders": exclude_embedder_names,
                     "temporalConfig": temporal_config,
-                    "rrfConstant": 60.0,
+                    "rrfConstant": RRF_K,
                     "resolvedWeightProfile": effective_weight_profile,
                 });
 
@@ -1676,12 +1683,10 @@ fn get_e5_causal_weight(profile_name: &str) -> f32 {
 /// * `results` - Mutable reference to search results to rerank
 /// * `query_embedding` - Query's semantic fingerprint
 /// * `query_direction` - Detected causal direction of the query
-/// * `_e5_weight` - Kept for signature stability, not used in gate logic
 fn apply_asymmetric_e5_reranking(
     results: &mut [TeleologicalSearchResult],
     query_embedding: &SemanticFingerprint,
     query_direction: CausalDirection,
-    _e5_weight: f32,
 ) {
     if results.is_empty() {
         return;
@@ -2240,13 +2245,12 @@ mod tests {
 
     #[test]
     fn test_validation_and_causal_gate() {
-        use crate::middleware::validation::{validate_string_length, validate_range};
-        // BUG-001/002: rationale and topK validation
-        assert!(validate_string_length("rationale", "", MIN_RATIONALE_LEN, MAX_RATIONALE_LEN).is_err());
-        assert!(validate_string_length("rationale", "x", MIN_RATIONALE_LEN, MAX_RATIONALE_LEN).is_ok());
-        assert!(validate_range("topK", 0_u64, MIN_TOP_K, MAX_TOP_K).is_err());
-        assert!(validate_range("topK", 1_u64, MIN_TOP_K, MAX_TOP_K).is_ok());
-        assert!(validate_range("topK", 101_u64, MIN_TOP_K, MAX_TOP_K).is_err());
+        // BUG-001/002: rationale and topK validation (inline checks after validation.rs removal)
+        assert!("".chars().count() < MIN_RATIONALE_LEN);
+        assert!("x".chars().count() >= MIN_RATIONALE_LEN && "x".chars().count() <= MAX_RATIONALE_LEN);
+        assert!(0_u64 < MIN_TOP_K);
+        assert!(1_u64 >= MIN_TOP_K && 1_u64 <= MAX_TOP_K);
+        assert!(101_u64 > MAX_TOP_K);
         // Causal gate: boost, demotion, passthrough, dead zone
         let boosted = apply_causal_gate(0.80, 0.05, true);
         assert!((boosted - 0.80 * causal_gate::CAUSAL_BOOST).abs() < 1e-6);

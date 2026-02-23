@@ -469,10 +469,17 @@ impl TemporalBenchmarkRunner {
         periodic_data: &PeriodicBenchmarkData,
         sequence_data: &SequenceBenchmarkData,
     ) -> AblationResults {
-        // Compute baseline score (no temporal features)
-        let baseline_score = 0.3; // Simulated baseline
+        // BM-H3 FIX: Compute baseline from default (empty) data instead of hardcoding 0.3.
+        // Baseline = metric scores when NO temporal features are provided (all default data).
+        let baseline_metrics = crate::metrics::temporal::compute_all_temporal_metrics(
+            &RecencyBenchmarkData::default(),
+            &PeriodicBenchmarkData::default(),
+            &SequenceBenchmarkData::default(),
+            0.0,
+        );
+        let baseline_score = baseline_metrics.quality_score();
 
-        // Compute scores with individual features
+        // Compute scores with individual features enabled (ablation study)
         let recency_metrics = crate::metrics::temporal::compute_all_temporal_metrics(
             recency_data,
             &PeriodicBenchmarkData::default(),
@@ -981,20 +988,29 @@ fn run_time_window_tests(
         .map(|m| m.id)
         .collect();
 
-    // Retrieve memories that actually fall within each time window
-    let retrieved_24h: HashSet<_> = dataset
-        .memories
-        .iter()
-        .filter(|m| m.timestamp >= threshold_24h)
-        .map(|m| m.id)
-        .collect();
+    // Simulate retrieval: score each memory by recency (exponential decay from now),
+    // then take top-K as "retrieved" results for each window. This tests whether a
+    // recency-based retrieval system surfaces the right time-window items.
+    let k = in_24h.len().max(1); // retrieve same count as ground truth for fair comparison
 
-    let retrieved_7d: HashSet<_> = dataset
+    let mut scored: Vec<_> = dataset
         .memories
         .iter()
-        .filter(|m| m.timestamp >= threshold_7d)
-        .map(|m| m.id)
+        .map(|m| {
+            let age_ms = (now - m.timestamp).num_milliseconds().max(0) as f64;
+            let half_life = settings.decay_half_life_ms as f64;
+            let score = (-age_ms * (2.0_f64.ln()) / half_life).exp();
+            (m.id, m.timestamp, score)
+        })
         .collect();
+    scored.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Retrieved for 24h window: top-K by recency score
+    let retrieved_24h: HashSet<_> = scored.iter().take(k).map(|(id, _, _)| *id).collect();
+
+    // Retrieved for 7d window: top-K' where K' = |in_7d|
+    let k7 = in_7d.len().max(1);
+    let retrieved_7d: HashSet<_> = scored.iter().take(k7).map(|(id, _, _)| *id).collect();
 
     let last_24h_precision = if retrieved_24h.is_empty() {
         0.0
@@ -2042,19 +2058,25 @@ pub fn run_scaling_benchmark(config: &ScalingConfig) -> ScalingBenchmarkResults 
         let mut generator = TemporalDatasetGenerator::new(dataset_config.clone());
         let dataset = generator.generate();
 
-        // Run queries and measure latency
-        let mut latencies = Vec::new();
-        for _ in 0..config.num_queries.min(100) {
-            let query_start = Instant::now();
-            // Simulate query
-            let _: Vec<_> = dataset.memories.iter().take(10).collect();
-            latencies.push(query_start.elapsed().as_micros() as f64 / 1000.0);
-        }
-        latencies.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
+        // BM-H1 FIX: Measure actual temporal metric computation latency,
+        // not Vec iteration. This benchmarks compute_all_temporal_metrics which is
+        // the real operation we care about at each corpus size.
         let recency_data = compute_recency_data(&dataset, &RecencyBenchmarkSettings::default());
         let periodic_data = compute_periodic_data(&dataset);
         let sequence_data = compute_sequence_data(&dataset, &SequenceBenchmarkSettings::default());
+
+        let mut latencies = Vec::new();
+        for _ in 0..config.num_queries.min(100) {
+            let query_start = Instant::now();
+            let _metrics = crate::metrics::temporal::compute_all_temporal_metrics(
+                &recency_data,
+                &periodic_data,
+                &sequence_data,
+                0.0,
+            );
+            latencies.push(query_start.elapsed().as_micros() as f64 / 1000.0);
+        }
+        latencies.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let metrics = crate::metrics::temporal::compute_all_temporal_metrics(
             &recency_data,
@@ -2291,20 +2313,26 @@ pub fn run_regression_benchmark(config: &RegressionConfig) -> RegressionBenchmar
     let mut generator = TemporalDatasetGenerator::new(dataset_config.clone());
     let dataset = generator.generate();
 
-    // Measure latency
+    // BM-H2 FIX: Measure actual temporal metric computation latency,
+    // not Vec iteration which measures nothing meaningful.
+    let recency_data = compute_recency_data(&dataset, &RecencyBenchmarkSettings::default());
+    let periodic_data = compute_periodic_data(&dataset);
+    let sequence_data = compute_sequence_data(&dataset, &SequenceBenchmarkSettings::default());
+
     let mut latencies = Vec::new();
     for _ in 0..100 {
         let query_start = Instant::now();
-        let _: Vec<_> = dataset.memories.iter().take(10).collect();
+        let _metrics = crate::metrics::temporal::compute_all_temporal_metrics(
+            &recency_data,
+            &periodic_data,
+            &sequence_data,
+            0.0,
+        );
         latencies.push(query_start.elapsed().as_micros() as f64 / 1000.0);
     }
     latencies.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let p95_idx = (latencies.len() as f64 * 0.95) as usize;
     let p95_latency = latencies.get(p95_idx).copied().unwrap_or(0.0);
-
-    let recency_data = compute_recency_data(&dataset, &RecencyBenchmarkSettings::default());
-    let periodic_data = compute_periodic_data(&dataset);
-    let sequence_data = compute_sequence_data(&dataset, &SequenceBenchmarkSettings::default());
 
     let metrics = crate::metrics::temporal::compute_all_temporal_metrics(
         &recency_data,

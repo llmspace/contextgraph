@@ -285,8 +285,8 @@ impl Handlers {
                     }
                 }
 
-                // Build response using DTO factory method
-                let response = BoostImportanceResponse::new(node_id, old_importance, request.delta);
+                // MCP-L1: Use handler's actual computed values, not recomputed from delta
+                let response = BoostImportanceResponse::from_result(node_id, old_importance, new_importance, clamped);
 
                 match serde_json::to_value(response) {
                     Ok(v) => self.tool_result(id, v),

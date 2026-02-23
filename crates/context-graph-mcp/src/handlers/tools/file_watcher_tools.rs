@@ -97,7 +97,10 @@ pub struct ReconcileFilesRequest {
 pub struct ReconcileFilesResponse {
     pub orphaned_files: Vec<String>,
     pub orphan_count: usize,
-    pub deleted_count: usize,
+    /// Number of individual fingerprints deleted (not files -- each file may have multiple fingerprints).
+    pub fingerprints_deleted: usize,
+    /// Number of fingerprints that were already deleted or not found (Ok(false) from store).
+    pub skipped: usize,
     pub dry_run: bool,
     /// ERR-13: Track which deletions failed instead of silently continuing
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -355,7 +358,7 @@ impl Handlers {
             }
         }
 
-        // Clear the file index
+        // Clear the file index — FAIL FAST if this fails to prevent ghost entries
         if let Err(e) = self
             .teleological_store
             .clear_file_index(&request.file_path)
@@ -364,10 +367,17 @@ impl Handlers {
             error!(
                 error = %e,
                 file_path = %request.file_path,
-                "delete_file_content: Failed to clear file index"
+                deleted_count = deleted_count,
+                "delete_file_content: Failed to clear file index — ghost entries remain"
             );
-            // Don't fail - the fingerprints were already deleted
-            warn!("Fingerprints deleted but file index clear failed - index may be stale");
+            return self.tool_error(
+                id,
+                &format!(
+                    "Deleted {} fingerprints but failed to clear file index for '{}': {}. \
+                     File index may contain stale entries — retry or manually clear.",
+                    deleted_count, request.file_path, e
+                ),
+            );
         }
 
         let message = if request.soft_delete {
@@ -469,7 +479,8 @@ impl Handlers {
         };
 
         let mut orphans = Vec::new();
-        let mut deleted_count = 0;
+        let mut fingerprints_deleted = 0;
+        let mut skipped = 0;
         let mut failed_deletions: Vec<String> = Vec::new();
 
         for entry in entries {
@@ -506,15 +517,26 @@ impl Handlers {
                     let fp_count = ids.len();
                     for fp_id in ids {
                         // Use soft delete per SEC-06
-                        if let Err(e) = self.teleological_store.delete(fp_id, true).await {
-                            error!(
-                                error = %e,
-                                fingerprint_id = %fp_id,
-                                "reconcile_files: Failed to delete orphan fingerprint"
-                            );
-                            failed_deletions.push(format!("{}:{}", entry.file_path, fp_id));
-                        } else {
-                            deleted_count += 1;
+                        match self.teleological_store.delete(fp_id, true).await {
+                            Ok(true) => {
+                                fingerprints_deleted += 1;
+                            }
+                            Ok(false) => {
+                                // MCP-L12: Track fingerprints already deleted or not found
+                                skipped += 1;
+                                debug!(
+                                    fingerprint_id = %fp_id,
+                                    "reconcile_files: Fingerprint already deleted or not found"
+                                );
+                            }
+                            Err(e) => {
+                                error!(
+                                    error = %e,
+                                    fingerprint_id = %fp_id,
+                                    "reconcile_files: Failed to delete orphan fingerprint"
+                                );
+                                failed_deletions.push(format!("{}:{}", entry.file_path, fp_id));
+                            }
                         }
                     }
 
@@ -542,29 +564,31 @@ impl Handlers {
 
         info!(
             orphan_count = orphans.len(),
-            deleted_count = deleted_count,
+            fingerprints_deleted = fingerprints_deleted,
+            skipped = skipped,
             dry_run = request.dry_run,
             "reconcile_files: Operation complete"
         );
 
         // Emit FileWatcherEvent audit record for reconcile (only if not dry run and we deleted)
-        if !request.dry_run && deleted_count > 0 {
+        if !request.dry_run && fingerprints_deleted > 0 {
             let audit_record = AuditRecord::new(
                 AuditOperation::FileWatcherEvent {
                     event_type: "reconcile_delete".to_string(),
                     file_path: request.base_path.clone().unwrap_or_default(),
-                    memories_affected: deleted_count,
+                    memories_affected: fingerprints_deleted,
                 },
                 Uuid::nil(),
             )
             .with_operator("reconcile_files")
             .with_rationale(format!(
-                "Reconciled {} orphaned files (deleted embeddings for files no longer on disk)",
-                deleted_count
+                "Reconciled {} orphaned files ({} fingerprints deleted, {} skipped)",
+                orphans.len(), fingerprints_deleted, skipped
             ))
             .with_parameters(json!({
                 "orphan_count": orphans.len(),
-                "deleted_count": deleted_count,
+                "fingerprints_deleted": fingerprints_deleted,
+                "skipped": skipped,
                 "dry_run": false,
                 "base_path": request.base_path,
                 "orphaned_files": &orphans,
@@ -578,7 +602,8 @@ impl Handlers {
         let response = ReconcileFilesResponse {
             orphan_count: orphans.len(),
             orphaned_files: orphans,
-            deleted_count,
+            fingerprints_deleted,
+            skipped,
             dry_run: request.dry_run,
             failed_deletions,
         };

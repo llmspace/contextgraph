@@ -55,6 +55,7 @@ pub mod entity_dtos;
 pub mod graph_dtos;
 pub mod graph_link_dtos;
 pub mod keyword_dtos;
+pub mod provenance_dtos;
 pub mod robustness_dtos;
 pub mod temporal_dtos;
 pub mod topic_dtos;

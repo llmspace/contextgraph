@@ -922,17 +922,52 @@ impl RocksDbTeleologicalStore {
                     Ok((k, v)) => (k, v),
                     Err(_) => continue,
                 };
-                // Value is the causal relationship UUID
-                if value.len() == 16 {
-                    if let Ok(causal_id) = Uuid::from_slice(&value) {
-                        let primary_key = causal_relationship_key(&causal_id);
-                        if db2.get_cf(cf_primary, primary_key).ok().flatten().is_none() {
-                            if let Err(e) = db2.delete_cf(cf_by_source, &key) {
-                                error!("Failed to delete orphaned secondary index entry: {}", e);
-                                continue;
+                // STOR-H1 FIX: Values are stored as JSON-serialized Vec<Uuid>,
+                // NOT raw 16-byte UUIDs. Deserialize properly.
+                let causal_ids: Vec<Uuid> = match serde_json::from_slice(&value) {
+                    Ok(ids) => ids,
+                    Err(e) => {
+                        warn!(
+                            key_len = key.len(),
+                            value_len = value.len(),
+                            error = %e,
+                            "CAUSAL REPAIR: Failed to deserialize CF_CAUSAL_BY_SOURCE value as JSON Vec<Uuid>"
+                        );
+                        continue;
+                    }
+                };
+
+                let mut any_orphaned = false;
+                let mut valid_ids: Vec<Uuid> = Vec::with_capacity(causal_ids.len());
+
+                for causal_id in &causal_ids {
+                    let primary_key = causal_relationship_key(causal_id);
+                    if db2.get_cf(cf_primary, &primary_key).ok().flatten().is_some() {
+                        valid_ids.push(*causal_id);
+                    } else {
+                        any_orphaned = true;
+                        orphan_count += 1;
+                        debug!(causal_id = %causal_id, "Found orphaned causal ID in CF_CAUSAL_BY_SOURCE entry");
+                    }
+                }
+
+                if any_orphaned {
+                    if valid_ids.is_empty() {
+                        // All IDs orphaned — delete the entire entry
+                        if let Err(e) = db2.delete_cf(cf_by_source, &key) {
+                            error!("Failed to delete fully orphaned secondary index entry: {}", e);
+                        }
+                    } else {
+                        // Some IDs remain — update with only valid ones
+                        match serde_json::to_vec(&valid_ids) {
+                            Ok(serialized) => {
+                                if let Err(e) = db2.put_cf(cf_by_source, &key, &serialized) {
+                                    error!("Failed to update partially orphaned secondary index entry: {}", e);
+                                }
                             }
-                            orphan_count += 1;
-                            debug!(causal_id = %causal_id, "Deleted orphaned CF_CAUSAL_BY_SOURCE entry");
+                            Err(e) => {
+                                error!("Failed to serialize pruned causal IDs: {}", e);
+                            }
                         }
                     }
                 }

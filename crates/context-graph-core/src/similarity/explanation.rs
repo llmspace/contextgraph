@@ -145,14 +145,14 @@ impl std::fmt::Display for ScoreInterpretation {
 /// Names for the 13 embedding spaces.
 pub const SPACE_NAMES: [&str; NUM_EMBEDDERS] = [
     "E1 Semantic",
-    "E2 Sentiment",
-    "E3 Temporal",
-    "E4 Spatial",
+    "E2 Temporal Recent",
+    "E3 Temporal Periodic",
+    "E4 Temporal Positional",
     "E5 Causal",
     "E6 Sparse",
     "E7 Code",
     "E8 Graph",
-    "E9 Contextual",
+    "E9 HDC",
     "E10 Multimodal",
     "E11 Entity",
     "E12 ColBERT",

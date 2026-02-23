@@ -569,10 +569,8 @@ pub struct UniqueFind {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListEmbedderIndexesRequest {
-    /// Include detailed stats (default: true).
-    #[serde(default = "default_true")]
-    #[allow(dead_code)] // Deserialized from user input
-    pub include_details: bool,
+    // MCP-L8: include_details field removed — was deserialized but never read by handler.
+    // Additional fields would go here if needed.
 }
 
 impl ListEmbedderIndexesRequest {

@@ -6,7 +6,7 @@
 //! # Research Background
 //!
 //! Per Elastic's Weighted RRF research:
-//! - RRF formula: `RRF_score(d) = Sum(weight_i / (rank_i + k))`
+//! - RRF formula: `RRF_score(d) = Sum(weight_i / (k + rank_i + 1))`
 //! - Standard k value is 60 (provides good balance between top-heavy and uniform)
 //! - RRF is robust to score distribution differences between embedders
 //!
@@ -110,12 +110,13 @@ impl FusedResult {
 
 /// Compute Weighted RRF across multiple embedder rankings
 ///
-/// Formula: `RRF_score(d) = Sum(weight_i / (rank_i + k))`
+/// Formula: `RRF_score(d) = Sum(weight_i / (k + rank_i + 1))`
 ///
 /// Where:
 /// - `weight_i` is the embedder's weight
 /// - `rank_i` is the document's 0-based rank in that embedder's results
 /// - `k` is the RRF constant (60.0 by default)
+/// - `+1` converts 0-based rank to 1-based (rank 0 -> denominator k+1)
 ///
 /// # Arguments
 ///

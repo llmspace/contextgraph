@@ -1079,7 +1079,6 @@ async fn phase7_llm_causal_discovery(
         temperature: 0.0,
         max_tokens: 512,
         n_gpu_layers: u32::MAX, // Full GPU offload
-        seed: 42,
         batch_size: 2048,
         use_few_shot: true,
     };

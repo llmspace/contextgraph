@@ -248,12 +248,11 @@ pub struct BoostImportanceResponse {
 }
 
 impl BoostImportanceResponse {
-    /// Create a new response with computed values.
-    pub fn new(node_id: Uuid, old_importance: f32, delta: f32) -> Self {
-        let raw_new = old_importance + delta;
-        let new_importance = raw_new.clamp(MIN_IMPORTANCE, MAX_IMPORTANCE);
-        let clamped = (raw_new - new_importance).abs() > f32::EPSILON;
-
+    /// Create a response using the handler's actual computed values.
+    ///
+    /// MCP-L1: Accepts the handler's real `new_importance` and `clamped` flag
+    /// instead of recomputing from delta (which could diverge from the store).
+    pub fn from_result(node_id: Uuid, old_importance: f32, new_importance: f32, clamped: bool) -> Self {
         Self {
             node_id,
             old_importance,
@@ -542,26 +541,26 @@ mod tests {
     }
 
     #[test]
-    fn test_boost_importance_response_new_factory() {
+    fn test_boost_importance_response_from_result_factory() {
         let id = Uuid::new_v4();
 
         // Normal case - no clamping
-        let response = BoostImportanceResponse::new(id, 0.5, 0.2);
+        let response = BoostImportanceResponse::from_result(id, 0.5, 0.7, false);
         assert!((response.old_importance - 0.5).abs() < f32::EPSILON);
         assert!((response.new_importance - 0.7).abs() < f32::EPSILON);
         assert!(!response.clamped);
 
         // Clamp at max
-        let response = BoostImportanceResponse::new(id, 0.9, 0.5);
+        let response = BoostImportanceResponse::from_result(id, 0.9, 1.0, true);
         assert!((response.new_importance - 1.0).abs() < f32::EPSILON);
         assert!(response.clamped);
 
         // Clamp at min
-        let response = BoostImportanceResponse::new(id, 0.1, -0.5);
+        let response = BoostImportanceResponse::from_result(id, 0.1, 0.0, true);
         assert!((response.new_importance - 0.0).abs() < f32::EPSILON);
         assert!(response.clamped);
 
-        println!("[PASS] BoostImportanceResponse::new computes clamping correctly");
+        println!("[PASS] BoostImportanceResponse::from_result passes through handler values");
     }
 
     // ===== Edge Case Tests =====

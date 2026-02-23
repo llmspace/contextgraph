@@ -167,22 +167,14 @@ fn build_filters(options: &SemanticSearchOptions) -> SearchFilters {
 }
 
 /// Convert a low-level SemanticSearchResultItem to a high-level SearchResult.
+///
+/// GR-M1 FIX: Similarity and domain filtering is already applied by `SearchFilters`
+/// in `build_filters()` at the FAISS search level. This function only converts types;
+/// it does NOT re-filter, avoiding redundant work.
 fn convert_result_item(
     item: &SemanticSearchResultItem,
-    options: &SemanticSearchOptions,
+    _options: &SemanticSearchOptions,
 ) -> Option<SearchResult> {
-    // Filter by minimum similarity
-    if item.similarity < options.min_similarity {
-        return None;
-    }
-
-    // Filter by domain if specified
-    if let Some(filter_domain) = options.domain {
-        if item.domain != Some(filter_domain) {
-            return None;
-        }
-    }
-
     // Create node_id from FAISS ID if not available
     let node_id = item.node_id.unwrap_or_else(|| {
         // Generate a deterministic UUID from faiss_id for consistency
@@ -201,34 +193,57 @@ fn convert_result_item(
 /// Enrich search results with graph context via BFS traversal.
 ///
 /// For each result node, performs BFS to find connected nodes up to
-/// the specified depth.
+/// the specified depth. A depth of 0 means no traversal; depth=1 means
+/// immediate neighbors; depth=2 means neighbors-of-neighbors, etc.
 async fn enrich_with_graph_context(
     results: &mut [SearchResult],
     storage: &GraphStorage,
-    _depth: usize,
+    depth: usize,
 ) -> GraphResult<()> {
+    if depth == 0 {
+        return Ok(());
+    }
+
     for result in results.iter_mut() {
-        // Get adjacency list for this node
-        // Convert UUID to i64 for storage lookup
-        let node_i64 = uuid_to_i64(&result.node_id);
+        let start_i64 = uuid_to_i64(&result.node_id);
 
-        match storage.get_adjacency(node_i64) {
-            Ok(edges) => {
-                // Convert LegacyGraphEdge targets to UUIDs
-                let connected: Vec<Uuid> = edges
-                    .iter()
-                    .map(|e| Uuid::from_u64_pair(e.target as u64, 0))
-                    .collect();
+        // BFS up to `depth` hops
+        let mut visited = std::collections::HashSet::new();
+        visited.insert(start_i64);
+        let mut frontier = vec![start_i64];
 
-                // Update result with graph context
-                // Note: edge_types left empty as LegacyGraphEdge uses u8, not EdgeType
-                result.connected_nodes = connected;
+        for _level in 0..depth {
+            let mut next_frontier = Vec::new();
+            for &node in &frontier {
+                match storage.get_adjacency(node) {
+                    Ok(edges) => {
+                        for edge in &edges {
+                            if visited.insert(edge.target) {
+                                next_frontier.push(edge.target);
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        // Node has no edges — skip silently
+                    }
+                }
             }
-            Err(_) => {
-                // Node has no edges - this is fine, not an error
-                continue;
+            if next_frontier.is_empty() {
+                break;
             }
+            frontier = next_frontier;
         }
+
+        // Remove the start node from visited set — only want neighbors
+        visited.remove(&start_i64);
+
+        // Convert all discovered nodes to UUIDs
+        let connected: Vec<Uuid> = visited
+            .into_iter()
+            .map(|id| Uuid::from_u64_pair(id as u64, 0))
+            .collect();
+
+        result.connected_nodes = connected;
     }
 
     Ok(())
@@ -283,10 +298,14 @@ mod tests {
     }
 
     #[test]
-    fn test_convert_result_item_filters_by_similarity() {
+    fn test_convert_result_item_does_not_filter() {
+        // GR-M1: Similarity/domain filtering is done at the FAISS search level
+        // via SearchFilters in build_filters(). convert_result_item only converts
+        // types and does not re-filter.
+        let node_id = Uuid::new_v4();
         let item = SemanticSearchResultItem {
             faiss_id: 1,
-            node_id: Some(Uuid::new_v4()),
+            node_id: Some(node_id),
             distance: 0.5,
             similarity: 0.5,
             domain: None,
@@ -296,7 +315,9 @@ mod tests {
         let options = SemanticSearchOptions::default().with_min_similarity(0.7);
         let result = convert_result_item(&item, &options);
 
-        assert!(result.is_none()); // Filtered out due to low similarity
+        // Item passes through — filtering already happened at FAISS level
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().node_id, node_id);
     }
 
     #[test]

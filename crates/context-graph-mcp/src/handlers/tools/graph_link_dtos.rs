@@ -718,6 +718,26 @@ pub fn embedder_name(id: usize) -> &'static str {
     }
 }
 
+/// Valid embedder names E1-E13.
+pub const EMBEDDER_NAMES: [&str; 13] = [
+    "E1", "E2", "E3", "E4", "E5", "E6", "E7",
+    "E8", "E9", "E10", "E11", "E12", "E13",
+];
+
+/// Convert embedder name (E1-E13) to index (0-12).
+///
+/// Returns `Ok(index)` for valid names, `Err(message)` for invalid.
+pub fn embedder_name_to_index(name: &str) -> Result<usize, String> {
+    match name {
+        "E1" => Ok(0), "E2" => Ok(1), "E3" => Ok(2),
+        "E4" => Ok(3), "E5" => Ok(4), "E6" => Ok(5),
+        "E7" => Ok(6), "E8" => Ok(7), "E9" => Ok(8),
+        "E10" => Ok(9), "E11" => Ok(10), "E12" => Ok(11),
+        "E13" => Ok(12),
+        _ => Err(format!("Invalid embedder '{}'. Valid names: E1-E13.", name)),
+    }
+}
+
 /// Check if embedder uses asymmetric similarity.
 pub fn uses_asymmetric_similarity(embedder_id: usize) -> bool {
     // E5 (causal) and E8 (graph) use asymmetric similarity per ARCH-18

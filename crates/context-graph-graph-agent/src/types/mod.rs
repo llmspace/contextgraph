@@ -718,9 +718,11 @@ impl DomainMarkers {
         let lower = content.to_lowercase();
 
         // Count markers for each domain
+        // CODE and ACADEMIC markers are already lowercase literals — no need to lowercase them.
+        // LEGAL markers contain uppercase ("U.S.C.", "F.3d", "S.Ct.") and need lowercasing.
         let code_score = Self::CODE
             .iter()
-            .filter(|m| lower.contains(&m.to_lowercase()))
+            .filter(|m| lower.contains(*m))
             .count();
         let legal_score = Self::LEGAL
             .iter()
@@ -728,7 +730,7 @@ impl DomainMarkers {
             .count();
         let academic_score = Self::ACADEMIC
             .iter()
-            .filter(|m| lower.contains(&m.to_lowercase()))
+            .filter(|m| lower.contains(*m))
             .count();
 
         // Require minimum threshold and pick highest score.
@@ -784,9 +786,10 @@ impl DomainMarkers {
     /// than `detect_domain()` for broader code detection.
     pub fn looks_like_code(content: &str) -> bool {
         let lower = content.to_lowercase();
+        // CODE markers are already lowercase literals — no need to lowercase them.
         Self::CODE
             .iter()
-            .any(|m| lower.contains(&m.to_lowercase()))
+            .any(|m| lower.contains(*m))
     }
 }
 
