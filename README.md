@@ -25,7 +25,7 @@ Most memory systems for AI use a single embedding model and basic vector search.
 
 **Temporal awareness without temporal bias.** Time-based embedders (freshness, periodicity, sequence) are applied as post-retrieval boosts, not during retrieval. This prevents recent memories from drowning out relevant older ones.
 
-**55 MCP tools.** Not just store-and-search — full causal chain building, entity extraction with TransE predictions, topic discovery via HDBSCAN, code-aware search with AST chunking, file watching, provenance tracking, and LLM-powered relationship discovery.
+**56 MCP tools.** Not just store-and-search — full causal chain building, entity extraction with TransE predictions, topic discovery via HDBSCAN, code-aware search with AST chunking, file watching, provenance tracking, and LLM-powered relationship discovery.
 
 **Production-grade storage.** RocksDB with 51 column families, HNSW indexes for O(log n) K-NN search, soft-delete with 30-day recovery, background compaction, and graceful degradation when components fail.
 
@@ -81,7 +81,7 @@ Add to `~/.claude/settings.json`:
 }
 ```
 
-Once connected, Claude has access to all 55 MCP tools — persistent memory, causal reasoning, entity linking, code search, and more — with no further configuration.
+Once connected, Claude has access to all 56 MCP tools — persistent memory, causal reasoning, entity linking, code search, and more — with no further configuration.
 
 ---
 
@@ -170,10 +170,10 @@ A query like *"Why does the authentication service fail under load?"*:
 │          (Claude Code, Claude Desktop)              │
 └──────────────────────┬──────────────────────────────┘
                        │ JSON-RPC 2.0
-                       │ (stdio / TCP / SSE)
+                       │ (stdio / TCP)
 ┌──────────────────────▼──────────────────────────────┐
 │              Context Graph MCP Server               │
-│                   55 MCP Tools                      │
+│                   56 MCP Tools                      │
 ├─────────────────────────────────────────────────────┤
 │  ┌─────────┐  ┌──────────┐  ┌────────────────────┐ │
 │  │ Handlers│  │ Transport│  │  Background Tasks  │ │
@@ -202,7 +202,7 @@ A query like *"Why does the authentication service fail under load?"*:
 
 | Crate | Purpose |
 |-------|---------|
-| `context-graph-mcp` | MCP server, transport layer, 55 tool handlers |
+| `context-graph-mcp` | MCP server, transport layer, 56 tool handlers |
 | `context-graph-core` | Domain types, config, traits, 14 weight profiles |
 | `context-graph-storage` | RocksDB persistence, 51 column families, HNSW indexes |
 | `context-graph-embeddings` | 13-model embedding pipeline (HuggingFace candle) |
@@ -332,6 +332,7 @@ A query like *"Why does the authentication service fail under load?"*:
 | Tool | Description |
 |------|-------------|
 | `repair_causal_relationships` | Repair corrupted causal relationship entries |
+| `daemon_status` | Check daemon process health and connection info |
 
 ---
 
@@ -349,7 +350,7 @@ A query like *"Why does the authentication service fail under load?"*:
 
 ### HNSW Indexing
 
-10 of 13 embedders use [usearch](https://github.com/unum-cloud/usearch) HNSW graphs for O(log n) K-NN search. E6/E13 (sparse) use inverted indexes. E12 (ColBERT) uses MaxSim token-level scoring. HNSW graphs are persisted to RocksDB and compacted on a 10-minute background interval.
+15 HNSW indexes use [usearch](https://github.com/unum-cloud/usearch) for O(log n) K-NN search: 11 base embedder indexes plus 2 asymmetric indexes for E5 (cause/effect) and 2 for E10 (paraphrase/context). E6/E13 (sparse) use inverted indexes. E12 (ColBERT) uses MaxSim token-level scoring. HNSW graphs are persisted to RocksDB and compacted on a 10-minute background interval.
 
 ---
 
@@ -366,14 +367,15 @@ A query like *"Why does the authentication service fail under load?"*:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CONTEXT_GRAPH_TRANSPORT` | `stdio` | Transport: `stdio`, `tcp`, `sse`, `stdio+tcp` |
+| `CONTEXT_GRAPH_TRANSPORT` | `stdio` | Transport: `stdio` or `tcp` |
 | `CONTEXT_GRAPH_TCP_PORT` | `3100` | TCP port |
-| `CONTEXT_GRAPH_SSE_PORT` | `3101` | SSE port |
 | `CONTEXT_GRAPH_BIND_ADDRESS` | `127.0.0.1` | Bind address |
 | `CONTEXT_GRAPH_DAEMON` | `false` | Enable daemon mode |
+| `CONTEXT_GRAPH_DAEMON_PORT` | `3100` | Daemon TCP port |
 | `CONTEXT_GRAPH_WARM_FIRST` | `true` | Block until models load |
 | `CONTEXT_GRAPH_STORAGE_PATH` | — | RocksDB database path |
 | `CONTEXT_GRAPH_MODELS_PATH` | — | Embedding models path |
+| `CONTEXT_GRAPH_WATCHER_ENABLED` | `true` | Enable file watcher |
 | `CONTEXT_GRAPH_ENV` | `development` | Config environment |
 | `RUST_LOG` | `info` | Log level |
 
@@ -383,7 +385,6 @@ A query like *"Why does the authentication service fail under load?"*:
 [mcp]
 transport = "stdio"
 tcp_port = 3100
-sse_port = 3101
 bind_address = "127.0.0.1"
 max_payload_size = 10485760
 request_timeout = 30
@@ -399,7 +400,7 @@ extensions = ["md"]
 
 [watcher.code]
 enabled = false
-watch_paths = ["./src"]
+watch_paths = ["./crates"]
 extensions = ["rs"]
 use_ast_chunker = true
 target_chunk_size = 500
@@ -413,9 +414,7 @@ target_chunk_size = 500
 |------|----------|----------|
 | **stdio** | Newline-delimited JSON over stdin/stdout | Claude Code, Claude Desktop |
 | **tcp** | JSON-RPC over TCP socket | Remote deployments, multiple clients |
-| **sse** | Server-Sent Events over HTTP | Web clients, real-time streaming |
-| **stdio+tcp** | Both simultaneously | stdio for Claude Code + TCP for hooks/CLI |
-| **daemon** | Shared TCP server | Single server instance across multiple terminals |
+| **daemon** | Shared TCP server with stdio proxy | Single server instance across multiple terminals |
 
 ---
 
@@ -452,7 +451,7 @@ context-graph-cli warmup   # Pre-load embeddings into VRAM
 
 Context Graph is designed to keep working when components fail:
 
-- **LLM unavailable**: 52 of 55 tools work normally. Only `trigger_causal_discovery`, `discover_graph_relationships`, and `validate_graph_link` return errors. Build without the `llm` feature to skip LLM dependencies entirely (~500MB smaller binary).
+- **LLM unavailable**: 52 of 56 tools work normally. Only `trigger_causal_discovery`, `get_causal_discovery_status`, `discover_graph_relationships`, and `validate_graph_link` require the LLM feature. Build without `llm` to skip LLM dependencies (~500MB smaller binary).
 - **Embedder failure**: The pipeline handles individual embedder loading failures. Search falls back to available embedders with degraded-mode tracking.
 - **Soft-delete**: All deletions are soft with a 30-day recovery window. A background GC task runs every 5 minutes to clean up expired deletions.
 - **HNSW compaction**: Background task rebuilds HNSW indexes every 10 minutes. Safe concurrent reads during rebuild.
@@ -480,7 +479,7 @@ To build without CUDA (CPU-only embeddings):
 cargo build --release --no-default-features --features llm
 ```
 
-To build without LLM support (smaller binary, 51 tools):
+To build without LLM support (smaller binary, 52 tools):
 
 ```bash
 cargo build --release --no-default-features --features cuda
