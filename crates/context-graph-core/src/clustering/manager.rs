@@ -667,9 +667,7 @@ impl MultiSpaceClusterManager {
                 continue;
             }
 
-            let cluster_ids = HashMap::new(); // N/A for FDMC
-            let topic = Topic::new(profile, cluster_ids, members.clone());
-            // Skip if we've reached the topic cap
+            // Check cap before allocating the Topic
             if self.topics.len() >= MAX_TOPICS {
                 tracing::warn!(
                     max = MAX_TOPICS,
@@ -677,6 +675,8 @@ impl MultiSpaceClusterManager {
                 );
                 break;
             }
+            let cluster_ids = HashMap::new(); // N/A for FDMC
+            let topic = Topic::new(profile, cluster_ids, members.clone());
             self.topics.insert(topic.id, topic);
             total_clusters += 1;
         }
@@ -1040,8 +1040,7 @@ impl MultiSpaceClusterManager {
             // Compute cluster_ids (most common cluster per space)
             let cluster_ids = Self::compute_dominant_cluster_ids(&members, &mem_clusters);
 
-            let topic = Topic::new(profile, cluster_ids, members);
-            // Skip if we've reached the topic cap
+            // Check cap before allocating the Topic
             if self.topics.len() >= MAX_TOPICS {
                 tracing::warn!(
                     max = MAX_TOPICS,
@@ -1049,6 +1048,7 @@ impl MultiSpaceClusterManager {
                 );
                 break;
             }
+            let topic = Topic::new(profile, cluster_ids, members);
             self.topics.insert(topic.id, topic);
         }
 
