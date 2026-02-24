@@ -819,7 +819,8 @@ impl Handlers {
         let mut visited: HashSet<Uuid> = HashSet::new();
         visited.insert(anchor_uuid);
 
-        let mut current_fingerprint = anchor_fingerprint.semantic.clone();
+        // M6 FIX: Move instead of clone — anchor_fingerprint is not used after this point.
+        let mut current_fingerprint = anchor_fingerprint.semantic;
         let mut cumulative_strength = 1.0_f32;
         let mut total_candidates_evaluated = 0;
         let mut truncated = false;
@@ -892,11 +893,14 @@ impl Handlers {
                 if best_candidate.is_none()
                     || adjusted_sim > best_candidate.as_ref().unwrap().2
                 {
+                    // M6 FIX: Move instead of clone — `for candidate in candidates` gives
+                    // ownership, so the SemanticFingerprint can be moved without copying
+                    // all 13+ embedding vectors (~50KB).
                     best_candidate = Some((
                         cand_id,
-                        candidate.similarity, // base similarity
+                        candidate.similarity, // base similarity (f32 is Copy)
                         adjusted_sim,         // asymmetric similarity
-                        candidate.fingerprint.semantic.clone(),
+                        candidate.fingerprint.semantic,
                     ));
                 }
             }

@@ -191,6 +191,12 @@ impl CausalEdge {
     }
 }
 
+/// Maximum number of nodes the causal graph will hold.
+const MAX_CAUSAL_NODES: usize = 500_000;
+
+/// Maximum number of edges the causal graph will hold.
+const MAX_CAUSAL_EDGES: usize = 2_000_000;
+
 /// Structural Causal Model represented as a directed graph.
 ///
 /// The SCM stores nodes and directed edges representing causal
@@ -214,8 +220,15 @@ impl CausalGraph {
     }
 
     /// Add a node to the graph.
-    pub fn add_node(&mut self, node: CausalNode) {
+    ///
+    /// Returns `false` if the graph has reached `MAX_CAUSAL_NODES` capacity
+    /// and the node was not inserted.
+    pub fn add_node(&mut self, node: CausalNode) -> bool {
+        if self.nodes.len() >= MAX_CAUSAL_NODES && !self.nodes.contains_key(&node.id) {
+            return false;
+        }
         self.nodes.insert(node.id, node);
+        true
     }
 
     /// Remove a node and all its connected edges.
@@ -242,7 +255,14 @@ impl CausalGraph {
     }
 
     /// Add a directed edge (causal relationship).
-    pub fn add_edge(&mut self, edge: CausalEdge) {
+    ///
+    /// Returns `false` if the graph has reached `MAX_CAUSAL_EDGES` capacity
+    /// and the edge was not inserted.
+    pub fn add_edge(&mut self, edge: CausalEdge) -> bool {
+        if self.edges.len() >= MAX_CAUSAL_EDGES {
+            return false;
+        }
+
         let edge_idx = self.edges.len();
 
         // Update indices
@@ -256,6 +276,7 @@ impl CausalGraph {
             .push(edge_idx);
 
         self.edges.push(edge);
+        true
     }
 
     /// Remove an edge between source and target.

@@ -33,6 +33,10 @@ pub const DEFAULT_ENTROPY_DURATION_SECS: u64 = 300;
 /// Snapshots retained for 24 hours.
 pub const SNAPSHOT_RETENTION_HOURS: i64 = 24;
 
+/// Maximum number of snapshots retained (hard cap for safety).
+/// At 1 snapshot/minute, 1440 covers 24 hours.
+const MAX_SNAPSHOTS: usize = 1440;
+
 /// Snapshot of topic portfolio at a point in time.
 ///
 /// Used for computing churn between snapshots. Only stores topic IDs
@@ -145,6 +149,7 @@ impl TopicStabilityTracker {
     /// Take a snapshot of current topic portfolio.
     ///
     /// Stores topic IDs and member counts. Old snapshots (>24h) are cleaned.
+    /// Hard-capped at `MAX_SNAPSHOTS` to prevent unbounded growth.
     pub fn take_snapshot(&mut self, topics: &[Topic]) {
         let snapshot = TopicSnapshot::from_topics(topics);
         tracing::debug!(
@@ -154,6 +159,11 @@ impl TopicStabilityTracker {
         );
         self.snapshots.push_back(snapshot);
         self.cleanup_old_snapshots();
+
+        // Hard cap: evict oldest if we exceed MAX_SNAPSHOTS
+        while self.snapshots.len() > MAX_SNAPSHOTS {
+            self.snapshots.pop_front();
+        }
     }
 
     /// Compute churn by comparing current state to a previous snapshot.
@@ -203,6 +213,11 @@ impl TopicStabilityTracker {
         self.current_churn = churn;
         self.churn_history.push_back((now, churn));
         self.cleanup_old_churn_history(now);
+
+        // Hard cap: evict oldest if we exceed MAX_SNAPSHOTS
+        while self.churn_history.len() > MAX_SNAPSHOTS {
+            self.churn_history.pop_front();
+        }
 
         churn
     }

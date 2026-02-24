@@ -248,9 +248,28 @@ impl SpladeInvertedIndex {
         Ok(())
     }
 
+    /// Maximum file size allowed for deserialization (1 GB).
+    const MAX_LOAD_FILE_SIZE: u64 = 1_073_741_824;
+
     /// Load index from file.
+    ///
+    /// Rejects files larger than 1 GB to prevent unbounded memory allocation
+    /// from malformed or excessively large index files.
     pub fn load(path: &Path) -> IndexResult<Self> {
         let file = File::open(path).map_err(|e| IndexError::io("opening SPLADE index file", e))?;
+
+        // Check file size before attempting deserialization
+        let metadata = file.metadata().map_err(|e| IndexError::io("reading SPLADE index file metadata", e))?;
+        if metadata.len() > Self::MAX_LOAD_FILE_SIZE {
+            return Err(IndexError::serialization(
+                "SPLADE index file too large",
+                format!(
+                    "file size {} bytes exceeds 1 GB limit; refusing to deserialize",
+                    metadata.len()
+                ),
+            ));
+        }
+
         let reader = BufReader::new(file);
         bincode::deserialize_from(reader)
             .map_err(|e| IndexError::serialization("deserializing SPLADE index", e))

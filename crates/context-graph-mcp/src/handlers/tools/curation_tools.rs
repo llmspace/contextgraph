@@ -320,10 +320,10 @@ mod tests {
 
     #[test]
     fn test_constants_match_constitution() {
-        // SEC-06: 30-day recovery
+        // L4 FIX: Recovery days must match GC retention (7 days)
         assert_eq!(
-            SOFT_DELETE_RECOVERY_DAYS, 30,
-            "SOFT_DELETE_RECOVERY_DAYS must be 30 per SEC-06"
+            SOFT_DELETE_RECOVERY_DAYS, 7,
+            "SOFT_DELETE_RECOVERY_DAYS must be 7 to match GC retention"
         );
 
         // BR-MCP-002: Importance clamped to [0.0, 1.0]

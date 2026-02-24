@@ -31,6 +31,10 @@ use super::McpServer;
 /// Prevents OOM from clients sending multi-gigabyte data without newlines.
 pub const MAX_LINE_BYTES: usize = 10 * 1024 * 1024;
 
+/// Maximum number of requests in a JSON-RPC 2.0 batch.
+/// L7 FIX: Prevents DoS via oversized batch arrays that could exhaust memory or CPU.
+pub const MAX_BATCH_SIZE: usize = 100;
+
 /// Read a line from an async buffered reader with a byte size limit.
 ///
 /// AGT-04 FIX: `BufReader::read_line()` allocates unboundedly until it finds
@@ -319,6 +323,28 @@ impl McpServer {
                         None,
                         crate::protocol::error_codes::INVALID_REQUEST,
                         "Empty batch request",
+                    );
+                    let response_json = serde_json::to_string(&error_response)?;
+                    writer.write_all(response_json.as_bytes()).await?;
+                    writer.write_all(b"\n").await?;
+                    writer.flush().await?;
+                    continue;
+                }
+
+                // L7 FIX: Reject oversized batch requests to prevent DoS.
+                if batch_values.len() > MAX_BATCH_SIZE {
+                    warn!(
+                        "[{}] {} sent batch with {} items (max {})",
+                        conn_tag, peer_addr, batch_values.len(), MAX_BATCH_SIZE
+                    );
+                    let error_response = JsonRpcResponse::error(
+                        None,
+                        crate::protocol::error_codes::INVALID_REQUEST,
+                        format!(
+                            "Batch too large: {} requests exceeds maximum of {}",
+                            batch_values.len(),
+                            MAX_BATCH_SIZE
+                        ),
                     );
                     let response_json = serde_json::to_string(&error_response)?;
                     writer.write_all(response_json.as_bytes()).await?;

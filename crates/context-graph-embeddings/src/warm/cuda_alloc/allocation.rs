@@ -19,7 +19,22 @@ use super::constants::GB;
 ///
 /// `VramAllocation` is `Send + Sync` as it only contains primitive data.
 /// The actual CUDA memory management is handled by the allocator.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+///
+/// # Why no `Clone`
+///
+/// `VramAllocation` holds a raw CUDA device pointer (`ptr`). Cloning would
+/// create two handles to the same GPU memory, risking double-free when the
+/// allocator calls `cudaFree` on one while the clone still references it.
+/// Use `&VramAllocation` for shared access instead.
+///
+/// # Why no `Drop`
+///
+/// Freeing CUDA memory requires the `WarmCudaAllocator` (which tracks
+/// `total_allocated_bytes` and `allocation_history`). `VramAllocation`
+/// intentionally does NOT hold a back-reference to the allocator, so it
+/// cannot free itself. The allocator owns the free logic via
+/// `WarmCudaAllocator::free_protected(&mut self, allocation: &VramAllocation)`.
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct VramAllocation {
     /// Raw CUDA device pointer (from cudaMalloc).
     ///

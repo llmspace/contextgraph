@@ -12,6 +12,11 @@ use uuid::Uuid;
 use super::super::get_hnsw_config;
 use super::super::hnsw_config::{DistanceMetric, EmbedderIndex, HnswConfig};
 
+/// Maximum vectors per HNSW index. At 1024D x 4 bytes = 4 KB per vector,
+/// 2M vectors = ~8 GB raw data + HNSW graph overhead (~16 GB total).
+/// Prevents unbounded memory growth from runaway inserts.
+pub(crate) const MAX_HNSW_VECTORS_PER_INDEX: usize = 2_000_000;
+
 /// Convert our DistanceMetric to usearch MetricKind.
 ///
 /// # Panics

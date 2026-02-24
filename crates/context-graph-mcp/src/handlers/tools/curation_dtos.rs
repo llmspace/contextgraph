@@ -1,11 +1,11 @@
 //! DTOs for curation-related MCP tools.
 //!
 //! Per PRD v6 Section 10.3, these DTOs support:
-//! - forget_concept: Soft-delete a memory with 30-day recovery
+//! - forget_concept: Soft-delete a memory with 7-day recovery
 //! - boost_importance: Adjust memory importance score
 //!
 //! Constitution References:
-//! - SEC-06: Soft delete 30-day recovery
+//! - SEC-06: Soft delete 7-day recovery
 //! - BR-MCP-001: forget_concept uses soft delete by default
 //! - BR-MCP-002: boost_importance clamps final value to [0.0, 1.0]
 //!
@@ -19,8 +19,9 @@ use uuid::Uuid;
 // CONSTANTS
 // ============================================================================
 
-/// Soft delete recovery period in days per SEC-06.
-pub const SOFT_DELETE_RECOVERY_DAYS: i64 = 30;
+/// Soft delete recovery period in days.
+/// L4 FIX: Matches actual GC retention of 7 days in server/mod.rs (gc_retention = 7 * 24 * 3600).
+pub const SOFT_DELETE_RECOVERY_DAYS: i64 = 7;
 
 /// Minimum importance value.
 pub const MIN_IMPORTANCE: f32 = 0.0;
@@ -50,7 +51,7 @@ pub struct ForgetConceptRequest {
     /// Must be a valid UUID string
     pub node_id: String,
 
-    /// Use soft delete with 30-day recovery window (default true per SEC-06)
+    /// Use soft delete with 7-day recovery window (default true per SEC-06)
     /// If false, memory is permanently deleted with no recovery option
     #[serde(default = "default_soft_delete")]
     pub soft_delete: bool,
@@ -195,7 +196,7 @@ pub struct ForgetConceptResponse {
     pub soft_deleted: bool,
 
     /// When the memory can be recovered until (if soft deleted)
-    /// Per SEC-06: 30 days from deletion
+    /// Per SEC-06: 7 days from deletion
     /// Only present if soft_deleted is true
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recoverable_until: Option<DateTime<Utc>>,
@@ -204,7 +205,7 @@ pub struct ForgetConceptResponse {
 impl ForgetConceptResponse {
     /// Create a response for a soft delete operation.
     ///
-    /// Computes recovery deadline as 30 days from now per SEC-06.
+    /// Computes recovery deadline as 7 days from now per SEC-06.
     pub fn soft_deleted(id: Uuid) -> Self {
         Self {
             forgotten_id: id,
@@ -225,7 +226,7 @@ impl ForgetConceptResponse {
 
 /// Compute the recovery deadline from a deletion timestamp.
 ///
-/// Per SEC-06: 30-day recovery window.
+/// Per SEC-06: 7-day recovery window.
 pub fn compute_recovery_deadline(deleted_at: DateTime<Utc>) -> DateTime<Utc> {
     deleted_at + Duration::days(SOFT_DELETE_RECOVERY_DAYS)
 }
@@ -450,7 +451,7 @@ mod tests {
 
     #[test]
     fn test_forget_concept_response_serialization_soft() {
-        let recovery_time = Utc::now() + Duration::days(30);
+        let recovery_time = Utc::now() + Duration::days(SOFT_DELETE_RECOVERY_DAYS);
         let response = ForgetConceptResponse {
             forgotten_id: Uuid::nil(),
             soft_deleted: true,
@@ -489,12 +490,12 @@ mod tests {
         assert!(response.soft_deleted);
         assert!(response.recoverable_until.is_some());
 
-        // Verify recovery is ~30 days from now
+        // Verify recovery is ~7 days from now (matches GC retention)
         let recovery = response.recoverable_until.unwrap();
-        let expected = Utc::now() + Duration::days(30);
+        let expected = Utc::now() + Duration::days(SOFT_DELETE_RECOVERY_DAYS);
         let diff = (recovery - expected).num_seconds().abs();
-        assert!(diff < 5, "Recovery time should be ~30 days from now");
-        println!("[PASS] ForgetConceptResponse::soft_deleted sets 30-day recovery per SEC-06");
+        assert!(diff < 5, "Recovery time should be ~7 days from now");
+        println!("[PASS] ForgetConceptResponse::soft_deleted sets 7-day recovery (matches GC retention)");
     }
 
     #[test]
@@ -609,16 +610,16 @@ mod tests {
         let deadline = compute_recovery_deadline(now);
 
         let diff_days = (deadline - now).num_days();
-        assert_eq!(diff_days, 30);
-        println!("[PASS] Recovery deadline is 30 days per SEC-06");
+        assert_eq!(diff_days, SOFT_DELETE_RECOVERY_DAYS);
+        println!("[PASS] Recovery deadline is 7 days (matches GC retention)");
     }
 
     // ===== Constitution Compliance Tests =====
 
     #[test]
     fn test_constants_match_constitution() {
-        // SEC-06: 30-day recovery
-        assert_eq!(SOFT_DELETE_RECOVERY_DAYS, 30);
+        // L4 FIX: Recovery days must match GC retention (7 days)
+        assert_eq!(SOFT_DELETE_RECOVERY_DAYS, 7);
 
         // BR-MCP-002: Importance clamped to [0.0, 1.0]
         assert!((MIN_IMPORTANCE - 0.0).abs() < f32::EPSILON);

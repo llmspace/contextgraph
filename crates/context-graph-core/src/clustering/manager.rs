@@ -81,6 +81,12 @@ pub const TOPIC_THRESHOLD: f32 = 2.5;
 /// history for meaningful HDBSCAN clustering.
 const MAX_EMBEDDINGS_PER_SPACE: usize = 50_000;
 
+/// Maximum number of topics the manager will track.
+///
+/// Prevents unbounded growth of the topics HashMap. If a new topic would
+/// exceed this limit, it is silently skipped.
+const MAX_TOPICS: usize = 10_000;
+
 // =============================================================================
 // ManagerParams
 // =============================================================================
@@ -396,8 +402,14 @@ impl MultiSpaceClusterManager {
             // Evict oldest half when cap exceeded to bound memory usage
             if state.embeddings.len() > MAX_EMBEDDINGS_PER_SPACE {
                 let keep_from = state.embeddings.len() / 2;
+                // Collect evicted memory_ids to prune memberships
+                let evicted_ids: Vec<Uuid> = state.memory_ids[..keep_from].to_vec();
                 state.embeddings.drain(..keep_from);
                 state.memory_ids.drain(..keep_from);
+                // Remove evicted entries from memberships to prevent stale references
+                for evicted_id in &evicted_ids {
+                    state.memberships.remove(evicted_id);
+                }
             }
 
             // Check if we need to trigger HDBSCAN reclustering
@@ -657,6 +669,14 @@ impl MultiSpaceClusterManager {
 
             let cluster_ids = HashMap::new(); // N/A for FDMC
             let topic = Topic::new(profile, cluster_ids, members.clone());
+            // Skip if we've reached the topic cap
+            if self.topics.len() >= MAX_TOPICS {
+                tracing::warn!(
+                    max = MAX_TOPICS,
+                    "Topic cap reached, skipping new topic from FDMC"
+                );
+                break;
+            }
             self.topics.insert(topic.id, topic);
             total_clusters += 1;
         }
@@ -1021,6 +1041,14 @@ impl MultiSpaceClusterManager {
             let cluster_ids = Self::compute_dominant_cluster_ids(&members, &mem_clusters);
 
             let topic = Topic::new(profile, cluster_ids, members);
+            // Skip if we've reached the topic cap
+            if self.topics.len() >= MAX_TOPICS {
+                tracing::warn!(
+                    max = MAX_TOPICS,
+                    "Topic cap reached, skipping new topic from HDBSCAN synthesis"
+                );
+                break;
+            }
             self.topics.insert(topic.id, topic);
         }
 
@@ -1413,6 +1441,15 @@ impl MultiSpaceClusterManager {
         // Temporal embedders (E2-E4) have topic_weight=0.0 and MUST NOT appear
         // in contributing_spaces.
         for topic in &portfolio.topics {
+            // Skip if we've reached the topic cap
+            if self.topics.len() >= MAX_TOPICS {
+                tracing::warn!(
+                    max = MAX_TOPICS,
+                    skipped = portfolio.topics.len().saturating_sub(self.topics.len()),
+                    "Topic cap reached during import, remaining topics skipped"
+                );
+                break;
+            }
             let mut imported_topic = topic.clone();
             imported_topic.update_contributing_spaces();
             self.topics.insert(imported_topic.id, imported_topic);

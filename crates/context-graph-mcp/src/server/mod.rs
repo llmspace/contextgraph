@@ -119,6 +119,10 @@ pub struct McpServer {
     /// M1 FIX: HNSW persistence background task handle.
     /// Uses tokio::sync::Mutex so shutdown(&self) can take ownership of the handle.
     hnsw_persist_task: tokio::sync::Mutex<Option<JoinHandle<()>>>,
+    /// M5 FIX: Background model loading task handle (constitution: JoinHandle must be awaited).
+    /// Only populated when warm_first=false (background loading mode).
+    /// None when models are loaded synchronously (warm_first=true or already warm).
+    model_load_task: tokio::sync::Mutex<Option<JoinHandle<()>>>,
     /// M1 FIX: Shutdown flag for background tasks (legacy, kept for compatibility).
     background_shutdown: Arc<AtomicBool>,
     /// SRV-M1 FIX: Watch channel sender for immediate background task cancellation.
@@ -322,7 +326,9 @@ impl McpServer {
         // Check if global warm provider is already initialized
         let warm_provider_initialized = is_warm_initialized();
 
-        if warm_provider_initialized {
+        // M5 FIX: Capture background model loading JoinHandle (if any).
+        // Only the warm_first=false branch spawns a background task.
+        let model_load_task: Option<JoinHandle<()>> = if warm_provider_initialized {
             // Use the already-warm global provider (regardless of warm_first flag)
             info!("Global warm provider already initialized - using warm models immediately");
             match get_warm_provider() {
@@ -351,6 +357,7 @@ impl McpServer {
                     models_loading.store(false, Ordering::SeqCst);
                 }
             }
+            None
         } else if warm_first {
             // TASK-EMB-WARMUP: BLOCKING warmup mode
             // Block startup until all 13 models are loaded into VRAM
@@ -401,6 +408,7 @@ impl McpServer {
                     ));
                 }
             }
+            None
         } else {
             // TASK-EMB-WARMUP: BACKGROUND warmup mode (warm_first=false)
             // Initialize global warm provider in background
@@ -419,7 +427,8 @@ impl McpServer {
             let failed_slot = Arc::clone(&models_failed);
             let models_dir_clone = models_dir.clone();
 
-            tokio::spawn(async move {
+            // M5 FIX: Store JoinHandle — panics in this task are now observable.
+            let model_load_handle = tokio::spawn(async move {
                 info!("Background model loading started...");
 
                 // First try to initialize global warm provider
@@ -476,7 +485,8 @@ impl McpServer {
                     }
                 }
             });
-        }
+            Some(model_load_handle)
+        };
 
         // Create lazy provider wrapper for immediate MCP startup
         let lazy_provider: Arc<dyn MultiArrayEmbeddingProvider> =
@@ -719,6 +729,8 @@ impl McpServer {
             // M1 FIX: Store background task handles (constitution: JoinHandle must be awaited)
             gc_task: tokio::sync::Mutex::new(Some(gc_task)),
             hnsw_persist_task: tokio::sync::Mutex::new(Some(hnsw_persist_task)),
+            // M5 FIX: Store model loading task handle (None when loaded synchronously)
+            model_load_task: tokio::sync::Mutex::new(model_load_task),
             background_shutdown,
             // SRV-M1 FIX: Watch channel sender for immediate cancellation
             shutdown_tx,
@@ -841,6 +853,29 @@ impl McpServer {
                         None,
                         crate::protocol::error_codes::INVALID_REQUEST,
                         "Empty batch request",
+                    );
+                    let response_json = serde_json::to_string(&error_response)?;
+                    writer.write_all(response_json.as_bytes()).await?;
+                    writer.write_all(b"\n").await?;
+                    writer.flush().await?;
+                    continue;
+                }
+
+                // L7 FIX: Reject oversized batch requests to prevent DoS.
+                if batch_values.len() > transport::MAX_BATCH_SIZE {
+                    warn!(
+                        "Batch request with {} items exceeds maximum of {}",
+                        batch_values.len(),
+                        transport::MAX_BATCH_SIZE
+                    );
+                    let error_response = JsonRpcResponse::error(
+                        None,
+                        crate::protocol::error_codes::INVALID_REQUEST,
+                        format!(
+                            "Batch too large: {} requests exceeds maximum of {}",
+                            batch_values.len(),
+                            transport::MAX_BATCH_SIZE
+                        ),
                     );
                     let response_json = serde_json::to_string(&error_response)?;
                     writer.write_all(response_json.as_bytes()).await?;
@@ -1023,10 +1058,11 @@ impl McpServer {
     ///
     /// 1. Signal all background tasks to stop via shutdown flag
     /// 2. Await GC task with 5s timeout
-    /// 3. Await HNSW persist task with 10s timeout
-    /// 4. Stop graph builder, code watcher, file watcher
-    /// 5. Final HNSW persistence (captures any unsaved changes)
-    /// 6. Flush ALL RocksDB column families to disk
+    /// 3. Await model loading task with 60s timeout (M5 FIX)
+    /// 4. Await HNSW persist task with 10s timeout
+    /// 5. Stop graph builder, code watcher, file watcher
+    /// 6. Final HNSW persistence (captures any unsaved changes)
+    /// 7. Flush ALL RocksDB column families to disk
     ///
     /// Safe to call multiple times (idempotent).
     pub async fn shutdown(&self) {
@@ -1051,7 +1087,20 @@ impl McpServer {
             }
         }
 
-        // 3. Await HNSW persist task with 10s timeout (persistence may take time)
+        // 3. Await model loading task with 60s timeout (model loading can take 20-30s)
+        // M5 FIX: Constitution: "JoinHandle must be awaited or aborted — never silently dropped"
+        {
+            let mut guard = self.model_load_task.lock().await;
+            if let Some(handle) = guard.take() {
+                match tokio::time::timeout(std::time::Duration::from_secs(60), handle).await {
+                    Ok(Ok(())) => info!("Model loading task shut down cleanly"),
+                    Ok(Err(e)) => error!("Model loading task panicked during shutdown: {}", e),
+                    Err(_) => warn!("Model loading task did not stop within 60s — abandoning"),
+                }
+            }
+        }
+
+        // 4. Await HNSW persist task with 10s timeout (persistence may take time)
         {
             let mut guard = self.hnsw_persist_task.lock().await;
             if let Some(handle) = guard.take() {
@@ -1063,7 +1112,7 @@ impl McpServer {
             }
         }
 
-        // 4. Stop graph builder, code watcher, file watcher
+        // 5. Stop graph builder, code watcher, file watcher
         self.stop_graph_builder().await;
         self.stop_code_watcher().await;
         // Audit-7 MCP7-L1 FIX: stop_file_watcher uses std::thread::sleep for polling,
@@ -1071,7 +1120,7 @@ impl McpServer {
         // off the async worker pool so other tasks can progress during the 0-2s wait.
         tokio::task::block_in_place(|| self.stop_file_watcher());
 
-        // 5. Final HNSW persistence (captures any changes since last background persist)
+        // 6. Final HNSW persistence (captures any changes since last background persist)
         info!("Persisting HNSW indexes on shutdown...");
         if let Err(e) = self.teleological_store.persist_hnsw_indexes_if_available() {
             error!("Failed to persist HNSW indexes on shutdown: {e}");
@@ -1079,7 +1128,7 @@ impl McpServer {
             info!("HNSW indexes persisted successfully on shutdown");
         }
 
-        // 6. Flush ALL RocksDB column families to disk
+        // 7. Flush ALL RocksDB column families to disk
         // This forces memtable → SST flush, ensuring all data is durable.
         // WAL replay would recover unflushed data, but explicit flush is more reliable.
         info!("Flushing RocksDB to disk on shutdown...");

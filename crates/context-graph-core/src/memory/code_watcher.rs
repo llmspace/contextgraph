@@ -492,16 +492,24 @@ impl<E: CodeEmbeddingProvider, S: CodeStorage> CodeFileWatcher<E, S> {
         Ok(ids)
     }
 
-    /// Handle file deletion by removing entities.
+    /// Handle file deletion by removing entities and cleaning up hash cache.
     async fn handle_file_deletion(&self, path: &Path) -> Result<usize, CodeWatcherError> {
         let path_str = path.to_string_lossy().to_string();
-        self.capture_service
+        let deleted = self.capture_service
             .delete_by_file(&path_str)
             .await
             .map_err(|e| CodeWatcherError::CaptureFailed {
                 path: path.to_path_buf(),
                 source: e,
-            })
+            })?;
+
+        // Remove the deleted file's hash to prevent stale entries from accumulating
+        {
+            let mut hashes = self.file_hashes.write().await;
+            hashes.remove(path);
+        }
+
+        Ok(deleted)
     }
 
     /// Check if a file has a supported code extension.

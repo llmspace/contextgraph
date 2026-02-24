@@ -29,6 +29,9 @@ use context_graph_core::causal::asymmetric::CausalDirection;
 use context_graph_core::traits::{SearchStrategy, TeleologicalSearchOptions};
 use context_graph_core::types::audit::{AuditOperation, AuditRecord};
 
+/// Maximum number of custom weight profiles to prevent unbounded HashMap growth.
+const MAX_CUSTOM_PROFILES: usize = 1_000;
+
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
 
 use context_graph_core::teleological::Embedder;
@@ -1131,19 +1134,23 @@ impl Handlers {
             return self.tool_error(id, &format!("Invalid weights: {}", e));
         }
 
-        // M7 FIX: Enforce maximum of 1000 custom weight profiles to prevent unbounded growth.
+        // M7 FIX: Enforce maximum custom weight profiles to prevent unbounded HashMap growth.
         // Check count BEFORE persisting to avoid orphaned RocksDB entries on rejection.
         {
             let profiles = self.custom_profiles.read();
             // Allow overwrite of existing profile (not counted as new)
-            if profiles.len() >= 1000 && !profiles.contains_key(&request.name) {
+            if profiles.len() >= MAX_CUSTOM_PROFILES && !profiles.contains_key(&request.name) {
                 error!(
                     current_count = profiles.len(),
+                    max = MAX_CUSTOM_PROFILES,
                     "create_weight_profile: Maximum profile count reached"
                 );
                 return self.tool_error(
                     id,
-                    "Maximum of 1000 custom weight profiles reached. Delete unused profiles first.",
+                    &format!(
+                        "Maximum number of custom weight profiles ({}) reached. Delete unused profiles first.",
+                        MAX_CUSTOM_PROFILES
+                    ),
                 );
             }
         }

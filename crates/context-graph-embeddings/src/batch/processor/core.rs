@@ -216,9 +216,11 @@ impl BatchProcessor {
     }
 }
 
-// SAFETY: All internal state protected by Arc<RwLock<>> or channels
-unsafe impl Send for BatchProcessor {}
-unsafe impl Sync for BatchProcessor {}
+// All fields are inherently Send + Sync:
+//   Arc<ModelRegistry>, Arc<RwLock<HashMap<...>>>, BatchProcessorConfig,
+//   mpsc::Sender<BatchRequest>, Option<JoinHandle<()>>, Arc<Notify>,
+//   Arc<AtomicBool>, Arc<BatchProcessorStatsInternal>, Arc<Semaphore>
+// No unsafe Send/Sync override needed.
 
 impl Drop for BatchProcessor {
     fn drop(&mut self) {

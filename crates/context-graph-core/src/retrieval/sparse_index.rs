@@ -440,7 +440,7 @@ impl SparseInvertedIndex {
         let doc_count = *self.doc_count.read();
 
         // Accumulate scores for each candidate
-        let mut candidate_scores: HashMap<Uuid, (f32, u32)> = HashMap::new();
+        let mut candidate_scores: HashMap<Uuid, (f32, u32)> = HashMap::with_capacity(1024);
         let mut posting_accesses = 0;
 
         // Process each query term

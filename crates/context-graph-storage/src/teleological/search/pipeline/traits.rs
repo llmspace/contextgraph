@@ -4,6 +4,7 @@
 //! and token embeddings (Stage 5 MaxSim).
 
 use std::collections::{HashMap, HashSet, VecDeque};
+#[cfg(test)]
 use std::sync::atomic::AtomicUsize;
 // HIGH-17 FIX: parking_lot::RwLock is non-poisonable.
 use parking_lot::RwLock;
@@ -158,32 +159,42 @@ pub trait SpladeIndex: Send + Sync {
 /// 100,000 docs is a reasonable ceiling for in-memory usage.
 const MAX_SPLADE_DOCS: usize = 100_000;
 
+/// Internal state for SPLADE index, protected by a single RwLock.
+/// Matches the `TokenCacheInner` pattern used by `InMemoryTokenStorage`.
+#[derive(Debug)]
+struct SpladeIndexInner {
+    /// Posting lists: term_id -> [(doc_id, weight), ...]
+    posting_lists: HashMap<usize, Vec<(Uuid, f32)>>,
+    /// Document L2 norms
+    doc_norms: HashMap<Uuid, f32>,
+    /// Document frequency per term
+    doc_freq: HashMap<usize, usize>,
+    /// Total documents (plain usize, no atomic needed under single lock)
+    num_docs: usize,
+    /// FIFO insertion order + reverse term index for efficient eviction
+    insertion_order: VecDeque<(Uuid, Vec<usize>)>,
+}
+
 /// In-memory SPLADE index with bounded capacity.
 ///
 /// Evicts oldest documents (FIFO) when capacity is reached.
 /// Bounded to MAX_SPLADE_DOCS (100,000) to prevent unbounded O(n*m) growth.
+/// Single RwLock guards all internal state for atomicity (L2 consolidation).
 #[derive(Debug)]
 pub struct InMemorySpladeIndex {
-    /// Posting lists: term_id -> [(doc_id, weight), ...]
-    posting_lists: RwLock<HashMap<usize, Vec<(Uuid, f32)>>>,
-    /// Document L2 norms
-    doc_norms: RwLock<HashMap<Uuid, f32>>,
-    /// Document frequency per term
-    doc_freq: RwLock<HashMap<usize, usize>>,
-    /// Total documents
-    num_docs: AtomicUsize,
-    /// FIFO insertion order + reverse term index for efficient eviction
-    insertion_order: RwLock<VecDeque<(Uuid, Vec<usize>)>>,
+    inner: RwLock<SpladeIndexInner>,
 }
 
 impl Default for InMemorySpladeIndex {
     fn default() -> Self {
         Self {
-            posting_lists: RwLock::new(HashMap::new()),
-            doc_norms: RwLock::new(HashMap::new()),
-            doc_freq: RwLock::new(HashMap::new()),
-            num_docs: AtomicUsize::new(0),
-            insertion_order: RwLock::new(VecDeque::new()),
+            inner: RwLock::new(SpladeIndexInner {
+                posting_lists: HashMap::new(),
+                doc_norms: HashMap::new(),
+                doc_freq: HashMap::new(),
+                num_docs: 0,
+                insertion_order: VecDeque::new(),
+            }),
         }
     }
 }
@@ -196,20 +207,18 @@ impl InMemorySpladeIndex {
 
     /// Remove a document from all index structures.
     fn evict_doc(
-        postings: &mut HashMap<usize, Vec<(Uuid, f32)>>,
-        doc_norms: &mut HashMap<Uuid, f32>,
-        doc_freq: &mut HashMap<usize, usize>,
+        inner: &mut SpladeIndexInner,
         doc_id: Uuid,
         doc_terms: &[usize],
     ) {
-        doc_norms.remove(&doc_id);
+        inner.doc_norms.remove(&doc_id);
         for &term_id in doc_terms {
-            if let Some(term_postings) = postings.get_mut(&term_id) {
+            if let Some(term_postings) = inner.posting_lists.get_mut(&term_id) {
                 term_postings.retain(|(id, _)| *id != doc_id);
                 if term_postings.is_empty() {
-                    postings.remove(&term_id);
-                    doc_freq.remove(&term_id);
-                } else if let Some(df) = doc_freq.get_mut(&term_id) {
+                    inner.posting_lists.remove(&term_id);
+                    inner.doc_freq.remove(&term_id);
+                } else if let Some(df) = inner.doc_freq.get_mut(&term_id) {
                     *df = df.saturating_sub(1);
                 }
             }
@@ -222,46 +231,29 @@ impl InMemorySpladeIndex {
     /// If the index is at capacity (MAX_SPLADE_DOCS), evicts the oldest
     /// document and logs a warning.
     pub fn add(&self, id: Uuid, sparse: &[(usize, f32)]) {
-        // Compute norm
+        // Compute norm outside lock (pure computation)
         let norm: f32 = sparse.iter().map(|(_, w)| w * w).sum::<f32>().sqrt();
         if norm < f32::EPSILON {
             return;
         }
 
-        let mut postings = self.posting_lists.write();
-        let mut doc_norms = self.doc_norms.write();
-        let mut doc_freq_map = self.doc_freq.write();
-        let mut order = self.insertion_order.write();
+        let mut inner = self.inner.write();
 
         // Guard: if ID already exists, evict old data first (prevents num_docs drift)
-        if doc_norms.contains_key(&id) {
+        if inner.doc_norms.contains_key(&id) {
             // Find and remove old entry from insertion_order
-            if let Some(pos) = order.iter().position(|(oid, _)| *oid == id) {
-                let (_, old_terms) = order.remove(pos).unwrap();
-                Self::evict_doc(
-                    &mut postings,
-                    &mut doc_norms,
-                    &mut doc_freq_map,
-                    id,
-                    &old_terms,
-                );
-                self.num_docs
-                    .fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+            if let Some(pos) = inner.insertion_order.iter().position(|(oid, _)| *oid == id) {
+                let (_, old_terms) = inner.insertion_order.remove(pos).unwrap();
+                Self::evict_doc(&mut inner, id, &old_terms);
+                inner.num_docs = inner.num_docs.saturating_sub(1);
             }
         }
 
         // Evict oldest if at capacity
-        while self.num_docs.load(std::sync::atomic::Ordering::SeqCst) >= MAX_SPLADE_DOCS {
-            if let Some((evicted_id, evicted_terms)) = order.pop_front() {
-                Self::evict_doc(
-                    &mut postings,
-                    &mut doc_norms,
-                    &mut doc_freq_map,
-                    evicted_id,
-                    &evicted_terms,
-                );
-                self.num_docs
-                    .fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+        while inner.num_docs >= MAX_SPLADE_DOCS {
+            if let Some((evicted_id, evicted_terms)) = inner.insertion_order.pop_front() {
+                Self::evict_doc(&mut inner, evicted_id, &evicted_terms);
+                inner.num_docs = inner.num_docs.saturating_sub(1);
                 warn!(
                     evicted_id = %evicted_id,
                     max_docs = MAX_SPLADE_DOCS,
@@ -273,7 +265,7 @@ impl InMemorySpladeIndex {
             }
         }
 
-        doc_norms.insert(id, norm);
+        inner.doc_norms.insert(id, norm);
 
         let mut added_terms = HashSet::new();
         let mut doc_term_ids = Vec::new();
@@ -283,41 +275,37 @@ impl InMemorySpladeIndex {
                 continue;
             }
 
-            postings.entry(term_id).or_default().push((id, weight));
+            inner.posting_lists.entry(term_id).or_default().push((id, weight));
             doc_term_ids.push(term_id);
 
             if added_terms.insert(term_id) {
-                *doc_freq_map.entry(term_id).or_insert(0) += 1;
+                *inner.doc_freq.entry(term_id).or_insert(0) += 1;
             }
         }
 
-        order.push_back((id, doc_term_ids));
-        self.num_docs
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        inner.insertion_order.push_back((id, doc_term_ids));
+        inner.num_docs += 1;
     }
 }
 
 impl SpladeIndex for InMemorySpladeIndex {
     fn search(&self, query: &[(usize, f32)], k: usize) -> Vec<(Uuid, f32)> {
-        let n = self.num_docs.load(std::sync::atomic::Ordering::SeqCst);
-        if n == 0 {
+        let inner = self.inner.read();
+
+        if inner.num_docs == 0 {
             return Vec::new();
         }
 
-        let postings = self.posting_lists.read();
-        let doc_norms = self.doc_norms.read();
-        let doc_freq = self.doc_freq.read();
-
         let mut scores: HashMap<Uuid, f32> = HashMap::new();
-        let n_f = n as f32;
+        let n_f = inner.num_docs as f32;
 
         for &(term_id, query_weight) in query {
-            if let Some(term_postings) = postings.get(&term_id) {
-                let df = doc_freq.get(&term_id).copied().unwrap_or(1) as f32;
+            if let Some(term_postings) = inner.posting_lists.get(&term_id) {
+                let df = inner.doc_freq.get(&term_id).copied().unwrap_or(1) as f32;
                 let idf = ((n_f - df + 0.5) / (df + 0.5) + 1.0).ln();
 
                 for &(doc_id, doc_weight) in term_postings {
-                    let norm = doc_norms.get(&doc_id).copied().unwrap_or(1.0);
+                    let norm = inner.doc_norms.get(&doc_id).copied().unwrap_or(1.0);
                     let tf = doc_weight / norm.max(f32::EPSILON);
                     *scores.entry(doc_id).or_insert(0.0) += query_weight * tf * idf;
                 }
@@ -331,7 +319,7 @@ impl SpladeIndex for InMemorySpladeIndex {
     }
 
     fn len(&self) -> usize {
-        self.num_docs.load(std::sync::atomic::Ordering::SeqCst)
+        self.inner.read().num_docs
     }
 }
 

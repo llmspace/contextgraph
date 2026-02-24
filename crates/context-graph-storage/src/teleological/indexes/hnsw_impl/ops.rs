@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use super::super::embedder_index::{validate_vector, EmbedderIndexOps, IndexError, IndexResult};
 use super::super::hnsw_config::{EmbedderIndex, HnswConfig};
-use super::types::HnswEmbedderIndex;
+use super::types::{HnswEmbedderIndex, MAX_HNSW_VECTORS_PER_INDEX};
 
 impl EmbedderIndexOps for HnswEmbedderIndex {
     fn embedder(&self) -> EmbedderIndex {
@@ -32,10 +32,25 @@ impl EmbedderIndexOps for HnswEmbedderIndex {
         let mut next_key = self.next_key.write();
 
         // Handle duplicate - remove old mapping (usearch may not support true deletion)
-        if let Some(&old_key) = id_to_key.get(&id) {
+        let is_update = if let Some(&old_key) = id_to_key.get(&id) {
             key_to_id.remove(&old_key);
             // Note: usearch doesn't support deletion, so the old vector remains in index
             // but won't be returned because key_to_id doesn't map it back
+            true
+        } else {
+            false
+        };
+
+        // H1 FIX: Reject inserts (not updates) when at max capacity
+        if !is_update && key_to_id.len() >= MAX_HNSW_VECTORS_PER_INDEX {
+            return Err(IndexError::OperationFailed {
+                embedder: self.embedder,
+                message: format!(
+                    "HNSW index at maximum capacity ({} vectors). \
+                     Remove vectors or increase MAX_HNSW_VECTORS_PER_INDEX.",
+                    MAX_HNSW_VECTORS_PER_INDEX
+                ),
+            });
         }
 
         // Ensure capacity - grow if needed

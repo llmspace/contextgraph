@@ -1195,12 +1195,15 @@ impl Handlers {
                 {
                     let store = self.teleological_store.clone();
                     let updates: Vec<_> = results.iter().map(|r| r.fingerprint.clone()).collect();
+                    // L6 FIX: Remove double-clone — `for fp in updates` gives ownership,
+                    // so save the ID before moving fp into update().
                     tokio::spawn(async move {
                         for fp in updates {
-                            if let Err(e) = store.update(fp.clone()).await {
+                            let memory_id = fp.id;
+                            if let Err(e) = store.update(fp).await {
                                 tracing::warn!(
                                     error = %e,
-                                    memory_id = %fp.id,
+                                    memory_id = %memory_id,
                                     "search_graph: Failed to persist access count update (background)"
                                 );
                             }

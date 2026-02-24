@@ -48,6 +48,8 @@ impl WarmCudaAllocator {
             gpu_info: Some(gpu_info),
             total_allocated_bytes: 0,
             allocation_history: Vec::new(),
+            next_alloc_id: 0,
+            live_tensors: Vec::new(),
         })
     }
 
@@ -219,6 +221,13 @@ impl WarmCudaAllocator {
     /// This method uses `cudaMalloc` (NOT `cudaMallocManaged`) to ensure
     /// the allocation remains resident in VRAM and cannot be evicted to
     /// system RAM under memory pressure.
+    ///
+    /// # Resource Ownership
+    ///
+    /// The underlying CUDA tensor is stored in `self.live_tensors` keyed by
+    /// a monotonic allocation ID. The returned `VramAllocation.ptr` contains
+    /// this ID (not a raw CUDA pointer). Calling `free_protected()` with the
+    /// allocation removes and drops the tensor, triggering `cudaFree`.
     pub fn allocate_protected(&mut self, size_bytes: usize) -> WarmResult<VramAllocation> {
         use candle_core::{DType, Device, Tensor};
 
@@ -240,14 +249,24 @@ impl WarmCudaAllocator {
             }
         })?;
 
-        let ptr = std::ptr::addr_of!(tensor) as u64;
+        // Generate a unique, non-zero allocation ID as the opaque handle.
+        // This replaces the previous broken `std::ptr::addr_of!(tensor) as u64`
+        // which captured a stack address that became invalid after return.
+        self.next_alloc_id = self.next_alloc_id.checked_add(1).unwrap_or(1);
+        let alloc_id = self.next_alloc_id;
+
+        // Store the tensor so it stays alive (VRAM remains allocated) and can
+        // be dropped later via free_protected() to actually call cudaFree.
+        // Previously, `mem::forget(tensor)` made the allocation permanent and
+        // unreclaimable — GPU memory leaked until process exit.
+        self.live_tensors.push((alloc_id, Box::new(tensor)));
 
         self.total_allocated_bytes = self.total_allocated_bytes.saturating_add(size_bytes);
 
         let history_entry = format!(
-            "ALLOC: {} bytes at 0x{:x} (total: {})",
+            "ALLOC: {} bytes, id={} (total: {})",
             size_bytes,
-            ptr,
+            alloc_id,
             format_bytes(self.total_allocated_bytes)
         );
         self.allocation_history.push(history_entry);
@@ -256,23 +275,46 @@ impl WarmCudaAllocator {
         }
 
         tracing::debug!(
-            "Allocated {} protected VRAM on device {}",
+            "Allocated {} protected VRAM on device {} (alloc_id={})",
             format_bytes(size_bytes),
-            self.device_id
+            self.device_id,
+            alloc_id
         );
 
-        std::mem::forget(tensor);
         Ok(VramAllocation::new_protected(
-            ptr,
+            alloc_id,
             size_bytes,
             self.device_id,
         ))
     }
 
     /// Free a protected VRAM allocation.
+    ///
+    /// Removes the underlying CUDA tensor from `live_tensors` and drops it,
+    /// which triggers candle's destructor to call `cudaFree`. Also updates
+    /// the accounting counters.
+    ///
+    /// If the allocation ID is not found in `live_tensors` (e.g., test-created
+    /// allocations), only accounting is updated.
     pub fn free_protected(&mut self, allocation: &VramAllocation) -> WarmResult<()> {
         if !allocation.is_valid() {
             return Ok(());
+        }
+
+        // Remove and drop the CUDA tensor, triggering cudaFree.
+        // The allocation.ptr is the alloc_id used as key in live_tensors.
+        let found = self
+            .live_tensors
+            .iter()
+            .position(|(id, _)| *id == allocation.ptr);
+        if let Some(idx) = found {
+            // Dropping the Box<dyn Any> drops the candle::Tensor inside,
+            // which calls cudaFree on the underlying GPU memory.
+            let _freed_tensor = self.live_tensors.swap_remove(idx);
+            tracing::debug!(
+                "Dropped CUDA tensor for alloc_id={}, triggering cudaFree",
+                allocation.ptr
+            );
         }
 
         self.total_allocated_bytes = self
@@ -280,7 +322,7 @@ impl WarmCudaAllocator {
             .saturating_sub(allocation.size_bytes);
 
         let history_entry = format!(
-            "FREE: {} bytes at 0x{:x} (total: {})",
+            "FREE: {} bytes, id={} (total: {})",
             allocation.size_bytes,
             allocation.ptr,
             format_bytes(self.total_allocated_bytes)

@@ -40,6 +40,13 @@ use super::gpu_info::GpuInfo;
 ///
 /// The allocator is NOT internally synchronized. Wrap in `Arc<Mutex<_>>`
 /// for multi-threaded access.
+///
+/// # Resource Management
+///
+/// Live CUDA tensors are stored in `live_tensors`. When `free_protected()` is
+/// called, the tensor is removed and dropped, which triggers `cudaFree` via
+/// candle's Drop impl. When the allocator itself is dropped, all remaining
+/// tensors are dropped automatically.
 #[derive(Debug)]
 #[allow(dead_code)] // Fields used conditionally based on `cuda` feature
 pub struct WarmCudaAllocator {
@@ -54,4 +61,14 @@ pub struct WarmCudaAllocator {
 
     /// Allocation history for debugging (last N allocations).
     pub(crate) allocation_history: Vec<String>,
+
+    /// Monotonic counter for generating unique allocation IDs.
+    /// Each call to `allocate_protected()` increments this and uses it
+    /// as the `VramAllocation.ptr` value (an opaque handle, not a raw pointer).
+    pub(crate) next_alloc_id: u64,
+
+    /// Live CUDA tensors keyed by allocation ID.
+    /// Dropping a tensor triggers candle's destructor which calls `cudaFree`.
+    /// Type-erased to avoid requiring candle in this struct definition file.
+    pub(crate) live_tensors: Vec<(u64, Box<dyn std::any::Any + Send>)>,
 }
