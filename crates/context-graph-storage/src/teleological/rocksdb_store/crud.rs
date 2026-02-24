@@ -542,6 +542,62 @@ impl RocksDbTeleologicalStore {
         // Without this, DashMap retains allocated capacity from peak usage indefinitely.
         if deleted > 0 {
             self.soft_deleted.shrink_to_fit();
+
+            // M7 FIX: Trigger RocksDB compaction on primary CFs after GC.
+            // Without this, tombstones from deleted entries remain in SST files
+            // until the next automatic compaction, wasting disk space.
+            // Only compact when enough entries were deleted to justify the I/O cost.
+            // Full compaction on 19 CFs is expensive; threshold avoids churn.
+            const GC_COMPACTION_THRESHOLD: usize = 10;
+            if deleted >= GC_COMPACTION_THRESHOLD {
+                let primary_cfs = [
+                    CF_FINGERPRINTS,
+                    CF_SOURCE_METADATA,
+                    CF_TOPIC_PROFILES,
+                    CF_E12_LATE_INTERACTION,
+                    CF_E13_SPLADE_INVERTED,
+                    CF_E1_MATRYOSHKA_128,
+                ];
+                for cf_name in &primary_cfs {
+                    match self.get_cf(cf_name) {
+                        Ok(cf) => {
+                            self.db.compact_range_cf(cf, None::<&[u8]>, None::<&[u8]>);
+                        }
+                        Err(e) => {
+                            warn!(
+                                cf = cf_name,
+                                error = %e,
+                                "GC: failed to compact CF after deletion — \
+                                 tombstones will persist until next auto-compaction"
+                            );
+                        }
+                    }
+                }
+                // Also compact quantized embedder CFs (emb_0..emb_12)
+                for cf_name in QUANTIZED_EMBEDDER_CFS {
+                    match self.get_cf(cf_name) {
+                        Ok(cf) => {
+                            self.db.compact_range_cf(cf, None::<&[u8]>, None::<&[u8]>);
+                        }
+                        Err(e) => {
+                            warn!(
+                                cf = cf_name,
+                                error = %e,
+                                "GC: failed to compact quantized CF — \
+                                 tombstones will persist until next auto-compaction"
+                            );
+                        }
+                    }
+                }
+                info!("GC: compacted {} primary + {} quantized CFs after {deleted} deletions",
+                    primary_cfs.len(), QUANTIZED_EMBEDDER_CFS.len());
+            } else {
+                debug!(
+                    deleted = deleted,
+                    threshold = GC_COMPACTION_THRESHOLD,
+                    "GC: skipping compaction — deleted count below threshold"
+                );
+            }
         }
 
         info!("GC: completed, {deleted}/{} entries hard-deleted", expired_ids.len());

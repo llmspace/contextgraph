@@ -41,6 +41,10 @@ use crate::types::fingerprint::{SparseVector, SPARSE_VOCAB_SIZE};
 /// Default number of candidates to recall in Stage 1.
 pub const DEFAULT_RECALL_LIMIT: usize = 10_000;
 
+/// Default maximum documents for the sparse inverted index.
+/// 500,000 docs with ~100 terms each uses ~1 GB RAM.
+pub const DEFAULT_MAX_SPARSE_DOCS: usize = 500_000;
+
 /// Minimum posting list size to consider for pruning.
 /// Very common terms (appearing in >90% of docs) are less discriminative.
 const MAX_DF_RATIO: f32 = 0.9;
@@ -71,6 +75,14 @@ pub enum SparseIndexError {
     /// Index is locked (concurrent modification detected).
     #[error("FAIL FAST: Index lock acquisition failed - concurrent modification")]
     LockFailed,
+
+    /// Index capacity exceeded.
+    #[error("FAIL FAST: Sparse index capacity exceeded ({current}/{max_docs} docs). Cannot index memory {memory_id}. Increase max_docs or remove entries first.")]
+    CapacityExceeded {
+        memory_id: Uuid,
+        current: usize,
+        max_docs: usize,
+    },
 }
 
 /// Result type for sparse index operations.
@@ -194,6 +206,7 @@ pub struct RecallStats {
 /// Sparse inverted index for E6/E13 SPLADE embeddings.
 ///
 /// Thread-safe via internal RwLock. Supports concurrent reads, exclusive writes.
+/// Bounded by `max_docs` to prevent unbounded memory growth.
 pub struct SparseInvertedIndex {
     /// Posting lists indexed by term ID (vocabulary index).
     /// Using RwLock for thread-safe access.
@@ -205,15 +218,20 @@ pub struct SparseInvertedIndex {
     /// Memory ID to sparse vector mapping (for deletion support).
     /// Maps memory_id -> Vec<term_id> (active terms for this memory)
     memory_terms: RwLock<HashMap<Uuid, Vec<u16>>>,
+
+    /// Maximum number of documents this index will hold.
+    /// index() returns CapacityExceeded when this limit is reached.
+    max_docs: usize,
 }
 
 impl SparseInvertedIndex {
-    /// Create a new empty sparse inverted index.
+    /// Create a new empty sparse inverted index with default capacity limit.
     pub fn new() -> Self {
         Self {
             posting_lists: RwLock::new(HashMap::with_capacity(SPARSE_VOCAB_SIZE / 10)),
             doc_count: RwLock::new(0),
             memory_terms: RwLock::new(HashMap::new()),
+            max_docs: DEFAULT_MAX_SPARSE_DOCS,
         }
     }
 
@@ -226,6 +244,17 @@ impl SparseInvertedIndex {
             posting_lists: RwLock::new(HashMap::with_capacity(estimated_unique_terms)),
             doc_count: RwLock::new(0),
             memory_terms: RwLock::new(HashMap::with_capacity(expected_docs)),
+            max_docs: DEFAULT_MAX_SPARSE_DOCS,
+        }
+    }
+
+    /// Create with a custom maximum document limit.
+    pub fn with_max_docs(max_docs: usize) -> Self {
+        Self {
+            posting_lists: RwLock::new(HashMap::with_capacity(SPARSE_VOCAB_SIZE / 10)),
+            doc_count: RwLock::new(0),
+            memory_terms: RwLock::new(HashMap::new()),
+            max_docs,
         }
     }
 
@@ -238,6 +267,7 @@ impl SparseInvertedIndex {
     /// # FAIL FAST Errors
     /// * `EmptyVector` - Cannot index empty sparse vector
     /// * `AlreadyExists` - Memory already indexed (use update)
+    /// * `CapacityExceeded` - Index is at max_docs limit
     pub fn index(&self, memory_id: Uuid, sparse: &SparseVector) -> SparseIndexResult<()> {
         if sparse.is_empty() {
             return Err(SparseIndexError::EmptyVector { memory_id });
@@ -259,6 +289,15 @@ impl SparseInvertedIndex {
         // Double-check after acquiring lock
         if terms_guard.contains_key(&memory_id) {
             return Err(SparseIndexError::AlreadyExists { memory_id });
+        }
+
+        // FAIL FAST: Reject if at capacity
+        if *count_guard >= self.max_docs {
+            return Err(SparseIndexError::CapacityExceeded {
+                memory_id,
+                current: *count_guard,
+                max_docs: self.max_docs,
+            });
         }
 
         // Index each term
@@ -336,7 +375,12 @@ impl SparseInvertedIndex {
         let mut posting_guard = self.posting_lists.write();
         let mut terms_guard = self.memory_terms.write();
 
-        // Remove old terms if exists
+        // Reject update on non-existent memory — caller should use index() instead
+        if !terms_guard.contains_key(&memory_id) {
+            return Err(SparseIndexError::NotFound { memory_id });
+        }
+
+        // Remove old terms
         if let Some(old_terms) = terms_guard.remove(&memory_id) {
             for term_id in old_terms {
                 if let Some(posting_list) = posting_guard.get_mut(&term_id) {
@@ -480,6 +524,11 @@ impl SparseInvertedIndex {
         self.len() == 0
     }
 
+    /// Get the maximum document capacity.
+    pub fn max_docs(&self) -> usize {
+        self.max_docs
+    }
+
     /// Get the number of unique terms in the index.
     pub fn term_count(&self) -> usize {
         self.posting_lists.read().len()
@@ -529,6 +578,16 @@ impl SparseInvertedIndex {
 impl Default for SparseInvertedIndex {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl std::fmt::Debug for SparseInvertedIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SparseInvertedIndex")
+            .field("doc_count", &*self.doc_count.read())
+            .field("max_docs", &self.max_docs)
+            .field("term_count", &self.posting_lists.read().len())
+            .finish()
     }
 }
 
@@ -959,6 +1018,65 @@ mod tests {
         assert!(candidates[0].score > 0.0, "Score should be positive");
 
         println!("[VERIFIED] Synthetic scores are correct");
+    }
+
+    // ========================================================================
+    // CAPACITY LIMIT TESTS
+    // ========================================================================
+
+    #[test]
+    fn test_capacity_exceeded() {
+        println!("=== TEST: Capacity Exceeded ===");
+
+        // Create index with small max_docs for testing
+        let index = SparseInvertedIndex::with_max_docs(5);
+        assert_eq!(index.max_docs(), 5);
+
+        // Fill to capacity
+        for i in 0..5 {
+            let id = Uuid::new_v4();
+            let sparse = create_test_sparse(&[((i as u16) * 10 + 10, 1.0)]);
+            index.index(id, &sparse).unwrap();
+        }
+
+        assert_eq!(index.len(), 5);
+
+        // Next index should fail fast
+        let overflow_id = Uuid::new_v4();
+        let sparse = create_test_sparse(&[(500, 1.0)]);
+        let result = index.index(overflow_id, &sparse);
+
+        match result {
+            Err(SparseIndexError::CapacityExceeded { memory_id, current, max_docs }) => {
+                assert_eq!(memory_id, overflow_id);
+                assert_eq!(current, 5);
+                assert_eq!(max_docs, 5);
+                println!("[VERIFIED] CapacityExceeded error returned with correct details");
+            }
+            other => panic!("Expected CapacityExceeded, got {:?}", other),
+        }
+
+        // After a remove, index should work again
+        let first_id = {
+            let terms = index.memory_terms.read();
+            *terms.keys().next().unwrap()
+        };
+        index.remove(first_id).unwrap();
+        assert_eq!(index.len(), 4);
+
+        let new_id = Uuid::new_v4();
+        let sparse = create_test_sparse(&[(600, 1.0)]);
+        assert!(index.index(new_id, &sparse).is_ok());
+        assert_eq!(index.len(), 5);
+
+        println!("[VERIFIED] Capacity limit works correctly with remove + re-index");
+    }
+
+    #[test]
+    fn test_default_max_docs() {
+        let index = SparseInvertedIndex::new();
+        assert_eq!(index.max_docs(), DEFAULT_MAX_SPARSE_DOCS);
+        println!("[VERIFIED] Default max_docs = {}", DEFAULT_MAX_SPARSE_DOCS);
     }
 
 }

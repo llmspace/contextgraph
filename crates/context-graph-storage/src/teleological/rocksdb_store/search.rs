@@ -91,6 +91,10 @@ use crate::teleological::schema::fingerprint_key;
 use crate::teleological::indexes::EmbedderIndexRegistry;
 use super::helpers::{compute_cosine_similarity, hnsw_distance_to_similarity};
 
+/// Maximum number of HNSW-capable embedders queried in multi-space search.
+/// E1, E5, E7, E8, E9, E10, E11 = 7 embedders.
+const MULTI_SPACE_MAX_EMBEDDERS: usize = 7;
+
 // =============================================================================
 // SPAWN_BLOCKING SYNC FUNCTIONS
 // These functions run in Tokio's blocking thread pool for parallel agent access
@@ -533,9 +537,10 @@ fn search_multi_space_sync(
     let weights = resolve_weights_sync(options)?;
     let k = (options.top_k * 3).max(50);
 
-    let mut embedder_rankings: Vec<EmbedderRanking> = Vec::new();
+    // M2 FIX: Pre-allocate for up to MULTI_SPACE_MAX_EMBEDDERS
+    let mut embedder_rankings: Vec<EmbedderRanking> = Vec::with_capacity(MULTI_SPACE_MAX_EMBEDDERS);
     // SEARCH-4: Track embedders that failed HNSW search for operational visibility
-    let mut degraded_embedders: Vec<&str> = Vec::new();
+    let mut degraded_embedders: Vec<&str> = Vec::with_capacity(MULTI_SPACE_MAX_EMBEDDERS);
 
     // E1 Semantic
     let entry_embedder = EmbedderIndex::E1Semantic;

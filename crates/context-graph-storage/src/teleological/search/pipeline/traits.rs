@@ -3,10 +3,11 @@
 //! This module defines the storage interfaces for SPLADE index (Stage 1)
 //! and token embeddings (Stage 5 MaxSim).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::AtomicUsize;
 // HIGH-17 FIX: parking_lot::RwLock is non-poisonable.
 use parking_lot::RwLock;
+use tracing::warn;
 use uuid::Uuid;
 
 // ============================================================================
@@ -24,10 +25,39 @@ pub trait TokenStorage: Send + Sync {
     fn get_tokens(&self, id: Uuid) -> Option<Vec<Vec<f32>>>;
 }
 
-/// In-memory token storage for testing.
-#[derive(Debug, Default)]
+/// Maximum entries in the in-memory token cache.
+/// Each entry is ~262 KB (512 tokens x 128D x 4 bytes).
+/// 5,000 entries = ~1.3 GB cap.
+const MAX_TOKEN_ENTRIES: usize = 5_000;
+
+/// Internal state for token storage, protected by a single RwLock.
+#[derive(Debug)]
+struct TokenCacheInner {
+    tokens: HashMap<Uuid, Vec<Vec<f32>>>,
+    /// FIFO insertion order for eviction.
+    insertion_order: VecDeque<Uuid>,
+}
+
+/// In-memory token storage with bounded capacity.
+///
+/// Evicts oldest entries (FIFO) when capacity is reached.
+/// Each entry stores ~512 x 128D ColBERT token embeddings (~262 KB).
+/// Bounded to MAX_TOKEN_ENTRIES (5,000) to prevent OOM.
+/// Single RwLock guards both map and insertion order for atomicity.
+#[derive(Debug)]
 pub struct InMemoryTokenStorage {
-    tokens: RwLock<HashMap<Uuid, Vec<Vec<f32>>>>,
+    inner: RwLock<TokenCacheInner>,
+}
+
+impl Default for InMemoryTokenStorage {
+    fn default() -> Self {
+        Self {
+            inner: RwLock::new(TokenCacheInner {
+                tokens: HashMap::new(),
+                insertion_order: VecDeque::new(),
+            }),
+        }
+    }
 }
 
 impl InMemoryTokenStorage {
@@ -37,24 +67,62 @@ impl InMemoryTokenStorage {
     }
 
     /// Insert tokens for an ID.
+    ///
+    /// If the cache is at capacity (MAX_TOKEN_ENTRIES), evicts the oldest entry
+    /// and logs a warning. Updates in-place if the ID already exists.
     pub fn insert(&self, id: Uuid, tokens: Vec<Vec<f32>>) {
-        self.tokens.write().insert(id, tokens);
+        let mut inner = self.inner.write();
+
+        // If ID already exists, just update the data (no order change needed)
+        if inner.tokens.contains_key(&id) {
+            inner.tokens.insert(id, tokens);
+            return;
+        }
+
+        // Evict oldest entries until we have room
+        while inner.tokens.len() >= MAX_TOKEN_ENTRIES {
+            if let Some(evicted_id) = inner.insertion_order.pop_front() {
+                inner.tokens.remove(&evicted_id);
+                warn!(
+                    evicted_id = %evicted_id,
+                    cache_size = MAX_TOKEN_ENTRIES,
+                    "Token storage cache full — evicted oldest entry. \
+                     Consider using a RocksDB-backed TokenStorage implementation."
+                );
+            } else {
+                // Safety: insertion_order and tokens are inconsistent — clear both
+                warn!(
+                    "Token storage insertion order desync — clearing cache"
+                );
+                inner.tokens.clear();
+                inner.insertion_order.clear();
+                break;
+            }
+        }
+
+        inner.tokens.insert(id, tokens);
+        inner.insertion_order.push_back(id);
     }
 
     /// Get number of stored IDs.
     pub fn len(&self) -> usize {
-        self.tokens.read().len()
+        self.inner.read().tokens.len()
     }
 
     /// Check if empty.
     pub fn is_empty(&self) -> bool {
-        self.tokens.read().is_empty()
+        self.inner.read().tokens.is_empty()
+    }
+
+    /// Maximum capacity of this cache.
+    pub fn capacity(&self) -> usize {
+        MAX_TOKEN_ENTRIES
     }
 }
 
 impl TokenStorage for InMemoryTokenStorage {
     fn get_tokens(&self, id: Uuid) -> Option<Vec<Vec<f32>>> {
-        self.tokens.read().get(&id).cloned()
+        self.inner.read().tokens.get(&id).cloned()
     }
 }
 
@@ -85,8 +153,16 @@ pub trait SpladeIndex: Send + Sync {
     }
 }
 
-/// In-memory SPLADE index for testing.
-#[derive(Debug, Default)]
+/// Maximum documents in the in-memory SPLADE index.
+/// At 200 unique terms/doc average: ~160 MB posting lists + overhead.
+/// 100,000 docs is a reasonable ceiling for in-memory usage.
+const MAX_SPLADE_DOCS: usize = 100_000;
+
+/// In-memory SPLADE index with bounded capacity.
+///
+/// Evicts oldest documents (FIFO) when capacity is reached.
+/// Bounded to MAX_SPLADE_DOCS (100,000) to prevent unbounded O(n*m) growth.
+#[derive(Debug)]
 pub struct InMemorySpladeIndex {
     /// Posting lists: term_id -> [(doc_id, weight), ...]
     posting_lists: RwLock<HashMap<usize, Vec<(Uuid, f32)>>>,
@@ -96,6 +172,20 @@ pub struct InMemorySpladeIndex {
     doc_freq: RwLock<HashMap<usize, usize>>,
     /// Total documents
     num_docs: AtomicUsize,
+    /// FIFO insertion order + reverse term index for efficient eviction
+    insertion_order: RwLock<VecDeque<(Uuid, Vec<usize>)>>,
+}
+
+impl Default for InMemorySpladeIndex {
+    fn default() -> Self {
+        Self {
+            posting_lists: RwLock::new(HashMap::new()),
+            doc_norms: RwLock::new(HashMap::new()),
+            doc_freq: RwLock::new(HashMap::new()),
+            num_docs: AtomicUsize::new(0),
+            insertion_order: RwLock::new(VecDeque::new()),
+        }
+    }
 }
 
 impl InMemorySpladeIndex {
@@ -104,7 +194,33 @@ impl InMemorySpladeIndex {
         Self::default()
     }
 
+    /// Remove a document from all index structures.
+    fn evict_doc(
+        postings: &mut HashMap<usize, Vec<(Uuid, f32)>>,
+        doc_norms: &mut HashMap<Uuid, f32>,
+        doc_freq: &mut HashMap<usize, usize>,
+        doc_id: Uuid,
+        doc_terms: &[usize],
+    ) {
+        doc_norms.remove(&doc_id);
+        for &term_id in doc_terms {
+            if let Some(term_postings) = postings.get_mut(&term_id) {
+                term_postings.retain(|(id, _)| *id != doc_id);
+                if term_postings.is_empty() {
+                    postings.remove(&term_id);
+                    doc_freq.remove(&term_id);
+                } else if let Some(df) = doc_freq.get_mut(&term_id) {
+                    *df = df.saturating_sub(1);
+                }
+            }
+        }
+    }
+
     /// Add a sparse vector to the index.
+    ///
+    /// If the document ID already exists, updates in-place.
+    /// If the index is at capacity (MAX_SPLADE_DOCS), evicts the oldest
+    /// document and logs a warning.
     pub fn add(&self, id: Uuid, sparse: &[(usize, f32)]) {
         // Compute norm
         let norm: f32 = sparse.iter().map(|(_, w)| w * w).sum::<f32>().sqrt();
@@ -112,11 +228,55 @@ impl InMemorySpladeIndex {
             return;
         }
 
-        self.doc_norms.write().insert(id, norm);
+        let mut postings = self.posting_lists.write();
+        let mut doc_norms = self.doc_norms.write();
+        let mut doc_freq_map = self.doc_freq.write();
+        let mut order = self.insertion_order.write();
+
+        // Guard: if ID already exists, evict old data first (prevents num_docs drift)
+        if doc_norms.contains_key(&id) {
+            // Find and remove old entry from insertion_order
+            if let Some(pos) = order.iter().position(|(oid, _)| *oid == id) {
+                let (_, old_terms) = order.remove(pos).unwrap();
+                Self::evict_doc(
+                    &mut postings,
+                    &mut doc_norms,
+                    &mut doc_freq_map,
+                    id,
+                    &old_terms,
+                );
+                self.num_docs
+                    .fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+
+        // Evict oldest if at capacity
+        while self.num_docs.load(std::sync::atomic::Ordering::SeqCst) >= MAX_SPLADE_DOCS {
+            if let Some((evicted_id, evicted_terms)) = order.pop_front() {
+                Self::evict_doc(
+                    &mut postings,
+                    &mut doc_norms,
+                    &mut doc_freq_map,
+                    evicted_id,
+                    &evicted_terms,
+                );
+                self.num_docs
+                    .fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+                warn!(
+                    evicted_id = %evicted_id,
+                    max_docs = MAX_SPLADE_DOCS,
+                    "SPLADE index full — evicted oldest document. \
+                     Consider using a RocksDB-backed SpladeIndex implementation."
+                );
+            } else {
+                break;
+            }
+        }
+
+        doc_norms.insert(id, norm);
 
         let mut added_terms = HashSet::new();
-        let mut postings = self.posting_lists.write();
-        let mut doc_freq = self.doc_freq.write();
+        let mut doc_term_ids = Vec::new();
 
         for &(term_id, weight) in sparse {
             if weight.abs() < f32::EPSILON {
@@ -124,12 +284,14 @@ impl InMemorySpladeIndex {
             }
 
             postings.entry(term_id).or_default().push((id, weight));
+            doc_term_ids.push(term_id);
 
             if added_terms.insert(term_id) {
-                *doc_freq.entry(term_id).or_insert(0) += 1;
+                *doc_freq_map.entry(term_id).or_insert(0) += 1;
             }
         }
 
+        order.push_back((id, doc_term_ids));
         self.num_docs
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
