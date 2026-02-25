@@ -38,38 +38,18 @@ pub use chain::{
     AbductionResult, CausalHop, CausalPairEmbedding, HOP_ATTENUATION, MAX_CHAIN_LENGTH,
     MIN_CHAIN_SCORE,
 };
-#[allow(deprecated)]
-pub use inference::{InferenceDirection, InferenceResult, OmniInfer};
+pub use inference::{InferenceDirection, InferenceResult};
 pub use scm::{CausalEdge, CausalGraph, CausalNode};
 
 #[cfg(test)]
-#[allow(deprecated)]
 mod tests {
     use super::*;
     use uuid::Uuid;
 
     #[test]
     fn test_causal_module_exports() {
-        // Verify all types are exported correctly
-        let _infer = OmniInfer::new();
         let _graph = CausalGraph::new();
         let _dir = InferenceDirection::Forward;
-    }
-
-    #[test]
-    fn test_basic_inference() {
-        let infer = OmniInfer::new();
-        let source = Uuid::new_v4();
-        let target = Uuid::new_v4();
-
-        let results = infer
-            .infer(source, Some(target), InferenceDirection::Forward)
-            .unwrap();
-
-        assert!(!results.is_empty());
-        assert_eq!(results[0].direction, InferenceDirection::Forward);
-        assert_eq!(results[0].source, source);
-        assert_eq!(results[0].target, target);
     }
 
     #[test]

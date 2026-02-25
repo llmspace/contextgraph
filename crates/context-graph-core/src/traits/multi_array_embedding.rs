@@ -703,6 +703,33 @@ impl EmbeddingMetadata {
         parts.join(" ")
     }
 
+    /// Generate instruction string for E2 (V_freshness) embedding.
+    ///
+    /// Passes the memory's creation timestamp so E2 computes a unique
+    /// decay vector per memory. Without this, E2 defaults to Utc::now()
+    /// producing identical vectors for all memories in a batch.
+    ///
+    /// Format: `"timestamp:2024-01-15T10:30:00+00:00"` or `"epoch:1705315800"`
+    #[must_use]
+    pub fn e2_instruction(&self) -> String {
+        if let Some(ts) = self.timestamp {
+            format!("timestamp:{}", ts.to_rfc3339())
+        } else {
+            format!("epoch:{}", Utc::now().timestamp())
+        }
+    }
+
+    /// Generate instruction string for E3 (V_periodicity) embedding.
+    ///
+    /// Passes the memory's creation timestamp so E3 encodes the correct
+    /// time-of-day and day-of-week periodic patterns for this memory.
+    ///
+    /// Uses the same format as E2 since both parse timestamps identically.
+    #[must_use]
+    pub fn e3_instruction(&self) -> String {
+        self.e2_instruction()
+    }
+
 }
 
 /// Multi-Array Embedding Provider trait.
@@ -1065,6 +1092,20 @@ pub trait SingleEmbedder: Send + Sync {
     /// - Model is not ready
     /// - Encoding fails
     async fn embed(&self, content: &str) -> CoreResult<Vec<f32>>;
+
+    /// Generate dense embedding with an optional instruction hint.
+    ///
+    /// Used by temporal embedders (E2/E3/E4) to receive timestamp/sequence
+    /// information via the instruction field. Non-temporal embedders can
+    /// ignore the instruction and delegate to `embed(content)`.
+    async fn embed_with_instruction(
+        &self,
+        content: &str,
+        instruction: Option<&str>,
+    ) -> CoreResult<Vec<f32>> {
+        let _ = instruction;
+        self.embed(content).await
+    }
 
     /// Check if model is loaded and ready.
     fn is_ready(&self) -> bool;

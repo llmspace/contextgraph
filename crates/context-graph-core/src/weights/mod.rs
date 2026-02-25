@@ -29,14 +29,14 @@ use crate::types::fingerprint::NUM_EMBEDDERS;
 
 /// Whether E2/E3/E4 temporal embedders generate vectors during store_memory.
 ///
-/// When `false` (default), E2/E3/E4 embed() calls are skipped and zero vectors
-/// are stored instead. This saves GPU compute time because:
-/// - E2 always produces identical vectors (delta=0 bug — use compute_e2_recency_decay instead)
-/// - E3/E4 have weight=0.0 in ALL search strategies and are never searched
-/// - HNSW indexes for E2/E3/E4 are already skipped (index_ops.rs)
+/// When `true`, E2/E3/E4 produce real temporal vectors:
+/// - E2: Exponential decay encoding of creation timestamp (recency)
+/// - E3: Fourier-basis periodic pattern encoding (time-of-day, day-of-week)
+/// - E4: Sinusoidal positional encoding (session ordering)
 ///
-/// Set to `true` and rebuild if temporal embedding vectors are needed for research.
-pub const TEMPORAL_EMBEDDERS_ENABLED: bool = false;
+/// These are used for post-retrieval temporal boosting per constitution rule 4.
+/// Weight=0.0 in fusion (never in similarity ranking), but stored for temporal queries.
+pub const TEMPORAL_EMBEDDERS_ENABLED: bool = true;
 
 /// Whether E11 Entity (KEPLER) participates in search/fusion.
 /// KEPLER produces near-identical vectors for all inputs (0.96-0.98 cosine).

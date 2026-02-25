@@ -27,7 +27,7 @@ use crate::error::EmbeddingError;
 /// Trait for retrieving quantized fingerprints from storage.
 ///
 /// # Implementors
-/// - `RocksDbMemex` in `context-graph-storage::teleological::quantized`
+/// - `RocksDbTeleologicalStore` in `context-graph-storage::teleological`
 pub trait QuantizedFingerprintRetriever: Send + Sync {
     /// Get full fingerprint by ID.
     fn get_fingerprint(
@@ -96,7 +96,7 @@ impl<S: QuantizedFingerprintRetriever> MultiSpaceSearchEngine<S> {
     ///
     /// # Example
     /// ```rust,ignore
-    /// let storage = Arc::new(RocksDbMemex::open(path)?);
+    /// let storage = Arc::new(RocksDbTeleologicalStore::open(path)?);
     /// let hnsw = Arc::new(HnswMultiSpaceIndex::new());
     /// let engine = MultiSpaceSearchEngine::new(storage, hnsw);
     /// ```

@@ -99,7 +99,6 @@ impl GraphDiscoveryService {
     ///
     /// This constructor creates an E8Activator WITHOUT a GraphModel.
     /// Embedding operations will fail. Use `with_models()` for production deployments.
-    #[allow(deprecated)]
     pub fn new(shared_llm: Arc<CausalDiscoveryLLM>) -> Self {
         Self::with_config(shared_llm, GraphDiscoveryConfig::default())
     }
@@ -110,10 +109,8 @@ impl GraphDiscoveryService {
     ///
     /// This constructor creates an E8Activator WITHOUT a GraphModel.
     /// Embedding operations will fail. Use `with_models()` for production deployments.
-    #[deprecated(
-        since = "0.1.0",
-        note = "Use with_models() for production. This constructor creates E8Activator without GraphModel."
-    )]
+    /// Creates E8Activator WITHOUT a GraphModel. Embedding operations will fail.
+    /// For production deployments use `with_models()`.
     pub fn with_config(shared_llm: Arc<CausalDiscoveryLLM>, config: GraphDiscoveryConfig) -> Self {
         let graph_llm = Arc::new(GraphRelationshipLLM::new(shared_llm));
         let activator = Arc::new(E8Activator::with_config(config.activator_config.clone()));

@@ -36,8 +36,8 @@ impl RocksDbTeleologicalStore {
         let id = fp.id;
 
         // Add to all HNSW-capable dense embedder indexes.
-        // Skip E2/E3/E4 temporal indexes — never searched in multi_space or pipeline modes,
-        // and E2 vectors are always identical (AP-9 post-retrieval decay). Saves CPU + RAM.
+        // Skip E2/E3/E4 temporal indexes — constitution rule 4: post-retrieval boost only,
+        // never in similarity fusion. Temporal boosting uses timestamps directly.
         // Skip E11 when disabled — KEPLER produces near-identical vectors (0.96-0.98 cosine).
         for embedder in EmbedderIndex::all_hnsw() {
             if matches!(

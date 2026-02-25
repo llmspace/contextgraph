@@ -148,7 +148,15 @@ impl SingleEmbedder for DenseEmbedderAdapter {
     }
 
     async fn embed(&self, content: &str) -> CoreResult<Vec<f32>> {
-        self.embed_with_instruction(content, None).await
+        DenseEmbedderAdapter::embed_with_instruction(self, content, None).await
+    }
+
+    async fn embed_with_instruction(
+        &self,
+        content: &str,
+        instruction: Option<&str>,
+    ) -> CoreResult<Vec<f32>> {
+        DenseEmbedderAdapter::embed_with_instruction(self, content, instruction).await
     }
 
     fn is_ready(&self) -> bool {
@@ -989,8 +997,9 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
                 let c = content_owned.clone();
                 async move { e1.embed(&c).await }
             }),
-            // E2/E3/E4: Skip GPU inference when disabled (weight=0, HNSW skipped, never searched).
-            // Zero vectors of correct dimension preserve fingerprint validation.
+            // E2/E3/E4: No instruction needed for search queries — Utc::now() fallback
+            // correctly represents query-time temporal position. When disabled, zero vectors
+            // preserve fingerprint validation.
             Self::timed_embed("E2_TemporalRecent", {
                 let c = content_owned.clone();
                 async move {
@@ -1138,8 +1147,8 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
     ///
     /// # Behavior
     ///
+    /// - E2/E3: Uses `metadata.e2_instruction()`/`e3_instruction()` to pass "timestamp:..." for decay/periodic encoding
     /// - E4: Uses `metadata.e4_instruction()` to pass "sequence:N" or "epoch:N"
-    /// - E2/E3: Currently use default behavior (could be extended to use metadata.timestamp)
     /// - All other embedders: Unchanged
     async fn embed_all_with_metadata(
         &self,
@@ -1172,7 +1181,9 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
 
         let content_owned = content.to_string();
 
-        // E4-FIX: Generate E4 instruction from metadata
+        // Generate temporal instructions from metadata timestamps
+        let e2_instruction = metadata.e2_instruction();
+        let e3_instruction = metadata.e3_instruction();
         let e4_instruction = metadata.e4_instruction();
 
         // CAUSAL-HINT Phase 6: Clone causal hint for E5 embedding
@@ -1198,28 +1209,31 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
                 let c = content_owned.clone();
                 async move { e1.embed(&c).await }
             }),
-            // E2/E3/E4: Skip GPU inference when disabled (weight=0, HNSW skipped, never searched).
+            // E2: Pass creation timestamp so each memory gets a unique decay vector
             Self::timed_embed("E2_TemporalRecent", {
                 let c = content_owned.clone();
+                let inst = e2_instruction.clone();
                 async move {
                     if TEMPORAL_EMBEDDERS_ENABLED {
-                        e2.embed(&c).await
+                        e2.embed_with_instruction(&c, Some(&inst)).await
                     } else {
                         Ok(vec![0.0f32; E2_DIM])
                     }
                 }
             }),
+            // E3: Pass creation timestamp for periodic pattern encoding
             Self::timed_embed("E3_TemporalPeriodic", {
                 let c = content_owned.clone();
+                let inst = e3_instruction.clone();
                 async move {
                     if TEMPORAL_EMBEDDERS_ENABLED {
-                        e3.embed(&c).await
+                        e3.embed_with_instruction(&c, Some(&inst)).await
                     } else {
                         Ok(vec![0.0f32; E3_DIM])
                     }
                 }
             }),
-            // E4-FIX: Use embed_with_instruction to pass sequence number (when enabled)
+            // E4: Pass session sequence number for positional encoding
             Self::timed_embed("E4_TemporalPositional", {
                 let c = content_owned.clone();
                 let inst = e4_instruction.clone();
@@ -1406,9 +1420,10 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
                 tokio::spawn(async move {
                     let start = Instant::now();
 
-                    // EMB-H1 FIX: Generate E4 instruction from metadata (same as embed_all_with_metadata)
+                    // Generate temporal instructions from metadata (same as embed_all_with_metadata)
+                    let e2_instruction = item_metadata.e2_instruction();
+                    let e3_instruction = item_metadata.e3_instruction();
                     let e4_instruction = item_metadata.e4_instruction();
-                    // EMB-H1 FIX: Clone causal hint for E5 embedding (same as embed_all_with_metadata)
                     let causal_hint = item_metadata.causal_hint.clone();
 
                     // Run all 13 embedders in parallel for this content
@@ -1431,28 +1446,31 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
                             let c = content.clone();
                             async move { e1.embed(&c).await }
                         }),
-                        // E2/E3/E4: Skip GPU inference when disabled (matches embed_all/embed_all_with_metadata).
+                        // E2: Pass creation timestamp for decay encoding
                         Self::timed_embed("E2_TemporalRecent", {
                             let c = content.clone();
+                            let inst = e2_instruction.clone();
                             async move {
                                 if TEMPORAL_EMBEDDERS_ENABLED {
-                                    e2.embed(&c).await
+                                    e2.embed_with_instruction(&c, Some(&inst)).await
                                 } else {
                                     Ok(vec![0.0f32; E2_DIM])
                                 }
                             }
                         }),
+                        // E3: Pass creation timestamp for periodic encoding
                         Self::timed_embed("E3_TemporalPeriodic", {
                             let c = content.clone();
+                            let inst = e3_instruction.clone();
                             async move {
                                 if TEMPORAL_EMBEDDERS_ENABLED {
-                                    e3.embed(&c).await
+                                    e3.embed_with_instruction(&c, Some(&inst)).await
                                 } else {
                                     Ok(vec![0.0f32; E3_DIM])
                                 }
                             }
                         }),
-                        // EMB-H1 FIX: Use embed_with_instruction for E4 (was embed)
+                        // E4: Pass session sequence for positional encoding
                         Self::timed_embed("E4_TemporalPositional", {
                             let c = content.clone();
                             let inst = e4_instruction.clone();
@@ -1859,6 +1877,97 @@ mod tests {
         );
         assert!(inst1.contains("session:session-A"));
         assert!(inst2.contains("session:session-B"));
+    }
+
+    // =========================================================================
+    // E2/E3 TEMPORAL INSTRUCTION VERIFICATION TESTS
+    // =========================================================================
+
+    /// Test that EmbeddingMetadata.e2_instruction() produces timestamp instruction.
+    #[test]
+    fn test_embedding_metadata_e2_instruction_with_timestamp() {
+        use chrono::TimeZone;
+        let ts = chrono::Utc.with_ymd_and_hms(2024, 6, 15, 12, 0, 0).unwrap();
+        let metadata = EmbeddingMetadata {
+            session_id: None,
+            session_sequence: None,
+            timestamp: Some(ts),
+            causal_hint: None,
+        };
+
+        let instruction = metadata.e2_instruction();
+        assert!(
+            instruction.starts_with("timestamp:"),
+            "e2_instruction() must start with 'timestamp:'. Got: {}",
+            instruction
+        );
+        assert!(
+            instruction.contains("2024-06-15"),
+            "e2_instruction() must contain the date. Got: {}",
+            instruction
+        );
+    }
+
+    /// Test that E2 instructions differ for different timestamps.
+    #[test]
+    fn test_e2_instructions_differ_for_different_timestamps() {
+        use chrono::TimeZone;
+        let ts1 = chrono::Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let ts2 = chrono::Utc.with_ymd_and_hms(2024, 6, 15, 12, 0, 0).unwrap();
+
+        let meta1 = EmbeddingMetadata {
+            session_id: None,
+            session_sequence: None,
+            timestamp: Some(ts1),
+            causal_hint: None,
+        };
+        let meta2 = EmbeddingMetadata {
+            session_id: None,
+            session_sequence: None,
+            timestamp: Some(ts2),
+            causal_hint: None,
+        };
+
+        assert_ne!(
+            meta1.e2_instruction(),
+            meta2.e2_instruction(),
+            "Different timestamps must produce different E2 instructions"
+        );
+    }
+
+    /// Test that e3_instruction delegates to e2_instruction (same timestamp format).
+    #[test]
+    fn test_e3_instruction_matches_e2_format() {
+        use chrono::TimeZone;
+        let ts = chrono::Utc.with_ymd_and_hms(2024, 3, 20, 8, 30, 0).unwrap();
+        let metadata = EmbeddingMetadata {
+            session_id: None,
+            session_sequence: None,
+            timestamp: Some(ts),
+            causal_hint: None,
+        };
+
+        let e2 = metadata.e2_instruction();
+        let e3 = metadata.e3_instruction();
+        assert_eq!(e2, e3, "E3 instruction should delegate to E2 (same timestamp format)");
+    }
+
+    /// Test that e2_instruction without timestamp produces epoch-based instruction.
+    #[test]
+    fn test_e2_instruction_fallback_to_epoch() {
+        let metadata = EmbeddingMetadata {
+            session_id: None,
+            session_sequence: None,
+            timestamp: None,
+            causal_hint: None,
+        };
+
+        let instruction = metadata.e2_instruction();
+        assert!(
+            instruction.starts_with("epoch:"),
+            "Without timestamp, e2_instruction() must use epoch format. Got: {}",
+            instruction
+        );
     }
 
     /// Test backward compatibility: metadata without session_id still works.

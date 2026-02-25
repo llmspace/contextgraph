@@ -44,8 +44,7 @@ pub struct SemanticModel {
 
 // SAFETY: SemanticModel wraps candle Tensors (via BertWeights in ModelState) behind a
 // std::sync::RwLock. Candle Tensors contain raw GPU pointers that are !Send/!Sync,
-// but all access is synchronized through the RwLock. The 3 temporal custom models
-// (TemporalRecentModel, TemporalPeriodicModel, TemporalPositionalModel) are auto-Send+Sync
-// and no longer need unsafe impls. Pretrained models with GPU weights still require them.
+// but all access is synchronized through the RwLock. Pretrained models with GPU weights
+// still require unsafe Send/Sync impls.
 unsafe impl Send for SemanticModel {}
 unsafe impl Sync for SemanticModel {}

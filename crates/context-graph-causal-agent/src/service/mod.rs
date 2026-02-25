@@ -187,10 +187,9 @@ pub struct CausalDiscoveryService {
 
 impl CausalDiscoveryService {
     /// Create a new service with the given configuration (no model).
-    #[deprecated(
-        since = "0.1.0",
-        note = "Use with_models() for production. This constructor creates E5EmbedderActivator without CausalModel."
-    )]
+    ///
+    /// Creates E5EmbedderActivator without CausalModel. For production use
+    /// `with_models()` which loads the full causal model stack.
     pub async fn new(config: CausalDiscoveryConfig) -> CausalAgentResult<Self> {
         let llm = CausalDiscoveryLLM::with_config(config.llm_config.clone())?;
         let llm = Arc::new(llm);
@@ -894,7 +893,6 @@ mod tests {
     #[tokio::test]
     async fn test_service_creation() {
         let config = create_test_config();
-        #[allow(deprecated)]
         let service = CausalDiscoveryService::new(config).await;
         assert!(service.is_ok());
     }
@@ -911,7 +909,6 @@ mod tests {
             return;
         }
 
-        #[allow(deprecated)]
         let service = CausalDiscoveryService::new(config).await.unwrap();
         service.load_model().await.unwrap();
 
@@ -927,14 +924,12 @@ mod tests {
     #[tokio::test]
     async fn test_service_status() {
         let config = create_test_config();
-        #[allow(deprecated)]
         let service = CausalDiscoveryService::new(config).await.unwrap();
 
         assert_eq!(service.status(), ServiceStatus::Stopped);
         assert!(!service.is_running());
     }
 
-    #[allow(deprecated)]
     fn default_service() -> CausalDiscoveryService {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {

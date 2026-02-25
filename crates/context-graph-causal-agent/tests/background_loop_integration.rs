@@ -415,8 +415,7 @@ async fn test_discovery_cycle_with_real_store() {
         },
     ];
 
-    // Create service (deprecated new() for testing without CausalModel)
-    #[allow(deprecated)]
+    // Create service (new() for testing without CausalModel)
     let service = CausalDiscoveryService::new(config)
         .await
         .expect("CausalDiscoveryService creation failed");
@@ -550,7 +549,6 @@ async fn test_non_causal_pair_no_relationship_stored() {
         },
     ];
 
-    #[allow(deprecated)]
     let service = CausalDiscoveryService::new(config)
         .await
         .expect("service creation failed");
@@ -629,7 +627,6 @@ async fn test_audit_record_after_discovery() {
         },
     ];
 
-    #[allow(deprecated)]
     let service = CausalDiscoveryService::new(config).await.unwrap();
     service.load_model().await.unwrap();
 
@@ -661,7 +658,6 @@ async fn test_adaptive_interval_with_real_store() {
     // Verify intervals are correct per spec:
     // 0 memories → 600s, 0 discoveries → 300s, ≤5 → 120s, >5 → 30s
     let config = test_config();
-    #[allow(deprecated)]
     let service = CausalDiscoveryService::new(config).await.unwrap();
 
     let cases = vec![
@@ -720,7 +716,6 @@ async fn test_adaptive_interval_with_real_store() {
 #[tokio::test]
 async fn test_service_stopped_initially() {
     let config = test_config();
-    #[allow(deprecated)]
     let service = CausalDiscoveryService::new(config).await.unwrap();
     assert!(!service.is_running());
     println!("PASS: Service starts in Stopped state");

@@ -375,7 +375,7 @@ impl RocksDbTeleologicalStore {
 
         // 3. Check HNSW index sizes vs live fingerprint count.
         // Skip indexes that are intentionally unpopulated:
-        // - E2/E3/E4: weight=0.0 in all profiles, HNSW population skipped
+        // - E2/E3/E4: post-retrieval only (constitution rule 4), HNSW not populated
         // - E11: skipped when E11_ENTITY_ENABLED=false (KEPLER non-discriminating)
         for (embedder, index) in self.index_registry.iter() {
             use crate::teleological::indexes::EmbedderIndex;
