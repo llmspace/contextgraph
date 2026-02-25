@@ -1655,7 +1655,11 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
     /// Efficient E11 embedding without running all 13 embedders.
     ///
     /// Returns E11 entity embedding (768D).
+    /// Returns zero vector when `E11_ENTITY_ENABLED` is false (no model inference).
     async fn embed_e11_only(&self, content: &str) -> CoreResult<Vec<f32>> {
+        if !E11_ENTITY_ENABLED {
+            return Ok(vec![0.0f32; E11_DIM]);
+        }
         if content.is_empty() {
             return Err(CoreError::ValidationError {
                 field: "content".to_string(),

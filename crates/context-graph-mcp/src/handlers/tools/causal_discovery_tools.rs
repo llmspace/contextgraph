@@ -821,31 +821,34 @@ impl Handlers {
                 };
 
                 // Generate E11 KEPLER entity embedding for knowledge graph search
-                // Concatenates cause|effect|explanation for entity context
                 // KEPLER knows entity relationships that E1 misses (e.g., "Diesel" = Rust ORM)
-                // E11 is a relational enhancer (ARCH-12) - critical for entity discovery
-                let e11_entity_text = format!(
-                    "{} | {} | {}",
-                    relationship.cause,
-                    relationship.effect,
-                    relationship.explanation
-                );
-                let e11_entity = match self
-                    .multi_array_provider
-                    .embed_e11_only(&e11_entity_text)
-                    .await
-                {
-                    Ok(emb) => emb,
-                    Err(e) => {
-                        warn!(
-                            memory_id = %memory_id,
-                            error = %e,
-                            "trigger_causal_discovery_extract: Failed to generate E11 embedding - skipping relationship"
-                        );
-                        e11_fallback_count += 1;
-                        // Skip this relationship - don't store corrupted data (per plan: fix #3)
-                        continue;
+                // Returns zeros when E11_ENTITY_ENABLED=false (no model inference)
+                let e11_entity = if context_graph_core::weights::E11_ENTITY_ENABLED {
+                    let e11_entity_text = format!(
+                        "{} | {} | {}",
+                        relationship.cause,
+                        relationship.effect,
+                        relationship.explanation
+                    );
+                    match self
+                        .multi_array_provider
+                        .embed_e11_only(&e11_entity_text)
+                        .await
+                    {
+                        Ok(emb) => emb,
+                        Err(e) => {
+                            warn!(
+                                memory_id = %memory_id,
+                                error = %e,
+                                "trigger_causal_discovery_extract: Failed to generate E11 embedding - skipping relationship"
+                            );
+                            e11_fallback_count += 1;
+                            // Skip this relationship - don't store corrupted data (per plan: fix #3)
+                            continue;
+                        }
                     }
+                } else {
+                    vec![0.0f32; context_graph_core::types::E11_DIM]
                 };
 
                 // Create and store the causal relationship with source-anchored, graph, and entity embeddings

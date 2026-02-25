@@ -2,7 +2,6 @@
 //!
 //! # Architecture Reference
 //!
-//! These 8 edge types are distinct from the Marblestone EdgeType (Semantic/Temporal/Causal/Hierarchical/Contradicts).
 //! Graph linking edge types are derived from which embedders agree that two nodes are similar.
 //!
 //! # Edge Types
@@ -23,7 +22,6 @@ use std::fmt;
 
 /// Edge types derived from embedder agreement patterns.
 ///
-/// Unlike Marblestone EdgeType which describes the semantic relationship type,
 /// GraphLinkEdgeType describes which embedder(s) detected the relationship.
 ///
 /// # Asymmetric Types

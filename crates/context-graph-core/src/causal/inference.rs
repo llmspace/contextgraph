@@ -3,10 +3,6 @@
 //! TASK-CAUSAL-001: Implements the omni_infer tool for causal reasoning.
 //! NO BACKWARDS COMPATIBILITY - FAIL FAST WITH ROBUST LOGGING.
 //!
-//! ## Constitution Reference
-//!
-//! See Marblestone tools section for `omni_infer` requirements (line 539).
-//!
 //! ## Inference Directions
 //!
 //! - Forward: A -> B (what effect does A have on B?)

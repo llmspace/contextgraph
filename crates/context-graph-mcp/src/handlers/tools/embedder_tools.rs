@@ -94,6 +94,27 @@ impl Handlers {
 
         let embedder_index = embedder_id.to_index();
 
+        // E11-DISABLE: Return empty results when E11 is disabled.
+        // The HNSW index rejects zero-norm query vectors (STOR-M1), so searching
+        // E11 when disabled would error. Return a clear message instead.
+        if matches!(embedder_id, EmbedderId::E11) && !context_graph_core::weights::E11_ENTITY_ENABLED {
+            info!(
+                embedder = %request.embedder,
+                "search_by_embedder: E11 is disabled (E11_ENTITY_ENABLED=false), returning empty results"
+            );
+            let response = SearchByEmbedderResponse {
+                embedder: request.embedder.clone(),
+                embedder_finds: format!("{} (DISABLED)", embedder_id.finds()),
+                results: Vec::new(),
+                total_searched: 0,
+                search_time_ms: start.elapsed().as_millis() as u64,
+            };
+            return match serde_json::to_value(&response) {
+                Ok(v) => self.tool_result(id, v),
+                Err(e) => self.tool_error_typed(id, ToolErrorKind::Execution, &format!("Serialization: {}", e)),
+            };
+        }
+
         info!(
             embedder = %request.embedder,
             embedder_name = %embedder_id.name(),
@@ -505,6 +526,23 @@ impl Handlers {
 
         for embedder_id in &embedder_ids {
             let embedder_index = embedder_id.to_index();
+
+            // E11-DISABLE: When E11 is disabled, its embedding is a zero vector.
+            // The HNSW index correctly rejects zero-norm queries (STOR-M1), so
+            // skip E11 search entirely and return 0 results for it.
+            if matches!(embedder_id, EmbedderId::E11) && !context_graph_core::weights::E11_ENTITY_ENABLED {
+                debug!(
+                    embedder = ?embedder_id,
+                    "compare_embedder_views: E11 disabled, returning empty results"
+                );
+                all_memory_sets.push(HashSet::new());
+                rankings.push(EmbedderRanking {
+                    embedder: format!("{:?}", embedder_id),
+                    finds: format!("{} (DISABLED)", embedder_id.finds()),
+                    results: Vec::new(),
+                });
+                continue;
+            }
 
             let mut options = TeleologicalSearchOptions::quick(request.top_k)
                 .with_strategy(SearchStrategy::E1Only)

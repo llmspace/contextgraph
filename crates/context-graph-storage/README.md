@@ -112,19 +112,6 @@ Demonstrates:
 - Embedding storage
 - Health checks
 
-### Marblestone Edge Operations
-
-```bash
-cargo run --package context-graph-storage --example marblestone_edges
-```
-
-Demonstrates:
-- Domain-specific neurotransmitter weights
-- Modulated weight calculation
-- Steering reward system
-- Edge traversal queries
-- Amortized shortcut creation
-
 ## Configuration
 
 ```rust
