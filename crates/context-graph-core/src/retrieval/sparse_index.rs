@@ -230,7 +230,7 @@ impl SparseInvertedIndex {
         Self {
             posting_lists: RwLock::new(HashMap::with_capacity(SPARSE_VOCAB_SIZE / 10)),
             doc_count: RwLock::new(0),
-            memory_terms: RwLock::new(HashMap::new()),
+            memory_terms: RwLock::new(HashMap::with_capacity(1024)),
             max_docs: DEFAULT_MAX_SPARSE_DOCS,
         }
     }
