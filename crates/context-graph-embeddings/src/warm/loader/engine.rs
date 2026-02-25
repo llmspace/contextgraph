@@ -46,7 +46,6 @@ pub struct WarmLoader {
     /// Dual-pool VRAM management (model + working).
     memory_pools: WarmMemoryPools,
     /// CUDA allocator for protected allocations.
-    #[allow(dead_code)]
     cuda_allocator: Option<WarmCudaAllocator>,
     /// Model validator for dimension/weight/inference checks.
     validator: WarmValidator,

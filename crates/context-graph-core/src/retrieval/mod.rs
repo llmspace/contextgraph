@@ -86,7 +86,6 @@ pub mod divergence;
 mod executor;
 pub mod insight_annotation;
 pub mod multi_space;
-mod pipeline;
 mod query;
 mod result;
 pub mod retriever;
@@ -105,10 +104,6 @@ mod tests;
 // Re-export all public types
 pub use aggregation::{AggregationStrategy, CombinedResult};
 pub use executor::{IndexType, MultiEmbeddingQueryExecutor, SpaceInfo};
-pub use pipeline::{
-    DefaultTeleologicalPipeline, PipelineHealth, TeleologicalRetrievalPipeline,
-    LateInteractionReranker, Stage5Result, TokenStorage, E12_TOKEN_DIM, DEFAULT_STAGE5_LIMIT,
-};
 
 // AP-007: InMemoryMultiEmbeddingExecutor is TEST ONLY - uses stubs
 #[cfg(test)]

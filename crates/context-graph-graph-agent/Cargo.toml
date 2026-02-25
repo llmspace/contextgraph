@@ -39,7 +39,6 @@ context-graph-causal-agent = { path = "../context-graph-causal-agent" }
 # Note: graph-agent uses CausalDiscoveryLLM from causal-agent (no direct llama-cpp-2 dependency)
 
 # Async utilities
-futures = "0.3"
 parking_lot = "0.12"
 
 [dev-dependencies]

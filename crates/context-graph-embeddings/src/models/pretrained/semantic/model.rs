@@ -40,7 +40,6 @@ impl SemanticModel {
             model_path: model_path.to_path_buf(),
             config,
             loaded: std::sync::atomic::AtomicBool::new(false),
-            memory_size: 0,
         })
     }
 

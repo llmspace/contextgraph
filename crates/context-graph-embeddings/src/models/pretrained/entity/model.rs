@@ -33,7 +33,6 @@ impl EntityModel {
             model_path: model_path.to_path_buf(),
             config,
             loaded: AtomicBool::new(false),
-            memory_size: 0,
         })
     }
 

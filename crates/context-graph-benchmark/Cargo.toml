@@ -48,9 +48,6 @@ rand = { workspace = true }
 rand_chacha = "0.3"
 rand_distr = { workspace = true }
 
-# Statistics
-statrs = "0.17"
-
 # Hashing
 md5 = "0.7"
 

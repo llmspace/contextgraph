@@ -40,10 +40,6 @@ pub struct SemanticModel {
 
     /// Whether model weights are loaded and ready.
     pub(crate) loaded: AtomicBool,
-
-    /// Memory used by model weights (bytes).
-    #[allow(dead_code)]
-    pub(crate) memory_size: usize,
 }
 
 // SAFETY: SemanticModel wraps candle Tensors (via BertWeights in ModelState) behind a

@@ -20,6 +20,7 @@ use uuid::Uuid;
 
 use context_graph_core::error::{CoreError, CoreResult};
 use context_graph_core::types::CausalRelationship;
+use context_graph_core::weights::E11_ENTITY_ENABLED;
 
 use crate::teleological::column_families::{CF_CAUSAL_BY_SOURCE, CF_CAUSAL_RELATIONSHIPS};
 use crate::teleological::schema::{causal_by_source_key, causal_relationship_key};
@@ -238,8 +239,9 @@ impl RocksDbTeleologicalStore {
             "Updated causal_by_source index (atomic)"
         );
 
-        // 5. Add to E11 HNSW index if embedding present
-        if relationship.has_entity_embedding() {
+        // 5. Add to E11 HNSW index if embedding present and E11 is enabled.
+        // Skip when E11 disabled — KEPLER produces near-identical vectors (0.96-0.98 cosine).
+        if E11_ENTITY_ENABLED && relationship.has_entity_embedding() {
             if let Err(e) = self
                 .causal_e11_index
                 .insert(relationship.id, relationship.e11_embedding())

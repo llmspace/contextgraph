@@ -26,6 +26,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use context_graph_core::types::fingerprint::TeleologicalFingerprint;
+use context_graph_core::weights::E11_ENTITY_ENABLED;
 
 use crate::column_families::{cf_names, get_all_column_family_descriptors};
 use crate::teleological::column_families::{
@@ -323,8 +324,12 @@ impl RocksDbTeleologicalStore {
             }
         }
 
-        // Rebuild E11 HNSW index from existing causal relationships
-        store.rebuild_causal_e11_index()?;
+        // Rebuild E11 HNSW index from existing causal relationships.
+        // Skip when E11 is disabled — KEPLER produces near-identical vectors (0.96-0.98 cosine),
+        // so the rebuild is wasted I/O scanning all causal relationships for nothing.
+        if E11_ENTITY_ENABLED {
+            store.rebuild_causal_e11_index()?;
+        }
 
         // Startup consistency verification — detect post-crash data inconsistencies.
         // Logs warnings only; does NOT block startup.
@@ -368,8 +373,23 @@ impl RocksDbTeleologicalStore {
             );
         }
 
-        // 3. Check HNSW index sizes vs live fingerprint count
+        // 3. Check HNSW index sizes vs live fingerprint count.
+        // Skip indexes that are intentionally unpopulated:
+        // - E2/E3/E4: weight=0.0 in all profiles, HNSW population skipped
+        // - E11: skipped when E11_ENTITY_ENABLED=false (KEPLER non-discriminating)
         for (embedder, index) in self.index_registry.iter() {
+            use crate::teleological::indexes::EmbedderIndex;
+            if matches!(
+                embedder,
+                EmbedderIndex::E2TemporalRecent
+                    | EmbedderIndex::E3TemporalPeriodic
+                    | EmbedderIndex::E4TemporalPositional
+            ) {
+                continue;
+            }
+            if !E11_ENTITY_ENABLED && *embedder == EmbedderIndex::E11Entity {
+                continue;
+            }
             let hnsw_count = index.len();
             // Allow 10% tolerance (removed entries are tracked but not physically deleted from usearch)
             let tolerance = (live_fp_count / 10).max(5);
@@ -929,8 +949,8 @@ impl RocksDbTeleologicalStore {
             }
         }
 
-        // STOR-4 FIX: Also check CausalE11Index for compaction
-        if self.causal_e11_index.needs_compaction() {
+        // STOR-4 FIX: Also check CausalE11Index for compaction (skip when E11 disabled)
+        if E11_ENTITY_ENABLED && self.causal_e11_index.needs_compaction() {
             let removed = self.causal_e11_index.removed_count();
             let total = self.causal_e11_index.len();
             info!(
@@ -952,10 +972,12 @@ impl RocksDbTeleologicalStore {
                 index.reset_removed_count();
             }
 
-            // STOR-4 FIX: Also rebuild and reset CausalE11Index
-            self.causal_e11_index.clear();
-            self.rebuild_causal_e11_index()?;
-            self.causal_e11_index.reset_removed_count();
+            // STOR-4 FIX: Also rebuild and reset CausalE11Index (skip when E11 disabled)
+            if E11_ENTITY_ENABLED {
+                self.causal_e11_index.clear();
+                self.rebuild_causal_e11_index()?;
+                self.causal_e11_index.reset_removed_count();
+            }
 
             info!("HNSW compaction complete — all orphaned vectors eliminated (including CausalE11Index)");
         }

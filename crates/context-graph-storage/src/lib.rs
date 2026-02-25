@@ -9,19 +9,15 @@
 //! using RocksDB as the underlying storage engine.
 //!
 //! # Architecture
-//! - `memex`: Storage trait abstraction (Memex = "memory index")
-//! - `rocksdb_backend`: RocksDB implementation
-//! - `column_families`: Column family definitions (11 base CFs)
-//! - `teleological`: TeleologicalFingerprint storage extensions
-//! - `graph_edges`: K-NN graph edges and typed edges (TASK-GRAPHLINK)
-//! - `serialization`: Bincode serialization utilities
+//! - `error`: Storage error types and result aliases
+//! - `column_families`: Column family definitions
+//! - `teleological`: TeleologicalFingerprint storage (RocksDbTeleologicalStore)
+//! - `graph_edges`: K-NN graph edges and typed edges
 //! - `indexes`: Secondary index operations (tags, temporal, sources)
 //! - `code`: Code entity and E7 embedding storage (separate from text)
 //!
-//! # Column Families (51 total)
+//! # Column Families
 //!
-//! Base (11): nodes, edges, embeddings, metadata, temporal, tags, sources, system,
-//!            embedder_edges, typed_edges, typed_edges_by_type
 //! Teleological (19): fingerprints, topic_profiles, e13_splade_inverted, e6_sparse_inverted,
 //!                    e1_matryoshka_128, content, source_metadata, file_index, topic_portfolio,
 //!                    e12_late_interaction, entity_provenance, audit_log, audit_by_target,
@@ -30,19 +26,12 @@
 //! Quantized Embedder (13): emb_0..emb_12
 //! Code (5): code_entities, code_e7_embeddings, code_file_index, code_name_index, code_signature_index
 //! Causal (2): causal_relationships, causal_by_source
-//!
-//! # Constitution Reference
-//! - db.dev: sqlite (ghost phase), db.prod: postgres16+
-//! - db.vector: faiss_gpu (separate from RocksDB node storage)
-//! - SEC-06: Soft delete 30-day recovery
 
 pub mod code;
 pub mod column_families;
+pub mod error;
 pub mod graph_edges;
 pub mod indexes;
-pub mod memex;
-pub mod rocksdb_backend;
-pub mod serialization;
 pub mod teleological;
 
 // Re-export column family types for storage consumers
@@ -52,27 +41,8 @@ pub use column_families::{
     TOTAL_COLUMN_FAMILIES,
 };
 
-// Re-export RocksDB backend types (TASK-M02-016, TASK-M02-025)
-pub use rocksdb_backend::{
-    RocksDbConfig, RocksDbMemex, StorageError, StorageResult, DEFAULT_CACHE_SIZE,
-    DEFAULT_MAX_OPEN_FILES,
-};
-
-// Re-export Memex trait and StorageHealth (TASK-M02-026)
-pub use memex::{Memex, StorageHealth};
-
-// Re-export core types for storage consumers
-pub use context_graph_core::marblestone::{Domain, EdgeType, NeurotransmitterWeights};
-pub use context_graph_core::types::{
-    EdgeId, EmbeddingVector, GraphEdge, MemoryNode, Modality, NodeId, NodeMetadata,
-    ValidationError,
-};
-
-// Re-export serialization types and functions
-pub use serialization::{
-    deserialize_edge, deserialize_embedding, deserialize_node, deserialize_uuid, serialize_edge,
-    serialize_embedding, serialize_node, serialize_uuid, SerializationError,
-};
+// Re-export storage error types
+pub use error::{StorageError, StorageResult};
 
 // Re-export teleological storage types (TASK-F004)
 pub use teleological::{

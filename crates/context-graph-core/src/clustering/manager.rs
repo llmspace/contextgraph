@@ -1166,33 +1166,6 @@ impl MultiSpaceClusterManager {
         result
     }
 
-    /// Compute average profile from a set of memories.
-    #[allow(dead_code)]
-    fn compute_average_profile(
-        &self,
-        memory_ids: &[Uuid],
-        profiles: &HashMap<Uuid, TopicProfile>,
-    ) -> TopicProfile {
-        let mut sum = [0.0f32; 13];
-        let count = memory_ids.len() as f32;
-
-        for id in memory_ids {
-            if let Some(profile) = profiles.get(id) {
-                for i in 0..13 {
-                    sum[i] += profile.strengths[i];
-                }
-            }
-        }
-
-        if count > 0.0 {
-            for s in &mut sum {
-                *s /= count;
-            }
-        }
-
-        TopicProfile::new(sum)
-    }
-
     /// Compute centroid from references to embeddings (zero-copy).
     fn compute_centroid_refs(embeddings: &[&Vec<f32>]) -> Vec<f32> {
         if embeddings.is_empty() {

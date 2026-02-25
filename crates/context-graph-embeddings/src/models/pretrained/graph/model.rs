@@ -65,8 +65,6 @@ pub struct GraphModel {
     #[allow(dead_code)]
     pub(crate) config: SingleModelConfig,
     pub(crate) loaded: AtomicBool,
-    #[allow(dead_code)]
-    pub(crate) memory_size: usize,
 }
 
 impl GraphModel {
@@ -82,7 +80,6 @@ impl GraphModel {
             model_path: model_path.to_path_buf(),
             config,
             loaded: AtomicBool::new(false),
-            memory_size: 0,
         })
     }
 

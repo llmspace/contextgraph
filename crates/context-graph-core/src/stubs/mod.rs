@@ -17,7 +17,6 @@
 //! - [`InMemoryTeleologicalStore`]: In-memory teleological storage (TASK-F008)
 //!   - **O(n) search complexity** - full table scan
 //!   - **No persistence** - data lost on drop
-//! - [`InMemoryGraphIndex`]: In-memory graph index
 //!
 //! # REMOVED (Phase 1 Cleanup)
 //!
@@ -51,18 +50,12 @@
 
 // AP-007: All stub modules are test-only or test-utils feature
 #[cfg(any(test, feature = "test-utils"))]
-mod graph_index;
-#[cfg(any(test, feature = "test-utils"))]
 mod multi_array_stub;
 #[cfg(any(test, feature = "test-utils"))]
 mod teleological_store_stub;
 
 // AP-007: All stub exports are gated to test-only or test-utils builds
 // Production code CANNOT import these - compile error if attempted
-
-// Graph index stub - TEST ONLY
-#[cfg(any(test, feature = "test-utils"))]
-pub use graph_index::InMemoryGraphIndex;
 
 // Multi-array embedding stub (TASK-F007) - TEST ONLY
 #[cfg(any(test, feature = "test-utils"))]

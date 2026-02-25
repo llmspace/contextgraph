@@ -92,20 +92,19 @@ fn l2_normalize(vector: &mut [f32]) {
     }
 }
 
-/// Compute cosine similarity between two session signatures.
-///
-/// Both vectors are assumed to be L2-normalized, so this is just the dot product.
-#[allow(dead_code)]
-pub fn signature_similarity(sig1: &[f32], sig2: &[f32]) -> f32 {
-    if sig1.len() != sig2.len() {
-        return 0.0;
-    }
-    sig1.iter().zip(sig2.iter()).map(|(a, b)| a * b).sum()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Compute cosine similarity between two session signatures.
+    ///
+    /// Both vectors are assumed to be L2-normalized, so this is just the dot product.
+    fn signature_similarity(sig1: &[f32], sig2: &[f32]) -> f32 {
+        if sig1.len() != sig2.len() {
+            return 0.0;
+        }
+        sig1.iter().zip(sig2.iter()).map(|(a, b)| a * b).sum()
+    }
 
     #[test]
     fn test_session_signature_deterministic() {

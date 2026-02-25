@@ -63,10 +63,6 @@ pub struct LateInteractionModel {
 
     /// Whether model weights are loaded and ready.
     pub(crate) loaded: AtomicBool,
-
-    /// Memory used by model weights (bytes).
-    #[allow(dead_code)]
-    pub(crate) memory_size: usize,
 }
 
 impl LateInteractionModel {
@@ -92,7 +88,6 @@ impl LateInteractionModel {
             model_path: model_path.to_path_buf(),
             config,
             loaded: AtomicBool::new(false),
-            memory_size: 0,
         })
     }
 

@@ -24,7 +24,7 @@ use std::collections::{HashMap, HashSet};
 
 use uuid::Uuid;
 
-use crate::embeddings::category::{category_for, max_weighted_agreement, topic_threshold};
+use crate::embeddings::category::{category_for, topic_threshold};
 use crate::teleological::Embedder;
 
 use super::error::ClusterError;
@@ -395,44 +395,6 @@ impl TopicSynthesizer {
         Ok(topics)
     }
 
-    /// Compute the average weighted agreement for a group of memories.
-    ///
-    /// Useful for evaluating topic cohesion.
-    #[allow(dead_code)]
-    fn compute_group_average_agreement(
-        &self,
-        members: &[Uuid],
-        mem_clusters: &HashMap<Uuid, HashMap<Embedder, i32>>,
-    ) -> f32 {
-        if members.len() < 2 {
-            return 0.0;
-        }
-
-        let mut sum = 0.0f32;
-        let mut count = 0usize;
-
-        for i in 0..members.len() {
-            for j in (i + 1)..members.len() {
-                sum += self.compute_weighted_agreement(&members[i], &members[j], mem_clusters);
-                count += 1;
-            }
-        }
-
-        if count > 0 {
-            sum / count as f32
-        } else {
-            0.0
-        }
-    }
-
-}
-
-/// Compute topic confidence from weighted agreement.
-///
-/// confidence = weighted_agreement / max_weighted_agreement (8.5)
-#[allow(dead_code)]
-fn compute_confidence(weighted_agreement: f32) -> f32 {
-    (weighted_agreement / max_weighted_agreement()).clamp(0.0, 1.0)
 }
 
 #[cfg(test)]

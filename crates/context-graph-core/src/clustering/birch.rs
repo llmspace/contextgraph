@@ -961,18 +961,6 @@ impl BIRCHTree {
         }
     }
 
-    /// Insert into a specific node (used for recursion).
-    /// This version takes &self which can cause borrow conflicts at root level.
-    #[allow(dead_code)]
-    fn insert_into_node(
-        &self,
-        node: &mut BIRCHNode,
-        embedding: &[f32],
-        memory_id: Uuid,
-    ) -> usize {
-        Self::insert_into_node_owned(node, embedding, memory_id, self.params.threshold)
-    }
-
     /// Insert into a node without requiring &self (avoids borrow conflicts).
     /// Uses explicit threshold parameter instead of self.params.
     fn insert_into_node_owned(

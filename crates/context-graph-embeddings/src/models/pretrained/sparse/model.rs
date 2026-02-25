@@ -63,10 +63,6 @@ pub struct SparseModel {
     /// Whether model weights are loaded and ready.
     pub(crate) loaded: AtomicBool,
 
-    /// Memory used by model weights (bytes).
-    #[allow(dead_code)]
-    pub(crate) memory_size: usize,
-
     /// Model ID (Sparse for E6, Splade for E13).
     /// Both use the same SPLADE architecture but report different IDs.
     pub(crate) model_id: ModelId,
@@ -127,7 +123,6 @@ impl SparseModel {
             model_path: model_path.to_path_buf(),
             config,
             loaded: AtomicBool::new(false),
-            memory_size: 0,
             model_id,
         })
     }

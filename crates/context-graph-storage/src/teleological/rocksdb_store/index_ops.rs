@@ -6,6 +6,7 @@ use tracing::debug;
 use uuid::Uuid;
 
 use context_graph_core::types::fingerprint::{SemanticFingerprint, TeleologicalFingerprint};
+use context_graph_core::weights::E11_ENTITY_ENABLED;
 
 use crate::teleological::indexes::{EmbedderIndex, EmbedderIndexOps, IndexError};
 
@@ -34,9 +35,10 @@ impl RocksDbTeleologicalStore {
     pub(crate) fn add_to_indexes_unlocked(&self, fp: &TeleologicalFingerprint) -> Result<(), IndexError> {
         let id = fp.id;
 
-        // Add to all HNSW-capable dense embedder indexes
+        // Add to all HNSW-capable dense embedder indexes.
         // Skip E2/E3/E4 temporal indexes — never searched in multi_space or pipeline modes,
         // and E2 vectors are always identical (AP-9 post-retrieval decay). Saves CPU + RAM.
+        // Skip E11 when disabled — KEPLER produces near-identical vectors (0.96-0.98 cosine).
         for embedder in EmbedderIndex::all_hnsw() {
             if matches!(
                 embedder,
@@ -44,6 +46,9 @@ impl RocksDbTeleologicalStore {
                     | EmbedderIndex::E3TemporalPeriodic
                     | EmbedderIndex::E4TemporalPositional
             ) {
+                continue;
+            }
+            if !E11_ENTITY_ENABLED && embedder == EmbedderIndex::E11Entity {
                 continue;
             }
             if let Some(index) = self.index_registry.get(embedder) {

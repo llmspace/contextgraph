@@ -27,9 +27,6 @@ tracing = { workspace = true }
 # UUID for memory IDs
 uuid = { workspace = true }
 
-# Float utilities for numerical stability
-half = { version = "2.4", features = ["num-traits"] }
-
 # GPU tensor operations for batched similarity (planned)
 # TODO: Re-enable when candle-core supports CUDA 13.1 / compute capability 12.0
 # candle-core = { version = "0.8", optional = true }

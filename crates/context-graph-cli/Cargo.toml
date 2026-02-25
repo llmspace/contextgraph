@@ -33,12 +33,6 @@ serde_json = "1.0"
 thiserror = { workspace = true }
 anyhow = "1.0"
 
-# Async traits
-async-trait = "0.1"
-
-# Synchronization
-parking_lot = "0.12"
-
 # UUIDs for node ID parsing (TASK-HOOKS-011)
 uuid = "1.0"
 

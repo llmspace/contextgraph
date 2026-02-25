@@ -20,13 +20,13 @@ use crate::teleological::column_families::{
 };
 use crate::teleological::schema::topic_profile_key;
 use crate::teleological::serialization::deserialize_topic_profile;
-use crate::RocksDbMemex;
+use crate::teleological::RocksDbTeleologicalStore;
 
 // =============================================================================
 // ROCKS DB IMPLEMENTATION
 // =============================================================================
 
-impl QuantizedFingerprintStorage for RocksDbMemex {
+impl QuantizedFingerprintStorage for RocksDbTeleologicalStore {
     fn store_quantized_fingerprint(
         &self,
         fingerprint: &StoredQuantizedFingerprint,
@@ -290,7 +290,7 @@ impl QuantizedFingerprintStorage for RocksDbMemex {
 
     fn quantization_router(&self) -> &QuantizationRouter {
         // Note: For a production implementation, the router should be stored
-        // as a field in RocksDbMemex. For now, we create a new one each time.
+        // as a field in the store. For now, we create a new one each time.
         // This is a design limitation that should be addressed in TASK-EMB-023.
         //
         // TEMPORARY: Return a static router. This is safe because QuantizationRouter

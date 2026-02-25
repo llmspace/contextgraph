@@ -13,7 +13,7 @@ mod tests {
     use crate::teleological::column_families::{
         QUANTIZED_EMBEDDER_CFS, QUANTIZED_EMBEDDER_CF_COUNT,
     };
-    use crate::RocksDbMemex;
+    use crate::teleological::RocksDbTeleologicalStore;
     use context_graph_embeddings::{
         QuantizationMetadata, QuantizationMethod, QuantizedEmbedding, StoredQuantizedFingerprint,
         MAX_QUANTIZED_SIZE_BYTES,
@@ -150,8 +150,8 @@ mod tests {
     // STORAGE INTEGRATION TESTS (REAL DATA, NO MOCKS)
     // =========================================================================
 
-    // Note: These tests require RocksDbMemex to be opened with the quantized
-    // embedder column families. The current RocksDbMemex::open() may not
+    // Note: These tests require RocksDbTeleologicalStore to be opened with the quantized
+    // embedder column families. The current RocksDbTeleologicalStore::open() may not
     // include these CFs by default. Tests are marked with appropriate guards.
 
     #[test]
@@ -160,9 +160,9 @@ mod tests {
         let tmp = TempDir::new().expect("create temp dir");
 
         // Open database with all column families including quantized embedder CFs
-        // Note: This requires RocksDbMemex to support the new CFs
+        // Note: This requires RocksDbTeleologicalStore to support the new CFs
         // For now, we skip if CFs aren't available
-        let memex = match RocksDbMemex::open(tmp.path()) {
+        let store = match RocksDbTeleologicalStore::open(tmp.path()) {
             Ok(m) => m,
             Err(e) => {
                 eprintln!("Skipping test - CFs not available: {}", e);
@@ -171,7 +171,7 @@ mod tests {
         };
 
         // Check if quantized CFs exist
-        if memex.get_cf("emb_0").is_err() {
+        if store.get_cf("emb_0").is_err() {
             eprintln!("Skipping test - quantized embedder CFs not configured");
             return;
         }
@@ -180,24 +180,24 @@ mod tests {
         let id = original.id;
 
         // Store
-        memex
+        store
             .store_quantized_fingerprint(&original)
             .expect("store should succeed");
 
         // Verify exists
         assert!(
-            memex.exists_quantized_fingerprint(id).unwrap(),
+            store.exists_quantized_fingerprint(id).unwrap(),
             "fingerprint should exist after store"
         );
 
         // Load single embedder
-        let emb_0 = memex
+        let emb_0 = store
             .load_embedder(id, 0)
             .expect("load embedder 0 should succeed");
         assert_eq!(emb_0.method, original.embeddings.get(&0).unwrap().method);
 
         // Load full fingerprint
-        let loaded = memex
+        let loaded = store
             .load_quantized_fingerprint(id)
             .expect("load should succeed");
 
@@ -218,35 +218,35 @@ mod tests {
         }
 
         // Delete
-        memex
+        store
             .delete_quantized_fingerprint(id)
             .expect("delete should succeed");
 
         // Verify not exists
         assert!(
-            !memex.exists_quantized_fingerprint(id).unwrap(),
+            !store.exists_quantized_fingerprint(id).unwrap(),
             "fingerprint should not exist after delete"
         );
 
         // Load should fail
-        let result = memex.load_quantized_fingerprint(id);
+        let result = store.load_quantized_fingerprint(id);
         assert!(result.is_err(), "load should fail after delete");
     }
 
     #[test]
     fn test_load_nonexistent_fingerprint() {
         let tmp = TempDir::new().expect("create temp dir");
-        let memex = match RocksDbMemex::open(tmp.path()) {
+        let store = match RocksDbTeleologicalStore::open(tmp.path()) {
             Ok(m) => m,
             Err(_) => return,
         };
 
-        if memex.get_cf("emb_0").is_err() {
+        if store.get_cf("emb_0").is_err() {
             return;
         }
 
         let nonexistent_id = Uuid::new_v4();
-        let result = memex.load_quantized_fingerprint(nonexistent_id);
+        let result = store.load_quantized_fingerprint(nonexistent_id);
 
         match result {
             Err(QuantizedStorageError::NotFound { fingerprint_id }) => {
@@ -260,17 +260,17 @@ mod tests {
     #[should_panic(expected = "STORAGE ERROR")]
     fn test_invalid_embedder_index_panics() {
         let tmp = TempDir::new().expect("create temp dir");
-        let memex = match RocksDbMemex::open(tmp.path()) {
+        let store = match RocksDbTeleologicalStore::open(tmp.path()) {
             Ok(m) => m,
             Err(_) => panic!("STORAGE ERROR: test setup failed"),
         };
 
-        if memex.get_cf("emb_0").is_err() {
+        if store.get_cf("emb_0").is_err() {
             panic!("STORAGE ERROR: CFs not available");
         }
 
         // This should panic because embedder_idx=15 is invalid
-        let _ = memex.load_embedder(Uuid::new_v4(), 15);
+        let _ = store.load_embedder(Uuid::new_v4(), 15);
     }
 
     // =========================================================================
@@ -282,12 +282,12 @@ mod tests {
         // This test performs PHYSICAL VERIFICATION of storage
         // by checking actual bytes in the database
         let tmp = TempDir::new().expect("create temp dir");
-        let memex = match RocksDbMemex::open(tmp.path()) {
+        let store = match RocksDbTeleologicalStore::open(tmp.path()) {
             Ok(m) => m,
             Err(_) => return,
         };
 
-        if memex.get_cf("emb_0").is_err() {
+        if store.get_cf("emb_0").is_err() {
             return;
         }
 
@@ -295,13 +295,13 @@ mod tests {
         let id = fingerprint.id;
 
         // Store
-        memex.store_quantized_fingerprint(&fingerprint).unwrap();
+        store.store_quantized_fingerprint(&fingerprint).unwrap();
 
         // PHYSICAL VERIFICATION: Read raw bytes from each CF
         let key = embedder_key(id);
         for (i, cf_name) in QUANTIZED_EMBEDDER_CFS.iter().enumerate() {
-            let cf = memex.get_cf(cf_name).unwrap();
-            let raw_data = memex
+            let cf = store.get_cf(cf_name).unwrap();
+            let raw_data = store
                 .db()
                 .get_cf(cf, key)
                 .expect("raw read should succeed")

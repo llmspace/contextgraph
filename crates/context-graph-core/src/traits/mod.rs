@@ -7,17 +7,12 @@
 //!
 //! - [`TeleologicalMemoryStore`]: Storage for teleological fingerprints (TASK-F008)
 //! - [`MultiArrayEmbeddingProvider`]: 13-embedding generation (TASK-F007)
-//! - [`GraphIndex`]: Graph traversal and indexing
 
-mod graph_index;
 mod multi_array_embedding;
 mod teleological_memory_store;
 
 #[cfg(test)]
 mod teleological_memory_store_tests;
-
-// Graph index trait
-pub use graph_index::GraphIndex;
 
 // Multi-array embedding provider (13 embeddings) - TASK-F007
 // E4-FIX: Added EmbeddingMetadata for session sequence support

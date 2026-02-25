@@ -76,8 +76,6 @@ pub struct ContextualModel {
     #[allow(dead_code)]
     pub(crate) config: SingleModelConfig,
     pub(crate) loaded: AtomicBool,
-    #[allow(dead_code)]
-    pub(crate) memory_size: usize,
 }
 
 impl ContextualModel {
@@ -93,7 +91,6 @@ impl ContextualModel {
             model_path: model_path.to_path_buf(),
             config,
             loaded: AtomicBool::new(false),
-            memory_size: 0,
         })
     }
 
