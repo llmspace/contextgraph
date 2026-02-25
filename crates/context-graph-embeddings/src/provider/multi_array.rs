@@ -1431,19 +1431,38 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
                             let c = content.clone();
                             async move { e1.embed(&c).await }
                         }),
+                        // E2/E3/E4: Skip GPU inference when disabled (matches embed_all/embed_all_with_metadata).
                         Self::timed_embed("E2_TemporalRecent", {
                             let c = content.clone();
-                            async move { e2.embed(&c).await }
+                            async move {
+                                if TEMPORAL_EMBEDDERS_ENABLED {
+                                    e2.embed(&c).await
+                                } else {
+                                    Ok(vec![0.0f32; E2_DIM])
+                                }
+                            }
                         }),
                         Self::timed_embed("E3_TemporalPeriodic", {
                             let c = content.clone();
-                            async move { e3.embed(&c).await }
+                            async move {
+                                if TEMPORAL_EMBEDDERS_ENABLED {
+                                    e3.embed(&c).await
+                                } else {
+                                    Ok(vec![0.0f32; E3_DIM])
+                                }
+                            }
                         }),
                         // EMB-H1 FIX: Use embed_with_instruction for E4 (was embed)
                         Self::timed_embed("E4_TemporalPositional", {
                             let c = content.clone();
                             let inst = e4_instruction.clone();
-                            async move { e4.embed_with_instruction(&c, Some(&inst)).await }
+                            async move {
+                                if TEMPORAL_EMBEDDERS_ENABLED {
+                                    e4.embed_with_instruction(&c, Some(&inst)).await
+                                } else {
+                                    Ok(vec![0.0f32; E4_DIM])
+                                }
+                            }
                         }),
                         // EMB-H1 FIX: Use embed_dual_with_hint for E5 (was embed_dual)
                         Self::timed_embed("E5_Causal_Dual", {
@@ -1471,9 +1490,16 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
                             let c = content.clone();
                             async move { e10.embed_dual(&c).await }
                         }),
+                        // E11: Skip GPU inference when disabled (matches embed_all/embed_all_with_metadata).
                         Self::timed_embed("E11_Entity", {
                             let c = content.clone();
-                            async move { e11.embed(&c).await }
+                            async move {
+                                if E11_ENTITY_ENABLED {
+                                    e11.embed(&c).await
+                                } else {
+                                    Ok(vec![0.0f32; E11_DIM])
+                                }
+                            }
                         }),
                         Self::timed_embed("E12_LateInteraction", {
                             let c = content.clone();

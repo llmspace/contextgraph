@@ -4,20 +4,19 @@ Core domain types, traits, and business logic for the Context Graph knowledge sy
 
 ## Overview
 
-This crate provides the foundational types for the Ultimate Context Graph - a 13-embedder memory system. It implements the Marblestone architecture for neural-inspired knowledge organization.
+This crate provides the foundational types for the Ultimate Context Graph - a 13-embedder memory system.
 
 ## Features
 
 - **MemoryNode**: Core knowledge node with 1536D embeddings and Ebbinghaus decay
-- **GraphEdge**: Marblestone-inspired edges with 13 fields including neurotransmitter weights and steering rewards
+- **GraphEdge**: Typed edges with weight modulation and steering rewards
 - **TeleologicalFingerprint**: 13-embedding fingerprint for multi-space retrieval
-- **Marblestone Types**: Domain, EdgeType, and NeurotransmitterWeights for neural-inspired edge modulation
 
 ## Quick Start
 
 ```rust
 use context_graph_core::types::MemoryNode;
-use context_graph_core::marblestone::{Domain, EdgeType, NeurotransmitterWeights};
+use context_graph_core::types::graph_edge::{GraphEdge, EdgeType};
 
 // Create a memory node
 fn create_valid_embedding() -> Vec<f32> {
@@ -40,12 +39,9 @@ node.validate().expect("Node should be valid");
 context-graph-core/
 ├── types/              # Core domain types
 │   ├── memory_node/    # MemoryNode, NodeMetadata, ValidationError
-│   ├── graph_edge/     # GraphEdge, EdgeId
+│   ├── graph_edge/     # GraphEdge, EdgeId, EdgeType
 │   └── fingerprint/    # TeleologicalFingerprint, SemanticFingerprint, TopicProfile
-├── marblestone/        # Marblestone architecture types
-│   ├── domain.rs       # Domain enum (Code, Legal, Medical, etc.)
-│   ├── edge_type.rs    # EdgeType enum (Semantic, Temporal, Causal, Hierarchical)
-│   └── neurotransmitter_weights.rs  # NT weights for edge modulation
+├── weights/            # Embedder weight profiles and gating constants
 ├── traits/             # Trait definitions
 │   └── memory_store.rs # MemoryStore async trait
 ├── error.rs            # CoreError, CoreResult
@@ -69,20 +65,18 @@ node.record_access();  // Track for decay calculation
 let decay = node.compute_decay();  // Ebbinghaus decay factor
 ```
 
-### GraphEdge (Marblestone)
+### GraphEdge
 
-Neural-inspired edges with 13 fields:
+Typed edges connecting memory nodes:
 - Source/target UUIDs
-- EdgeType (Semantic, Temporal, Causal, Hierarchical)
-- Domain (Code, Legal, Medical, Creative, Research, General)
-- Neurotransmitter weights (excitatory, inhibitory, modulatory)
+- EdgeType (Semantic, Temporal, Causal, Hierarchical, Contradicts)
+- Optional domain string
 - Steering reward [-1, 1] for feedback
 - Amortized shortcut tracking
 
 ```rust
-let edge = GraphEdge::new(source_id, target_id, EdgeType::Causal, Domain::Code);
+let edge = GraphEdge::new(source_id, target_id, EdgeType::Causal, Some("code".into()));
 let modulated = edge.get_modulated_weight();
-// Uses internal self.weight: w_eff = base x (1 + E - I + 0.5xM)
 ```
 
 ### TeleologicalFingerprint
