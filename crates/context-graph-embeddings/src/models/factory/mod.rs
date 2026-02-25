@@ -21,7 +21,7 @@
 //! - E7: CodeModel (CodeBERT)
 //! - E8: GraphModel (sentence-transformers)
 //! - E10: ContextualModel (intfloat/e5-base-v2)
-//! - E11: EntityModel (MiniLM entity)
+//! - E11: KeplerModel (KEPLER RoBERTa + TransE)
 //! - E12: LateInteractionModel (ColBERT)
 //!
 //! ## Custom Models (lightweight, no model files)

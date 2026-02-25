@@ -1,7 +1,6 @@
 //! Unit tests for GraphEdge traversal, shortcut, and default trait methods.
 
 use super::*;
-use crate::marblestone::{Domain, EdgeType};
 use uuid::Uuid;
 
 // record_traversal() Tests
@@ -11,7 +10,6 @@ fn test_record_traversal_increments_count() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     assert_eq!(edge.traversal_count, 0);
     edge.record_traversal();
@@ -26,7 +24,6 @@ fn test_record_traversal_updates_timestamp() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     assert!(edge.last_traversed_at.is_none());
     edge.record_traversal();
@@ -39,7 +36,6 @@ fn test_record_traversal_saturates() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     edge.traversal_count = u64::MAX;
     edge.record_traversal();
@@ -52,7 +48,6 @@ fn test_record_traversal_updates_timestamp_each_time() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     edge.record_traversal();
     let first = edge.last_traversed_at.unwrap();
@@ -69,7 +64,6 @@ fn test_is_reliable_shortcut_all_conditions_met() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     edge.is_amortized_shortcut = true;
     edge.traversal_count = 5;
@@ -84,7 +78,6 @@ fn test_is_reliable_shortcut_fails_not_shortcut() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     edge.is_amortized_shortcut = false;
     edge.traversal_count = 5;
@@ -99,7 +92,6 @@ fn test_is_reliable_shortcut_fails_low_traversal() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     edge.is_amortized_shortcut = true;
     edge.traversal_count = 2;
@@ -114,7 +106,6 @@ fn test_is_reliable_shortcut_fails_low_reward() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     edge.is_amortized_shortcut = true;
     edge.traversal_count = 5;
@@ -129,7 +120,6 @@ fn test_is_reliable_shortcut_fails_low_confidence() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     edge.is_amortized_shortcut = true;
     edge.traversal_count = 5;
@@ -144,7 +134,6 @@ fn test_is_reliable_shortcut_boundary_traversal() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     edge.is_amortized_shortcut = true;
     edge.traversal_count = 3;
@@ -159,7 +148,6 @@ fn test_is_reliable_shortcut_boundary_reward() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     edge.is_amortized_shortcut = true;
     edge.traversal_count = 5;
@@ -174,7 +162,6 @@ fn test_is_reliable_shortcut_boundary_confidence() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     edge.is_amortized_shortcut = true;
     edge.traversal_count = 5;
@@ -190,7 +177,6 @@ fn test_mark_as_shortcut() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     assert!(!edge.is_amortized_shortcut);
     edge.mark_as_shortcut();
@@ -203,7 +189,6 @@ fn test_mark_as_shortcut_idempotent() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     edge.mark_as_shortcut();
     edge.mark_as_shortcut();
@@ -217,7 +202,6 @@ fn test_age_seconds_non_negative() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     assert!(edge.age_seconds() >= 0);
 }
@@ -228,7 +212,6 @@ fn test_age_seconds_increases() {
         Uuid::new_v4(),
         Uuid::new_v4(),
         EdgeType::Semantic,
-        Domain::General,
     );
     let age1 = edge.age_seconds();
     std::thread::sleep(std::time::Duration::from_millis(10));
@@ -251,15 +234,9 @@ fn test_default_uses_semantic_edge_type() {
 }
 
 #[test]
-fn test_default_uses_general_domain() {
+fn test_default_domain_is_none() {
     let edge = GraphEdge::default();
-    assert_eq!(edge.domain, Domain::General);
-}
-
-#[test]
-fn test_default_has_valid_nt_weights() {
-    let edge = GraphEdge::default();
-    assert!(edge.neurotransmitter_weights.validate());
+    assert!(edge.domain.is_none());
 }
 
 #[test]

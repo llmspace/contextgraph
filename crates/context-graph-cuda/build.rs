@@ -1,7 +1,7 @@
 //! Build script for CUDA kernel compilation.
 //!
 //! Compiles .cu files in kernels/ directory using nvcc.
-//! Produces PTX for Driver API (knn.cu) or static libraries for Runtime API.
+//! Produces PTX for Driver API (knn.cu).
 //!
 //! # Target Hardware
 //!
@@ -59,24 +59,6 @@ fn compile_cuda_kernels() {
 
     // Find nvcc
     let nvcc = find_nvcc();
-
-    // Compile poincare_distance.cu (still uses Runtime API)
-    compile_kernel_to_lib(
-        &nvcc,
-        "kernels/poincare_distance.cu",
-        "poincare_distance",
-        &cuda_arch,
-        &out_dir,
-    );
-
-    // Compile cone_check.cu (still uses Runtime API)
-    compile_kernel_to_lib(
-        &nvcc,
-        "kernels/cone_check.cu",
-        "cone_check",
-        &cuda_arch,
-        &out_dir,
-    );
 
     // Compile knn.cu to PTX (uses Driver API to avoid WSL2 cudart bugs)
     compile_kernel_to_ptx(
@@ -304,89 +286,5 @@ fn compile_kernel_to_ptx(
         "cargo:warning=Successfully compiled CUDA kernel to PTX: {} -> {}",
         source,
         ptx_path.display()
-    );
-}
-
-/// Compile CUDA kernel to static library for Runtime API linking.
-#[cfg(feature = "cuda")]
-fn compile_kernel_to_lib(
-    nvcc: &std::path::Path,
-    source: &str,
-    name: &str,
-    arch: &str,
-    out_dir: &std::path::Path,
-) {
-    let obj_path = out_dir.join(format!("{}.o", name));
-    let lib_path = out_dir.join(format!("lib{}.a", name));
-
-    // Get additional nvcc flags from environment
-    let extra_flags: Vec<String> = env::var("NVCC_FLAGS")
-        .map(|f| f.split_whitespace().map(String::from).collect())
-        .unwrap_or_default();
-
-    // Compile to object file
-    let mut compile_cmd = Command::new(nvcc);
-    compile_cmd
-        .arg("-c")
-        .arg("-O3")
-        .args(["-arch", arch])
-        .args(["--compiler-options", "-fPIC"])
-        .arg("--generate-line-info")
-        .arg("-DNDEBUG")
-        .args(&extra_flags)
-        .args(["-o", obj_path.to_str().unwrap()])
-        .arg(source);
-
-    println!("cargo:warning=Running: {:?}", compile_cmd);
-
-    let compile_status = compile_cmd
-        .status()
-        .unwrap_or_else(|e| panic!("Failed to run nvcc: {}\nCommand: {:?}", e, compile_cmd));
-
-    if !compile_status.success() {
-        panic!(
-            "CUDA kernel compilation failed for {}\n\
-             nvcc exit code: {:?}",
-            source,
-            compile_status.code()
-        );
-    }
-
-    // Create static library using ar
-    let ar_status = Command::new("ar")
-        .args([
-            "rcs",
-            lib_path.to_str().unwrap(),
-            obj_path.to_str().unwrap(),
-        ])
-        .status()
-        .expect("Failed to run ar");
-
-    if !ar_status.success() {
-        panic!(
-            "Failed to create static library: {}\n\
-             ar exit code: {:?}",
-            lib_path.display(),
-            ar_status.code()
-        );
-    }
-
-    // Tell Cargo where to find the library
-    println!("cargo:rustc-link-search=native={}", out_dir.display());
-    println!("cargo:rustc-link-lib=static={}", name);
-
-    // Link CUDA runtime library (required for these kernels)
-    println!("cargo:rustc-link-lib=cudart");
-
-    // Also link math library for transcendental functions
-    println!("cargo:rustc-link-lib=m");
-
-    // Link C++ standard library for CUDA runtime symbols
-    println!("cargo:rustc-link-lib=stdc++");
-
-    println!(
-        "cargo:warning=Successfully compiled CUDA kernel: {} -> {}",
-        source,
-        lib_path.display()
     );
 }

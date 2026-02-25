@@ -1,7 +1,6 @@
 //! Unit tests for GraphEdge struct fields, types, and serialization.
 
 use super::*;
-use crate::marblestone::{Domain, EdgeType, NeurotransmitterWeights};
 use crate::types::NodeId;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -15,8 +14,7 @@ pub(super) fn create_test_edge() -> GraphEdge {
         edge_type: EdgeType::Semantic,
         weight: 0.5,
         confidence: 0.8,
-        domain: Domain::General,
-        neurotransmitter_weights: NeurotransmitterWeights::default(),
+        domain: None,
         is_amortized_shortcut: false,
         steering_reward: 0.0,
         traversal_count: 0,
@@ -28,23 +26,8 @@ pub(super) fn create_test_edge() -> GraphEdge {
 
 // Struct Field Existence Tests
 #[test]
-fn test_graph_edge_has_all_13_fields() {
-    let edge = GraphEdge {
-        id: Uuid::new_v4(),
-        source_id: Uuid::new_v4(),
-        target_id: Uuid::new_v4(),
-        edge_type: EdgeType::Semantic,
-        weight: 0.5,
-        confidence: 0.8,
-        domain: Domain::General,
-        neurotransmitter_weights: NeurotransmitterWeights::default(),
-        is_amortized_shortcut: false,
-        steering_reward: 0.0,
-        traversal_count: 0,
-        created_at: Utc::now(),
-        last_traversed_at: None,
-        discovery_provenance: None,
-    };
+fn test_graph_edge_has_all_fields() {
+    let edge = create_test_edge();
     // Verify all fields are accessible
     let _id: EdgeId = edge.id;
     let _src: NodeId = edge.source_id;
@@ -52,8 +35,7 @@ fn test_graph_edge_has_all_13_fields() {
     let _et: EdgeType = edge.edge_type;
     let _w: f32 = edge.weight;
     let _c: f32 = edge.confidence;
-    let _d: Domain = edge.domain;
-    let _nt: NeurotransmitterWeights = edge.neurotransmitter_weights;
+    let _d: &Option<String> = &edge.domain;
     let _short: bool = edge.is_amortized_shortcut;
     let _sr: f32 = edge.steering_reward;
     let _tc: u64 = edge.traversal_count;
@@ -83,21 +65,9 @@ fn test_target_id_is_node_id() {
 }
 
 #[test]
-fn test_edge_type_uses_marblestone_enum() {
+fn test_edge_type_methods() {
     let edge = create_test_edge();
     let _weight = edge.edge_type.default_weight();
-}
-
-#[test]
-fn test_domain_uses_marblestone_enum() {
-    let edge = create_test_edge();
-    let _desc = edge.domain.description();
-}
-
-#[test]
-fn test_nt_weights_uses_marblestone_struct() {
-    let edge = create_test_edge();
-    let _eff = edge.neurotransmitter_weights.compute_effective_weight(0.5);
 }
 
 // Serde Serialization Tests
@@ -110,13 +80,12 @@ fn test_serde_roundtrip() {
 }
 
 #[test]
-fn test_serde_json_contains_all_fields() {
+fn test_serde_json_contains_core_fields() {
     let edge = create_test_edge();
     let json = serde_json::to_string(&edge).unwrap();
     assert!(json.contains("\"id\"") && json.contains("\"source_id\""));
     assert!(json.contains("\"target_id\"") && json.contains("\"edge_type\""));
     assert!(json.contains("\"weight\"") && json.contains("\"confidence\""));
-    assert!(json.contains("\"domain\"") && json.contains("\"neurotransmitter_weights\""));
     assert!(json.contains("\"is_amortized_shortcut\"") && json.contains("\"steering_reward\""));
     assert!(json.contains("\"traversal_count\"") && json.contains("\"created_at\""));
     assert!(json.contains("\"last_traversed_at\""));
@@ -149,11 +118,22 @@ fn test_serde_edge_type_snake_case() {
 }
 
 #[test]
-fn test_serde_domain_snake_case() {
+fn test_serde_domain_string() {
     let mut edge = create_test_edge();
-    edge.domain = Domain::Medical;
+    edge.domain = Some("medical".to_string());
     let json = serde_json::to_string(&edge).unwrap();
     assert!(json.contains("\"medical\""));
+    let restored: GraphEdge = serde_json::from_str(&json).unwrap();
+    assert_eq!(restored.domain.as_deref(), Some("medical"));
+}
+
+#[test]
+fn test_serde_domain_none() {
+    let edge = create_test_edge();
+    assert!(edge.domain.is_none());
+    let json = serde_json::to_string(&edge).unwrap();
+    let restored: GraphEdge = serde_json::from_str(&json).unwrap();
+    assert!(restored.domain.is_none());
 }
 
 // Derive Trait Tests
@@ -234,7 +214,7 @@ fn test_is_amortized_shortcut_can_be_true() {
     assert!(edge.is_amortized_shortcut);
 }
 
-// All EdgeType/Domain Variants Tests
+// All EdgeType Variants Tests
 #[test]
 fn test_all_edge_types_work() {
     for edge_type in EdgeType::all() {
@@ -243,18 +223,6 @@ fn test_all_edge_types_work() {
         let json = serde_json::to_string(&edge).unwrap();
         let restored: GraphEdge = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.edge_type, edge_type);
-    }
-}
-
-#[test]
-fn test_all_domains_work() {
-    for domain in Domain::all() {
-        let mut edge = create_test_edge();
-        edge.domain = domain;
-        edge.neurotransmitter_weights = NeurotransmitterWeights::for_domain(domain);
-        let json = serde_json::to_string(&edge).unwrap();
-        let restored: GraphEdge = serde_json::from_str(&json).unwrap();
-        assert_eq!(restored.domain, domain);
     }
 }
 

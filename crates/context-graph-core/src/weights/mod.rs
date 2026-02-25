@@ -27,6 +27,17 @@
 
 use crate::types::fingerprint::NUM_EMBEDDERS;
 
+/// Whether E2/E3/E4 temporal embedders generate vectors during store_memory.
+///
+/// When `false` (default), E2/E3/E4 embed() calls are skipped and zero vectors
+/// are stored instead. This saves GPU compute time because:
+/// - E2 always produces identical vectors (delta=0 bug — use compute_e2_recency_decay instead)
+/// - E3/E4 have weight=0.0 in ALL search strategies and are never searched
+/// - HNSW indexes for E2/E3/E4 are already skipped (index_ops.rs)
+///
+/// Set to `true` and rebuild if temporal embedding vectors are needed for research.
+pub const TEMPORAL_EMBEDDERS_ENABLED: bool = false;
+
 /// Whether E11 Entity (KEPLER) participates in search/fusion.
 /// KEPLER produces near-identical vectors for all inputs (0.96-0.98 cosine).
 /// Set to `true` and rebuild to re-enable when loading custom entity embeddings.

@@ -23,9 +23,16 @@ fn test_create_all_13_models() {
         );
 
         let model = result.unwrap();
+        // ModelId::Entity is a legacy alias — the factory creates a KeplerModel,
+        // which reports ModelId::Kepler. All other models match their requested ID.
+        let expected = if *model_id == ModelId::Entity {
+            ModelId::Kepler
+        } else {
+            *model_id
+        };
         assert_eq!(
             model.model_id(),
-            *model_id,
+            expected,
             "Model ID mismatch for {:?}",
             model_id
         );

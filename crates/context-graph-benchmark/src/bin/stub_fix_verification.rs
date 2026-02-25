@@ -48,7 +48,6 @@ fn test_faiss_ntotal_error_signal() -> VerificationResult {
     // We can't call the actual function here without FFI, but we verify
     // the behavior exists by checking the source code was updated
 
-    // The actual test is in context-graph-graph/src/index/faiss_ffi/mod.rs
     // This is a placeholder that confirms the fix pattern
     VerificationResult::pass(
         "Fix #7: FAISS ntotal error signal",

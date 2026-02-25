@@ -2269,9 +2269,9 @@ mod tests {
         // BUG-001/002: rationale and topK validation (inline checks after validation.rs removal)
         assert!("".chars().count() < MIN_RATIONALE_LEN);
         assert!("x".chars().count() >= MIN_RATIONALE_LEN && "x".chars().count() <= MAX_RATIONALE_LEN);
-        assert!(0_u64 < MIN_TOP_K);
-        assert!(1_u64 >= MIN_TOP_K && 1_u64 <= MAX_TOP_K);
-        assert!(101_u64 > MAX_TOP_K);
+        const { assert!(0_u64 < MIN_TOP_K) };
+        const { assert!(1_u64 >= MIN_TOP_K && 1_u64 <= MAX_TOP_K) };
+        const { assert!(101_u64 > MAX_TOP_K) };
         // Causal gate: boost, demotion, passthrough, dead zone
         let boosted = apply_causal_gate(0.80, 0.05, true);
         assert!((boosted - 0.80 * causal_gate::CAUSAL_BOOST).abs() < 1e-6);

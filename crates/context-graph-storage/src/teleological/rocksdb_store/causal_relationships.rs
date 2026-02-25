@@ -944,7 +944,7 @@ impl RocksDbTeleologicalStore {
 
                 for causal_id in &causal_ids {
                     let primary_key = causal_relationship_key(causal_id);
-                    if db2.get_cf(cf_primary, &primary_key).ok().flatten().is_some() {
+                    if db2.get_cf(cf_primary, primary_key).ok().flatten().is_some() {
                         valid_ids.push(*causal_id);
                     } else {
                         any_orphaned = true;

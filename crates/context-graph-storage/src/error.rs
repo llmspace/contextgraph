@@ -3,8 +3,7 @@
 //! Defines error types for all storage operations.
 //! Errors are designed for fail-fast debugging with descriptive messages.
 
-use context_graph_core::marblestone::EdgeType;
-use context_graph_core::types::{NodeId, ValidationError};
+use context_graph_core::types::{EdgeType, NodeId, ValidationError};
 use thiserror::Error;
 
 /// Storage operation errors.

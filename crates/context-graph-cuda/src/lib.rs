@@ -5,7 +5,6 @@
 //! This crate provides GPU-accelerated operations for:
 //! - Vector similarity search (cosine, dot product)
 //! - Neural attention mechanisms
-//! - Poincaré ball hyperbolic operations
 //! - GPU-accelerated HDBSCAN clustering (ARCH-GPU-05)
 //!
 //! # Constitution AP-007 Compliance
@@ -36,13 +35,11 @@
 //! }
 //! ```
 
-pub mod cone;
 pub mod context;
 pub mod error;
 pub mod ffi;
 pub mod hdbscan;
 pub mod ops;
-pub mod poincare;
 pub mod safe;
 pub mod similarity;
 
@@ -50,12 +47,6 @@ pub mod similarity;
 #[cfg(test)]
 pub mod stub;
 
-pub use cone::{
-    cone_check_batch_cpu, cone_membership_score_cpu, get_cone_kernel_info, is_cone_gpu_available,
-    ConeCudaConfig, ConeData, ConeKernelInfo, CONE_DATA_DIM, POINT_DIM,
-};
-#[cfg(feature = "cuda")]
-pub use cone::{cone_check_batch_gpu, cone_check_single_gpu};
 pub use error::{CudaError, CudaResult};
 pub use ffi::{
     // CUDA Driver API exports
@@ -112,9 +103,6 @@ pub use context::{
     INFERENCE_PARTITION_PERCENT, MIN_SMS_FOR_PARTITIONING,
 };
 pub use ops::VectorOps;
-pub use poincare::{poincare_distance_batch_cpu, poincare_distance_cpu, PoincareCudaConfig};
-#[cfg(feature = "cuda")]
-pub use poincare::{poincare_distance_batch_gpu, poincare_distance_single_gpu};
 // GPU-batched similarity (ARCH-GPU-06: batch operations preferred)
 // Note: Currently using optimized CPU implementation until candle-core supports CUDA 13.1
 pub use similarity::{

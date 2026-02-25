@@ -66,8 +66,6 @@ pub use pretrained::{
     CodeModel,
     // ContextualModel (E10) - intfloat/e5-base-v2
     ContextualModel,
-    // EntityModel (E11 legacy) - MiniLM entity (deprecated, use KeplerModel)
-    EntityModel,
     // GraphModel (E8) - sentence-transformers/all-MiniLM-L6-v2
     GraphModel,
     // KeplerModel (E11) - RoBERTa-base + TransE on Wikidata5M (768D)
@@ -88,10 +86,6 @@ pub use pretrained::{
     CODE_MODEL_NAME,
     CODE_NATIVE_DIMENSION,
     CODE_PROJECTED_DIMENSION,
-    ENTITY_DIMENSION,
-    ENTITY_LATENCY_BUDGET_MS,
-    ENTITY_MAX_TOKENS,
-    ENTITY_MODEL_NAME,
     GRAPH_DIMENSION,
     GRAPH_LATENCY_BUDGET_MS,
     GRAPH_MAX_TOKENS,

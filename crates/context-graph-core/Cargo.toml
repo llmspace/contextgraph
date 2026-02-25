@@ -46,18 +46,11 @@ parking_lot = "0.12"
 # Half-precision floating point for FP16 quantization (TASK-L03: E12 Quantization)
 half = "2.3"
 
-# Real NVML GPU monitoring (TASK-23: NvmlGpuMonitor)
-# Feature-gated to allow builds on systems without NVIDIA drivers
-nvml-wrapper = { version = "0.10", optional = true }
-
 [features]
-# Default includes NVML for RTX 5090 GPU monitoring
-default = ["nvml"]
+default = []
 # Enable test utilities (stubs, zeroed() methods) for downstream crate tests
 # WARNING: Never enable this in production builds!
 test-utils = []
-# Real NVML GPU monitoring (RTX 5090 required per Constitution)
-nvml = ["nvml-wrapper"]
 
 [dev-dependencies]
 tempfile = "3.10"

@@ -27,7 +27,7 @@
 //! // Check model dimensions statically
 //! assert_eq!(ModelId::Semantic.dimension(), 1024);
 //! assert_eq!(ModelId::Code.dimension(), 1536); // Qodo-Embed-1-1.5B native
-//! assert_eq!(ModelId::Entity.dimension(), 384);
+//! assert_eq!(ModelId::Kepler.dimension(), 768);
 //!
 //! // Registry config defaults
 //! let config = ModelRegistryConfig::default();

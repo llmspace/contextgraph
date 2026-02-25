@@ -206,11 +206,10 @@ A query like *"Why does the authentication service fail under load?"*:
 | `context-graph-core` | Domain types, config, traits, 14 weight profiles |
 | `context-graph-storage` | RocksDB persistence, 51 column families, HNSW indexes |
 | `context-graph-embeddings` | 13-model embedding pipeline (HuggingFace candle) |
-| `context-graph-graph` | Knowledge graph with vector search |
 | `context-graph-cuda` | GPU acceleration (CUDA / candle) |
 | `context-graph-cli` | CLI tools, Claude Code hooks |
 | `context-graph-causal-agent` | LLM-based causal discovery |
-| `context-graph-graph-agent` | LLM-based graph relationship discovery |
+| `context-graph-graph-agent` | LLM-based graph relationship discovery (via causal-agent) |
 | `context-graph-benchmark` | Performance benchmarking suite |
 | `context-graph-test-utils` | Shared test utilities |
 
@@ -518,7 +517,6 @@ contextgraph/
 │   ├── context-graph-core/         # Domain types, config, traits, weight profiles
 │   ├── context-graph-storage/      # RocksDB persistence, 51 column families
 │   ├── context-graph-embeddings/   # 13-model embedding pipeline (candle)
-│   ├── context-graph-graph/        # Knowledge graph with vector search
 │   ├── context-graph-cuda/         # GPU acceleration
 │   ├── context-graph-cli/          # CLI and Claude Code hooks
 │   ├── context-graph-causal-agent/ # LLM-based causal discovery

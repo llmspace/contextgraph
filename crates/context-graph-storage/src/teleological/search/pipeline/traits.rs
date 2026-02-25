@@ -75,8 +75,8 @@ impl InMemoryTokenStorage {
         let mut inner = self.inner.write();
 
         // If ID already exists, just update the data (no order change needed)
-        if inner.tokens.contains_key(&id) {
-            inner.tokens.insert(id, tokens);
+        if let std::collections::hash_map::Entry::Occupied(mut entry) = inner.tokens.entry(id) {
+            entry.insert(tokens);
             return;
         }
 

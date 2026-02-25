@@ -688,14 +688,14 @@ impl CausalBenchmarkRunner {
         for pair in dataset.pairs.iter().take(total) {
             // Compute forward (cause→effect) and reverse (effect→cause) similarities
             let forward = compute_asymmetric_similarity(
-                pair.strength as f32,
+                pair.strength,
                 CausalDirection::Cause,
                 CausalDirection::Effect,
                 None,
                 None,
             );
             let reverse = compute_asymmetric_similarity(
-                pair.strength as f32,
+                pair.strength,
                 CausalDirection::Effect,
                 CausalDirection::Cause,
                 None,
@@ -787,7 +787,7 @@ impl CausalBenchmarkRunner {
         for pair in &dataset.pairs {
             // Symmetric means: compute_asymmetric_similarity with Unknown direction
             let sim = compute_asymmetric_similarity(
-                pair.strength as f32,
+                pair.strength,
                 CausalDirection::Unknown,
                 CausalDirection::Unknown,
                 None,
@@ -810,7 +810,7 @@ impl CausalBenchmarkRunner {
         for pair in &dataset.pairs {
             // cause→effect direction modifiers enabled
             let sim = compute_asymmetric_similarity(
-                pair.strength as f32,
+                pair.strength,
                 CausalDirection::Cause,
                 CausalDirection::Effect,
                 None, // No intervention context
@@ -837,7 +837,7 @@ impl CausalBenchmarkRunner {
             };
 
             let sim = compute_asymmetric_similarity(
-                pair.strength as f32,
+                pair.strength,
                 CausalDirection::Unknown, // No direction modifier
                 CausalDirection::Unknown,
                 Some(&intervention),

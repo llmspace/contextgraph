@@ -60,6 +60,7 @@ use context_graph_core::types::fingerprint::{
     SemanticFingerprint, SparseVector, E11_DIM, E12_TOKEN_DIM, E1_DIM, E2_DIM, E3_DIM, E4_DIM,
     E7_DIM, E9_DIM, NUM_EMBEDDERS,
 };
+use context_graph_core::weights::{E11_ENTITY_ENABLED, TEMPORAL_EMBEDDERS_ENABLED};
 
 use crate::config::GpuConfig;
 use crate::error::EmbeddingResult;
@@ -988,17 +989,37 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
                 let c = content_owned.clone();
                 async move { e1.embed(&c).await }
             }),
+            // E2/E3/E4: Skip GPU inference when disabled (weight=0, HNSW skipped, never searched).
+            // Zero vectors of correct dimension preserve fingerprint validation.
             Self::timed_embed("E2_TemporalRecent", {
                 let c = content_owned.clone();
-                async move { e2.embed(&c).await }
+                async move {
+                    if TEMPORAL_EMBEDDERS_ENABLED {
+                        e2.embed(&c).await
+                    } else {
+                        Ok(vec![0.0f32; E2_DIM])
+                    }
+                }
             }),
             Self::timed_embed("E3_TemporalPeriodic", {
                 let c = content_owned.clone();
-                async move { e3.embed(&c).await }
+                async move {
+                    if TEMPORAL_EMBEDDERS_ENABLED {
+                        e3.embed(&c).await
+                    } else {
+                        Ok(vec![0.0f32; E3_DIM])
+                    }
+                }
             }),
             Self::timed_embed("E4_TemporalPositional", {
                 let c = content_owned.clone();
-                async move { e4.embed(&c).await }
+                async move {
+                    if TEMPORAL_EMBEDDERS_ENABLED {
+                        e4.embed(&c).await
+                    } else {
+                        Ok(vec![0.0f32; E4_DIM])
+                    }
+                }
             }),
             Self::timed_embed("E5_Causal_Dual", {
                 let c = content_owned.clone();
@@ -1024,9 +1045,16 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
                 let c = content_owned.clone();
                 async move { e10.embed_dual(&c).await }
             }),
+            // E11: Skip GPU inference when disabled (KEPLER non-discriminating, 0.96-0.98 cosine).
             Self::timed_embed("E11_Entity", {
                 let c = content_owned.clone();
-                async move { e11.embed(&c).await }
+                async move {
+                    if E11_ENTITY_ENABLED {
+                        e11.embed(&c).await
+                    } else {
+                        Ok(vec![0.0f32; E11_DIM])
+                    }
+                }
             }),
             Self::timed_embed("E12_LateInteraction", {
                 let c = content_owned.clone();
@@ -1170,19 +1198,38 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
                 let c = content_owned.clone();
                 async move { e1.embed(&c).await }
             }),
+            // E2/E3/E4: Skip GPU inference when disabled (weight=0, HNSW skipped, never searched).
             Self::timed_embed("E2_TemporalRecent", {
                 let c = content_owned.clone();
-                async move { e2.embed(&c).await }
+                async move {
+                    if TEMPORAL_EMBEDDERS_ENABLED {
+                        e2.embed(&c).await
+                    } else {
+                        Ok(vec![0.0f32; E2_DIM])
+                    }
+                }
             }),
             Self::timed_embed("E3_TemporalPeriodic", {
                 let c = content_owned.clone();
-                async move { e3.embed(&c).await }
+                async move {
+                    if TEMPORAL_EMBEDDERS_ENABLED {
+                        e3.embed(&c).await
+                    } else {
+                        Ok(vec![0.0f32; E3_DIM])
+                    }
+                }
             }),
-            // E4-FIX: Use embed_with_instruction to pass sequence number
+            // E4-FIX: Use embed_with_instruction to pass sequence number (when enabled)
             Self::timed_embed("E4_TemporalPositional", {
                 let c = content_owned.clone();
                 let inst = e4_instruction.clone();
-                async move { e4.embed_with_instruction(&c, Some(&inst)).await }
+                async move {
+                    if TEMPORAL_EMBEDDERS_ENABLED {
+                        e4.embed_with_instruction(&c, Some(&inst)).await
+                    } else {
+                        Ok(vec![0.0f32; E4_DIM])
+                    }
+                }
             }),
             // CAUSAL-HINT Phase 6: Use embed_dual_with_hint for E5 if hint is available
             Self::timed_embed("E5_Causal_Dual", {
@@ -1210,9 +1257,16 @@ impl MultiArrayEmbeddingProvider for ProductionMultiArrayProvider {
                 let c = content_owned.clone();
                 async move { e10.embed_dual(&c).await }
             }),
+            // E11: Skip GPU inference when disabled (KEPLER non-discriminating).
             Self::timed_embed("E11_Entity", {
                 let c = content_owned.clone();
-                async move { e11.embed(&c).await }
+                async move {
+                    if E11_ENTITY_ENABLED {
+                        e11.embed(&c).await
+                    } else {
+                        Ok(vec![0.0f32; E11_DIM])
+                    }
+                }
             }),
             Self::timed_embed("E12_LateInteraction", {
                 let c = content_owned.clone();

@@ -17,7 +17,6 @@ pub mod adapters;
 #[cfg(feature = "cuda")]
 pub mod gpu_clustering;
 pub mod handlers;
-pub mod middleware;
 pub mod monitoring;
 pub mod protocol;
 pub mod server;

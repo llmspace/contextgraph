@@ -40,7 +40,6 @@ pub mod graph;
 pub mod graph_linking;
 pub mod injection;
 pub mod index;
-pub mod marblestone;
 pub mod memory;
 pub mod monitoring;
 pub mod quantization;
@@ -61,7 +60,7 @@ pub use error::{
     ConfigError, ContextGraphError, EmbeddingError, GpuError, IndexError, McpError, Result,
     StorageError,
 };
-pub use marblestone::{Domain, EdgeType, NeurotransmitterWeights};
+pub use types::EdgeType;
 
 // Production monitoring types (traits and error types only)
 pub use monitoring::{

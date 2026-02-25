@@ -17,7 +17,6 @@ pub(crate) mod shared;
 pub(crate) mod causal;
 mod code;
 mod contextual;
-mod entity;
 mod graph;
 pub mod kepler;
 mod late_interaction;
@@ -43,9 +42,6 @@ pub use contextual::{
 pub use code::{
     CodeModel, CODE_LATENCY_BUDGET_MS, CODE_MAX_TOKENS, CODE_MODEL_NAME, CODE_NATIVE_DIMENSION,
     CODE_PROJECTED_DIMENSION,
-};
-pub use entity::{
-    EntityModel, ENTITY_DIMENSION, ENTITY_LATENCY_BUDGET_MS, ENTITY_MAX_TOKENS, ENTITY_MODEL_NAME,
 };
 pub use kepler::{
     KeplerModel, KEPLER_DIMENSION, KEPLER_LATENCY_BUDGET_MS, KEPLER_MAX_TOKENS, KEPLER_MODEL_NAME,

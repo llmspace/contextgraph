@@ -12,7 +12,7 @@ use crate::models::custom::{
     HdcModel, TemporalPeriodicModel, TemporalPositionalModel, TemporalRecentModel,
 };
 use crate::models::pretrained::{
-    CausalModel, CodeModel, ContextualModel, EntityModel, GraphModel, KeplerModel,
+    CausalModel, CodeModel, ContextualModel, GraphModel, KeplerModel,
     LateInteractionModel, SemanticModel, SparseModel,
 };
 
@@ -167,11 +167,7 @@ impl DefaultModelFactory {
                 let model = ContextualModel::new(&model_path, config.clone())?;
                 Ok(Box::new(model))
             }
-            ModelId::Entity => {
-                let model = EntityModel::new(&model_path, config.clone())?;
-                Ok(Box::new(model))
-            }
-            ModelId::Kepler => {
+            ModelId::Entity | ModelId::Kepler => {
                 let model = KeplerModel::new(&model_path, config.clone())?;
                 Ok(Box::new(model))
             }
