@@ -15,6 +15,20 @@ members = [
     "crates/context-graph-graph-agent",
     "crates/context-graph-test-utils",
 ]
+# Exclude benchmark from default builds — it's 87K lines (22% of codebase)
+# and never compiled into the MCP server. Build explicitly with:
+#   cargo build -p context-graph-benchmark
+default-members = [
+    "crates/context-graph-mcp",
+    "crates/context-graph-core",
+    "crates/context-graph-cuda",
+    "crates/context-graph-embeddings",
+    "crates/context-graph-storage",
+    "crates/context-graph-cli",
+    "crates/context-graph-causal-agent",
+    "crates/context-graph-graph-agent",
+    "crates/context-graph-test-utils",
+]
 
 [workspace.package]
 version = "0.1.0"
