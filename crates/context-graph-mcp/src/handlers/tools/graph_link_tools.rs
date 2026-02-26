@@ -524,14 +524,15 @@ impl Handlers {
 
                 // Determine actual direction relative to the queried memory_id.
                 // If the edge's source matches memory_uuid, it's outgoing; otherwise incoming.
-                let actual_direction = if edge.source() == memory_uuid {
-                    "outgoing".to_string()
+                // The "peer" is the node at the other end of the edge.
+                let (actual_direction, peer_id) = if edge.source() == memory_uuid {
+                    ("outgoing".to_string(), edge.target())
                 } else {
-                    "incoming".to_string()
+                    ("incoming".to_string(), edge.source())
                 };
 
                 Some(TypedEdgeResult {
-                    target_id: edge.target(),
+                    target_id: peer_id,
                     edge_type: edge_type_to_string(edge.edge_type()),
                     weight: edge.weight(),
                     weighted_agreement: compute_weighted_agreement(edge.embedder_scores()),

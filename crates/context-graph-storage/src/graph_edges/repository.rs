@@ -9,7 +9,7 @@
 //!
 //! - `embedder_edges`: Key = [embedder_id: u8][source: 16 bytes], Value = Vec<EmbedderEdge>
 //! - `typed_edges`: Key = [source: 16 bytes][target: 16 bytes], Value = TypedEdge
-//! - `typed_edges_by_type`: Key = [edge_type: u8][source: 16 bytes], Value = target UUID
+//! - `typed_edges_by_type`: Key = [edge_type: u8][source: 16 bytes][target: 16 bytes], Value = target UUID
 
 use context_graph_core::graph_linking::{
     EdgeStorageKey, EmbedderEdge, GraphLinkEdgeType, TypedEdge, TypedEdgeStorageKey,
@@ -228,10 +228,12 @@ impl EdgeRepository {
         let primary_key = TypedEdgeStorageKey::new(edge.source(), edge.target());
         let value = serialize_typed_edge(edge)?;
 
-        // Secondary index key: [edge_type: u8][source: 16 bytes]
-        let mut secondary_key = [0u8; 17];
+        // Secondary index key: [edge_type: u8][source: 16 bytes][target: 16 bytes]
+        // Target included in key so multiple edges of same type from same source don't overwrite.
+        let mut secondary_key = [0u8; 33];
         secondary_key[0] = edge.edge_type() as u8;
         secondary_key[1..17].copy_from_slice(edge.source().as_bytes());
+        secondary_key[17..33].copy_from_slice(edge.target().as_bytes());
 
         // Batch write both the primary edge and secondary index
         let mut batch = WriteBatch::default();
@@ -294,9 +296,10 @@ impl EdgeRepository {
 
         // Delete from secondary index if edge existed
         if let Some(e) = edge {
-            let mut secondary_key = [0u8; 17];
+            let mut secondary_key = [0u8; 33];
             secondary_key[0] = e.edge_type() as u8;
             secondary_key[1..17].copy_from_slice(source.as_bytes());
+            secondary_key[17..33].copy_from_slice(target.as_bytes());
             batch.delete_cf(&by_type_cf, secondary_key);
         }
 
@@ -353,7 +356,9 @@ impl EdgeRepository {
             },
         )?;
 
-        // Query secondary index
+        // Query secondary index using [edge_type][source] as prefix
+        // Full key is [edge_type: u8][source: 16][target: 16] = 33 bytes,
+        // but we iterate with 17-byte prefix to get all targets for this (type, source).
         let mut prefix = [0u8; 17];
         prefix[0] = edge_type as u8;
         prefix[1..17].copy_from_slice(source.as_bytes());
@@ -375,14 +380,25 @@ impl EdgeRepository {
                 break;
             }
 
-            // Value is target UUID
-            let target_bytes: [u8; 16] = value[0..16].try_into().map_err(|_| {
-                GraphEdgeStorageError::deserialization(
-                    "get_typed_edges_by_type",
-                    "invalid target UUID",
-                )
-            })?;
-            let target = Uuid::from_bytes(target_bytes);
+            // Target UUID: extract from key (bytes 17..33) if available, else from value
+            let target = if key.len() >= 33 {
+                let target_bytes: [u8; 16] = key[17..33].try_into().map_err(|_| {
+                    GraphEdgeStorageError::deserialization(
+                        "get_typed_edges_by_type",
+                        "invalid target UUID in key",
+                    )
+                })?;
+                Uuid::from_bytes(target_bytes)
+            } else {
+                // Legacy 17-byte key format: target is in value
+                let target_bytes: [u8; 16] = value[0..16].try_into().map_err(|_| {
+                    GraphEdgeStorageError::deserialization(
+                        "get_typed_edges_by_type",
+                        "invalid target UUID",
+                    )
+                })?;
+                Uuid::from_bytes(target_bytes)
+            };
 
             // Fetch full edge from primary storage
             let primary_key = TypedEdgeStorageKey::new(source, target);
@@ -462,10 +478,11 @@ impl EdgeRepository {
             let primary_key = TypedEdgeStorageKey::new(edge.source(), edge.target());
             let value = serialize_typed_edge(edge)?;
 
-            // Secondary index key
-            let mut secondary_key = [0u8; 17];
+            // Secondary index key: [edge_type: u8][source: 16][target: 16] = 33 bytes
+            let mut secondary_key = [0u8; 33];
             secondary_key[0] = edge.edge_type() as u8;
             secondary_key[1..17].copy_from_slice(edge.source().as_bytes());
+            secondary_key[17..33].copy_from_slice(edge.target().as_bytes());
 
             batch.put_cf(&typed_cf, primary_key.to_bytes(), &value);
             batch.put_cf(&by_type_cf, secondary_key, edge.target().as_bytes());
