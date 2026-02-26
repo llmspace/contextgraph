@@ -97,6 +97,8 @@ fn topic_to_summary(topic: &Topic) -> TopicSummary {
         member_count: topic.member_count(),
         contributing_spaces,
         phase: phase_str,
+        parent_topic_id: topic.parent_id.map(|id| id.to_string()),
+        depth: topic.depth,
     }
 }
 
@@ -260,7 +262,9 @@ impl Handlers {
                         "id": t.id.to_string(),
                         "name": t.name,
                         "member_count": t.member_count,
-                        "top_space": t.contributing_spaces.first()
+                        "top_space": t.contributing_spaces.first(),
+                        "parentTopicId": t.parent_topic_id,
+                        "depth": t.depth
                     })
                 }).collect()
             }
@@ -275,7 +279,9 @@ impl Handlers {
                         "weighted_agreement": t.weighted_agreement,
                         "member_count": t.member_count,
                         "contributing_spaces": t.contributing_spaces,
-                        "phase": t.phase
+                        "phase": t.phase,
+                        "parentTopicId": t.parent_topic_id,
+                        "depth": t.depth
                     });
                     if let Some(core_t) = topic_core {
                         let strengths = core_t.profile.strengths;

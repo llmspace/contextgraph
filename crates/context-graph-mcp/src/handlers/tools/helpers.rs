@@ -272,3 +272,26 @@ pub(crate) fn compute_position_label(result_seq: u64, current_seq: u64) -> Strin
         }
     }
 }
+
+/// Compute importance decay factor based on time since last access.
+///
+/// Uses exponential half-life decay: `factor = 0.5^(days_since_access / half_life_days)`
+///
+/// - half_life_days = 30 (importance halves every 30 days without access)
+/// - factor is clamped to [0.01, 1.0] (never fully zeroes out)
+///
+/// # Arguments
+/// * `last_accessed_at` - When memory was last accessed
+/// * `now` - Current time
+#[allow(dead_code)] // Infrastructure for scoring-time importance decay
+pub fn importance_decay_factor(
+    last_accessed_at: chrono::DateTime<chrono::Utc>,
+    now: chrono::DateTime<chrono::Utc>,
+) -> f32 {
+    const HALF_LIFE_DAYS: f64 = 30.0;
+    const MIN_DECAY_FACTOR: f32 = 0.01;
+
+    let days_since_access = (now - last_accessed_at).num_seconds().max(0) as f64 / 86400.0;
+    let factor = (0.5f64).powf(days_since_access / HALF_LIFE_DAYS) as f32;
+    factor.clamp(MIN_DECAY_FACTOR, 1.0)
+}

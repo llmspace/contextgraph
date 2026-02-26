@@ -23,7 +23,7 @@ mod causal_discovery_tools;
 mod causal_relationship_tools;
 mod causal_tools;
 mod code_tools;
-mod consolidation;
+pub(crate) mod consolidation;
 mod curation_tools;
 pub(crate) mod daemon_tools;
 mod dispatch;

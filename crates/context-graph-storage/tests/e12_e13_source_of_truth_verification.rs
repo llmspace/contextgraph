@@ -100,6 +100,7 @@ fn create_test_fingerprint_with_e12_e13(id: Uuid, token_count: usize, splade_nnz
         last_updated: Utc::now(),
         access_count: 0,
         importance: 0.5,
+        last_accessed_at: Utc::now(),
         e6_sparse: None,
     }
 }

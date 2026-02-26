@@ -38,7 +38,7 @@ use crate::tools::types::ToolDefinition;
 
 /// Get all tool definitions for the `tools/list` response.
 pub fn get_tool_definitions() -> Vec<ToolDefinition> {
-    let mut tools = Vec::with_capacity(56);
+    let mut tools = Vec::with_capacity(58);
 
     // Core tools (4 - inject_context merged into store_memory)
     tools.extend(core::definitions());
@@ -82,6 +82,9 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
     // Embedder-first search tools (7) - Constitution v6.3 + NAV-GAP tools
     tools.extend(embedder::definitions());
 
+    // E12/E13 standalone search tools (2)
+    tools.extend(embedder::standalone_definitions());
+
     // Temporal tools (2) - E2 recency search, E3 periodic search
     tools.extend(temporal::definitions());
 
@@ -108,9 +111,9 @@ mod tests {
     fn test_total_tool_count_and_no_duplicates() {
         let tools = get_tool_definitions();
         #[cfg(feature = "llm")]
-        assert_eq!(tools.len(), 56);
+        assert_eq!(tools.len(), 58);
         #[cfg(not(feature = "llm"))]
-        assert_eq!(tools.len(), 52);
+        assert_eq!(tools.len(), 54);
         // No duplicates
         let mut names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
         let len_before = names.len();

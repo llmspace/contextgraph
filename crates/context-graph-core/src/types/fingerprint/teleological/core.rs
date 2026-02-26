@@ -56,6 +56,7 @@ impl TeleologicalFingerprint {
             last_updated: now,
             access_count: 0,
             importance: importance.clamp(0.0, 1.0),
+            last_accessed_at: now,
             e6_sparse: None,
         }
     }
@@ -136,10 +137,12 @@ impl TeleologicalFingerprint {
 
     /// Record an access event.
     ///
-    /// Increments access_count and updates last_updated timestamp.
+    /// Increments access_count and updates last_updated and last_accessed_at timestamps.
     pub fn record_access(&mut self) {
         self.access_count += 1;
-        self.last_updated = Utc::now();
+        let now = Utc::now();
+        self.last_updated = now;
+        self.last_accessed_at = now;
     }
 
     /// Get the age of this fingerprint (time since creation).

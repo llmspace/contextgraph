@@ -323,8 +323,54 @@ pub fn definitions() -> Vec<ToolDefinition> {
                         "type": "boolean",
                         "description": "Include content text in results (default: false).",
                         "default": false
+                    },
+                    "primaryEmbedder": {
+                        "type": "string",
+                        "description": "Primary embedder for generalized blind spot detection (default: E1).",
+                        "default": "E1",
+                        "enum": ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13"]
+                    },
+                    "contrastEmbedder": {
+                        "type": "string",
+                        "description": "Contrast embedder for generalized blind spot detection (default: E9).",
+                        "default": "E9",
+                        "enum": ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13"]
                     }
                 },
+                "additionalProperties": false
+            }),
+        ),
+    ]
+}
+
+/// Returns E12/E13 standalone search tool definitions (2 tools).
+pub fn standalone_definitions() -> Vec<ToolDefinition> {
+    vec![
+        ToolDefinition::new(
+            "search_by_tokens",
+            "Search using E12 ColBERT token-level MaxSim scoring for precise phrase matching.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Query text" },
+                    "topK": { "type": "integer", "default": 10, "minimum": 1, "maximum": 100 },
+                    "minSimilarity": { "type": "number", "default": 0.3, "minimum": 0.0, "maximum": 1.0 }
+                },
+                "required": ["query"],
+                "additionalProperties": false
+            }),
+        ),
+        ToolDefinition::new(
+            "search_by_expansion",
+            "Search using E13 SPLADE learned term expansion for enhanced keyword recall.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Query text" },
+                    "topK": { "type": "integer", "default": 10, "minimum": 1, "maximum": 100 },
+                    "minScore": { "type": "number", "default": 0.1, "minimum": 0.0, "maximum": 1.0 }
+                },
+                "required": ["query"],
                 "additionalProperties": false
             }),
         ),

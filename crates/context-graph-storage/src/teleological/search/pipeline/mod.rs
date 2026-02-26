@@ -93,7 +93,7 @@ pub use traits::{
 #[allow(unused_imports)]
 pub use types::{
     EdgeTypeRouting, GraphExpansionConfig, PipelineCandidate, PipelineConfig, PipelineError,
-    PipelineResult, PipelineStage, QueryType, StageConfig, StageResult,
+    PipelineResult, PipelineStage, StageConfig, StageResult,
 };
 
 // Note: E6 sparse index types are test-only and accessed via traits module directly.

@@ -145,6 +145,9 @@ impl Handlers {
             tool_names::GET_MEMORY_FINGERPRINT => call_get_memory_fingerprint(arguments),
             tool_names::CREATE_WEIGHT_PROFILE => call_create_weight_profile(arguments),
             tool_names::SEARCH_CROSS_EMBEDDER_ANOMALIES => call_search_cross_embedder_anomalies(arguments),
+            // E12/E13 standalone search tools
+            tool_names::SEARCH_BY_TOKENS => call_search_by_tokens(arguments),
+            tool_names::SEARCH_BY_EXPANSION => call_search_by_expansion(arguments),
             // Temporal tools (E2/E3)
             tool_names::SEARCH_RECENT => call_search_recent(arguments),
             tool_names::SEARCH_PERIODIC => call_search_periodic(arguments),

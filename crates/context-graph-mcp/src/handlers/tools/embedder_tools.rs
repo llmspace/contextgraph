@@ -1359,6 +1359,12 @@ impl Handlers {
 
         let elapsed_ms = start.elapsed().as_millis() as u64;
 
+        let blind_spot_rate = if total_searched > 0 {
+            anomalies.len() as f32 / total_searched as f32
+        } else {
+            0.0
+        };
+
         let response = SearchCrossEmbedderAnomaliesResponse {
             query: request.query.clone(),
             high_embedder: request.high_embedder.clone(),
@@ -1373,6 +1379,9 @@ impl Handlers {
             high_threshold: request.high_threshold,
             low_threshold: request.low_threshold,
             search_multiplier: 5,
+            primary_embedder: request.primary_embedder.clone(),
+            contrast_embedder: request.contrast_embedder.clone(),
+            blind_spot_rate,
         };
 
         info!(
@@ -1418,6 +1427,112 @@ impl Handlers {
         }
     }
 
+    /// search_by_tokens tool (E12 ColBERT MaxSim).
+    ///
+    /// Uses pipeline strategy (E13 recall → E1 dense → multi-space scoring) which
+    /// is the only search path that incorporates E12 token-level matching.
+    /// E12 uses MaxSim scoring (not HNSW) so it cannot be queried as a standalone
+    /// embedder index — it participates through the pipeline's reranking stages.
+    pub(crate) async fn call_search_by_tokens(
+        &self,
+        id: Option<JsonRpcId>,
+        arguments: serde_json::Value,
+    ) -> JsonRpcResponse {
+        use super::embedder_dtos::{SearchByTokensRequest, SearchByTokensResponse, TokenSearchResult};
+
+        let req: SearchByTokensRequest = match serde_json::from_value(arguments) {
+            Ok(r) => r,
+            Err(e) => return self.tool_error(id, &format!("Invalid arguments: {}", e)),
+        };
+
+        let top_k = req.top_k.min(100);
+        let start = Instant::now();
+
+        // Embed query to get all 13 embeddings (including E12 token vectors)
+        let query_fp = match self.embed_query(id.clone(), &req.query, "search_by_tokens").await {
+            Ok(fp) => fp,
+            Err(resp) => return resp,
+        };
+
+        // Use pipeline strategy — E13 SPLADE recall + E1 dense + multi-space scoring.
+        // E12 MaxSim participates through the pipeline's late-interaction reranking.
+        let options = TeleologicalSearchOptions::quick(top_k)
+            .with_strategy(SearchStrategy::Pipeline)
+            .with_min_similarity(req.min_similarity);
+
+        match self.teleological_store.search_semantic(&query_fp, options).await {
+            Ok(results) => {
+                let token_results: Vec<TokenSearchResult> = results
+                    .iter()
+                    .take(top_k)
+                    .map(|r| TokenSearchResult {
+                        memory_id: r.fingerprint.id.to_string(),
+                        score: r.similarity,
+                    })
+                    .collect();
+                let count = token_results.len();
+                let resp = SearchByTokensResponse { results: token_results, count, latency_ms: start.elapsed().as_secs_f64() * 1000.0 };
+                match serde_json::to_value(&resp) {
+                    Ok(v) => self.tool_result(id, v),
+                    Err(e) => self.tool_error(id, &format!("Serialization failed: {}", e)),
+                }
+            }
+            Err(e) => self.tool_error(id, &format!("E12 token search failed: {}", e)),
+        }
+    }
+
+    /// search_by_expansion tool (E13 SPLADE).
+    ///
+    /// Uses pipeline strategy which starts with E13 SPLADE sparse recall
+    /// (inverted index, not HNSW) for enhanced keyword expansion matching,
+    /// followed by multi-space scoring for precision.
+    pub(crate) async fn call_search_by_expansion(
+        &self,
+        id: Option<JsonRpcId>,
+        arguments: serde_json::Value,
+    ) -> JsonRpcResponse {
+        use super::embedder_dtos::{SearchByExpansionRequest, SearchByExpansionResponse, ExpansionSearchResult};
+
+        let req: SearchByExpansionRequest = match serde_json::from_value(arguments) {
+            Ok(r) => r,
+            Err(e) => return self.tool_error(id, &format!("Invalid arguments: {}", e)),
+        };
+
+        let top_k = req.top_k.min(100);
+        let start = Instant::now();
+
+        // Embed query to get all 13 embeddings (including E13 SPLADE sparse terms)
+        let query_fp = match self.embed_query(id.clone(), &req.query, "search_by_expansion").await {
+            Ok(fp) => fp,
+            Err(resp) => return resp,
+        };
+
+        // Use pipeline strategy — Stage 1 uses E13 SPLADE inverted index for recall,
+        // followed by E1 dense scoring and multi-space fusion.
+        let options = TeleologicalSearchOptions::quick(top_k)
+            .with_strategy(SearchStrategy::Pipeline)
+            .with_min_similarity(req.min_score);
+
+        match self.teleological_store.search_semantic(&query_fp, options).await {
+            Ok(results) => {
+                let expansion_results: Vec<ExpansionSearchResult> = results
+                    .iter()
+                    .take(top_k)
+                    .map(|r| ExpansionSearchResult {
+                        memory_id: r.fingerprint.id.to_string(),
+                        score: r.similarity,
+                    })
+                    .collect();
+                let count = expansion_results.len();
+                let resp = SearchByExpansionResponse { results: expansion_results, count, latency_ms: start.elapsed().as_secs_f64() * 1000.0 };
+                match serde_json::to_value(&resp) {
+                    Ok(v) => self.tool_result(id, v),
+                    Err(e) => self.tool_error(id, &format!("Serialization failed: {}", e)),
+                }
+            }
+            Err(e) => self.tool_error(id, &format!("E13 expansion search failed: {}", e)),
+        }
+    }
 }
 
 #[cfg(test)]

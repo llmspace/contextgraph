@@ -823,6 +823,12 @@ pub struct SearchCrossEmbedderAnomaliesRequest {
     /// Include content in results (default: false).
     #[serde(default)]
     pub include_content: bool,
+    /// Primary embedder for generalized blind spot detection (default: "E1").
+    #[serde(default = "default_primary_embedder")]
+    pub primary_embedder: String,
+    /// Contrast embedder for generalized blind spot detection (default: "E9").
+    #[serde(default = "default_contrast_embedder")]
+    pub contrast_embedder: String,
 }
 
 fn default_high_threshold() -> f32 {
@@ -914,7 +920,85 @@ pub struct SearchCrossEmbedderAnomaliesResponse {
     pub low_threshold: f32,
     /// Documents the over-fetch multiplier used when searching candidates.
     pub search_multiplier: usize,
+    /// Primary embedder used for generalized blind spot detection.
+    pub primary_embedder: String,
+    /// Contrast embedder used for generalized blind spot detection.
+    pub contrast_embedder: String,
+    /// Fraction of results classified as blind spots (anomalies / total_searched).
+    pub blind_spot_rate: f32,
 }
+
+// ============================================================================
+// search_by_tokens (E12 ColBERT MaxSim) DTOs
+// ============================================================================
+
+fn default_min_similarity() -> f32 {
+    0.3
+}
+
+/// Request DTO for search_by_tokens (E12 ColBERT MaxSim).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchByTokensRequest {
+    pub query: String,
+    #[serde(default = "default_top_k")]
+    pub top_k: usize,
+    #[serde(default = "default_min_similarity")]
+    pub min_similarity: f32,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchByTokensResponse {
+    pub results: Vec<TokenSearchResult>,
+    pub count: usize,
+    pub latency_ms: f64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenSearchResult {
+    pub memory_id: String,
+    pub score: f32,
+}
+
+// ============================================================================
+// search_by_expansion (E13 SPLADE) DTOs
+// ============================================================================
+
+fn default_expansion_min_score() -> f32 { 0.1 }
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchByExpansionRequest {
+    pub query: String,
+    #[serde(default = "default_top_k")]
+    pub top_k: usize,
+    #[serde(default = "default_expansion_min_score")]
+    pub min_score: f32,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchByExpansionResponse {
+    pub results: Vec<ExpansionSearchResult>,
+    pub count: usize,
+    pub latency_ms: f64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExpansionSearchResult {
+    pub memory_id: String,
+    pub score: f32,
+}
+
+// ============================================================================
+// Generalized blind spot detection fields
+// ============================================================================
+
+fn default_primary_embedder() -> String { "E1".to_string() }
+fn default_contrast_embedder() -> String { "E9".to_string() }
 
 #[cfg(test)]
 mod tests {

@@ -183,6 +183,48 @@ pub fn compute_consensus(id: Uuid, result_sets: &[(Vec<(Uuid, f32)>, f32)], top_
     count as f32 / total_embedders as f32
 }
 
+/// Apply synergy weights to RRF fusion results.
+///
+/// When a candidate appears in multiple embedder result sets, boost its score
+/// based on cross-embedder synergy weights. Rewards results "seen" by
+/// multiple complementary embedders.
+#[allow(dead_code)]
+pub fn apply_synergy_boost(
+    mut results: Vec<(Uuid, f32, HashMap<String, f32>)>,
+    synergy_weights: &[f32; 13],
+) -> Vec<(Uuid, f32, HashMap<String, f32>)> {
+    let embedder_name_to_index = |name: &str| -> Option<usize> {
+        match name {
+            "E1" => Some(0), "E2" => Some(1), "E3" => Some(2), "E4" => Some(3),
+            "E5" => Some(4), "E6" => Some(5), "E7" => Some(6), "E8" => Some(7),
+            "E9" => Some(8), "E10" => Some(9), "E11" => Some(10), "E12" => Some(11),
+            "E13" => Some(12), _ => None,
+        }
+    };
+
+    const SYNERGY_BASE_BOOST: f32 = 0.1;
+
+    for (_, score, per_embedder) in results.iter_mut() {
+        let contributing_indices: Vec<usize> = per_embedder
+            .keys()
+            .filter_map(|name| embedder_name_to_index(name))
+            .collect();
+
+        let mut synergy_bonus = 0.0f32;
+        for i in 0..contributing_indices.len() {
+            for j in (i + 1)..contributing_indices.len() {
+                let idx_i = contributing_indices[i];
+                let idx_j = contributing_indices[j];
+                synergy_bonus += synergy_weights[idx_i] * synergy_weights[idx_j] * SYNERGY_BASE_BOOST;
+            }
+        }
+        *score += synergy_bonus;
+    }
+
+    results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    results
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -16,6 +16,59 @@ use crate::handlers::Handlers;
 use crate::handlers::tools::helpers::cosine_similarity;
 use crate::protocol::{JsonRpcId, JsonRpcResponse};
 
+/// Configuration for automatic background consolidation.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct AutoConsolidationConfig {
+    pub enabled: bool,
+    pub interval_secs: u64,
+    pub similarity_threshold: f32,
+    pub max_merges_per_cycle: usize,
+}
+
+impl Default for AutoConsolidationConfig {
+    fn default() -> Self {
+        Self { enabled: false, interval_secs: 3600, similarity_threshold: 0.92, max_merges_per_cycle: 10 }
+    }
+}
+
+/// Status of the last auto-consolidation cycle.
+#[derive(Debug, Clone, Default)]
+pub struct AutoConsolidationStatus {
+    pub running: bool,
+    pub last_run_epoch_secs: u64,
+    pub last_candidates_found: usize,
+    pub last_merges_executed: usize,
+    pub total_merges: u64,
+    pub total_cycles: u64,
+}
+
+/// Dream consolidation phase types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+pub enum DreamPhase {
+    /// NREM: Merge near-duplicate memories (high threshold).
+    Nrem,
+    /// REM: Discover cross-domain connections via cross-embedder analysis.
+    Rem,
+}
+
+/// Status of dream consolidation.
+#[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
+pub struct DreamConsolidationStatus {
+    /// Whether dream consolidation is currently running.
+    pub active: bool,
+    /// Current phase (if active).
+    pub current_phase: Option<String>,
+    /// Last NREM merges performed.
+    pub last_nrem_merges: usize,
+    /// Last REM connections discovered.
+    pub last_rem_connections: usize,
+    /// Total dream cycles completed.
+    pub total_dream_cycles: u64,
+}
+
 // ============================================================================
 // LOCAL TYPES FOR CONSOLIDATION
 // ============================================================================

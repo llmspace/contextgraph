@@ -67,4 +67,7 @@ pub use stability::{
     DEFAULT_ENTROPY_THRESHOLD, SNAPSHOT_RETENTION_HOURS,
 };
 pub use synthesizer::{TopicSynthesizer, DEFAULT_MERGE_THRESHOLD, DEFAULT_MIN_SILHOUETTE};
-pub use topic::{Topic, TopicPhase, TopicProfile, TopicStability, TOPIC_SILHOUETTE_THRESHOLD};
+pub use topic::{
+    build_topic_hierarchy, Topic, TopicPhase, TopicProfile, TopicStability, MAX_TOPIC_DEPTH,
+    TOPIC_SILHOUETTE_THRESHOLD,
+};

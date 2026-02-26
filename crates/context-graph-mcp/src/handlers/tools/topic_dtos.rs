@@ -339,6 +339,13 @@ pub struct TopicSummary {
 
     /// Current lifecycle phase
     pub phase: String,
+
+    /// Parent topic ID (null for root topics).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_topic_id: Option<String>,
+
+    /// Depth in hierarchy (0 = root, 1 = category, 2 = specific).
+    pub depth: u8,
 }
 
 impl TopicSummary {
@@ -682,6 +689,8 @@ mod tests {
             member_count: 15,
             contributing_spaces: vec!["Semantic".to_string(), "Causal".to_string()],
             phase: "Stable".to_string(),
+            parent_topic_id: None,
+            depth: 0,
         };
 
         let json = serde_json::to_string(&summary).unwrap();
@@ -702,6 +711,8 @@ mod tests {
             member_count: 15,
             contributing_spaces: vec![],
             phase: "Emerging".to_string(),
+            parent_topic_id: None,
+            depth: 0,
         };
 
         let json = serde_json::to_string(&summary).unwrap();
@@ -719,6 +730,8 @@ mod tests {
             member_count: 10,
             contributing_spaces: vec![],
             phase: "Stable".to_string(),
+            parent_topic_id: None,
+            depth: 0,
         };
         assert!(valid.is_valid_topic());
 
@@ -730,6 +743,8 @@ mod tests {
             member_count: 5,
             contributing_spaces: vec![],
             phase: "Emerging".to_string(),
+            parent_topic_id: None,
+            depth: 0,
         };
         assert!(!invalid.is_valid_topic());
         println!("[PASS] TopicSummary validity check works (threshold 2.5)");

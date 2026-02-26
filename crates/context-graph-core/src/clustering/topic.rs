@@ -374,6 +374,15 @@ pub struct Topic {
     pub stability: TopicStability,
     /// Creation timestamp.
     pub created_at: DateTime<Utc>,
+
+    /// Parent topic ID for hierarchical topics (None for root-level topics).
+    #[serde(default)]
+    pub parent_id: Option<Uuid>,
+
+    /// Depth in the topic hierarchy (0 = root, 1 = category, 2 = specific).
+    /// Maximum depth is 3.
+    #[serde(default)]
+    pub depth: u8,
 }
 
 impl Topic {
@@ -427,6 +436,8 @@ impl Topic {
             silhouette_score: 1.0, // Default to valid, updated when cluster silhouettes are computed
             stability: TopicStability::new(),
             created_at: Utc::now(),
+            parent_id: None,
+            depth: 0,
         }
     }
 
@@ -551,6 +562,155 @@ impl Topic {
         }
         Uuid::new_v5(&Uuid::NAMESPACE_OID, &bytes)
     }
+}
+
+// =============================================================================
+// Hierarchy Construction
+// =============================================================================
+
+/// Maximum allowed depth in the topic hierarchy.
+pub const MAX_TOPIC_DEPTH: u8 = 3;
+
+/// Compute cosine similarity between two topic profile strength vectors.
+///
+/// Returns 0.0 for zero-norm vectors. Result is clamped to [0.0, 1.0].
+fn topic_cosine_similarity(a: &[f32; 13], b: &[f32; 13]) -> f32 {
+    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm_a < 1e-8 || norm_b < 1e-8 {
+        return 0.0;
+    }
+    let sim = dot / (norm_a * norm_b);
+    if sim.is_nan() || sim.is_infinite() {
+        0.0
+    } else {
+        sim.clamp(0.0, 1.0)
+    }
+}
+
+/// Build topic hierarchy from flat topic list.
+///
+/// Groups topics by similarity of their `TopicProfile::strengths` vectors.
+/// Topics with cosine similarity > `threshold` are grouped under a shared parent.
+///
+/// # Algorithm
+/// 1. Compute pairwise topic profile cosine similarity
+/// 2. Group topics where similarity > threshold into clusters (single-linkage)
+/// 3. For each cluster with 2+ members, create a parent topic with averaged profile
+/// 4. Set `parent_id` on child topics and `depth` to 1
+///
+/// # Arguments
+/// * `topics` - Flat list of detected topics (modified in place to set parent_id/depth)
+/// * `threshold` - Cosine similarity threshold for grouping (typical: 0.7)
+///
+/// # Returns
+/// Additional parent topics to add to the list. These have `depth` 0 and
+/// `parent_id` None. The child topics in `topics` are modified in place.
+pub fn build_topic_hierarchy(topics: &mut Vec<Topic>, threshold: f32) -> Vec<Topic> {
+    let n = topics.len();
+    if n < 2 {
+        return Vec::new();
+    }
+
+    // Union-Find for single-linkage clustering
+    let mut uf_parent: Vec<usize> = (0..n).collect();
+
+    fn find(uf_parent: &mut [usize], i: usize) -> usize {
+        let mut root = i;
+        while uf_parent[root] != root {
+            root = uf_parent[root];
+        }
+        // Path compression
+        let mut current = i;
+        while uf_parent[current] != root {
+            let next = uf_parent[current];
+            uf_parent[current] = root;
+            current = next;
+        }
+        root
+    }
+
+    fn union(uf_parent: &mut [usize], a: usize, b: usize) {
+        let ra = find(uf_parent, a);
+        let rb = find(uf_parent, b);
+        if ra != rb {
+            uf_parent[rb] = ra;
+        }
+    }
+
+    // Pairwise similarity -> union if above threshold
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let sim = topic_cosine_similarity(
+                &topics[i].profile.strengths,
+                &topics[j].profile.strengths,
+            );
+            if sim > threshold {
+                union(&mut uf_parent, i, j);
+            }
+        }
+    }
+
+    // Group indices by cluster root
+    let mut groups: HashMap<usize, Vec<usize>> = HashMap::new();
+    for i in 0..n {
+        let root = find(&mut uf_parent, i);
+        groups.entry(root).or_default().push(i);
+    }
+
+    // For each group with 2+ members, create a parent topic
+    let mut parent_topics: Vec<Topic> = Vec::new();
+    for indices in groups.values() {
+        if indices.len() < 2 {
+            continue;
+        }
+
+        // Compute averaged profile strengths
+        let mut avg_strengths = [0.0f32; 13];
+        for &idx in indices {
+            for (k, s) in topics[idx].profile.strengths.iter().enumerate() {
+                avg_strengths[k] += s;
+            }
+        }
+        let count = indices.len() as f32;
+        for s in &mut avg_strengths {
+            *s /= count;
+        }
+
+        // Create parent topic
+        let first_label = topics[indices[0]]
+            .name
+            .clone()
+            .unwrap_or_else(|| "Topic".to_string());
+        let parent_label = format!("Category: {}", first_label);
+
+        // Gather all member memories from children
+        let all_members: Vec<Uuid> = indices
+            .iter()
+            .flat_map(|&idx| topics[idx].member_memories.clone())
+            .collect();
+
+        let mut new_parent = Topic::new(
+            TopicProfile::new(avg_strengths),
+            HashMap::new(),
+            all_members,
+        );
+        new_parent.set_name(parent_label);
+        new_parent.depth = 0;
+        new_parent.parent_id = None;
+
+        // Set children's parent_id and depth
+        let pid = new_parent.id;
+        for &idx in indices {
+            topics[idx].parent_id = Some(pid);
+            topics[idx].depth = 1;
+        }
+
+        parent_topics.push(new_parent);
+    }
+
+    parent_topics
 }
 
 // =============================================================================

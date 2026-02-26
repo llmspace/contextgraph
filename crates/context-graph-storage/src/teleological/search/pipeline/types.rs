@@ -72,57 +72,6 @@ impl Default for StageConfig {
 // GRAPH EXPANSION CONFIGURATION
 // ============================================================================
 
-/// Query type for edge type routing during graph expansion.
-///
-/// Determines which edge types to follow based on query semantics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum QueryType {
-    /// General query - expand via all edge types.
-    #[default]
-    General,
-    /// Code query - prefer E7 CodeRelated edges.
-    Code,
-    /// Causal query - prefer E5 CausalChain edges.
-    Causal,
-    /// Entity query - prefer E11 EntityShared edges.
-    Entity,
-    /// Paraphrase query - prefer E10 ParaphraseAligned edges.
-    Paraphrase,
-}
-
-impl QueryType {
-    /// Detect query type from query text and optional weight profile.
-    pub fn from_query(query: &str, weight_profile: Option<&str>) -> Self {
-        // Check weight profile first (explicit preference)
-        if let Some(profile) = weight_profile {
-            match profile {
-                "code_search" => return Self::Code,
-                "causal_reasoning" => return Self::Causal,
-                "fact_checking" => return Self::Entity,
-                _ => {}
-            }
-        }
-
-        // Heuristic detection from query text
-        let q = query.to_lowercase();
-        if q.contains("function") || q.contains("implement") || q.contains("code")
-            || q.contains("struct") || q.contains("class") || q.contains("method")
-        {
-            Self::Code
-        } else if q.contains("why") || q.contains("cause") || q.contains("because")
-            || q.contains("reason") || q.contains("led to")
-        {
-            Self::Causal
-        } else if q.contains("what is") || q.contains("entity") || q.contains("who is")
-            || q.contains("define")
-        {
-            Self::Entity
-        } else {
-            Self::General
-        }
-    }
-}
-
 /// Edge type routing strategy for graph expansion.
 ///
 /// Determines which edge types to follow during expansion.
@@ -131,11 +80,6 @@ pub enum EdgeTypeRouting {
     /// Follow all edge types (default).
     #[default]
     All,
-    /// Route based on detected query type.
-    QuerySpecific {
-        /// The detected query type.
-        query_type: QueryType,
-    },
     /// Follow only specific edge types.
     Custom(Vec<GraphLinkEdgeType>),
 }
@@ -145,25 +89,6 @@ impl EdgeTypeRouting {
     pub fn should_expand(&self, edge_type: GraphLinkEdgeType) -> bool {
         match self {
             Self::All => true,
-            Self::QuerySpecific { query_type } => match query_type {
-                QueryType::Code => matches!(
-                    edge_type,
-                    GraphLinkEdgeType::CodeRelated | GraphLinkEdgeType::MultiAgreement
-                ),
-                QueryType::Causal => matches!(
-                    edge_type,
-                    GraphLinkEdgeType::CausalChain | GraphLinkEdgeType::MultiAgreement
-                ),
-                QueryType::Entity => matches!(
-                    edge_type,
-                    GraphLinkEdgeType::EntityShared | GraphLinkEdgeType::MultiAgreement
-                ),
-                QueryType::Paraphrase => matches!(
-                    edge_type,
-                    GraphLinkEdgeType::ParaphraseAligned | GraphLinkEdgeType::MultiAgreement
-                ),
-                QueryType::General => true,
-            },
             Self::Custom(types) => types.contains(&edge_type),
         }
     }

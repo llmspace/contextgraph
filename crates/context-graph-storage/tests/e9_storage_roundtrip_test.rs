@@ -90,6 +90,7 @@ fn create_test_fingerprint_with_unique_vectors() -> TeleologicalFingerprint {
         last_updated: Utc::now(),
         access_count: 0,
         importance: 0.5,
+        last_accessed_at: Utc::now(),
         e6_sparse: None,
     }
 }

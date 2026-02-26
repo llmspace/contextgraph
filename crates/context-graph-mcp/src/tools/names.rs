@@ -111,6 +111,10 @@ pub const SEARCH_CROSS_EMBEDDER_ANOMALIES: &str = "search_cross_embedder_anomali
 pub const SEARCH_RECENT: &str = "search_recent";
 pub const SEARCH_PERIODIC: &str = "search_periodic";
 
+// ========== TOKEN/EXPANSION SEARCH TOOLS (E12/E13 Standalone) ==========
+pub const SEARCH_BY_TOKENS: &str = "search_by_tokens";
+pub const SEARCH_BY_EXPANSION: &str = "search_by_expansion";
+
 // ========== GRAPH LINKING TOOLS (K-NN Navigation and Typed Edges) ==========
 // Tools for navigating the K-NN graph and exploring typed edges derived from
 // embedder agreement patterns. Per ARCH-18, E5/E8 use asymmetric similarity.

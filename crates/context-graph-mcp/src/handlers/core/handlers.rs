@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 use serde_json::json;
+use tokio::sync::RwLock as TokioRwLock;
 use tracing::{info, warn};
 
 use context_graph_core::clustering::{ClusterError, MultiSpaceClusterManager};
@@ -137,6 +138,10 @@ pub struct Handlers {
     /// None in stdio mode or tests where daemon state is not applicable.
     pub(in crate::handlers) daemon_state:
         Option<Arc<crate::handlers::tools::daemon_tools::DaemonState>>,
+
+    /// Auto-consolidation status for daemon_status reporting.
+    pub(in crate::handlers) auto_consolidation_status:
+        Arc<TokioRwLock<crate::handlers::tools::consolidation::AutoConsolidationStatus>>,
 }
 
 impl Handlers {
@@ -174,6 +179,7 @@ impl Handlers {
             causal_discovery_llm: None,
             causal_model: None,
             daemon_state: None,
+            auto_consolidation_status: Arc::new(TokioRwLock::new(crate::handlers::tools::consolidation::AutoConsolidationStatus::default())),
         })
     }
 
@@ -226,6 +232,7 @@ impl Handlers {
             causal_discovery_llm: Some(causal_discovery_llm),
             causal_model: Some(causal_model),
             daemon_state: None,
+            auto_consolidation_status: Arc::new(TokioRwLock::new(crate::handlers::tools::consolidation::AutoConsolidationStatus::default())),
         })
     }
 
@@ -267,6 +274,7 @@ impl Handlers {
             #[cfg(feature = "llm")]
             causal_model: None,
             daemon_state: None,
+            auto_consolidation_status: Arc::new(TokioRwLock::new(crate::handlers::tools::consolidation::AutoConsolidationStatus::default())),
         })
     }
 

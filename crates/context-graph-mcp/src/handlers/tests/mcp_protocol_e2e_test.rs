@@ -171,8 +171,8 @@ async fn test_e2e_tools_list_all_tools() {
     // Audit-12 TST-H3 FIX: Exact assertion (this test is #[cfg(feature = "llm")])
     assert_eq!(
         tools.len(),
-        56,
-        "Expected exactly 56 tools with LLM feature, found {}",
+        58,
+        "Expected exactly 58 tools with LLM feature, found {}",
         tools.len()
     );
 

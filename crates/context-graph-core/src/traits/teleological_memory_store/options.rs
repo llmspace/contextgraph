@@ -1127,6 +1127,35 @@ pub struct TeleologicalSearchOptions {
     #[serde(default)]
     pub causal_direction: CausalDirection,
 
+    // =========================================================================
+    // Synergy Matrix (Cross-Embedder Correlation Boost)
+    // =========================================================================
+
+    /// Optional per-embedder synergy weights for cross-embedder correlation boosting.
+    /// When present, boosts RRF scores when multiple embedders agree on a candidate.
+    /// Only applies to MultiSpace strategy.
+    #[serde(default)]
+    pub synergy_weights: Option<[f32; 13]>,
+
+    // =========================================================================
+    // Quantized Pre-Filter (PQ-8 Fast Pass)
+    // =========================================================================
+
+    /// Whether to use PQ-8 quantized vectors for fast approximate pre-filtering.
+    /// When enabled, approximate distances from quantized vectors narrow candidates
+    /// before full-precision HNSW search.
+    #[serde(default)]
+    pub use_quantized_prefilter: bool,
+
+    // =========================================================================
+    // 13D Teleological Vector Pre-Filter
+    // =========================================================================
+
+    /// Whether to use 13D teleological vector pre-filtering.
+    /// When enabled, computes a 13D signature for the query and uses it
+    /// to pre-filter candidates before full multi-embedder search.
+    #[serde(default)]
+    pub enable_teleological_prefilter: bool,
 }
 
 impl TeleologicalSearchOptions {
@@ -1161,6 +1190,12 @@ impl Default for TeleologicalSearchOptions {
             temporal_options: TemporalSearchOptions::default(),
             // Causal search options (ARCH-15) - Unknown (symmetric) by default
             causal_direction: CausalDirection::Unknown,
+            // Cross-embedder synergy - disabled by default
+            synergy_weights: None,
+            // Quantized pre-filter - disabled by default
+            use_quantized_prefilter: false,
+            // 13D teleological pre-filter - disabled by default
+            enable_teleological_prefilter: false,
         }
     }
 }
@@ -1585,6 +1620,23 @@ impl TeleologicalSearchOptions {
         self
     }
 
+    /// Set synergy weights for cross-embedder correlation boosting.
+    pub fn with_synergy_weights(mut self, weights: [f32; 13]) -> Self {
+        self.synergy_weights = Some(weights);
+        self
+    }
+
+    /// Enable quantized pre-filtering for approximate fast-pass.
+    pub fn with_quantized_prefilter(mut self, enabled: bool) -> Self {
+        self.use_quantized_prefilter = enabled;
+        self
+    }
+
+    /// Enable 13D teleological vector pre-filtering.
+    pub fn with_teleological_prefilter(mut self, enabled: bool) -> Self {
+        self.enable_teleological_prefilter = enabled;
+        self
+    }
 }
 
 #[cfg(test)]

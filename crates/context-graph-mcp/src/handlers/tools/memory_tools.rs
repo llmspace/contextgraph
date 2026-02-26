@@ -92,44 +92,6 @@ fn infer_causal_direction_from_fingerprint(fingerprint: &SemanticFingerprint) ->
     }
 }
 
-/// CHAIN-1: Infer causal direction from content text using keyword heuristics.
-///
-/// When E5 LoRA isn't loaded (zero vectors) and LLM isn't available,
-/// this provides a third inference path using causal language patterns.
-/// Constitution query_type_detection.CAUSAL: ["why", "caused", "because", "root cause"]
-///
-/// # Returns
-/// - "cause" if content describes something that CAUSES an effect
-/// - "effect" if content describes the RESULT of something
-/// - "unknown" if no causal language detected
-fn infer_causal_direction_from_content(content: &str) -> String {
-    let lower = content.to_lowercase();
-
-    // Cause indicators: content describes something that produces effects
-    const CAUSE_PATTERNS: &[&str] = &[
-        "causes", "leads to", "results in", "triggers", "produces",
-        "because of this", "this means", "therefore", "consequently",
-        "as a result", "root cause", "the reason",
-    ];
-    // Effect indicators: content describes an outcome or consequence
-    const EFFECT_PATTERNS: &[&str] = &[
-        "caused by", "result of", "because", "due to", "stems from",
-        "outcome of", "consequence of", "led to", "resulted from",
-        "affected by", "driven by", "influenced by",
-    ];
-
-    let cause_score: usize = CAUSE_PATTERNS.iter().filter(|p| lower.contains(**p)).count();
-    let effect_score: usize = EFFECT_PATTERNS.iter().filter(|p| lower.contains(**p)).count();
-
-    if cause_score > effect_score {
-        "cause".to_string()
-    } else if effect_score > cause_score {
-        "effect".to_string()
-    } else {
-        "unknown".to_string()
-    }
-}
-
 impl Handlers {
     /// store_memory tool implementation.
     ///
@@ -291,18 +253,10 @@ impl Handlers {
         let cluster_array = embedding_output.fingerprint.to_cluster_array();
 
         // E5 Phase 5: Determine causal direction for storage
-        // Priority: LLM hint → E5 norm inference → content keyword heuristics
-        // CHAIN-1: When E5 LoRA isn't loaded and LLM unavailable, keyword
-        // heuristics provide a fallback so causal direction is still persisted.
+        // Infer causal direction from LLM hint or E5 norms (no keyword heuristics).
         let causal_direction = llm_causal_direction.unwrap_or_else(|| {
             debug!("store_memory: No LLM hint, inferring causal direction from E5 norms");
-            let e5_direction = infer_causal_direction_from_fingerprint(&embedding_output.fingerprint);
-            if e5_direction != "unknown" {
-                e5_direction
-            } else {
-                debug!("store_memory: E5 norms inconclusive, falling back to content heuristics");
-                infer_causal_direction_from_content(&content)
-            }
+            infer_causal_direction_from_fingerprint(&embedding_output.fingerprint)
         });
 
         // E6-FIX: Extract e6_sparse BEFORE creating TeleologicalFingerprint
@@ -715,6 +669,12 @@ impl Handlers {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
+        // Parse useQuantizedPrefilter (default: false)
+        let use_quantized_prefilter = args
+            .get("useQuantizedPrefilter")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
         // =========================================================================
         // TEMPORAL SEARCH PARAMETERS (ARCH-14)
         // =========================================================================
@@ -928,24 +888,8 @@ impl Handlers {
             query.to_string()
         };
 
-        // Auto-select weight profile based on query type
-        // Priority: user-specified > causal > conversation_context > default
-        let effective_weight_profile = match (&weight_profile, &causal_direction, use_conversation_context) {
-            // User specified a profile - always use it
-            (Some(profile), _, _) => Some(profile.clone()),
-            // Causal query detected - use causal_reasoning
-            (None, CausalDirection::Cause | CausalDirection::Effect, _) => {
-                debug!("Auto-selecting 'causal_reasoning' profile for causal query");
-                Some("causal_reasoning".to_string())
-            }
-            // Conversation context enabled - use conversation_history for balanced E1+E4
-            (None, CausalDirection::Unknown, true) => {
-                debug!("Auto-selecting 'conversation_history' profile for conversation context");
-                Some("conversation_history".to_string())
-            }
-            // No special case - use default
-            (None, CausalDirection::Unknown, false) => weight_profile.clone(),
-        };
+        // Use user-specified weight profile directly (no auto-detection).
+        let effective_weight_profile = weight_profile.clone();
 
         // Build search options with multi-space parameters
         // For causal queries, over-fetch candidates to allow for reranking
@@ -961,6 +905,21 @@ impl Handlers {
             .with_strategy(strategy)
             .with_rerank(enable_rerank)
             .with_causal_direction(causal_direction); // ARCH-15, AP-77: Thread direction to retrieval
+
+        // Map weight profile to synergy weights for cross-embedder correlation boost
+        if let Some(sw) = match effective_weight_profile.as_deref() {
+            Some("code_search") => Some([0.3, 0.0, 0.0, 0.0, 0.1, 0.2, 1.0, 0.2, 0.1, 0.1, 0.0, 0.0, 0.0]),
+            Some("semantic_search") => Some([1.0, 0.0, 0.0, 0.0, 0.3, 0.2, 0.1, 0.2, 0.2, 0.3, 0.1, 0.0, 0.0]),
+            Some("temporal_navigation") => Some([0.3, 0.8, 0.8, 0.8, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+            Some("causal_reasoning") => Some([0.3, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.1, 0.0, 0.0]),
+            Some("entity_focused") => Some([0.3, 0.0, 0.0, 0.0, 0.0, 0.2, 0.0, 0.2, 0.0, 0.0, 1.0, 0.0, 0.0]),
+            _ => None,
+        } {
+            options = options.with_synergy_weights(sw);
+        }
+
+        // Apply quantized pre-filter option
+        options = options.with_quantized_prefilter(use_quantized_prefilter);
 
         if let Some(ref profile) = effective_weight_profile {
             // Check custom profiles first, then fall back to built-in

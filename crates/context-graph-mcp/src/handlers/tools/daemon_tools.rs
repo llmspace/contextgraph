@@ -99,6 +99,8 @@ impl Handlers {
                 }
             };
 
+        let consolidation_status = self.auto_consolidation_status.read().await;
+
         let result = json!({
             "pid": pid,
             "uptime_secs": uptime_secs,
@@ -108,6 +110,14 @@ impl Handlers {
             "background_tasks": {
                 "running": !background_shutdown,
                 "graph_builder": graph_builder_running
+            },
+            "autoConsolidation": {
+                "running": consolidation_status.running,
+                "lastRunEpochSecs": consolidation_status.last_run_epoch_secs,
+                "lastCandidatesFound": consolidation_status.last_candidates_found,
+                "lastMergesExecuted": consolidation_status.last_merges_executed,
+                "totalMerges": consolidation_status.total_merges,
+                "totalCycles": consolidation_status.total_cycles
             },
         });
 
