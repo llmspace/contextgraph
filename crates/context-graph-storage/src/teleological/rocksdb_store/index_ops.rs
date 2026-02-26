@@ -2,7 +2,7 @@
 //!
 //! Contains methods for adding/removing fingerprints to/from HNSW indexes.
 
-use tracing::debug;
+use tracing::{debug, warn};
 use uuid::Uuid;
 
 use context_graph_core::types::fingerprint::{SemanticFingerprint, TeleologicalFingerprint};
@@ -36,23 +36,39 @@ impl RocksDbTeleologicalStore {
         let id = fp.id;
 
         // Add to all HNSW-capable dense embedder indexes.
-        // Skip E2/E3/E4 temporal indexes — constitution rule 4: post-retrieval boost only,
-        // never in similarity fusion. Temporal boosting uses timestamps directly.
+        // E2/E3/E4 temporal indexes are now populated for first-class fusion participation.
+        // Weight profiles control whether they contribute to scoring (0.0 = excluded).
         // Skip E11 when disabled — KEPLER produces near-identical vectors (0.96-0.98 cosine).
         for embedder in EmbedderIndex::all_hnsw() {
-            if matches!(
-                embedder,
-                EmbedderIndex::E2TemporalRecent
-                    | EmbedderIndex::E3TemporalPeriodic
-                    | EmbedderIndex::E4TemporalPositional
-            ) {
-                continue;
-            }
             if !E11_ENTITY_ENABLED && embedder == EmbedderIndex::E11Entity {
                 continue;
             }
             if let Some(index) = self.index_registry.get(embedder) {
                 let vector = Self::get_embedder_vector(&fp.semantic, embedder);
+                // Skip zero-norm vectors: cosine similarity is undefined for zero-norm,
+                // so HNSW correctly rejects them. For E2/E3/E4 temporal embedders,
+                // this is expected legacy data (stored before temporal embedding fix).
+                // For other embedders, zero-norm indicates possible corruption — warn.
+                if vector.iter().all(|&v| v == 0.0) {
+                    let is_temporal = matches!(
+                        embedder,
+                        EmbedderIndex::E2TemporalRecent
+                            | EmbedderIndex::E3TemporalPeriodic
+                            | EmbedderIndex::E4TemporalPositional
+                    );
+                    if is_temporal {
+                        debug!(
+                            "Skipping zero-norm vector for {:?} on fingerprint {} (legacy data)",
+                            embedder, id
+                        );
+                    } else {
+                        warn!(
+                            "Skipping zero-norm vector for {:?} on fingerprint {} (possible corruption)",
+                            embedder, id
+                        );
+                    }
+                    continue;
+                }
                 index.insert(id, vector)?;
             }
         }

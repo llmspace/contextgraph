@@ -37,7 +37,7 @@ pub(crate) fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 /// Compute semantic similarity across all embedders.
 ///
 /// MATCHES production scoring at search.rs:446-466:
-/// - E2: hardcoded 0.5 (E2 cosine broken; production uses timestamp decay)
+/// - E2: cosine similarity (E2 vectors are now unique per memory — bug fixed)
 /// - E5: returns -1.0 sentinel (AP-77: causal requires direction; stub has no direction context)
 /// - E6/E13: sparse cosine normalized to [0,1] via (raw+1)/2
 /// - E8: asymmetric cross-pair max: max(source→target, target→source)
@@ -51,9 +51,8 @@ pub(crate) fn compute_semantic_scores(
     // E1: Semantic
     scores[0] = cosine_similarity(&query.e1_semantic, &target.e1_semantic);
 
-    // E2: Temporal Recent — neutral score (E2 cosine is broken: all vectors identical → 1.0)
-    // Production uses compute_e2_recency_decay(stored_created_at) but we lack timestamps here.
-    scores[1] = 0.5;
+    // E2: Temporal Recent — cosine similarity (E2 vectors are now unique per memory)
+    scores[1] = cosine_similarity(&query.e2_temporal_recent, &target.e2_temporal_recent);
 
     // E3: Temporal Periodic
     scores[2] = cosine_similarity(&query.e3_temporal_periodic, &target.e3_temporal_periodic);

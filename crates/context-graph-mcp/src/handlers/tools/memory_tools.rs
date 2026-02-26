@@ -1584,22 +1584,25 @@ impl Handlers {
                     let (strategy_indices, strategy_label) = match strategy {
                         SearchStrategy::E1Only => (vec![0usize], "E1 HNSW only"),
                         SearchStrategy::MultiSpace => {
-                            let mut indices = vec![0, 4, 6, 7, 9];
+                            // E2(1), E3(2), E4(3) are weight-gated in search_multi_space_sync
+                            // E6(5) participates in scoring (not HNSW recall) when weight > 0
+                            let mut indices = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
                             let label = if E11_ENTITY_ENABLED {
                                 indices.push(10);
-                                "E1+E5+E7+E8+E10+E11 RRF fusion"
+                                "E1+E2*+E3*+E4*+E5+E6+E7+E8+E9+E10+E11 RRF fusion (* = weight-gated)"
                             } else {
-                                "E1+E5+E7+E8+E10 RRF fusion (E11 disabled)"
+                                "E1+E2*+E3*+E4*+E5+E6+E7+E8+E9+E10 RRF fusion (* = weight-gated, E11 disabled)"
                             };
                             (indices, label)
                         }
                         SearchStrategy::Pipeline => {
-                            let mut indices = vec![0, 4, 6, 7, 9];
+                            // E6(5) participates in Stage 2 scoring when weight > 0
+                            let mut indices = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
                             let label = if E11_ENTITY_ENABLED {
                                 indices.push(10);
-                                "E13+E1+E5+E7+E8+E11 recall → 6-embedder RRF scoring"
+                                "E13 recall → E1+E2*+E3*+E4*+E5+E6+E7+E8+E9+E10+E11 RRF scoring (* = weight-gated)"
                             } else {
-                                "E13+E1+E5+E7+E8 recall → 5-embedder RRF scoring (E11 disabled)"
+                                "E13 recall → E1+E2*+E3*+E4*+E5+E6+E7+E8+E9+E10 RRF scoring (* = weight-gated, E11 disabled)"
                             };
                             (indices, label)
                         }

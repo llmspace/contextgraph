@@ -208,7 +208,7 @@ fn get_unified_neighbors_definition() -> ToolDefinition {
                         "balanced"
                     ],
                     "default": "semantic_search",
-                    "description": "Weight profile for RRF fusion. All 14 profiles available (default: semantic_search)."
+                    "description": "Weight profile for RRF fusion. Temporal profiles: temporal_navigation (E2+E3+E4 balanced), sequence_navigation (E4-heavy), conversation_history (E4+E1). Use customWeights for fine-grained E2/E3/E4 control."
                 },
                 "top_k": {
                     "type": "integer",

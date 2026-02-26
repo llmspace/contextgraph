@@ -1,9 +1,10 @@
 //! Temporal tool implementations (search_recent, search_periodic).
 //!
-//! Per Constitution v6.5 and ARCH-25:
-//! - E2 (V_freshness) finds recency patterns
-//! - E3 (V_periodicity) finds time-of-day and day-of-week patterns
-//! - Temporal boost is POST-RETRIEVAL only, NOT in similarity fusion
+//! E2 (V_freshness) and E3 (V_periodicity) now participate in fusion when
+//! the weight profile assigns non-zero weight (e.g., temporal_navigation).
+//!
+//! These tools provide ADDITIONAL post-retrieval temporal boosting on top of
+//! fusion participation — complementary to, not replaced by, fusion scoring.
 //!
 //! Tools:
 //! - search_recent: E2 freshness boost with configurable decay functions

@@ -65,11 +65,12 @@ pub fn definitions() -> Vec<ToolDefinition> {
         // search_graph - semantic search with E5 causal and E10 paraphrase asymmetric similarity (ARCH-15, AP-77)
         ToolDefinition::new(
             "search_graph",
-            "Search the knowledge graph using multi-space semantic similarity. \
+            "Search the knowledge graph using multi-space semantic similarity across 13 embedders. \
+             Supports temporal search via E2 (recency), E3 (periodicity), E4 (sequence) — \
+             use temporal_navigation profile or set E2/E3/E4 independently via customWeights. \
              For causal queries ('why', 'what happens'), automatically applies \
              asymmetric E5 similarity with direction modifiers (cause→effect 1.2x, \
-             effect→cause 0.8x). For paraphrase queries, applies E10 asymmetric similarity \
-             (paraphrase→context 1.2x, context→paraphrase 0.8x). Returns nodes matching the query with relevance scores.",
+             effect→cause 0.8x). Returns nodes matching the query with relevance scores.",
             json!({
                 "type": "object",
                 "properties": {
@@ -111,25 +112,25 @@ pub fn definitions() -> Vec<ToolDefinition> {
                             "pipeline_stage1_recall", "pipeline_stage2_scoring", "pipeline_full",
                             "balanced"
                         ],
-                        "description": "Weight profile for multi-space search. All 14 profiles available. Pipeline profiles (pipeline_*) are for staged retrieval. balanced gives equal weight to all embedders."
+                        "description": "Weight profile for multi-space search. Temporal profiles: temporal_navigation (E2+E3+E4 balanced — time-based retrieval), sequence_navigation (E4-heavy — find nearby conversation items), conversation_history (E4+E1 — contextual recall within sessions). For fine-grained temporal control, use customWeights to set E2/E3/E4 independently."
                     },
                     "customWeights": {
                         "type": "object",
-                        "description": "Custom per-embedder weights (overrides weightProfile). Each value 0-1, must sum to ~1.0. Omitted embedders default to 0.",
+                        "description": "Custom per-embedder weights (overrides weightProfile). Each value 0-1, must sum to ~1.0. Omitted embedders default to 0. Temporal embedders E2/E3/E4 encode INDEPENDENT time dimensions and should be tuned separately: E2 (recency — how recently something was stored), E3 (periodicity — recurring time-of-day/day-of-week patterns), E4 (sequence — ordering within a conversation session). Set any combination to emphasize different temporal aspects.",
                         "properties": {
-                            "E1":  { "type": "number", "minimum": 0, "maximum": 1 },
-                            "E2":  { "type": "number", "minimum": 0, "maximum": 1 },
-                            "E3":  { "type": "number", "minimum": 0, "maximum": 1 },
-                            "E4":  { "type": "number", "minimum": 0, "maximum": 1 },
-                            "E5":  { "type": "number", "minimum": 0, "maximum": 1 },
-                            "E6":  { "type": "number", "minimum": 0, "maximum": 1 },
-                            "E7":  { "type": "number", "minimum": 0, "maximum": 1 },
-                            "E8":  { "type": "number", "minimum": 0, "maximum": 1 },
-                            "E9":  { "type": "number", "minimum": 0, "maximum": 1 },
-                            "E10": { "type": "number", "minimum": 0, "maximum": 1 },
-                            "E11": { "type": "number", "minimum": 0, "maximum": 1 },
-                            "E12": { "type": "number", "minimum": 0, "maximum": 1 },
-                            "E13": { "type": "number", "minimum": 0, "maximum": 1 }
+                            "E1":  { "type": "number", "minimum": 0, "maximum": 1, "description": "Semantic similarity (foundation)" },
+                            "E2":  { "type": "number", "minimum": 0, "maximum": 1, "description": "Temporal recency — find memories stored near a given time" },
+                            "E3":  { "type": "number", "minimum": 0, "maximum": 1, "description": "Temporal periodicity — find memories matching time-of-day or day-of-week patterns" },
+                            "E4":  { "type": "number", "minimum": 0, "maximum": 1, "description": "Temporal sequence — find memories near the same position in a conversation" },
+                            "E5":  { "type": "number", "minimum": 0, "maximum": 1, "description": "Causal relationships (cause→effect)" },
+                            "E6":  { "type": "number", "minimum": 0, "maximum": 1, "description": "Sparse keyword matching" },
+                            "E7":  { "type": "number", "minimum": 0, "maximum": 1, "description": "Code pattern similarity" },
+                            "E8":  { "type": "number", "minimum": 0, "maximum": 1, "description": "Graph structure (imports, dependencies)" },
+                            "E9":  { "type": "number", "minimum": 0, "maximum": 1, "description": "Noise-robust matching (typo tolerant)" },
+                            "E10": { "type": "number", "minimum": 0, "maximum": 1, "description": "Paraphrase/multimodal similarity" },
+                            "E11": { "type": "number", "minimum": 0, "maximum": 1, "description": "Named entity matching" },
+                            "E12": { "type": "number", "minimum": 0, "maximum": 1, "description": "ColBERT reranking (stage only, weight 0)" },
+                            "E13": { "type": "number", "minimum": 0, "maximum": 1, "description": "SPLADE recall (stage only, weight 0)" }
                         },
                         "additionalProperties": false
                     },

@@ -34,8 +34,9 @@ use crate::types::fingerprint::NUM_EMBEDDERS;
 /// - E3: Fourier-basis periodic pattern encoding (time-of-day, day-of-week)
 /// - E4: Sinusoidal positional encoding (session ordering)
 ///
-/// These are used for post-retrieval temporal boosting per constitution rule 4.
-/// Weight=0.0 in fusion (never in similarity ranking), but stored for temporal queries.
+/// E2/E3/E4 participate in fusion when the weight profile assigns non-zero weight
+/// (e.g., temporal_navigation profile). Default semantic profiles keep them at 0.0.
+/// Post-retrieval temporal boosting (search_recent, search_periodic) is complementary.
 pub const TEMPORAL_EMBEDDERS_ENABLED: bool = true;
 
 /// Whether E11 Entity (KEPLER) participates in search/fusion.
@@ -107,14 +108,12 @@ impl std::error::Error for WeightProfileError {}
 /// Each profile has 13 weights corresponding to:
 /// [E1, E2, E3, E4, E5, E6, E7, E8, E9, E10, E11, E12, E13]
 ///
-/// # IMPORTANT: Temporal Embedders (E2-E4)
+/// # Temporal Embedders (E2-E4)
 ///
-/// Per AP-71 and research findings:
-/// **Temporal embedders (E2-E4) have weight 0.0 in semantic search profiles.**
-///
-/// Temporal proximity != topical similarity. Documents created at the same time
-/// are NOT necessarily on the same topic. Time should be a post-retrieval boost,
-/// not a similarity measure.
+/// E2-E4 have weight 0.0 in semantic search profiles (semantic_search, code_search, etc.)
+/// because temporal proximity != topical similarity. They participate in fusion only
+/// when the AI explicitly selects a temporal-aware profile (temporal_navigation,
+/// sequence_navigation, conversation_history) with non-zero E2/E3/E4 weights.
 ///
 /// # Profile Categories
 ///

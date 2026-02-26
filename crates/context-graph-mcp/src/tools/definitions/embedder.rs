@@ -247,7 +247,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     },
                     "weights": {
                         "type": "object",
-                        "description": "Per-embedder weights. Keys are E1-E13, values are 0-1. Must sum to ~1.0.",
+                        "description": "Per-embedder weights. Keys are E1-E13, values are 0-1. Must sum to ~1.0. Temporal embedders are independent: E2 (recency — how recently stored), E3 (periodicity — time-of-day/day-of-week patterns), E4 (sequence — conversation ordering). Set any combination freely.",
                         "properties": {
                             "E1": { "type": "number", "minimum": 0, "maximum": 1 },
                             "E2": { "type": "number", "minimum": 0, "maximum": 1 },

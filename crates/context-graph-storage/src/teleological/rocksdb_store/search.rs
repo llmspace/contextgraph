@@ -13,7 +13,9 @@
 //! ## Key Research Insights
 //!
 //! Temporal embedders (E2-E4) measure TIME proximity, not TOPIC similarity.
-//! They are excluded from similarity scoring and applied as post-retrieval boosts.
+//! They participate in fusion when the weight profile assigns non-zero weight
+//! (e.g., temporal_navigation, sequence_navigation). Default semantic profiles
+//! keep E2-E4 at weight 0.0. Post-retrieval boosts remain complementary.
 //!
 //! # Embedder-Specific Search (CRIT-06)
 //!
@@ -52,7 +54,6 @@ use std::sync::atomic::Ordering;
 // P5: DashMap for lock-free concurrent soft-delete checks
 use dashmap::DashMap;
 
-use chrono::{DateTime, Utc};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -92,8 +93,8 @@ use crate::teleological::indexes::EmbedderIndexRegistry;
 use super::helpers::{compute_cosine_similarity, hnsw_distance_to_similarity};
 
 /// Maximum number of HNSW-capable embedders queried in multi-space search.
-/// E1, E5, E7, E8, E9, E10, E11 = 7 embedders.
-const MULTI_SPACE_MAX_EMBEDDERS: usize = 7;
+/// E1, E2, E3, E4, E5, E7, E8, E9, E10, E11 = 10 embedders.
+const MULTI_SPACE_MAX_EMBEDDERS: usize = 10;
 
 // =============================================================================
 // SPAWN_BLOCKING SYNC FUNCTIONS
@@ -211,7 +212,7 @@ fn search_single_embedder_sync(
             let fp = deserialize_teleological_fingerprint(&data)?;
             let code_query_type = options.effective_code_query_type();
             let embedder_scores = compute_embedder_scores_sync(
-                query, &fp.semantic, code_query_type, options.causal_direction, fp.created_at,
+                query, &fp.semantic, code_query_type, options.causal_direction,
             );
             results.push(TeleologicalSearchResult::new(fp, similarity, embedder_scores));
         }
@@ -341,7 +342,7 @@ fn search_filtered_multi_space_sync(
         if let Some(data) = get_fingerprint_raw_sync(db, fused.doc_id)? {
             let fp = deserialize_teleological_fingerprint(&data)?;
             let embedder_scores = compute_embedder_scores_sync(
-                query, &fp.semantic, code_query_type, options.causal_direction, fp.created_at,
+                query, &fp.semantic, code_query_type, options.causal_direction,
             );
             candidates.push((fp, embedder_scores));
         }
@@ -378,35 +379,6 @@ fn search_filtered_multi_space_sync(
     Ok(results)
 }
 
-/// Compute E2 recency score from a stored memory's creation timestamp.
-///
-/// Replaces broken E2 cosine similarity (all E2 vectors are identical because
-/// TemporalRecentModel embeds delta=0 for every memory at embed time).
-///
-/// Uses multi-scale exponential decay blending three time horizons:
-///   - Short (1h half-life, weight 0.4): sensitive to minute-level freshness
-///   - Medium (1d half-life, weight 0.35): day-level discrimination
-///   - Long (7d half-life, weight 0.25): week-level discrimination
-///
-/// Score behavior:
-///   - Just created: ~1.0
-///   - 1 hour old:   ~0.79
-///   - 1 day old:    ~0.40
-///   - 1 week old:   ~0.13
-///   - 1 month old:  ~0.01
-fn compute_e2_recency_decay(stored_created_at: DateTime<Utc>) -> f32 {
-    let now = Utc::now();
-    let age_secs = (now - stored_created_at).num_seconds().max(0) as f64;
-
-    // Three-scale exponential decay for smooth discrimination at all time ranges
-    let short = (-age_secs * std::f64::consts::LN_2 / 3600.0).exp();   // 1h half-life
-    let medium = (-age_secs * std::f64::consts::LN_2 / 86400.0).exp(); // 1d half-life
-    let long = (-age_secs * std::f64::consts::LN_2 / 604800.0).exp();  // 7d half-life
-
-    let score = 0.4 * short + 0.35 * medium + 0.25 * long;
-    score as f32
-}
-
 /// Compute all 13 embedder similarity scores (pure function).
 ///
 /// E5 causal score uses direction-aware asymmetric similarity when `causal_direction`
@@ -418,7 +390,6 @@ fn compute_embedder_scores_sync(
     stored: &SemanticFingerprint,
     code_query_type: Option<CodeQueryType>,
     causal_direction: CausalDirection,
-    stored_created_at: DateTime<Utc>,
 ) -> [f32; 13] {
     use crate::teleological::search::compute_maxsim_direct;
     use context_graph_core::code::compute_e7_similarity_with_query_type;
@@ -449,8 +420,8 @@ fn compute_embedder_scores_sync(
 
     [
         compute_cosine_similarity(&query.e1_semantic, &stored.e1_semantic),
-        // E2: Timestamp-based recency decay (cosine is broken — all E2 vectors identical)
-        compute_e2_recency_decay(stored_created_at),
+        // E2: Cosine similarity (E2 vectors are now unique per memory — sinusoidal PE fix).
+        compute_cosine_similarity(&query.e2_temporal_recent, &stored.e2_temporal_recent),
         compute_cosine_similarity(&query.e3_temporal_periodic, &stored.e3_temporal_periodic),
         compute_cosine_similarity(&query.e4_temporal_positional, &stored.e4_temporal_positional),
         e5_score,
@@ -509,7 +480,7 @@ fn search_e1_only_sync(
             let fp = deserialize_teleological_fingerprint(&data)?;
             let code_query_type = options.effective_code_query_type();
             let embedder_scores = compute_embedder_scores_sync(
-                query, &fp.semantic, code_query_type, options.causal_direction, fp.created_at,
+                query, &fp.semantic, code_query_type, options.causal_direction,
             );
             results.push(TeleologicalSearchResult::new(fp, similarity, embedder_scores));
         }
@@ -563,6 +534,75 @@ fn search_multi_space_sync(
 
     if !e1_ranked.is_empty() {
         embedder_rankings.push(EmbedderRanking::new("E1", weights[0], e1_ranked));
+    }
+
+    // E2 Temporal Recent — weight-gated (participates in fusion when weight > 0.0)
+    if weights[1] > 0.0 {
+        if let Some(e2_index) = index_registry.get(EmbedderIndex::E2TemporalRecent) {
+            match e2_index.search(&query.e2_temporal_recent, k, None) {
+                Ok(e2_candidates) => {
+                    let e2_ranked: Vec<(Uuid, f32)> = e2_candidates
+                        .into_iter()
+                        .filter(|(id, _)| options.include_deleted || !is_soft_deleted_sync(soft_deleted, id))
+                        .map(|(id, dist)| (id, hnsw_distance_to_similarity(dist)))
+                        .collect();
+                    if !e2_ranked.is_empty() {
+                        embedder_rankings.push(EmbedderRanking::new("E2", weights[1], e2_ranked));
+                    }
+                }
+                Err(e) => {
+                    degraded_embedders.push("E2");
+                    error!(index = ?EmbedderIndex::E2TemporalRecent, error = %e,
+                           "E2 HNSW search failed — degraded results");
+                }
+            }
+        }
+    }
+
+    // E3 Temporal Periodic — weight-gated (participates in fusion when weight > 0.0)
+    if weights[2] > 0.0 {
+        if let Some(e3_index) = index_registry.get(EmbedderIndex::E3TemporalPeriodic) {
+            match e3_index.search(&query.e3_temporal_periodic, k, None) {
+                Ok(e3_candidates) => {
+                    let e3_ranked: Vec<(Uuid, f32)> = e3_candidates
+                        .into_iter()
+                        .filter(|(id, _)| options.include_deleted || !is_soft_deleted_sync(soft_deleted, id))
+                        .map(|(id, dist)| (id, hnsw_distance_to_similarity(dist)))
+                        .collect();
+                    if !e3_ranked.is_empty() {
+                        embedder_rankings.push(EmbedderRanking::new("E3", weights[2], e3_ranked));
+                    }
+                }
+                Err(e) => {
+                    degraded_embedders.push("E3");
+                    error!(index = ?EmbedderIndex::E3TemporalPeriodic, error = %e,
+                           "E3 HNSW search failed — degraded results");
+                }
+            }
+        }
+    }
+
+    // E4 Temporal Positional — weight-gated (participates in fusion when weight > 0.0)
+    if weights[3] > 0.0 {
+        if let Some(e4_index) = index_registry.get(EmbedderIndex::E4TemporalPositional) {
+            match e4_index.search(&query.e4_temporal_positional, k, None) {
+                Ok(e4_candidates) => {
+                    let e4_ranked: Vec<(Uuid, f32)> = e4_candidates
+                        .into_iter()
+                        .filter(|(id, _)| options.include_deleted || !is_soft_deleted_sync(soft_deleted, id))
+                        .map(|(id, dist)| (id, hnsw_distance_to_similarity(dist)))
+                        .collect();
+                    if !e4_ranked.is_empty() {
+                        embedder_rankings.push(EmbedderRanking::new("E4", weights[3], e4_ranked));
+                    }
+                }
+                Err(e) => {
+                    degraded_embedders.push("E4");
+                    error!(index = ?EmbedderIndex::E4TemporalPositional, error = %e,
+                           "E4 HNSW search failed — degraded results");
+                }
+            }
+        }
     }
 
     // E5 Causal — direction-aware HNSW retrieval (Gap 1 fix)
@@ -774,7 +814,7 @@ fn search_multi_space_sync(
         if let Some(data) = get_fingerprint_raw_sync(db, fused.doc_id)? {
             let fp = deserialize_teleological_fingerprint(&data)?;
             let embedder_scores = compute_embedder_scores_sync(
-                query, &fp.semantic, code_query_type, options.causal_direction, fp.created_at,
+                query, &fp.semantic, code_query_type, options.causal_direction,
             );
             candidates.push((fp, embedder_scores));
         }
@@ -831,6 +871,9 @@ fn search_pipeline_sync(
 ) -> CoreResult<Vec<TeleologicalSearchResult>> {
     let recall_k = options.top_k * STAGE1_RECALL_MULTIPLIER;
     let stage2_k = options.top_k * STAGE2_CANDIDATE_MULTIPLIER;
+
+    // Resolve weights once for both Stage 1 gating and Stage 2 scoring.
+    let weights = resolve_weights_sync(options)?;
 
     info!(
         "Pipeline search: Stage1 recall_k={}, Stage2 candidates={}, final_k={}",
@@ -959,8 +1002,54 @@ fn search_pipeline_sync(
         }
     }
 
+    // E2/E3/E4 Temporal HNSW recall (weight-gated).
+    // Only search when weight > 0.0 (e.g., temporal_navigation profile).
+    // Default semantic profiles have weight=0.0, so these are skipped for normal queries.
+    if weights[1] > 0.0 {
+        if let Some(e2_index) = index_registry.get(EmbedderIndex::E2TemporalRecent) {
+            match e2_index.search(&query.e2_temporal_recent, recall_k / 2, None) {
+                Ok(e2_candidates) => {
+                    let e2_count = e2_candidates.len();
+                    candidate_ids.extend(e2_candidates.into_iter().map(|(id, _)| id));
+                    debug!("Stage 1: E2 Temporal Recent returned {} additional candidates", e2_count);
+                }
+                Err(e) => {
+                    warn!("Stage 1: E2 Temporal Recent search failed: {}, continuing without E2 candidates", e);
+                }
+            }
+        }
+    }
+    if weights[2] > 0.0 {
+        if let Some(e3_index) = index_registry.get(EmbedderIndex::E3TemporalPeriodic) {
+            match e3_index.search(&query.e3_temporal_periodic, recall_k / 2, None) {
+                Ok(e3_candidates) => {
+                    let e3_count = e3_candidates.len();
+                    candidate_ids.extend(e3_candidates.into_iter().map(|(id, _)| id));
+                    debug!("Stage 1: E3 Temporal Periodic returned {} additional candidates", e3_count);
+                }
+                Err(e) => {
+                    warn!("Stage 1: E3 Temporal Periodic search failed: {}, continuing without E3 candidates", e);
+                }
+            }
+        }
+    }
+    if weights[3] > 0.0 {
+        if let Some(e4_index) = index_registry.get(EmbedderIndex::E4TemporalPositional) {
+            match e4_index.search(&query.e4_temporal_positional, recall_k / 2, None) {
+                Ok(e4_candidates) => {
+                    let e4_count = e4_candidates.len();
+                    candidate_ids.extend(e4_candidates.into_iter().map(|(id, _)| id));
+                    debug!("Stage 1: E4 Temporal Positional returned {} additional candidates", e4_count);
+                }
+                Err(e) => {
+                    warn!("Stage 1: E4 Temporal Positional search failed: {}, continuing without E4 candidates", e);
+                }
+            }
+        }
+    }
+
     info!(
-        "Stage 1 complete: {} unique candidates from E13+E1+E5+E7+E8+E9+E11",
+        "Stage 1 complete: {} unique candidates from E13+E1+E2*+E3*+E4*+E5+E7+E8+E9+E11 (* = weight-gated)",
         candidate_ids.len()
     );
 
@@ -969,8 +1058,7 @@ fn search_pipeline_sync(
         return Ok(Vec::new());
     }
 
-    // STAGE 2: MULTI-SPACE SCORING
-    let weights = resolve_weights_sync(options)?;
+    // STAGE 2: MULTI-SPACE SCORING (weights resolved above for Stage 1 gating)
     let code_query_type = options.effective_code_query_type();
 
     let mut valid_candidates: Vec<(Uuid, TeleologicalFingerprint)> = Vec::with_capacity(candidate_ids.len());
@@ -989,7 +1077,7 @@ fn search_pipeline_sync(
         .into_iter()
         .map(|(id, fp)| {
             let embedder_scores = compute_embedder_scores_sync(
-                query, &fp.semantic, code_query_type, options.causal_direction, fp.created_at,
+                query, &fp.semantic, code_query_type, options.causal_direction,
             );
             (id, embedder_scores, fp.semantic)
         })
@@ -1012,12 +1100,14 @@ fn search_pipeline_sync(
             FusionStrategy::WeightedRRF | FusionStrategy::ScoreWeightedRRF => {
                 // SEARCH-5: Build embedder list dynamically from weights instead of
                 // hardcoding indices. Excludes:
-                //   - E2/E3/E4 (indices 1,2,3): temporal, not topical similarity (ARCH-25)
                 //   - E12 (index 11): reranking only, not for RRF fusion (AP-74)
+                // E2/E3/E4 participate in RRF when weight > 0.0 (e.g., temporal_navigation).
+                // Weight-gating handles exclusion: suppress_degenerate_weights zeros them out
+                // when they show no cross-candidate variance (default semantic profiles).
                 let embedder_names_all: [&str; 13] = [
                     "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13",
                 ];
-                let excluded_from_rrf: [usize; 4] = [1, 2, 3, 11]; // E2,E3,E4 temporal + E12 rerank-only
+                let excluded_from_rrf: [usize; 1] = [11]; // E12 rerank-only
                 let semantic_indices: Vec<(usize, &str, f32)> = adjusted_weights.iter().enumerate()
                     .filter(|(idx, &w)| w > 0.0 && !excluded_from_rrf.contains(idx))
                     .map(|(idx, &w)| (idx, embedder_names_all[idx], w))
@@ -1327,9 +1417,9 @@ fn search_sparse_sync(
 /// E2-E4 (temporal) = 0.0 per research
 const DEFAULT_SEMANTIC_WEIGHTS: [f32; 13] = [
     0.35, // E1 - Semantic (primary) [+0.02 from E11]
-    0.0,  // E2 - Temporal Recent (metadata only)
-    0.0,  // E3 - Temporal Periodic (metadata only)
-    0.0,  // E4 - Temporal Positional (metadata only)
+    0.0,  // E2 - Temporal Recent (0.0 in default — temporal, not topical)
+    0.0,  // E3 - Temporal Periodic (0.0 in default — temporal, not topical)
+    0.0,  // E4 - Temporal Positional (0.0 in default — temporal, not topical)
     0.16, // E5 - Causal [+0.01 from E11]
     // MED-16: E6 (keyword/sparse) only participates in fusion SCORING, not candidate
     // retrieval. E6 is not HNSW-indexed (see get_query_vector_for_embedder returning None
@@ -1795,8 +1885,22 @@ impl RocksDbTeleologicalStore {
 
 #[cfg(test)]
 mod e2_recency_tests {
-    use super::*;
-    use chrono::Duration;
+    use chrono::{DateTime, Duration, Utc};
+
+    /// Compute E2 recency score from a stored memory's creation timestamp.
+    ///
+    /// Test-only: was used by fusion scoring before E2 vectors were fixed.
+    /// Now the fusion path uses cosine similarity. This function is kept for
+    /// testing the decay behavior used by the post-retrieval search_recent path.
+    fn compute_e2_recency_decay(stored_created_at: DateTime<Utc>) -> f32 {
+        let now = Utc::now();
+        let age_secs = (now - stored_created_at).num_seconds().max(0) as f64;
+        let short = (-age_secs * std::f64::consts::LN_2 / 3600.0).exp();
+        let medium = (-age_secs * std::f64::consts::LN_2 / 86400.0).exp();
+        let long = (-age_secs * std::f64::consts::LN_2 / 604800.0).exp();
+        let score = 0.4 * short + 0.35 * medium + 0.25 * long;
+        score as f32
+    }
 
     #[test]
     fn test_just_created_near_one() {

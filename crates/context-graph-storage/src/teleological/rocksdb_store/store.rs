@@ -310,6 +310,26 @@ impl RocksDbTeleologicalStore {
         match store.try_load_hnsw_indexes() {
             Ok(true) => {
                 debug!("HNSW indexes loaded from persisted CF_HNSW_GRAPHS");
+                // Check for newly-enabled HNSW indexes that have no persisted data.
+                // This happens when embedders are promoted to HNSW (e.g., E2/E3/E4
+                // temporal embedders after first-class fusion integration). The fast
+                // path loads existing graphs but skips indexes with no CF_HNSW_GRAPHS
+                // entry. Detect empty indexes and trigger a full rebuild if needed.
+                if raw_fp_count > 0 {
+                    use crate::teleological::indexes::{EmbedderIndex, EmbedderIndexOps};
+                    let has_empty = store.index_registry.iter().any(|(embedder, index)| {
+                        if !E11_ENTITY_ENABLED && *embedder == EmbedderIndex::E11Entity {
+                            return false;
+                        }
+                        index.len() == 0
+                    });
+                    if has_empty {
+                        info!("Detected empty HNSW indexes after fast-path restore — clearing all and rebuilding from fingerprints");
+                        // Clear ALL indexes to prevent duplicates from fast-path + rebuild overlap.
+                        store.index_registry.clear_all();
+                        store.rebuild_indexes_from_store()?;
+                    }
+                }
             }
             Ok(false) => {
                 // No persisted HNSW data — full rebuild from fingerprints
@@ -374,19 +394,10 @@ impl RocksDbTeleologicalStore {
         }
 
         // 3. Check HNSW index sizes vs live fingerprint count.
-        // Skip indexes that are intentionally unpopulated:
-        // - E2/E3/E4: post-retrieval only (constitution rule 4), HNSW not populated
-        // - E11: skipped when E11_ENTITY_ENABLED=false (KEPLER non-discriminating)
+        // E2/E3/E4 HNSW indexes are now populated (temporal first-class fusion).
+        // Skip E11 when E11_ENTITY_ENABLED=false (KEPLER non-discriminating).
         for (embedder, index) in self.index_registry.iter() {
             use crate::teleological::indexes::EmbedderIndex;
-            if matches!(
-                embedder,
-                EmbedderIndex::E2TemporalRecent
-                    | EmbedderIndex::E3TemporalPeriodic
-                    | EmbedderIndex::E4TemporalPositional
-            ) {
-                continue;
-            }
             if !E11_ENTITY_ENABLED && *embedder == EmbedderIndex::E11Entity {
                 continue;
             }
@@ -661,6 +672,8 @@ impl RocksDbTeleologicalStore {
         use crate::teleological::column_families::CF_FINGERPRINTS;
         use crate::teleological::schema::parse_fingerprint_key;
         use crate::teleological::serialization::deserialize_teleological_fingerprint;
+        use context_graph_embeddings::models::custom::compute_decay_embedding;
+        use context_graph_embeddings::models::custom::DEFAULT_DECAY_RATES;
 
         // DATA-5 FIX: Acquire write lock — blocks all concurrent store/delete
         // until rebuild is complete. Prevents duplicate/missing entries.
@@ -673,6 +686,7 @@ impl RocksDbTeleologicalStore {
 
         let mut success_count = 0;
         let mut error_count = 0;
+        let mut e2_recomputed = 0;
 
         for item in iter {
             let (key, value) = item.map_err(|e| {
@@ -689,7 +703,7 @@ impl RocksDbTeleologicalStore {
             }
 
             // Deserialize fingerprint - skip corrupted records
-            let fp = match deserialize_teleological_fingerprint(&value) {
+            let mut fp = match deserialize_teleological_fingerprint(&value) {
                 Ok(fp) => fp,
                 Err(e) => {
                     warn!(
@@ -700,6 +714,16 @@ impl RocksDbTeleologicalStore {
                     continue;
                 }
             };
+
+            // Recompute E2 vector from created_at timestamp using sinusoidal encoding.
+            // Stored E2 vectors from before the sinusoidal fix are degenerate (all identical,
+            // computed with delta≈0 decay). Recomputing ensures the E2 HNSW index contains
+            // distinct vectors that reflect actual creation timestamps.
+            // This is a fast CPU computation (~1μs per fingerprint).
+            let recomputed_e2 =
+                compute_decay_embedding(fp.created_at, None, &DEFAULT_DECAY_RATES);
+            fp.semantic.e2_temporal_recent = recomputed_e2;
+            e2_recomputed += 1;
 
             // Add to HNSW indexes — use unlocked variant since we hold write lock
             match self.add_to_indexes_unlocked(&fp) {
@@ -732,10 +756,11 @@ impl RocksDbTeleologicalStore {
 
         if success_count > 0 {
             info!(
-                "Rebuilt HNSW indexes: {} fingerprints added to {} indexes in {:?}",
+                "Rebuilt HNSW indexes: {} fingerprints added to {} indexes in {:?} ({} E2 vectors recomputed)",
                 success_count,
                 self.index_registry.len(),
-                elapsed
+                elapsed,
+                e2_recomputed
             );
         } else {
             debug!("No fingerprints to rebuild indexes from (empty store)");
@@ -999,6 +1024,17 @@ impl RocksDbTeleologicalStore {
         let mut errors = Vec::new();
 
         for (embedder, index) in self.index_registry.iter() {
+            // Skip E2 persisted HNSW — E2 vectors are recomputed from created_at
+            // timestamps during rebuild to use sinusoidal encoding. Persisted E2
+            // graphs may contain degenerate vectors from the old decay encoding.
+            // NOTE: This forces a full O(n) rebuild on every startup (the empty E2
+            // triggers the has_empty detection path). Once all deployments have run
+            // the sinusoidal rebuild at least once, this skip can be removed.
+            if *embedder == crate::teleological::indexes::EmbedderIndex::E2TemporalRecent {
+                debug!("Skipping persisted E2 HNSW — will recompute from timestamps during rebuild");
+                continue;
+            }
+
             let name = format!("{:?}", embedder);
             let graph_key = format!("graph:{}", name);
             let meta_key = format!("meta:{}", name);

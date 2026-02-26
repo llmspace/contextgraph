@@ -373,7 +373,7 @@ impl Handlers {
 
         // Step 2: Query typed edges from EdgeRepository - NO FALLBACKS
         let typed_edges = if let Some(ref filter_type) = edge_type_filter {
-            // Query by specific edge type
+            // Query by specific edge type — respect direction parameter
             let graph_link_type = match string_to_edge_type(filter_type) {
                 Some(t) => t,
                 None => {
@@ -381,22 +381,65 @@ impl Handlers {
                     return self.tool_error(id, &format!("Invalid edge type: {}", filter_type));
                 }
             };
-            match edge_repo.get_typed_edges_by_type(memory_uuid, graph_link_type) {
-                Ok(edges) => edges,
-                Err(e) => {
-                    error!(
-                        error = %e,
-                        memory_id = %memory_uuid,
-                        edge_type = %filter_type,
-                        "get_typed_edges: EdgeRepository query by type failed - NO FALLBACKS"
-                    );
-                    return self.tool_error(
-                        id,
-                        &format!(
-                            "EdgeRepository query failed for edge type {}: {}. NO FALLBACKS.",
-                            filter_type, e
-                        ),
-                    );
+            // BUG FIX: get_typed_edges_by_type uses secondary index keyed by SOURCE uuid.
+            // For incoming edges (memory is TARGET), we must use get_typed_edges_to() and
+            // post-filter by edge type. For "both", we combine both approaches.
+            match direction.as_str() {
+                "incoming" => {
+                    // Full scan of incoming edges, post-filter by type
+                    match edge_repo.get_typed_edges_to(memory_uuid) {
+                        Ok(edges) => edges.into_iter()
+                            .filter(|e| e.edge_type() == graph_link_type)
+                            .collect(),
+                        Err(e) => {
+                            error!(error = %e, "get_typed_edges: Incoming edge query failed - NO FALLBACKS");
+                            return self.tool_error(id, &format!("Incoming query failed: {}. NO FALLBACKS.", e));
+                        }
+                    }
+                }
+                "both" => {
+                    // Outgoing: use secondary index (fast path)
+                    let outgoing = match edge_repo.get_typed_edges_by_type(memory_uuid, graph_link_type) {
+                        Ok(edges) => edges,
+                        Err(e) => {
+                            error!(error = %e, "get_typed_edges: Outgoing type query failed");
+                            return self.tool_error(id, &format!("Outgoing type query failed: {}", e));
+                        }
+                    };
+                    // Incoming: full scan + post-filter by type
+                    let incoming = match edge_repo.get_typed_edges_to(memory_uuid) {
+                        Ok(edges) => edges.into_iter()
+                            .filter(|e| e.edge_type() == graph_link_type)
+                            .collect::<Vec<_>>(),
+                        Err(e) => {
+                            error!(error = %e, "get_typed_edges: Incoming edge query failed");
+                            return self.tool_error(id, &format!("Incoming query failed: {}", e));
+                        }
+                    };
+                    let mut combined = outgoing;
+                    combined.extend(incoming);
+                    combined
+                }
+                _ => {
+                    // "outgoing" or default — secondary index is correct (keyed by source)
+                    match edge_repo.get_typed_edges_by_type(memory_uuid, graph_link_type) {
+                        Ok(edges) => edges,
+                        Err(e) => {
+                            error!(
+                                error = %e,
+                                memory_id = %memory_uuid,
+                                edge_type = %filter_type,
+                                "get_typed_edges: EdgeRepository query by type failed - NO FALLBACKS"
+                            );
+                            return self.tool_error(
+                                id,
+                                &format!(
+                                    "EdgeRepository query failed for edge type {}: {}. NO FALLBACKS.",
+                                    filter_type, e
+                                ),
+                            );
+                        }
+                    }
                 }
             }
         } else {
